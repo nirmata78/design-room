@@ -218,6 +218,16 @@ Staff+ IC track.**
 **No loop yet?** Go for coverage — one round in each archetype teaches more than ten rounds in the two
 that feel comfortable.
 
+### Reference solutions and theory
+
+- **[Reference solutions](solutions/README.md)** — stage-by-stage answer keys for the five most-asked
+  problems (rate limiter, news feed, chat, distributed KV store, payments ledger): what to ask, the
+  numbers that decide the design, diagrams, deep dives, failure modes, SLOs, what changes by level, and
+  the four-sentence close. **Read them after you've run the round, not before.**
+- **[Theory](theory/README.md)** — nine chapters on the building blocks: the interview method,
+  estimation, storage and partitioning, replication and consistency, caching, messaging, correctness
+  under failure, reliability and operations, real-time connections.
+
 ### Levels — Staff Engineer is not the same round as Engineering Manager
 
 | Track | Levels | The panel is asking… |
@@ -274,6 +284,8 @@ design-room/
 ├── README.md                this file
 ├── Question-Bank.md         index of all 92 questions — by archetype, kind, domain and level
 ├── levels.md                six levels on two tracks: the bar, the weights, the outcome thresholds
+├── solutions/               reference answer keys — read after a round, never before
+├── theory/                  nine building-block chapters the solutions link into
 ├── questions/
 │   ├── A-streaming-analytics.md           SD-01…07
 │   ├── B-social-feed-content.md           SD-08…14

@@ -592,7 +592,9 @@ Then, in this order:
    a tighter opening, the habit of reading every estimate back into a decision, breadth-before-depth,
    or "run `wrap` mode three times".
 7. **Ask if they want the alternate design.** Some candidates want the model answer walked through;
-   some want to re-attempt cold. Offer, do not impose.
+   some want to re-attempt cold. Offer, do not impose. If `solutions/SD-nn-*.md` exists for this
+   question, point to it — and to the `theory/` chapter that covers their weakest dimension — in the
+   report's *Next* section. **Never read or quote a solution file during a live round.**
 
 **Be genuinely useful and genuinely honest here.** Inflated debrief feedback is the one way this
 simulator can actively harm them — it produces confidence that the real loop will remove. If the
@@ -696,6 +698,7 @@ They may type any of these in chat. Recognise paraphrases.
 | Company nuance, the estimation number kit, the phrasebook, level ladder | `guides/playbook.md` |
 | Question index → cue sheets | `Question-Bank.md` → `questions/*.md` (archetypes A–K) |
 | Levels, tracks, weights, outcome thresholds | `levels.md` |
+| Reference solutions (after the round only) and the theory they rely on | `solutions/`, `theory/` |
 | The per-attempt report and its renderer | `templates/report-template.md` → `scripts/build-report.sh` |
 | The candidate's targets and constraints | `profile.md` (optional, private) |
 | Their scoring history | `Progress-Log.md` (private; created from `Progress-Log.template.md`) |

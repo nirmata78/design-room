@@ -12,8 +12,33 @@ aux_links_new_tab: true
 back_to_top: true
 footer_content: 'MIT licensed · <a href="https://github.com/nirmata78/design-room">github.com/nirmata78/design-room</a>'
 
+mermaid:
+  version: "11.4.1"
+
+callouts_level: quiet
+callouts:
+  say:
+    title: Say it in the room
+    color: blue
+  why:
+    title: Why? What is it?
+    color: grey-lt
+  key:
+    title: The number that matters
+    color: purple
+  warn:
+    title: Trap
+    color: red
+  level:
+    title: Level lens
+    color: green
+  spoiler:
+    title: Spoiler warning
+    color: yellow
+
 plugins:
   - jekyll-remote-theme
+  - jekyll-titles-from-headings
   - jekyll-relative-links
   - jekyll-optional-front-matter
   - jekyll-readme-index
@@ -69,6 +94,14 @@ defaults:
     values: { title: Levels & tracks, nav_order: 3 }
   - scope: { path: "examples/sample-report.md" }
     values: { title: Sample report, nav_order: 12 }
+  - scope: { path: "solutions/README.md" }
+    values: { title: Reference solutions, nav_order: 2.5, has_children: true }
+  - scope: { path: "solutions/SD-*" }
+    values: { parent: Reference solutions }
+  - scope: { path: "theory/README.md" }
+    values: { title: Theory, nav_order: 2.7, has_children: true }
+  - scope: { path: "theory/0*" }
+    values: { parent: Theory }
   - scope: { path: "CLAUDE.md" }
     values: { title: How the interviewer works, nav_order: 3 }
   - scope: { path: "guides/interviewer-guide.md" }

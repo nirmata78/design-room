@@ -12,6 +12,10 @@ question anchored as `### SD-nn`.
 
 **Candidates: don't read the cue sheets before a round** — they contain the answer. This index is safe.
 
+**Reference solutions** — full stage-by-stage answer keys — exist for the rows marked
+**solution**: SD-08, SD-09, SD-15, SD-25, SD-44 ([index](solutions/README.md)). Run the round first,
+read the solution after. The building blocks they rely on are in [Theory](theory/README.md).
+
 ## How the bank is organised — four ways to slice it
 
 | Axis | Values | Use it to… |
@@ -52,8 +56,8 @@ minutes (`levels.md` §3).
 
 | ID | Question | T | Kind | Domain | Levels | Asked by | Loads |
 |---|---|:-:|---|---|---|---|---|
-| SD-08 | News feed / home timeline | 1 | Build | social | Sr St EM | M★ G | fan-out write vs read, the celebrity problem, ranking |
-| SD-09 | Chat / messaging (1:1 + groups) | 1 | Build | social | Sr St EM | M★ MS★ | connection state, ordering, delivery receipts, offline |
+| SD-08 | News feed / home timeline · [**solution**](solutions/SD-08-news-feed.md) | 1 | Build | social | Sr St EM | M★ G | fan-out write vs read, the celebrity problem, ranking |
+| SD-09 | Chat / messaging (1:1 + groups) · [**solution**](solutions/SD-09-chat-messaging.md) | 1 | Build | social | Sr St EM | M★ MS★ | connection state, ordering, delivery receipts, offline |
 | SD-10 | Live comments & reactions on a live stream | 2 | Build | social media | Sr St | M★ | pub/sub fan-out, backpressure, shedding |
 | SD-11 | Photo & video sharing (Instagram-like) | 2 | Build | social media | Sr EM | M★ | blob + metadata split, thumbnails, CDN |
 | SD-12 | Notification & push platform | 1 | Build | social | Sr St EM | M A MS | multi-channel fan-out, dedup, preferences, rate control |
@@ -64,7 +68,7 @@ minutes (`levels.md` §3).
 
 | ID | Question | T | Kind | Domain | Levels | Asked by | Loads |
 |---|---|:-:|---|---|---|---|---|
-| SD-15 | Globally distributed KV store / multi-region consistency | 1 | Build | infra | St Pr | G★ A MS | consensus, quorums, CAP honesty, replication |
+| SD-15 | Globally distributed KV store / multi-region consistency · [**solution**](solutions/SD-15-distributed-kv-store.md) | 1 | Build | infra | St Pr | G★ A MS | consensus, quorums, CAP honesty, replication |
 | SD-16 | Object store data plane (S3-like) | 2 | Build | infra | St Pr | A★ G | erasure coding, durability math, large-object writes |
 | SD-17 | Object storage control plane | 2 | Build | infra saas | St EM | A G | metadata at scale, quotas, lifecycle, tenancy |
 | SD-18 | File sync (Drive / Dropbox) | 1 | Build | saas | Sr St EM | G★ MS | chunking, dedup, conflict resolution, sync protocol |
@@ -79,7 +83,7 @@ minutes (`levels.md` §3).
 | ID | Question | T | Kind | Domain | Levels | Asked by | Loads |
 |---|---|:-:|---|---|---|---|---|
 | SD-24 | Distributed lock / coordination service | 2 | Build | infra | St Pr | G★ A | consensus, fencing, lease expiry, safety vs liveness |
-| SD-25 | Rate limiter (distributed) | 1 | Build | infra | Sr St EM | G★ M★ A MS | algorithms, distributed counters, cell-local vs global |
+| SD-25 | Rate limiter (distributed) · [**solution**](solutions/SD-25-rate-limiter.md) | 1 | Build | infra | Sr St EM | G★ M★ A MS | algorithms, distributed counters, cell-local vs global |
 | SD-26 | Feature flags & config delivery | 2 | Build | infra | Sr St EM | M★ N G | push vs poll, staleness, kill switches, targeting |
 | SD-27 | Authorization / permission graph (Zanzibar-like) | 2 | Build | infra saas | St Pr | G★ MS | graph evaluation, caching consistency, tuple storage |
 | SD-28 | Workflow orchestrator / distributed job scheduler | 1 | Build | infra | St EM | A★ G MS | durable state machines, retries, exactly-once effects |
@@ -112,7 +116,7 @@ See also archetype **I** for AI & LLM systems — SD-42 is the serving prerequis
 
 | ID | Question | T | Kind | Domain | Levels | Asked by | Loads |
 |---|---|:-:|---|---|---|---|---|
-| SD-44 | Payment processing & double-entry ledger | 1 | Build | fintech | Sr St EM | A★ G MS | idempotency, exactly-once effects, sagas, reconciliation |
+| SD-44 | Payment processing & double-entry ledger · [**solution**](solutions/SD-44-payments-ledger.md) | 1 | Build | fintech | Sr St EM | A★ G MS | idempotency, exactly-once effects, sagas, reconciliation |
 | SD-45 | Payment gateway integration (multi-PSP) | 2 | Build | fintech commerce | Sr St EM | A MS | adapter design, retries against third parties, webhooks |
 | SD-46 | Digital wallet & balance transfers | 2 | Build | fintech | Sr St | A G | atomic balance moves, hot accounts, holds, audit |
 | SD-47 | Ticket / seat booking under contention | 1 | Build | commerce | Sr St EM | A★ G MS | holds vs locks, oversell, fairness, expiry |

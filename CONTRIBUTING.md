@@ -15,6 +15,16 @@ Thanks for helping make the room harder to bluff.
 - **Interviewer behaviour bugs.** If Claude leaked a component, praised, multi-probed or ran over
   time, open an issue with the excerpt (scrub anything confidential first).
 
+## Adding a reference solution
+
+Follow the twelve-stage layout of [`solutions/README.md`](solutions/README.md): clarify table with
+*why it matters*, three estimates each with a consequence, API and data model, a Mermaid diagram plus
+the end-to-end walk-through, deep dives starting with the cue sheet's crux, the curveball as a delta,
+failure modes, SLOs and cost, the level lens, the four-sentence close, a self-check and a cheat card.
+Numbers must match the cue sheet's clarification answers so the solution fits a simulator run. Link
+to `theory/` rather than re-teaching, and avoid `{{` / `{%` sequences (GitHub Pages treats them as
+Liquid).
+
 ## Adding a question
 
 1. Write the sheet with [`Cue-Sheet-Template.md`](Cue-Sheet-Template.md). A **T1** sheet has the full
