@@ -64,7 +64,7 @@ sequenceDiagram
   participant DB as Database
   participant R as Outbox relay
   participant L as Log
-  S->>DB: BEGIN; UPDATE order; INSERT outbox(event); COMMIT
+  S->>DB: BEGIN · UPDATE order · INSERT outbox(event) · COMMIT
   R->>DB: read unsent outbox rows (or CDC)
   R->>L: publish event (at-least-once)
   R->>DB: mark sent
