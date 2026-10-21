@@ -1,0 +1,78 @@
+title: design-room
+description: A system-design interviewer that will not help you — a Claude Code mock-interview simulator for senior, staff and EM loops.
+url: https://nirmata78.github.io
+baseurl: /design-room
+remote_theme: just-the-docs/just-the-docs@v0.10.1
+color_scheme: light
+search_enabled: true
+heading_anchors: true
+aux_links:
+  "View on GitHub": https://github.com/nirmata78/design-room
+aux_links_new_tab: true
+back_to_top: true
+footer_content: 'MIT licensed · <a href="https://github.com/nirmata78/design-room">github.com/nirmata78/design-room</a>'
+
+plugins:
+  - jekyll-remote-theme
+  - jekyll-relative-links
+  - jekyll-optional-front-matter
+  - jekyll-readme-index
+  - jekyll-seo-tag
+
+relative_links:
+  enabled: true
+  collections: false
+
+exclude:
+  - profile.md
+  - Progress-Log.md
+  - interview.md
+  - sessions/
+  - LICENSE
+  - Gemfile
+  - Gemfile.lock
+  - vendor/
+
+defaults:
+  - scope: { path: "" }
+    values: { layout: default }
+  - scope: { path: "README.md" }
+    values: { title: Home, nav_order: 1, permalink: / }
+  - scope: { path: "Question-Bank.md" }
+    values: { title: Question bank, nav_order: 2, has_children: true }
+  - scope: { path: "questions/A-streaming-analytics.md" }
+    values: { title: "A · Streaming & analytics", parent: Question bank, nav_order: 1 }
+  - scope: { path: "questions/B-social-feed-content.md" }
+    values: { title: "B · Social, feed & content", parent: Question bank, nav_order: 2 }
+  - scope: { path: "questions/C-storage-data-consistency.md" }
+    values: { title: "C · Storage & consistency", parent: Question bank, nav_order: 3 }
+  - scope: { path: "questions/D-infrastructure-control-planes.md" }
+    values: { title: "D · Infrastructure & control planes", parent: Question bank, nav_order: 4 }
+  - scope: { path: "questions/E-search-geo-ml.md" }
+    values: { title: "E · Search, geo & ML", parent: Question bank, nav_order: 5 }
+  - scope: { path: "questions/F-transactions-payments.md" }
+    values: { title: "F · Transactions & payments", parent: Question bank, nav_order: 6 }
+  - scope: { path: "questions/G-media-delivery.md" }
+    values: { title: "G · Media & delivery", parent: Question bank, nav_order: 7 }
+  - scope: { path: "questions/H-em-specific-rounds.md" }
+    values: { title: "H · EM-specific rounds", parent: Question bank, nav_order: 8 }
+  - scope: { path: "CLAUDE.md" }
+    values: { title: How the interviewer works, nav_order: 3 }
+  - scope: { path: "guides/interviewer-guide.md" }
+    values: { title: Interviewer guide (for humans), nav_order: 4 }
+  - scope: { path: "guides/playbook.md" }
+    values: { title: Candidate playbook, nav_order: 5 }
+  - scope: { path: "Scorecard-Template.md" }
+    values: { title: Scorecard, nav_order: 6 }
+  - scope: { path: "prompts/README.md" }
+    values: { title: Paste-in prompts, nav_order: 7 }
+  - scope: { path: "Cue-Sheet-Template.md" }
+    values: { title: Cue-sheet template, nav_order: 8 }
+  - scope: { path: "Progress-Log.template.md" }
+    values: { title: Progress log template, nav_exclude: true }
+  - scope: { path: "templates/interview-template.md" }
+    values: { title: Interview workspace template, nav_order: 9 }
+  - scope: { path: "profile.example.md" }
+    values: { title: Profile template, nav_order: 10 }
+  - scope: { path: "CONTRIBUTING.md" }
+    values: { title: Contributing, nav_order: 11 }

@@ -1,0 +1,20 @@
+# ── Private: your rounds, scores and profile never leave this machine ──
+profile.md
+Progress-Log.md
+interview.md
+sessions/*
+!sessions/README.md
+
+# ── Jekyll / GitHub Pages local builds ──
+_site/
+.sass-cache/
+.jekyll-cache/
+.jekyll-metadata
+Gemfile.lock
+
+# ── OS / editor ──
+.DS_Store
+.obsidian/
+.idea/
+.vscode/
+*.swp
