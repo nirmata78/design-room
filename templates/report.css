@@ -1,0 +1,42 @@
+/* design-room — per-attempt report. Rendered by scripts/build-report.sh. */
+@page { size: A4; margin: 16mm 15mm 18mm 15mm; }
+
+:root {
+  --ink: #1b1f24; --muted: #5b6573; --rule: #d9dee5; --panel: #f5f7fa;
+  --accent: #2f5da8; --good: #1f7a45; --warn: #a15c00; --bad: #b42318;
+}
+html { font-size: 10pt; }
+body {
+  font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  color: var(--ink); line-height: 1.45; max-width: 180mm; margin: 0 auto; background: #fff;
+}
+header#title-block-header { border-bottom: 3px solid var(--accent); margin-bottom: 14px; padding-bottom: 6px; }
+h1.title { font-size: 20pt; margin: 0 0 2px; letter-spacing: -0.01em; }
+p.subtitle { color: var(--muted); margin: 0; font-size: 10.5pt; }
+p.date, p.author { color: var(--muted); margin: 2px 0 0; font-size: 9pt; }
+
+h1 { font-size: 13.5pt; color: var(--accent); margin: 20px 0 6px; padding-bottom: 3px;
+     border-bottom: 1px solid var(--rule); break-after: avoid; }
+h2 { font-size: 11pt; margin: 14px 0 4px; break-after: avoid; }
+h3 { font-size: 10pt; margin: 10px 0 2px; color: var(--muted); text-transform: uppercase;
+     letter-spacing: 0.04em; break-after: avoid; }
+p, ul, ol { margin: 4px 0 8px; }
+li { margin: 2px 0; }
+
+table { border-collapse: collapse; width: 100%; margin: 6px 0 10px; font-size: 9pt; break-inside: auto; }
+thead { display: table-header-group; }
+tr { break-inside: avoid; }
+th { background: var(--panel); text-align: left; font-weight: 600; }
+th, td { border: 1px solid var(--rule); padding: 4px 6px; vertical-align: top; }
+
+blockquote { margin: 8px 0; padding: 6px 10px; background: var(--panel);
+             border-left: 3px solid var(--accent); color: var(--ink); break-inside: avoid; }
+blockquote p { margin: 2px 0; }
+code { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 8.5pt;
+       background: var(--panel); padding: 0 3px; border-radius: 3px; }
+pre { background: var(--panel); padding: 8px; font-size: 8pt; overflow-x: hidden;
+      white-space: pre-wrap; break-inside: avoid; }
+pre code { background: none; padding: 0; }
+hr { border: 0; border-top: 1px solid var(--rule); margin: 14px 0; }
+strong { font-weight: 650; }
+a { color: var(--accent); text-decoration: none; }

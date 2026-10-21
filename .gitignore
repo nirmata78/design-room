@@ -18,3 +18,8 @@ Gemfile.lock
 .idea/
 .vscode/
 *.swp
+
+# ── Per-attempt reports (also under sessions/, belt and braces) ──
+*.pdf
+.report.html
+!examples/*.pdf

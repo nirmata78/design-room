@@ -3,11 +3,16 @@
 One row per completed round, appended by the interviewer at archive time (`CLAUDE.md` §12).
 This is what makes question selection intelligent — `surprise me` reads the weakest rows here.
 
-**Scores** are the nine dimensions in order, comma-free: `Req Est HLD Dep Trd Ops Com Amb EM`.
-`—` = unscored (not probed). **Help** = highest hint rung used, with count.
+**Scores** are the nine dimensions in order: `Req Est HLD Dep Trd Ops Com Amb Ldr`.
+`—` = unscored (not probed). **W** = weighted score at the target level (`levels.md` §2). **Out** =
+outcome (SH strong hire · H hire · LN lean no · NH no hire). **Help** = highest hint rung used, with
+count. **Kind** = Build · Review · Strategy.
 
-| Date | ID | Question | Arch | Co/Lvl | Mode | Req | Est | HLD | Dep | Trd | Ops | Com | Amb | EM | Help | Time | One drill |
-|---|---|---|---|---|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|---|---|---|
+| Date | ID | Question | Arch | Kind | Domain | Co | Level | Mode | Req | Est | HLD | Dep | Trd | Ops | Com | Amb | Ldr | W | Out | Help | Time | One drill | Report |
+|---|---|---|---|---|---|---|---|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|---|---|---|---|
+| | | | | | | | | | | | | | | | | | | | | | | | |
+
+---|---|---|---|---|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|---|---|---|
 | | | | | | | | | | | | | | | | | | |
 
 ---
@@ -21,13 +26,22 @@ This is what makes question selection intelligent — `surprise me` reads the we
 | C | Storage, data & consistency | 0 | |
 | D | Infrastructure & control planes | 0 | |
 | E | Search, geo & ML | 0 | |
-| F | Transactions, payments & commerce | 0 | |
+| F | Transactions, payments & commerce (+ fintech) | 0 | |
 | G | Media & delivery | 0 | |
-| H | EM-specific rounds | 0 | |
+| H | EM & senior-manager rounds | 0 | |
+| I | AI & LLM systems | 0 | |
+| J | Crypto & digital assets | 0 | |
+| K | Staff+ technical-leadership rounds | 0 | |
+
+## Weighted score by level — the trend that matters
+
+| Level | Rounds | Last 3 weighted | Best | Outcome trend |
+|---|:-:|---|:-:|---|
+| | | | | |
 
 **Coverage before depth.** One round in each of the eight archetypes teaches more than eight rounds
-in the two you find comfortable. Archetype H is the one candidates skip and the one an L6 EM loop is
-most likely to contain in some form.
+in the two you find comfortable. Archetype H (managers) and K (Staff+) are the ones candidates skip and the
+ones senior loops are most likely to contain in some form.
 
 ---
 

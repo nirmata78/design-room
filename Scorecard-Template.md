@@ -8,7 +8,9 @@
 | **Candidate** | |
 | **Date** | |
 | **Question** | *(bank ID + title)* |
-| **Calibrated to** | *(company · level)* |
+| **Calibrated to** | *(company · level — `senior` · `staff` · `principal` · `em` · `senior-em` · `director`)* |
+| **Kind / domain** | *(Build · Review · Strategy / domain tag)* |
+| **Attempt** | *(N on this question · N overall)* |
 | **Mode / pace / difficulty** | |
 | **Elapsed** | *(actual, from the shell — not the budget)* |
 
@@ -18,19 +20,26 @@
 > never probed is **unscored (—)**, never a default 2. A wall of 4s means the interviewer
 > under-probed and the sheet should say so.
 
-| # | Dimension | Score | Evidence (quote / timestamp) |
-|---|---|:-:|---|
-| 1 | Requirements & scoping | | |
-| 2 | Estimation (drives decisions) | | |
-| 3 | High-level design | | |
-| 4 | Technical depth (deep dive) | | |
-| 5 | Trade-off reasoning | | |
-| 6 | Operations / reliability / cost — **manager bar** | | |
-| 7 | Communication & collaboration | | |
-| 8 | Handling ambiguity & pushback | | |
-| 9 | Leadership signal (EM) | | |
+*Scores are against the **target level's** bar. Weights (H 1.5 · N 1.0 · L 0.5) come from
+`levels.md` §2 for that level.*
 
-**Mean (indicative only — the pattern matters more than the average):**
+| # | Dimension | Weight | Score | Evidence (quote / timestamp) |
+|---|---|:-:|:-:|---|
+| 1 | Requirements & scoping | | | |
+| 2 | Estimation (drives decisions) | | | |
+| 3 | High-level design | | | |
+| 4 | Technical depth (deep dive) | | | |
+| 5 | Trade-off reasoning | | | |
+| 6 | Operations / reliability / cost — **manager bar** | | | |
+| 7 | Communication & collaboration | | | |
+| 8 | Handling ambiguity & pushback | | | |
+| 9 | Leadership signal — *technical* (IC) or *org/delivery* (manager) | | | |
+
+**Weighted score** = Σ(weight × score) ÷ Σ(weight), scored dimensions only: **____ / 4**
+*(show the arithmetic)*
+
+**Outcome at the target level** (`levels.md` §4: ≥3.25 strong hire · 2.75–3.24 hire · 2.25–2.74 lean
+no · <2.25 no hire; **a 1 on any H-weight dimension caps it at lean no**):
 
 ---
 
@@ -106,7 +115,8 @@ versus which are checklist noise:
 
 **Overall:** ☐ strong hire ☐ hire ☐ mixed / lean no ☐ no hire
 
-**Apparent level:** ☐ senior IC (L5/E5) ☐ EM bar (L6/E6) ☐ senior EM (L7/E7)
+**Apparent level:** ☐ senior ☐ staff ☐ principal ☐ em ☐ senior-em ☐ director — *and in one line,
+where it differed by dimension (e.g. "staff depth, senior framing")*
 
 **Self-assessment accuracy** *(what they said at debrief step 1 vs what the sheet says — a strong
 signal in its own right):* ☐ accurate ☐ too harsh ☐ too generous

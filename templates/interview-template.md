@@ -19,7 +19,9 @@ been granted mid-round.*
 | | |
 |---|---|
 | **Question** | *(bank ID + title)* |
-| **Company / level** | |
+| **Company / level** | *(e.g. Google · `staff`)* |
+| **Kind / domain** | |
+| **Attempt** | *(N on this question)* |
 | **Mode / pace / difficulty** | |
 | **Started** | |
 | **Budget** | |

@@ -12,11 +12,17 @@ optional; delete what you don't need.*
 
 ## What I'm preparing for
 
-- **Target level:** L5 senior IC · **L6 EM** · L7 senior EM
+- **Target level** (see `levels.md`): IC track `senior` · `staff` · `principal` — manager track
+  **`em`** · `senior-em` · `director`
 - **Target companies, in priority order:** e.g. Google, Meta
 - **Next real loop, if scheduled:** company · date
 - **Default difficulty:** gentle · **standard** · brutal
 - **Default pace:** realtime · **typing-adjusted** · relaxed
+
+## Target domains — what I'm interviewing for
+
+e.g. *fintech*, *ai*. Used to filter "surprise me" (`general` · `fintech` · `crypto` · `ai` · `social` ·
+`commerce` · `media` · `search` · `mobility` · `saas` · `infra` · `data`).
 
 ## My home domain — probe me harder here
 

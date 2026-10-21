@@ -32,6 +32,9 @@ exclude:
   - Gemfile
   - Gemfile.lock
   - vendor/
+  - scripts/
+  - templates/report.css
+  - templates/report-template.md
 
 defaults:
   - scope: { path: "" }
@@ -55,7 +58,17 @@ defaults:
   - scope: { path: "questions/G-media-delivery.md" }
     values: { title: "G · Media & delivery", parent: Question bank, nav_order: 7 }
   - scope: { path: "questions/H-em-specific-rounds.md" }
-    values: { title: "H · EM-specific rounds", parent: Question bank, nav_order: 8 }
+    values: { title: "H · EM & senior-manager rounds", parent: Question bank, nav_order: 8 }
+  - scope: { path: "questions/I-ai-llm-systems.md" }
+    values: { title: "I · AI & LLM systems", parent: Question bank, nav_order: 9 }
+  - scope: { path: "questions/J-crypto-digital-assets.md" }
+    values: { title: "J · Crypto & digital assets", parent: Question bank, nav_order: 10 }
+  - scope: { path: "questions/K-staff-technical-leadership.md" }
+    values: { title: "K · Staff+ technical leadership", parent: Question bank, nav_order: 11 }
+  - scope: { path: "levels.md" }
+    values: { title: Levels & tracks, nav_order: 3 }
+  - scope: { path: "examples/sample-report.md" }
+    values: { title: Sample report, nav_order: 12 }
   - scope: { path: "CLAUDE.md" }
     values: { title: How the interviewer works, nav_order: 3 }
   - scope: { path: "guides/interviewer-guide.md" }

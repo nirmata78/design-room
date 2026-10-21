@@ -6,8 +6,9 @@ Completed rounds, one directory each. Written by the interviewer at the end of t
 ```
 sessions/YYYY-MM-DD-SD-nn-slug/
 ├── interview.md      the workspace as it stood at the end, including §10 interviewer notes
-├── scorecard.md      nine dimensions with evidence, help rungs, time breakdown, self-audit
-└── debrief.md        headline, two strengths, two improvements, the delta vs the cue sheet, one drill
+├── scorecard.md      nine dimensions × level weights, evidence, help rungs, time breakdown, self-audit
+├── report.md         the per-attempt report: verdict, scorecard, retrospective, feedback, delta, trend, next
+└── report.pdf        the same, rendered by ../scripts/build-report.sh — what you re-read before the next round
 ```
 
 **The most useful thing in here is the diff between two sessions on the same archetype, months

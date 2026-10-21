@@ -1,6 +1,6 @@
 # Archetype F · Transactions, payments & commerce
 
-**SD-44 – SD-50.** Slice with `grep -n '^### SD-44' questions/F-transactions-payments.md`, then Read
+**SD-44 – SD-50, plus the fintech expansion SD-77 – SD-82.** Slice with `grep -n '^### SD-44' questions/F-transactions-payments.md`, then Read
 with `offset`. Do not read this file whole.
 
 **What this archetype tests as a family:** **correctness under retry and partial failure.** Every
@@ -436,3 +436,293 @@ cards, resumable idempotent invoicing, credit notes for corrections. *Exceptiona
 invoice reproducible from immutable inputs including rate-card versions, guarantees the in-period
 estimate never exceeds the final bill, supports spend caps off the real-time path, and designs the
 dispute-resolution view as a product surface.
+
+---
+
+## Fintech expansion — SD-77 – SD-82
+
+*Added for fintech-targeted loops (payment companies, neobanks, lenders, card issuers). Same family
+test as SD-44–50 — correctness under retry and partial failure — with the regulatory and
+counterparty constraints that make fintech different from generic commerce: **you are not the only
+ledger**, and an external party's file is often the final word.*
+
+---
+
+### SD-77 · Card authorisation & issuer processing   [T1 · FT★ A MS]
+
+**Read aloud:** *"You're building a card issuer — a company that issues debit cards to its customers.
+Design the system that receives authorisation requests from the card network and approves or declines
+them."*
+
+**Crux.** **A hard real-time decision with a contractual deadline, followed by a long, messy
+reconciliation.** The network gives the issuer a couple of seconds to answer; miss it and the network
+decides for you (stand-in). Approval places a **hold**, not a debit — the real money moves days later
+in **clearing files** whose amounts can differ from the authorisation (tips, currency conversion,
+partial shipments). The design is the **authorisation path** plus the **auth ↔ clearing matching**.
+
+**If they ask:**
+
+| Question | Answer |
+|---|---|
+| Scale? | 8M cards, 1,500 authorisations/sec peak, 4,000 on Black Friday |
+| Deadline? | The network times out after ~2 seconds; target internal p99 under 300 ms |
+| Decision inputs? | Balance, card status, limits, fraud score, merchant category rules, 3-D Secure results |
+| Message types? | Authorisation, incremental auth, reversal, advice (stand-in notifications), refunds |
+| Settlement? | Daily clearing files from the network; amounts may differ from auth; some auths never clear |
+| Availability? | Each declined good transaction is a customer at a till; downtime triggers network stand-in |
+
+**Listen for:**
+- **Available balance = ledger balance − active holds**, with holds as first-class ledger entries
+  that expire (e.g. 7–30 days) if never cleared.
+- **Idempotency on network identifiers** — the network retries, and reversals can arrive before the
+  original (out-of-order).
+- **A tight critical path**: in-memory/low-latency balance and limit check, fraud scoring within a
+  budget with a **fail-open/fail-closed policy per risk class**, everything else async.
+- **Stand-in** handling: when the issuer is down the network approves under configured limits and later
+  sends advices — **← the senior insight: the issuer's ledger must absorb decisions it did not make,
+  so "balance can never go negative" is false by construction; the design needs overdraft handling.**
+- **Clearing/matching**: match clearing records to authorisations (by network reference, with fuzzy
+  fallback), release or adjust holds, post final debits, handle unmatched both ways.
+- **Hot account contention** is mostly absent here (per-card), but **per-cardholder serialisation** of
+  concurrent auths on one balance is required.
+- **Audit and dispute support**: every decision and its inputs recorded.
+
+**Probe ladder:**
+- *Requirements:* "What's the deadline and what happens if you miss it?" · "What's out of scope?"
+  (card manufacturing, the network itself)
+- *Estimation:* "1,500 auths/sec at a 300 ms budget — how much concurrency, and what's your per-call
+  budget for fraud scoring?"
+- *Design:* walk a $60 restaurant auth that clears three days later at $72 with tip.
+- *Deep dives:* **"Your fraud service is at 1.8 s p99 tonight. What does the authorisation path do?"** ·
+  "A reversal arrives before the authorisation it reverses. What happens?" · "You were down for 20
+  minutes; the network approved 9,000 transactions in stand-in. Walk me through the next morning." ·
+  "A hold was never cleared after 30 days. What does the customer see?"
+- *EM/Staff bar:* "What's on the on-call runbook for 'auth decline rate doubled in 10 minutes'?" ·
+  "Who decides the fail-open policy for fraud — engineering, risk or finance?"
+
+**Curveball:** *"The card network sends the clearing file six hours late and with 3% of records
+duplicated."* Tests idempotent ingestion of external files and resilience of the posting schedule.
+
+**Weak / Strong / Exceptional.** *Weak* — synchronous debit of the balance on auth, no holds, no
+stand-in thinking. *Strong* — holds model, available-balance arithmetic, idempotent out-of-order
+message handling, budgeted fraud with explicit fail policy, clearing matching with adjustments.
+*Exceptional* — designs the ledger to absorb stand-in and over-clearing (negative balances as a modelled
+state), treats the clearing file as the financial source of truth, and quantifies the cost of each
+fail-open decision.
+
+**Traps.** Debiting at authorisation. Assuming one auth = one clearing record. Ignoring stand-in.
+
+---
+
+### SD-78 · KYC / AML onboarding & sanctions screening   [T2 · FT★ MS]
+
+**Read aloud:** *"Design customer onboarding for a regulated financial app: identity verification,
+anti-money-laundering checks, sanctions screening — and keep screening customers after they join."*
+
+**Crux.** **A long-running, partially manual, audited workflow with external vendors**, where the
+regulator cares less about the average case than about proving every decision. Screening is not a
+one-off: **sanctions lists change daily and every existing customer must be re-screened.**
+
+**Numbers if asked:** 20k sign-ups/day, three identity-verification vendors with different coverage by
+country, ~8% of applicants need manual review, sanctions lists updated several times a day, 5M
+existing customers, fuzzy name matching produces many false positives, and regulators require
+retaining evidence for 5+ years.
+
+**Listen for:** **workflow engine / state machine** per application (submitted → document check →
+liveness → screening → risk score → approved / manual review / rejected), durable and resumable across
+vendor calls taking seconds to days · **vendor abstraction with routing by country and fallback** ·
+**risk-based approach**: tiered checks and limits by risk score · **sanctions screening as fuzzy
+matching** with tunable thresholds, transliteration, and a **case-management queue** for analysts ·
+**continuous screening**: a list update triggers re-screening of all customers incrementally (match the
+delta against the customer base, not the base against the full list) · **immutable audit evidence** of
+each decision with the inputs and list versions used · **PII protection** — encryption, access logging,
+data minimisation, retention schedules.
+
+**Probes:** *"The sanctions list adds 300 names at 4 p.m. How long until every affected customer is
+frozen?"* · *"A vendor is down for one country. What do applicants see?"* · *"An analyst cleared a
+false positive last month; the same customer matches again today. What happens?"* · *"A regulator asks
+why customer X was approved in 2023. Show me."* · *(EM bar)* *"Manual review backlog is 4 days and
+growth wants instant onboarding. How do you negotiate that?"*
+
+**Weak / Strong / Exceptional.** *Weak* — synchronous vendor calls in the sign-up request, one-time
+screening. *Strong* — durable workflow, vendor routing, risk tiers, fuzzy screening with case
+management, continuous delta re-screening, immutable evidence. *Exceptional* — treats audit evidence as
+a product, remembers analyst dispositions to suppress repeat false positives safely, and quantifies the
+re-screening time against regulatory expectations.
+
+---
+
+### SD-79 · Reconciliation & settlement engine   [T1 · FT★ A MS]
+
+**Read aloud:** *"We process payments through several banks and payment processors. Every day they send
+us files saying what they think happened. Design the system that reconciles their view with ours and
+settles the money."*
+
+**Crux.** **Matching imperfect records from systems you don't control, at volume, and turning every
+difference into an owned, explained exception.** The internal ledger is your truth for intent; the
+bank's statement is the truth for money. Reconciliation is where those meet, and its outputs —
+**breaks** — are the most important operational signal in a payments company.
+
+**If they ask:**
+
+| Question | Answer |
+|---|---|
+| Volume? | 15M transactions/day across 6 processors and 4 banks |
+| Formats? | CSV, fixed-width, ISO 20022 XML, and one processor's API; formats change without notice |
+| Timing? | Files arrive T+0 to T+3, sometimes late, sometimes resent with corrections |
+| Matching? | No common key across all sources; processor references, amounts, dates, sometimes only descriptions |
+| Differences? | Fees netted from settlements, FX conversions, chargebacks, partial refunds, rounding |
+| Users? | Finance ops team of 25 resolves exceptions; auditors review monthly |
+
+**Listen for:**
+- **Ingestion as immutable raw files** with checksums and versioning; parsing into a canonical schema
+  per source, with schema-change detection that **fails loudly**.
+- **Multi-pass matching**: exact on strong keys first, then rule-based (amount + date window +
+  reference fragments), then many-to-one / one-to-many (a settlement batch vs many transactions),
+  with confidence scores.
+- **Expected vs actual**: the ledger generates *expectations* (we expect processor X to pay us Y on
+  day Z, net of fees) — **← the senior insight: reconciliation works when the ledger predicts external
+  records, so a break is "expectation unmet", not "two lists that don't line up".**
+- **Exceptions as a workflow**: categorised (timing, fee, missing, duplicate, amount mismatch), aged,
+  owned, with SLAs and write-off approvals; auto-resolution of timing breaks when the late record
+  arrives.
+- **Idempotent re-runs** when a corrected file supersedes an earlier one.
+- **Settlement**: computing net positions per counterparty and generating payment instructions, under
+  maker-checker approval.
+- **Reporting**: unreconciled balance by age as the key metric; audit trail of every match and manual
+  action.
+
+**Probe ladder:**
+- *Requirements:* "What's the output — a report, a ledger adjustment, or a workflow?" · "Who are the
+  users?"
+- *Estimation:* "15M records/day against 15M ledger entries — what's the matching cost if you're naive,
+  and how do you avoid it?" (partition by date, account and processor — never a cross product)
+- *Design:* walk one processor's settlement file from arrival to matched/unmatched.
+- *Deep dives:* **"Processor B resends yesterday's file with 4% of rows changed. What happens to
+  matches already made?"** · "A $1.2M settlement is $3,400 short. How does your system explain it?"
+  (fees, FX, chargebacks — expected vs actual) · "A file format changes silently and parsing 'succeeds'
+  with amounts in the wrong column. Who notices?" · "Breaks older than 30 days are growing 10% a
+  month. What do you do?"
+- *EM/Staff bar:* "The finance-ops team is 25 people resolving breaks by hand. What's your plan for
+  that number?" · "Auditors want proof nobody can change a match without approval. Show me."
+
+**Curveball:** *"One bank moves to a real-time payment rail; you now get individual credit
+notifications in seconds instead of a daily file."* Tests whether the design is file-batch-shaped or
+event-shaped underneath.
+
+**Weak / Strong / Exceptional.** *Weak* — nightly SQL join on amount and date, mismatches emailed as a
+spreadsheet. *Strong* — immutable raw ingestion, canonical schema, multi-pass matching including
+many-to-one, exception workflow with ageing and ownership, idempotent re-runs, maker-checker
+settlement. *Exceptional* — ledger-generated expectations including fees and FX, break taxonomy driving
+root-cause fixes upstream, and an ops-headcount reduction plan tied to auto-match rate.
+
+**Traps.** Matching only on exact keys. Mutable raw data. Treating the exception queue as a report
+rather than a workflow.
+
+---
+
+### SD-80 · Cross-border payments & FX   [T2 · FT★ A]
+
+**Read aloud:** *"Design the system that lets customers send money abroad: they pay in one currency and
+the recipient gets another, in seconds where possible."*
+
+**Crux.** **Quoting a rate is making a promise against a moving market**, and the money crosses
+several systems with different speeds and finality. The design is **quote → lock → fund → convert →
+pay out** with the company's **FX exposure** managed explicitly, and with **prefunded accounts** in
+destination countries as the trick that makes it fast.
+
+**Numbers if asked:** 40 corridors, 300k transfers/day, quotes valid 30 seconds to 24 hours, market
+rates move constantly, local payout rails differ by country (instant to T+2), prefunded balances in 25
+countries, and compliance screening on both ends.
+
+**Listen for:** **quote service** with a rate source, a margin, an expiry, and a locked rate stored with
+the transfer · **exposure management**: aggregating net positions per currency and hedging/rebalancing
+treasury, rather than converting each transfer on the market · **prefunding** local accounts to pay
+out instantly and settle the cross-border leg in bulk later — and the liquidity forecasting it
+requires · **multi-currency double-entry ledger** with explicit FX conversion entries and realised
+gain/loss · **payout rail adapters** with per-rail status semantics · **transfer state machine** with
+idempotency and refunds in the original currency · **compliance**: screening, travel-rule data, limits
+per corridor.
+
+**Probes:** *"A customer locks a quote for 24 hours and the currency drops 4%. Who loses money?"* ·
+*"Your prefunded balance in Mexico runs out at 2 p.m. What happens?"* · *"How do you record a GBP→MXN
+transfer in your ledger?"* · *"The payout rail returns 'pending' for three days."* · *(EM bar)* *"Who
+owns FX risk — engineering, treasury or product — and how does the system make that ownership
+visible?"*
+
+**Weak / Strong / Exceptional.** *Weak* — call an FX API per transfer, one-currency ledger. *Strong* —
+locked quotes, multi-currency ledger with FX entries, prefunding with forecasting, rail adapters,
+transfer saga. *Exceptional* — treats net exposure as the system's real output for treasury, prices quote
+duration as risk, and designs liquidity alerts as operational SLIs.
+
+---
+
+### SD-81 · Payouts & disbursements to bank rails   [T2 · FT★ A U]
+
+**Read aloud:** *"A marketplace pays millions of sellers and drivers every week. Design the payout
+system."*
+
+**Crux.** **Money leaving is the dangerous direction**: a duplicate payout is usually unrecoverable, and
+bank rails have **asynchronous, delayed and sometimes contradictory** status reporting. The design
+centres on **exactly-once intent with idempotent rail submission**, **returns** that arrive days later,
+and **funding** — making sure the money is there before you promise it.
+
+**Numbers if asked:** 4M payees, weekly cycle plus on-demand instant payouts, 6 rails (batch ACH-style
+files, real-time rails, cards, wallets), returns arrive up to 5 business days later (closed account,
+wrong details), some payees blocked by compliance, and a funding account that must be topped up before
+batch submission.
+
+**Listen for:** **payout as a state machine** (calculated → approved → submitted → sent → settled /
+returned / failed) with an idempotency key per payout that survives retries and re-runs ·
+**balance reservation** before submission so the same earnings cannot be paid twice · **rail
+adapters** — batch-file rails with file-level and record-level acknowledgements, real-time rails with
+synchronous-but-unreliable responses · **returns handling** — reverse the ledger entry, notify, retry
+with corrected details · **funding check and cut-off times** per rail · **compliance holds** and limits
+· **reconciliation** against bank statements (see SD-79).
+
+**Probes:** *"You submitted a batch file and got no acknowledgement. Do you resubmit?"* · *"Instant
+payout request times out at the rail. What do you tell the driver?"* · *"2% of last week's payouts come
+back as returns on Thursday. Walk me through it."* · *"How do you guarantee earnings can't be paid out
+twice when the weekly run and an instant payout race?"* · *(EM bar)* *"A bug double-paid 800 sellers.
+What happens next — technically and with the business?"*
+
+**Weak / Strong / Exceptional.** *Weak* — loop over payees and call a bank API. *Strong* — idempotent
+payout state machine, reservation, rail-specific adapters with ack semantics, returns flow, funding
+check, reconciliation. *Exceptional* — designs ambiguous rail outcomes explicitly ("unknown" as a state
+with a resolution procedure), and puts kill switches and per-run limits on the outbound path.
+
+---
+
+### SD-82 · Real-time credit decisioning (BNPL / instant lending)   [T2 · FT★ A]
+
+**Read aloud:** *"At checkout, customers can split a purchase into instalments. Design the system that
+decides, in under a second, whether to lend them the money — and then services the loan."*
+
+**Crux.** **A regulated, explainable decision under a latency budget**, followed by a long-lived
+financial object. The decision combines bureau data, internal history and models; regulators require
+that every decline can be explained and that the same inputs give the same answer. After approval, the
+**loan servicing** (schedules, collections, late fees, early repayment) is a ledger and state-machine
+problem that lasts months.
+
+**Numbers if asked:** 500 decisions/sec at peak, under 800 ms p99 including a credit-bureau call that
+is sometimes slow, 10M active loans, models retrained monthly, regulators require adverse-action
+reasons and audit of model versions, merchants are paid upfront.
+
+**Listen for:** **decision pipeline**: hard rules → feature assembly (internal + bureau, cached where
+permitted) → model score → policy (limits, pricing) — with a **timeout strategy for the bureau** that
+is a credit-policy decision · **reproducibility**: decisions stored with all inputs, model version and
+policy version · **reason codes** generated from the policy and model for adverse-action notices ·
+**champion/challenger** for models and policies with controlled exposure · **loan as a state machine**
+and **amortisation schedule** in a ledger, with payment retries and collections workflows · **exposure
+limits** per customer and portfolio · **fairness monitoring** across protected groups.
+
+**Probes:** *"The bureau takes 3 seconds today. Approve, decline, or something else?"* · *"A regulator
+asks why a customer was declined 14 months ago. Reproduce it."* · *"A new model approves 6% more people.
+How do you roll it out safely?"* · *"A customer repays early mid-cycle. What changes in the ledger?"* ·
+*(EM bar)* *"Who signs off a model change — data science, risk, or engineering?"*
+
+**Weak / Strong / Exceptional.** *Weak* — synchronous model call, no versioning, servicing as a cron
+job. *Strong* — budgeted pipeline with bureau fallback policy, versioned reproducible decisions, reason
+codes, champion/challenger, ledger-backed servicing. *Exceptional* — treats every timeout as a risk
+decision with an owner, monitors fairness and drift as SLIs, and separates model, policy and pricing
+versions so each can change independently with audit.

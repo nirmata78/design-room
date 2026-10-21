@@ -1,6 +1,6 @@
 # Archetype H · EM-specific rounds
 
-**SD-55 – SD-62.** Slice with `grep -n '^### SD-56' questions/H-em-specific-rounds.md`, then Read with
+**SD-55 – SD-62, plus the senior-manager & director expansion SD-89 – SD-92.** Slice with `grep -n '^### SD-56' questions/H-em-specific-rounds.md`, then Read with
 `offset`. Do not read this file whole.
 
 **Read this before running any question in this archetype.**
@@ -549,3 +549,191 @@ and on-call, open-source considered as a third option, time-to-value against the
 vendor risk addressed. *Exceptional* — quantifies ongoing cost as the dominant term, sequences
 buy-now-build-later where that fits, prices the exit and buys cheap insurance at the boundary, decides
 with a review date, and handles the team's motivation openly.
+
+---
+
+## Senior-manager & director expansion — SD-89 – SD-92
+
+*Added for `senior-em` and `director` loops. At these levels the "system design" round is often a
+**technical-strategy conversation**: the interviewer wants to see how you allocate a scarce budget of
+people, money and risk across several systems — and whether your architecture opinions survive contact
+with an org chart. **Box-level depth is not the point; decisions, sequencing and the org shape are.**
+Score Leadership signal and Ops/cost at High weight (`levels.md` §2).*
+
+---
+
+### SD-89 · Engineering org & architecture for a new product line   [T1 · G MS A]
+
+**Read aloud:** *"The company is launching a new product line — a B2B version of our consumer product.
+You'll lead its engineering: you have budget for about 40 engineers over 18 months. Design the
+architecture and the organisation that builds it."*
+
+**Crux.** **Conway's law, used deliberately.** The architecture and the team topology are one decision:
+what to **reuse from the consumer platform** (and the coupling that creates), what to **build new**,
+and how to **shape teams so their boundaries match the system's seams**. Sequencing hiring against an
+18-month plan, and keeping the consumer product safe, are the risk dimensions.
+
+**If they ask:**
+
+| Question | Answer |
+|---|---|
+| Product? | Same core experience plus SSO, admin console, audit logs, data residency (EU), SLAs, invoicing |
+| Existing platform? | Consumer product built by 120 engineers; shared identity, billing and storage services |
+| Timeline? | A design-partner beta in 6 months, general availability in 15 |
+| People? | 8 engineers transfer in now; 32 to hire; 2 experienced managers available |
+| Constraints? | The consumer org is protective of its platform and on-call; enterprise customers demand 99.95% |
+
+**Listen for:**
+- **Reuse vs fork decided per capability**: reuse the core product surfaces and shared services, build
+  enterprise-specific capabilities (tenancy, admin, audit, residency) — with an explicit **contract**
+  with the consumer platform teams, not ad-hoc requests.
+- **Multi-tenancy model** chosen deliberately (shared with tenant isolation vs cells per region for
+  residency), and its consequences for the consumer stack.
+- **Team topology**: stream-aligned teams per enterprise capability, maybe a small enablement or
+  platform-liaison team, cognitive load per team, and **teams staffed before the work that needs them
+  — sequenced hiring**.
+- **Phased plan**: thin beta with design partners (manual where possible) → harden for GA; what is
+  deliberately manual or deferred in the beta.
+- **Risk to the consumer product**: changes to shared services go through the owners; reliability
+  isolation so enterprise SLAs don't impose on consumer on-call without agreement.
+- **Metrics**: beta adoption, time-to-onboard a tenant, SLA attainment, cost per tenant.
+- **Leadership**: two managers placed where the risk is; hiring bar and onboarding plan; how decisions
+  are made across the two orgs.
+
+**Probe ladder:**
+- *Requirements:* "What has to be true at beta versus GA?" · "What's out of scope for the first 6 months?"
+- *Estimation:* "40 engineers, 32 not hired yet — how many are actually productive at month 6?" (hiring
+  lag and ramp-up: maybe 15–18 effective) **— does that change the beta scope?**
+- *Design:* the architecture on one page and the team map beside it.
+- *Deep dives:* **"The consumer identity team says SSO isn't on their roadmap for a year. What now?"** ·
+  "A design partner needs EU data residency for beta. What does that do to your architecture and your
+  plan?" · "Hiring is 40% behind at month 5. What do you cut?" · "Who is on call for a shared service
+  outage that only hurts enterprise customers?"
+- *Director bar:* "How do you report progress to the exec team — what three numbers?" · "What would make
+  you recommend not doing GA in 15 months?"
+
+**Curveball:** *"The CEO asks you to also support a large customer's on-premise deployment for the GA
+deal."* Tests whether they price that as a strategy change (a second deployment model) rather than a
+feature, and push back with the cost.
+
+**Weak / Strong / Exceptional.** *Weak* — an architecture diagram with no org, or an org chart with no
+architecture; hire 40 and start. *Strong* — per-capability reuse/build with contracts, a tenancy model,
+teams aligned to seams, sequenced hiring against a phased plan, consumer-risk isolation. *Exceptional* —
+designs teams and system boundaries as one decision, uses effective capacity (not headcount) to scope
+the beta, negotiates the platform dependency as an agreement with incentives, and names the conditions
+under which they'd change the plan.
+
+**Traps.** Assuming hires are productive on arrival. Forking the consumer platform wholesale. Treating
+shared-service teams as vendors who must comply.
+
+---
+
+### SD-90 · The reliability program after a major outage   [T2 · A★ G N]
+
+**Read aloud:** *"Last month the company had a nine-hour outage that made the news. The CEO asks you to
+lead a reliability program across eight engineering teams. What do you do in the first 90 days, and
+what does the program look like after that?"*
+
+**Crux.** **Turning one dramatic incident into systemic improvement without a year of freeze and
+theatre.** The program must stabilise now, fix the specific failure, find the **class** of failures,
+and create **lasting mechanisms** — SLOs, error budgets, review practices — while keeping product
+delivery alive and keeping trust with an anxious exec team.
+
+**Context if asked:** the outage was a configuration change propagated globally that took down
+authentication, and recovery was slow because the rollback path depended on the failed system; 8
+teams; no SLOs today; incident reviews are inconsistent; the board wants a monthly update; product
+leadership fears a feature freeze.
+
+**Listen for:** **first weeks**: finish the incident review blamelessly and fix the specific chain
+(staged config rollout, rollback independent of the failed dependency) · **find the class**: audit
+other global-blast-radius changes and circular recovery dependencies across all 8 teams · **mechanisms**:
+SLOs on critical user journeys, error budgets with an agreed policy, progressive delivery for code
+*and* config, game days for recovery paths · **governance**: a small reliability review, not a central
+approval bottleneck · **balancing delivery**: a time-boxed percentage of capacity or error-budget-driven
+trade-offs instead of a blanket freeze · **reporting**: leading indicators (change failure rate, MTTR,
+budget burn, % of changes staged) rather than "number of incidents" · **people**: on-call health and
+not making engineers fear deploying.
+
+**Probes:** *"The CEO wants a full freeze until it's fixed. What do you say?"* · *"What will you report
+at the first board update?"* · *"Two of eight teams say reliability isn't their problem — they've had no
+incidents."* · *"How will you know in six months whether this worked?"* · *(Director bar)* *"What's the
+budget for this, and what are you not doing because of it?"*
+
+**Weak / Strong / Exceptional.** *Weak* — freeze, add approvals, count incidents. *Strong* — fix the
+chain, find the class, SLOs and error budgets, staged config, recovery drills, capacity allocation,
+leading indicators. *Exceptional* — targets blast radius and recovery independence as the systemic
+themes, designs governance that scales without a bottleneck, and manages executive trust with honest
+leading metrics.
+
+---
+
+### SD-91 · Annual planning — roadmap, headcount and platform investment   [T2 · G MS A]
+
+**Read aloud:** *"You run engineering for a product area: five teams, about 45 engineers. Product has
+asked for 14 major initiatives next year; you have capacity for maybe six. You also believe the
+platform underneath needs serious investment. Walk me through how you build the plan."*
+
+**Crux.** **Capacity is the constraint, and the platform investment is the argument you must win in
+business terms.** A strong answer builds a **real capacity model** (KTLO, on-call, attrition, hiring
+lag), forces **explicit trade-offs** with product rather than accepting all 14, and justifies platform
+work by **the delivery and risk outcomes it buys**, not engineering preference.
+
+**Context if asked:** 45 engineers, ~30% of capacity goes to keeping the lights on and on-call; platform
+debt is slowing every feature (lead time doubled in two years); 6 open reqs approved; attrition ~12%;
+product's 14 initiatives have rough sizes; leadership wants a revenue-linked story.
+
+**Listen for:** **capacity model**: 45 × (1 − KTLO 30%) minus attrition and hiring ramp → roughly 25–28
+engineer-years of new work · **sizing the asks** at coarse granularity with uncertainty ranges ·
+**prioritisation with product** by outcome, cost and risk, with explicit "not this year" decisions
+written down · **platform investment framed as a business case**: lead time, incident cost, the
+features it unblocks, and a staged investment with checkpoints rather than "20% for platform" ·
+**protected allocation** for KTLO and reliability · **contingency** buffer · **communicating the
+plan**: what each stakeholder gets, quarterly re-planning, and the signals that trigger a change.
+
+**Probes:** *"Product says all 14 are must-haves. What happens next?"* · *"Show me the arithmetic for
+your capacity."* · *"Your CFO asks what the platform investment returns. Answer in one minute."* · *"Two
+months in, two senior engineers leave. What changes?"* · *(Director bar)* *"How do you avoid this being
+negotiated team by team in a way that loses the platform investment?"*
+
+**Weak / Strong / Exceptional.** *Weak* — accepts 14, or allocates a flat percentage to "tech debt" with
+no case. *Strong* — capacity model with KTLO and hiring lag, prioritised trade-offs agreed with product,
+platform work justified by outcomes, contingency, quarterly re-plan. *Exceptional* — makes the
+not-doing list a shared artifact owned with product, ties platform investment to measurable delivery
+improvements with staged checkpoints, and plans for attrition explicitly.
+
+---
+
+### SD-92 · Cloud, vendor and multi-region strategy   [T2 · A MS G N]
+
+**Read aloud:** *"Your company runs on one cloud provider in one region. Leadership is asking three
+things at once: cut infrastructure cost by 25%, survive a full regional outage, and reduce dependence on
+the provider. You lead the infrastructure organisation. What's your recommendation?"*
+
+**Crux.** **The three asks conflict**, and the job is to make that visible and choose. Multi-region
+raises cost; multi-cloud raises cost and complexity far more; cost cuts compete with redundancy. A strong
+answer **separates the asks, quantifies each**, and recommends a sequence — usually **cost discipline
+first, multi-region for the critical tier, and portability only where lock-in risk is real.**
+
+**Context if asked:** $30M/year infrastructure spend; ~35% of compute idle or over-provisioned; a regional
+outage last year cost ~$4M in revenue; a few critical services, many internal ones; heavy use of the
+provider's proprietary managed services; a renewal negotiation in 9 months.
+
+**Listen for:** **cost first**: rightsizing, commitments/reservations, storage tiers, killing idle
+resources, per-team attribution — often the 25% is mostly here · **tier services by criticality** and
+apply multi-region (active-passive or active-active) **only to the critical tier**, with honest data
+replication and failover testing · **multi-cloud scepticism**: lowest-common-denominator cost, the
+real risk being addressed (pricing power? outage? regulation?), and cheaper hedges — portable data
+formats, containerisation where cheap, exit plan documented, **using the renewal as negotiation
+leverage** · **quantify**: cost of downtime vs cost of redundancy · **sequencing over 12–24 months**
+with milestones · **organisational ownership**: FinOps practice, team-level budgets.
+
+**Probes:** *"Multi-region will raise spend. How do you also cut 25%?"* · *"The CTO wants active-active
+multi-cloud. What do you say?"* · *"What's your failover test cadence, and what happens the first time?"*
+· *"How do you use the renewal?"* · *(Director bar)* *"Which of the three asks do you push back on, and
+how do you say it to the exec team?"*
+
+**Weak / Strong / Exceptional.** *Weak* — "go multi-cloud" or "go multi-region everywhere" without
+numbers. *Strong* — separates and quantifies the asks, cost programme first, tiered multi-region,
+targeted portability, failover testing, sequenced roadmap. *Exceptional* — exposes the conflict
+explicitly with numbers, recommends what not to do (blanket multi-cloud), uses commercial leverage as
+part of the architecture strategy, and makes cost ownership a team-level habit.
