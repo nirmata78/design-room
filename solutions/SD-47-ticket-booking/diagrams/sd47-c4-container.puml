@@ -1,0 +1,38 @@
+@startuml
+!include <C4/C4_Container>
+HIDE_STEREOTYPE()
+skinparam wrapWidth 200
+Person(fan, "Fan")
+System_Ext(cdn, "CDN / WAF", "Layout SVG, static app, bot challenge")
+System_Boundary(tix, "Ticketing Platform") {
+  Container(gw, "API gateway", "Envoy", "AuthN, rate limits, verifies signed admission token")
+  Container(wr, "Waiting room", "Java", "Join, position, admit at rate R")
+  ContainerDb(wrdb, "Queue store", "Redis + AOF", "Join sequence, admit pointer")
+  Container(map, "Seat-map service", "Java", "Versioned availability snapshots")
+  ContainerDb(mapc, "Snapshot cache", "Redis", "Bitmap per event")
+  Container(inv, "Inventory & holds", "Java", "Atomic claim, TTL holds")
+  ContainerDb(invdb, "Inventory DB", "PostgreSQL, sharded by event_id", "event_seat, hold, outbox")
+  Container(ord, "Order service", "Java", "Checkout saga, idempotency")
+  ContainerDb(orddb, "Order DB", "PostgreSQL", "order, ticket, payment_attempt")
+  ContainerQueue(bus, "Event bus", "Kafka", "SeatHeld / Released / Sold, OrderConfirmed")
+  Container(exp, "Hold expirer", "Scheduled job", "Releases expired holds")
+  Container(ntf, "Notification service", "Java", "Tickets, waitlist")
+}
+System_Ext(psp, "Payment provider")
+Rel(fan, cdn, "HTTPS")
+Rel(cdn, gw, "API calls")
+Rel(gw, wr, "join / poll")
+Rel(wr, wrdb, "INCR, GET")
+Rel(gw, map, "GET snapshot")
+Rel(map, mapc, "read")
+Rel(gw, inv, "POST /holds")
+Rel(inv, invdb, "conditional UPDATE")
+Rel(gw, ord, "POST /orders")
+Rel(ord, inv, "freeze / sell / release")
+Rel(ord, orddb, "write")
+Rel(ord, psp, "authorize, capture, void")
+Rel(invdb, bus, "outbox relay")
+Rel(bus, map, "rebuild snapshot")
+Rel(bus, ntf, "OrderConfirmed")
+Rel(exp, invdb, "SKIP LOCKED batches")
+@enduml

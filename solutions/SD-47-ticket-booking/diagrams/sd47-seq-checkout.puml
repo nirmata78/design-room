@@ -1,0 +1,35 @@
+@startuml
+hide footbox
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 230
+skinparam noteBackgroundColor #FFF8DC
+skinparam noteBorderColor #C9A227
+actor Fan as F
+participant "Order\nservice" as O
+database "Order DB" as ODB
+participant "Inventory" as I
+participant "PSP" as P
+F -> O : POST /orders {holdId, paymentToken}\nIdempotency-Key: k-77
+O -> ODB : INSERT order PENDING\n(UNIQUE user_id + idem_key)
+O -> I : freeze hold: HELD -> PAYMENT_PENDING,\ndeadline = now + 10 min
+O --> F : 202 {orderId}; fan polls GET /orders/{id}
+O -> P : authorize(amount, token, idempotencyKey = order-91)
+P --x O : (no answer within 10 s)
+O -> ODB : payment_attempt = UNKNOWN
+note right of O : unknown is NOT a decline.\nSeats stay frozen.
+loop backoff 2 s, 4 s, 8 s ...
+  O -> P : GET payment by reference order-91
+  P --> O : processing
+end
+P -> O : webhook: order-91 authorized (signed)
+O -> O : verify signature, dedupe by PSP event id
+O -> I : PAYMENT_PENDING -> SOLD
+O -> ODB : CONFIRMED, tickets, outbox row (one transaction)
+O -> P : capture(authId)
+F -> O : GET /orders/{id}
+O --> F : CONFIRMED + tickets
+@enduml

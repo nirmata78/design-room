@@ -1,0 +1,58 @@
+<svg class="d" viewBox="0 0 720 236" xmlns="http://www.w3.org/2000/svg">
+  <rect x="6" y="40" width="166" height="148" rx="5" class="b"/>
+  <text x="89" y="60" class="c tb">dict: member → score</text>
+  <text x="20" y="84" class="tm">u-17   → 0.12</text>
+  <text x="20" y="102" class="tm">u-903  → 0.31</text>
+  <text x="20" y="120" class="tm">u-4    → 0.47</text>
+  <text x="20" y="138" class="tm">u-55   → 0.58</text>
+  <text x="20" y="156" class="tm">u-261  → 0.83</text>
+  <text x="89" y="178" class="c ts">ZSCORE, ZADD NX check: O(1)</text>
+
+  <text x="200" y="20" class="tb">skiplist, ordered by score · ZRANK / ZRANGE: O(log n)</text>
+
+  <!-- columns: head 200, nodes 290 370 450 530 610 ; cell w=52 h=20 ; levels L0 y=170 L1 140 L2 110 L3 80 -->
+  <!-- head -->
+  <rect x="200" y="170" width="52" height="20" class="g2"/><rect x="200" y="140" width="52" height="20" class="g2"/>
+  <rect x="200" y="110" width="52" height="20" class="g2"/><rect x="200" y="80" width="52" height="20" class="g2"/>
+  <text x="226" y="184" class="c ts">L0</text><text x="226" y="154" class="c ts">L1</text>
+  <text x="226" y="124" class="c ts">L2</text><text x="226" y="94" class="c ts">L3</text>
+  <text x="226" y="208" class="c tm">head</text>
+  <!-- u-17: 2 levels -->
+  <rect x="290" y="170" width="52" height="20" class="b"/><rect x="290" y="140" width="52" height="20" class="b"/>
+  <text x="316" y="208" class="c tm">u-17</text><text x="316" y="222" class="c ts">0.12</text>
+  <!-- u-903: 1 -->
+  <rect x="370" y="170" width="52" height="20" class="b"/>
+  <text x="396" y="208" class="c tm">u-903</text><text x="396" y="222" class="c ts">0.31</text>
+  <!-- u-4: 4 -->
+  <rect x="450" y="170" width="52" height="20" class="b"/><rect x="450" y="140" width="52" height="20" class="b"/>
+  <rect x="450" y="110" width="52" height="20" class="b"/><rect x="450" y="80" width="52" height="20" class="b"/>
+  <text x="476" y="208" class="c tm">u-4</text><text x="476" y="222" class="c ts">0.47</text>
+  <!-- u-55: 1 (target) -->
+  <rect x="530" y="170" width="52" height="20" class="r"/>
+  <text x="556" y="208" class="c tm tb">u-55</text><text x="556" y="222" class="c ts">0.58</text>
+  <!-- u-261: 2 -->
+  <rect x="610" y="170" width="52" height="20" class="b"/><rect x="610" y="140" width="52" height="20" class="b"/>
+  <text x="636" y="208" class="c tm">u-261</text><text x="636" y="222" class="c ts">0.83</text>
+
+  <!-- L3 / L2: head -> u-4 -->
+  <line x1="252" y1="90" x2="449" y2="90" class="ln-r"/><text x="350" y="85" class="c ts sp">span 3</text>
+  <line x1="252" y1="120" x2="449" y2="120" class="ln"/><text x="350" y="115" class="c ts">span 3</text>
+  <!-- L1 -->
+  <line x1="252" y1="150" x2="289" y2="150" class="ln"/>
+  <line x1="342" y1="150" x2="449" y2="150" class="ln"/><text x="396" y="145" class="c ts">span 2</text>
+  <line x1="502" y1="150" x2="609" y2="150" class="ln"/><text x="556" y="145" class="c ts">span 2</text>
+  <!-- L0 -->
+  <line x1="252" y1="180" x2="289" y2="180" class="ln"/>
+  <line x1="342" y1="180" x2="369" y2="180" class="ln"/>
+  <line x1="422" y1="180" x2="449" y2="180" class="ln"/>
+  <line x1="502" y1="180" x2="529" y2="180" class="ln-r"/>
+  <line x1="582" y1="180" x2="609" y2="180" class="ln"/>
+  <!-- drop down at u-4 -->
+  <line x1="476" y1="100" x2="476" y2="169" class="ln-r dash"/>
+
+  <text x="680" y="90" class="ts">∅</text><text x="680" y="120" class="ts">∅</text>
+  <text x="680" y="150" class="ts">∅</text><text x="680" y="180" class="ts">∅</text>
+
+  <text x="290" y="48" class="ts sp">ZRANK u-55: follow L3 to u-4 (+3), L2/L1 overshoot, drop to L0 (+1)</text>
+  <text x="290" y="63" class="ts sp">→ sum of spans = 4 → rank 3 (0-based) → seq = rank + 1 = 4</text>
+</svg>

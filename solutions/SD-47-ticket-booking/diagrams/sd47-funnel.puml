@@ -1,0 +1,16 @@
+@startuml
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam rectangleRoundCorner 10
+skinparam rectangleBorderColor #4A6FA5
+rectangle "<b>1,000,000 fans</b>\nin the lobby or the queue" as A #EAF1FB
+rectangle "<b>~29,000 admitted</b> to shop\nR = 2,000 per minute for ~15 minutes" as B #DCE8F7
+rectangle "<b>~20,000 orders confirmed</b>\n= all 50,000 seats sold\n(2.5 tickets per order)" as D #DFF1E4
+rectangle "<b>~970,000 never admitted</b>\ntold <i>sold out</i> by the cached flag,\nwithin seconds, offered the waitlist" as X #FBE6E4
+rectangle "<b>~9,000 admitted, no order</b>\ntoken ran out, card declined, gave up.\nTheir held seats return to the pool\nand the next fans in line buy them" as Y #FFF3D1
+A -down-> B : admission at rate R
+B -down-> D : about 70% convert
+A -right-> X
+B -right-> Y
+@enduml

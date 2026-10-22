@@ -1,0 +1,14 @@
+@startuml
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+hide empty description
+[*] --> AVAILABLE
+AVAILABLE --> HELD : claim (conditional UPDATE)
+HELD --> AVAILABLE : expires_at passed\n(lazy check or sweeper)\nor user cancels
+HELD --> PAYMENT_PENDING : checkout submitted\n(deadline extended)
+PAYMENT_PENDING --> SOLD : authorize approved
+PAYMENT_PENDING --> AVAILABLE : definite decline\nor auth voided
+SOLD --> AVAILABLE : refund / release\n(ops only)
+SOLD --> [*]
+@enduml

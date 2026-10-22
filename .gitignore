@@ -2,6 +2,9 @@
 profile.md
 Progress-Log.md
 interview.md
+.clock.json
+board/
+private/
 sessions/*
 !sessions/README.md
 
@@ -23,3 +26,8 @@ Gemfile.lock
 *.pdf
 .report.html
 !examples/*.pdf
+
+# ── PDF kit: local venv, build intermediates, review images ──
+pdf-kit/.venv/
+*.built.html
+*_pages/

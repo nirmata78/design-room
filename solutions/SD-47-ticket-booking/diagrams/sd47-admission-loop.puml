@@ -1,0 +1,22 @@
+@startuml
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam wrapWidth 260
+skinparam ActivityBackgroundColor #F7F9FC
+start
+repeat :every 1 second, per event;
+  :read signals: active shoppers, hold p99,\nDB CPU and connections, PSP error rate,\n409 ratio;
+  if (any signal over its limit?) then (yes)
+    :R = R x 0.7  (back off fast);
+  elseif (shoppers < target 10,000?) then (yes)
+    :R = R + step  (ramp up slowly);
+  else (no)
+    :keep R;
+  endif
+  :admittedUpTo += R / 60, capped at the last issued number;
+  :seats_left / 2.5 < admitted fans still shopping?\nthen set soldOut = true;
+  :write admittedUpTo, rate, soldOut to Redis;
+repeat while (sale open?) is (yes)
+stop
+@enduml

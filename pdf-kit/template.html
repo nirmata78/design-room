@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<!-- The page title becomes the footer text unless you pass --footer to build.py -->
+<title>Template · reference-guide style</title>
+<link rel="stylesheet" href="style.css">
+</head><body>
+<!-- Arrowheads for every inline SVG. Keep this block once, at the top of the body. -->
+<svg width="0" height="0" style="position:absolute"><defs>
+<marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L10,5 L0,9 z" fill="#57606a"/></marker>
+<marker id="ahr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,1 L10,5 L0,9 z" fill="#c8341f"/></marker>
+<marker id="ahg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,1 L10,5 L0,9 z" fill="#2d8a4e"/></marker>
+</defs></svg>
+
+<!-- ======================= COVER (page 1) ======================= -->
+<div class="cover-band">
+  <div class="tag">Companion · Topic deep dive</div>
+  <h0>Topic, owned.</h0>
+  <div class="sub">One sentence on what this document gives the reader and why it's worth their time.</div>
+  <div class="meta">Date · scope · versions covered</div>
+  <!-- optional icon, top right; any small SVG -->
+  <svg class="icon" viewBox="0 0 100 100"><g fill="none" stroke-width="2.4">
+    <path d="M50 8 L88 28 L50 48 L12 28 Z" stroke="#ff7a66" fill="#c8341f" fill-opacity=".35"/>
+    <path d="M12 28 L12 52 L50 72 L50 48" stroke="#ff7a66"/><path d="M88 28 L88 52 L50 72" stroke="#ff7a66"/></g></svg>
+</div>
+
+<div class="box key"><span class="t">Five sentences that show you own this</span>
+  <ol style="margin-bottom:2pt">
+    <li><strong>The core mechanism</strong> in one sentence.</li>
+    <li><strong>The main trade-off</strong> and which side you pick.</li>
+    <li><strong>The number that decides the design</strong> and its consequence.</li>
+  </ol>
+</div>
+
+<h2>Contents</h2>
+<ul class="toc">
+  <li><b>1</b>Components <span>every building block</span></li>
+  <li><b>2</b>Diagrams and code</li>
+  <li><b>3</b>Cheat sheet</li>
+</ul>
+
+<!-- ======================= SECTION 1 ======================= -->
+<!-- .pb forces a page break before the element. Use it for the first section and the cheat sheet only;
+     everything else flows, so pages stay full. -->
+<div class="section pb">
+<h1><span class="n">1</span>Components<span class="slot">STAGE 1 · MIN 0–5</span></h1>
+<p>Body text is Inter 8.8 pt. <strong>Bold</strong> for the words a skimming reader must catch, <em>italic</em> for nuance,
+<code>inline code</code> for commands, keys and identifiers.</p>
+
+<h2>Callout boxes</h2>
+<div class="cols">
+<div class="box say"><span class="t">Say it</span><p>"A line the reader can say out loud, nearly verbatim."</p></div>
+<div class="box why"><span class="t">Why</span><p>The theory behind a decision, in plain words.</p></div>
+</div>
+<div class="cols">
+<div class="box trap"><span class="t">Trap</span><p>Something weak answers do, or a claim that breaks under a follow-up.</p></div>
+<div class="box key"><span class="t">Must-know</span><p>The one fact the section hinges on.</p></div>
+</div>
+<div class="box probe"><span class="t">Interviewer probes</span>
+<p><b>A follow-up question?</b> A short answer, one or two sentences.</p>
+<p><b>Another one?</b> Another short answer.</p></div>
+
+<h2>Tables</h2>
+<!-- Put the header row in <thead> so it repeats when a table crosses a page. -->
+<table>
+<thead><tr><th style="width:22%">Quantity</th><th style="width:28%">Arithmetic</th><th style="width:18%">Result</th><th>Consequence</th></tr></thead>
+<tr><td>Writes</td><td>100 M / day ÷ 86,400 s</td><td><strong>~1,200/s</strong></td><td>One database could take it</td></tr>
+<tr><td>Reads</td><td>100 × writes</td><td><strong>~115k/s</strong></td><td>This drives the design</td></tr>
+</table>
+<!-- .api: first column monospace (command), second narrow (cost), .grp rows are red group headers -->
+<table class="api">
+<thead><tr><th>Command</th><th>Cost</th><th>What it's for</th></tr></thead>
+<tr class="grp"><td colspan="3">A group of commands</td></tr>
+<tr><td>SET key val [NX] [PX ms]</td><td>O(1)</td><td>Create-if-absent with a TTL.</td></tr>
+<tr><td>GET key</td><td>O(1)</td><td>Read it back.</td></tr>
+</table>
+
+<h3>Numbered steps</h3>
+<ol class="steps">
+<li><strong>Validate</strong> the input.</li>
+<li><strong>Write</strong> with a conditional put.</li>
+</ol>
+
+<!-- ======================= SECTION 2 ======================= -->
+<h1><span class="n">2</span>Diagrams and code<span class="slot">DEEP DIVE</span></h1>
+<!-- A placeholder comment of the form "SVG:name" (see the next line) is replaced by svg/name.svg at build time -->
+<figure><!--SVG:example-->
+<figcaption><b>Figure 1. A caption starts with a bold title.</b> Then one or two sentences saying what to notice.</figcaption></figure>
+
+<div class="cols">
+<!-- In two columns keep code lines ≤ 50 characters; full width allows ~110. -->
+<pre><span class="c">-- comment</span>
+<span class="k">if</span> redis.call('GET', KEYS[1]) == ARGV[1] <span class="k">then</span>
+  <span class="k">return</span> redis.call('DEL', KEYS[1])
+<span class="k">end</span>
+<span class="k">return</span> 0</pre>
+<div class="box why"><span class="t">Code colours</span>
+<p><code>&lt;span class="k"&gt;</code> keywords (red), <code>&lt;span class="c"&gt;</code> comments (grey),
+<code>&lt;span class="s"&gt;</code> strings (green). Escape <code>&lt;</code>, <code>&gt;</code>, <code>&amp;</code> inside &lt;pre&gt;.</p></div>
+</div>
+
+<h2>Q&amp;A drill</h2>
+<div class="cols">
+<div>
+<div class="qa"><div class="q">A likely interview question?</div><div class="a">A one- or two-sentence answer.</div></div>
+</div>
+<div>
+<div class="qa"><div class="q">Another question?</div><div class="a">Another answer.</div></div>
+</div>
+</div>
+</div>
+
+<!-- ======================= CHEAT SHEET (last page) ======================= -->
+<!-- add "roomy" for larger text when the sheet has space: class="section pb cheat roomy" -->
+<div class="section pb cheat">
+<h1><span class="n">3</span>One-page cheat sheet</h1>
+<div class="cols3">
+<div>
+<h3>Numbers</h3>
+<table>
+<tr><td>Writes</td><td>~1,200/s</td></tr>
+<tr><td>Reads</td><td>~115k/s</td></tr>
+</table>
+</div>
+<div>
+<h3>Commands</h3>
+<table>
+<tr><td class="m">SET k v NX PX ms</td><td>lock, lease</td></tr>
+<tr><td class="m">INCR k</td><td>counter</td></tr>
+</table>
+</div>
+<div>
+<h3>The one-liner</h3>
+<p><em>"The sentence you want the interviewer to remember."</em></p>
+</div>
+</div>
+</div>
+</body></html>

@@ -18,13 +18,14 @@ been granted mid-round.*
 
 | | |
 |---|---|
+| **Session** | *certifying · practice (help: light / medium / heavy)* |
 | **Question** | *(bank ID + title)* |
 | **Company / level** | *(e.g. Google · `staff`)* |
 | **Kind / domain** | |
 | **Attempt** | *(N on this question)* |
-| **Mode / pace / difficulty** | |
+| **Mode / format / pace / difficulty** | |
 | **Started** | |
-| **Budget** | |
+| **Budget** | *(certifying: live clock — `scripts/clock.py watch --notify` in a second terminal · practice: no clock)* |
 
 **The prompt (verbatim):**
 
@@ -131,6 +132,12 @@ GET    /...
 
 *Budget: ~18 min including §3. Few boxes. Label every arrow with its protocol. Then be ready to walk
 one request end to end — you will be asked, every time.*
+
+**Drawing in Excalidraw?** Export PNG with *Embed scene* ticked into `board/` at the repo root
+(`board/hld-v1.png`, then `-v2` after changes), or paste a screenshot into chat. Write the current one
+here so the interviewer knows which to read — and keep §4.1 as text.
+
+**Current diagram:** *(e.g. `board/hld-v1.png`, or "ASCII below")*
 
 ```
        ┌──────────┐

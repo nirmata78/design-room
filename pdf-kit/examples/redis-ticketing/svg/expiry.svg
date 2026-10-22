@@ -1,0 +1,34 @@
+<svg class="d" viewBox="0 0 720 196" xmlns="http://www.w3.org/2000/svg">
+  <!-- lane 1 -->
+  <rect x="4" y="8" width="112" height="48" rx="5" class="bl"/>
+  <text x="60" y="28" class="c tb">Passive expiry</text><text x="60" y="44" class="c ts">on access</text>
+  <rect x="136" y="8" width="150" height="48" rx="5" class="b"/>
+  <text x="211" y="28" class="c ts">client touches key</text><text x="211" y="43" class="c ts">(GET, ZRANK, …)</text>
+  <rect x="306" y="8" width="150" height="48" rx="5" class="b"/>
+  <text x="381" y="28" class="c ts">expires[key] ≤ now ?</text><text x="381" y="43" class="c ts">lookup in expires dict</text>
+  <rect x="476" y="8" width="238" height="48" rx="5" class="w"/>
+  <text x="595" y="28" class="c ts">yes → delete now, reply as if missing</text><text x="595" y="43" class="c ts">no → serve normally</text>
+  <line x1="116" y1="32" x2="135" y2="32" class="ln"/><line x1="286" y1="32" x2="305" y2="32" class="ln"/><line x1="456" y1="32" x2="475" y2="32" class="ln"/>
+
+  <!-- lane 2 -->
+  <rect x="4" y="74" width="112" height="48" rx="5" class="bl"/>
+  <text x="60" y="94" class="c tb">Active expiry</text><text x="60" y="110" class="c ts">background cycle</text>
+  <rect x="136" y="74" width="150" height="48" rx="5" class="b"/>
+  <text x="211" y="94" class="c ts">every 100 ms (hz 10)</text><text x="211" y="109" class="c ts">time-boxed slice</text>
+  <rect x="306" y="74" width="150" height="48" rx="5" class="b"/>
+  <text x="381" y="94" class="c ts">sample ~20 keys</text><text x="381" y="109" class="c ts">that have a TTL</text>
+  <rect x="476" y="74" width="238" height="48" rx="5" class="w"/>
+  <text x="595" y="94" class="c ts">delete the expired ones; repeat while</text><text x="595" y="109" class="c ts">enough of the sample was expired</text>
+  <line x1="116" y1="98" x2="135" y2="98" class="ln"/><line x1="286" y1="98" x2="305" y2="98" class="ln"/><line x1="456" y1="98" x2="475" y2="98" class="ln"/>
+
+  <!-- lane 3 -->
+  <rect x="4" y="140" width="112" height="48" rx="5" class="r"/>
+  <text x="60" y="160" class="c tb">Eviction</text><text x="60" y="176" class="c ts">memory full</text>
+  <rect x="136" y="140" width="150" height="48" rx="5" class="b"/>
+  <text x="211" y="160" class="c ts">a write arrives and</text><text x="211" y="175" class="c ts">used_memory &gt; maxmemory</text>
+  <rect x="306" y="140" width="150" height="48" rx="5" class="b"/>
+  <text x="381" y="160" class="c ts">sample 5 keys</text><text x="381" y="175" class="c ts">(maxmemory-samples)</text>
+  <rect x="476" y="140" width="238" height="48" rx="5" class="w"/>
+  <text x="595" y="160" class="c ts">evict the best candidate for the policy</text><text x="595" y="175" class="c ts tb">noeviction → the write fails with OOM</text>
+  <line x1="116" y1="164" x2="135" y2="164" class="ln"/><line x1="286" y1="164" x2="305" y2="164" class="ln"/><line x1="456" y1="164" x2="475" y2="164" class="ln"/>
+</svg>

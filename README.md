@@ -4,7 +4,7 @@
 
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://nirmata78.github.io/design-room/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-![92 questions](https://img.shields.io/badge/questions-92-orange)
+![93 questions](https://img.shields.io/badge/questions-93-orange)
 ![6 levels](https://img.shields.io/badge/levels-Senior%20→%20Director-blue)
 ![Runs on Claude Code](https://img.shields.io/badge/runs%20on-Claude%20Code-8A2BE2)
 
@@ -19,6 +19,9 @@ It is not a chatbot that explains system design to you. It is a room with a stra
 help, will not praise you, and will stop on time. **That is the point** — the failure modes it trains
 away (not scoping, not managing the clock, not going deep, not talking about operations or cost) are
 behavioural, and they only surface under those conditions.
+
+When you want to *learn* a problem rather than be tested on it, ask for a **practice session**: same
+round, no clock, and a coach alongside the interviewer who hands you partial solutions to finish.
 
 ---
 
@@ -47,6 +50,8 @@ from the template, starts a real clock, and reads you a problem.
 
 ```
 Mock me: SD-08, Google, em, full round, brutal.
+Practice SD-47 — coach me through it.
+Certify SD-47 as data-co, drip format, pace hour.
 Mock me as staff on something fintech.
 Director round — surprise me.
 Surprise me — pick my weakest archetype.
@@ -60,6 +65,33 @@ confidentiality rules about your employer. `profile.md` is gitignored and never 
 > **No Claude Code?** [`prompts/`](prompts/README.md) has a paste-into-any-chat version. It has no
 > clock, no workspace and no memory between rounds, so it is a much weaker simulation — but it works
 > anywhere.
+
+### Two session types — certify, or practise with a coach
+
+| | **certifying** *(default)* | **practice** |
+|---|---|---|
+| Feels like | the real loop | a round with a coach beside you |
+| Clock | **real, ticking, enforced** — alarms at every phase budget and at T−10 | **none** |
+| Help | the hint ladder, sparingly, and it costs you | hints, suggestions and **partial solutions with blanks** you finish: compute the numbers, justify the choice, complete the diagram |
+| Every message | the interviewer's probe | the interviewer's probe **plus** a separate coach block: what it's testing · a hint · a scaffold · your move |
+| Result | scored report, weighted outcome, trend | practice report: how much you did unaided, where the help went, readiness estimate — no score |
+
+In practice, say `more help` · `less help` · `check my work` · `show me`. The coach fades the help as
+you get it right, aiming to finish the round at `light`. Then certify on the same question cold, three
+or more days later. Full rules: `CLAUDE.md` §0.2 and §16.
+
+**The clock (certifying).** `scripts/clock.py` keeps real wall-clock time; the interviewer is woken by
+it at each phase budget, T−10 and the end, even if you're silent. To watch it yourself, open a second
+terminal:
+
+```bash
+scripts/clock.py watch --notify     # live line + bell + macOS notification at every alarm
+```
+
+**Drawing in Excalidraw.** Paste a screenshot into chat, or export PNG (*Embed scene* ticked) into
+`board/` — `board/hld-v1.png`, `-v2` after changes — and say *"look at §4"*. Claude reads images;
+the embedded scene keeps an editable copy in the session archive. Keep the numbered walk-through in
+§4.1 as text.
 
 ---
 
@@ -146,6 +178,9 @@ round stops being scoreable. That's a deliberate trade, not a failure.
 | `as staff` · `level director` · `domain crypto` | Sets the level or the domain filter for the session |
 | `report` | Re-renders the latest session's PDF |
 | `history` · `how am I doing?` | Trend by level, coverage gaps, standing weaknesses, drills not done |
+| `more help` · `less help` | *Practice:* moves the coach's help dial |
+| `check my work` | *Practice:* checks what you just wrote — arithmetic, gaps, the why |
+| `show me` | *Practice:* the worked answer for this step only (logged) |
 | `coach mode` | Breaks character to teach. Round becomes unscoreable |
 
 ---
@@ -168,9 +203,9 @@ week, run `loop` with the company's flagship questions.
 
 ---
 
-## 5 · The question bank — 92 questions, sliced four ways
+## 5 · The question bank — 93 questions, sliced four ways
 
-[`Question-Bank.md`](Question-Bank.md) is the index. **40 full cue sheets** (crux, clarification
+[`Question-Bank.md`](Question-Bank.md) is the index. **41 full cue sheets** (crux, clarification
 numbers, checklist, phase-by-phase probes, curveball, weak/strong/exceptional, traps) and **52 compact
 ones**, all runnable. Every question carries four tags:
 
@@ -221,9 +256,12 @@ that feel comfortable.
 ### Reference solutions and theory
 
 - **[Reference solutions](solutions/README.md)** — stage-by-stage answer keys for the five most-asked
-  problems (rate limiter, news feed, chat, distributed KV store, payments ledger): what to ask, the
-  numbers that decide the design, diagrams, deep dives, failure modes, SLOs, what changes by level, and
-  the four-sentence close. **Read them after you've run the round, not before.**
+  problems (rate limiter, news feed, chat, distributed KV store, payments ledger), plus a 50-page
+  illustrated booklet for SD-47 ticket booking: what to ask, the numbers that decide the design,
+  diagrams, deep dives, failure modes, SLOs, what changes by level, and the four-sentence close.
+  **Read them after you've run the round, not before** — or let the coach use them in a practice session.
+- **[Tool-depth crib](guides/tool-depth-crib.md)** — what "talk in depth about that tool" means for
+  PostgreSQL, Kafka, Redis and an object store + CDN.
 - **[Theory](theory/README.md)** — nine chapters on the building blocks: the interview method,
   estimation, storage and partitioning, replication and consistency, caching, messaging, correctness
   under failure, reliability and operations, real-time connections.
@@ -282,7 +320,7 @@ through it on paper scores you on the same axes.
 design-room/
 ├── CLAUDE.md                the interviewer's operating manual — the engine. Read by Claude, not you
 ├── README.md                this file
-├── Question-Bank.md         index of all 92 questions — by archetype, kind, domain and level
+├── Question-Bank.md         index of all 93 questions — by archetype, kind, domain and level
 ├── levels.md                six levels on two tracks: the bar, the weights, the outcome thresholds
 ├── solutions/               reference answer keys — read after a round, never before
 ├── theory/                  nine building-block chapters the solutions link into
@@ -292,7 +330,7 @@ design-room/
 │   ├── C-storage-data-consistency.md      SD-15…23
 │   ├── D-infrastructure-control-planes.md SD-24…35
 │   ├── E-search-geo-ml.md                 SD-36…43
-│   ├── F-transactions-payments.md         SD-44…50, SD-77…82 (fintech)
+│   ├── F-transactions-payments.md         SD-44…50, SD-77…82 (fintech), SD-93
 │   ├── G-media-delivery.md                SD-51…54
 │   ├── H-em-specific-rounds.md            SD-55…62, SD-89…92 (senior EM / director)  ← inverted rounds + keys
 │   ├── I-ai-llm-systems.md                SD-63…70
@@ -300,23 +338,30 @@ design-room/
 │   └── K-staff-technical-leadership.md    SD-83…88  ← inverted rounds + keys
 ├── templates/
 │   ├── interview-template.md   copied to ./interview.md at session start
-│   ├── report-template.md      the per-attempt report
-│   └── report.css              its print styling
+│   ├── report-template.md      the per-attempt report (certifying)
+│   ├── practice-report-template.md   the practice-session report
+│   ├── report-kit.html         report layout for the PDF kit
+│   └── report.css              print styling for the fallback engines
 ├── scripts/
-│   └── build-report.sh      report.md → report.pdf
+│   ├── clock.py             the real-time round clock: start · status · watch · wait · pause · stop
+│   └── build-report.sh      report.md → report.pdf (PDF kit if set up, else Chrome / weasyprint / LaTeX)
+├── pdf-kit/                 HTML + SVG → booklet-style A4 PDFs; three worked examples
 ├── Scorecard-Template.md    the nine-dimension rubric
 ├── Cue-Sheet-Template.md    for running a prompt that isn't in the bank
 ├── Progress-Log.template.md copied to Progress-Log.md on first run
 ├── profile.example.md       copy to profile.md to calibrate the interviewer to you
 ├── guides/
 │   ├── interviewer-guide.md the persona — also usable by a human mock partner
-│   └── playbook.md          how to behave in the room; estimation number kit; phrasebook
+│   ├── playbook.md          how to behave in the room; estimation number kit; phrasebook
+│   └── tool-depth-crib.md   what "in depth" means for the default tools
 ├── prompts/                 paste-into-any-chat fallbacks (system design, behavioural, coding)
 │
 │   ── private, gitignored ──
 ├── profile.md               who you are and what you're targeting
 ├── Progress-Log.md          one row per round; drives "surprise me" and coverage tracking
 ├── interview.md             YOUR WORKSPACE — exists only during a session
+├── board/                   your Excalidraw exports during a session
+├── private/                 your own loop briefs and study PDFs (e.g. private/<company>/)
 └── sessions/                one directory per attempt: interview.md · scorecard.md · report.md · report.pdf
 ```
 

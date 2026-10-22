@@ -1,0 +1,16 @@
+@startuml
+!include <C4/C4_Context>
+LAYOUT_LEFT_RIGHT()
+HIDE_STEREOTYPE()
+Person(fan, "Fan", "Joins the queue, picks seats, pays")
+Person(ops, "Promoter ops", "Creates events, releases inventory")
+System_Ext(edge, "CDN + bot defence", "Static assets, WAF, challenge")
+System(tix, "Ticketing Platform", "Waiting room, seat inventory, holds, orders, tickets")
+System_Ext(psp, "Payment provider", "Authorize / capture / void; 2-10 s, ambiguous timeouts")
+System_Ext(msg, "Email / push provider", "Tickets, waitlist alerts")
+Rel(fan, edge, "HTTPS")
+Rel(edge, tix, "HTTPS, admission token")
+Rel(ops, tix, "Admin UI")
+Rel(tix, psp, "Payments API + webhooks")
+Rel(tix, msg, "Send")
+@enduml

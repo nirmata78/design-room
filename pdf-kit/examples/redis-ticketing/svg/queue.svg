@@ -1,0 +1,44 @@
+<svg class="d" viewBox="0 0 720 222" xmlns="http://www.w3.org/2000/svg">
+  <rect x="20" y="6" width="214" height="56" rx="5" class="bl"/>
+  <text x="127" y="22" class="c tb">Before T0 · phase = LOBBY</text>
+  <text x="30" y="39" class="tm">ZADD lobby:{e} NX</text>
+  <text x="30" y="53" class="tm">     &lt;secret score&gt; &lt;user&gt;</text>
+  <rect x="252" y="6" width="214" height="56" rx="5" class="a"/>
+  <text x="359" y="22" class="c tb">At T0 · open_queue.lua</text>
+  <text x="262" y="39" class="tm">SET phase:{e} QUEUE</text>
+  <text x="262" y="53" class="tm">SET next:{e} (ZCARD lobby) = n</text>
+  <rect x="484" y="6" width="216" height="56" rx="5" class="b"/>
+  <text x="592" y="22" class="c tb">After T0 · late arrivals</text>
+  <text x="494" y="39" class="tm">INCR next:{e} → n+1, n+2, …</text>
+  <text x="494" y="53" class="tm">HSET seqOf:{e} user seq</text>
+
+  <!-- the line -->
+  <rect x="20" y="104" width="470" height="36" class="bl"/>
+  <rect x="490" y="104" width="210" height="36" class="b"/>
+  <rect x="20" y="104" width="150" height="36" class="r" style="fill-opacity:.85"/>
+  <text x="95" y="126" class="c ts tb">admitted</text>
+  <text x="330" y="120" class="c ts">seq 1 … n = ZRANK lobby + 1</text>
+  <text x="330" y="133" class="c ts">lobby fans, random order (the draw)</text>
+  <text x="595" y="120" class="c ts">seq n+1 … next</text>
+  <text x="595" y="133" class="c ts">arrived after T0, FIFO</text>
+  <line x1="127" y1="62" x2="127" y2="103" class="ln dash"/>
+  <line x1="595" y1="62" x2="595" y2="103" class="ln dash"/>
+
+  <!-- pointer -->
+  <line x1="170" y1="156" x2="170" y2="141" class="ln-r"/>
+  <text x="170" y="170" class="c tm tr tb">admittedUpTo:{e}</text>
+  <text x="170" y="184" class="c ts">+= R/60 every second,</text>
+  <text x="170" y="197" class="c ts">never past next:{e}</text>
+
+  <!-- fan marker -->
+  <line x1="320" y1="156" x2="320" y2="141" class="ln"/>
+  <text x="320" y="170" class="c tm">you: seq 412,377</text>
+  <text x="320" y="184" class="c ts">ahead = seq − pointer</text>
+  <text x="320" y="197" class="c ts">(computed in the browser)</text>
+
+  <rect x="412" y="152" width="288" height="64" rx="5" class="w"/>
+  <text x="420" y="168" class="ts"><tspan class="tb">Poll:</tspan> <tspan class="tm">MGET admittedUpTo rate soldOut</tspan></text>
+  <text x="420" y="182" class="ts">   same bytes for everyone → CDN, 1 s TTL</text>
+  <text x="420" y="198" class="ts"><tspan class="tb">Admit:</tspan> seq ≤ pointer, then</text>
+  <text x="420" y="211" class="ts">   <tspan class="tm">SET admitted:{e}:{u} &lt;jti&gt; NX EX 600</tspan></text>
+</svg>

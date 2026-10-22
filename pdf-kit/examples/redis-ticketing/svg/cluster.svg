@@ -1,0 +1,41 @@
+<svg class="d" viewBox="0 0 720 256" xmlns="http://www.w3.org/2000/svg">
+  <text x="20" y="14" class="lab">16,384 HASH SLOTS · slot = CRC16(hash tag or key) mod 16384</text>
+  <rect x="20" y="26" width="226" height="24" class="r"/><text x="133" y="42" class="c ts">slots 0 – 5460</text>
+  <rect x="246" y="26" width="227" height="24" class="bl"/><text x="359" y="42" class="c ts">slots 5461 – 10922</text>
+  <rect x="473" y="26" width="227" height="24" class="g"/><text x="632" y="42" class="c ts">slots 10923 – 16383</text>
+  <line x1="41" y1="20" x2="41" y2="56" style="stroke:#1f2328;stroke-width:2"/>
+  <text x="46" y="66" class="ts tb">500 ← "evt-7731"</text>
+  <line x1="547" y1="20" x2="547" y2="56" style="stroke:#1f2328;stroke-width:2"/>
+  <text x="552" y="66" class="ts tb">12695 ← "evt-7732"</text>
+
+  <rect x="20" y="80" width="170" height="70" rx="5" class="r"/>
+  <text x="105" y="97" class="c tb">Primary A  10.0.1.11</text>
+  <text x="30" y="115" class="tm">lobby:{evt-7731}</text>
+  <text x="30" y="129" class="tm">next:{evt-7731}</text>
+  <text x="30" y="143" class="tm">admitted:{evt-7731}:{u}</text>
+  <rect x="196" y="92" width="44" height="46" rx="5" class="b"/><text x="218" y="119" class="c ts">A′</text>
+
+  <rect x="256" y="80" width="170" height="70" rx="5" class="bl"/>
+  <text x="341" y="97" class="c tb">Primary B  10.0.1.12</text>
+  <text x="266" y="122" class="tm">(other events)</text>
+  <rect x="432" y="92" width="44" height="46" rx="5" class="b"/><text x="454" y="119" class="c ts">B′</text>
+
+  <rect x="492" y="80" width="170" height="70" rx="5" class="g"/>
+  <text x="577" y="97" class="c tb">Primary C  10.0.1.13</text>
+  <text x="502" y="115" class="tm">lobby:{evt-7732}</text>
+  <text x="502" y="129" class="tm">next:{evt-7732}</text>
+  <rect x="668" y="92" width="44" height="46" rx="5" class="b"/><text x="690" y="119" class="c ts">C′</text>
+
+  <rect x="280" y="210" width="130" height="40" rx="5" class="w"/>
+  <text x="345" y="227" class="c tb">client</text><text x="345" y="242" class="c ts">caches slot → node map</text>
+  <line x1="330" y1="209" x2="330" y2="151" class="ln"/>
+  <text x="200" y="176" class="ts">① GET next:{evt-7731}</text>
+  <text x="200" y="189" class="ts">   (stale map says B)</text>
+  <line x1="372" y1="151" x2="372" y2="209" class="ln-r"/>
+  <text x="380" y="176" class="ts tr">② -MOVED 500 10.0.1.11:6379</text>
+  <text x="380" y="189" class="ts">   update map, never ask B again</text>
+  <path d="M280,232 L105,232 L105,151" class="ln-g"/>
+  <text x="112" y="222" class="ts tg">③ retry on A</text>
+  <text x="430" y="226" class="ts">During a slot move: <tspan class="tm">-ASK 500 host</tspan> = one-off;</text>
+  <text x="430" y="240" class="ts">send <tspan class="tm">ASKING</tspan> + command to the target, keep the map.</text>
+</svg>

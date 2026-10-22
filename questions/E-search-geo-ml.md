@@ -265,6 +265,8 @@ the one most candidates never reach on their own.
 next-ride while still finishing the current one."* Tests whether their claim mechanism generalises from
 binary availability to capacity.
 
+**Drips** (format `drip`, §7.5 — read the prompt above as increment #1): **#2** *"Add surge pricing."* · **#3** *"We're expanding to a second continent."* Listen for the delta stated out loud and the seam that absorbs it.
+
 **Weak / Strong / Exceptional.** *Weak* — driver locations in a relational table, a query computing
 distance across all rows, nearest driver returned with no claim step. *Strong* — cell-based index with
 neighbour queries, ephemeral in-memory location store, region sharding, atomic claim plus an offer

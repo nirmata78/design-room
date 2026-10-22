@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Notification Platform Reference Interview</title>
+<link rel="stylesheet" href="style.css">
+</head><body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L10,5 L0,9 z" fill="#57606a"/></marker>
+<marker id="ahr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,1 L10,5 L0,9 z" fill="#c8341f"/></marker>
+<marker id="ahg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,1 L10,5 L0,9 z" fill="#2d8a4e"/></marker>
+</defs></svg>
+
+<!-- ============================ COVER ============================ -->
+<div class="cover-band">
+  <div class="tag">Reference interview · System design · SD-12</div>
+  <h0>Notification Platform,<br>passed.</h0>
+  <div class="sub">Push, email, SMS and in-app for twenty product teams and 500 million users, run stage by stage:
+  what to ask, what to compute, what to draw and what to say, with the theory behind each choice.</div>
+  <div class="meta">21 October 2026 · built on the SD-12 reference design · 45-minute round</div>
+  <svg class="link" viewBox="0 0 100 100"><g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M30 70 L30 46 C30 32 39 24 50 24 C61 24 70 32 70 46 L70 70 L78 78 L22 78 L30 70 Z" stroke="#ff7a66" stroke-width="6" fill="#c8341f" fill-opacity=".35"/>
+    <path d="M42 84 C44 90 56 90 58 84" stroke="#8c959f" stroke-width="6"/>
+    <circle cx="76" cy="26" r="9" fill="#ff7a66"/></g></svg>
+</div>
+
+<div class="box key">
+  <span class="t">Five sentences that pass this round</span>
+  <ol style="margin-bottom:2pt">
+    <li><strong>This is a governance problem, not a delivery problem.</strong> Sending a push is one API call; the platform's value is stopping twenty teams from spamming, duplicating, waking up or overcharging 500 million users.</li>
+    <li><strong>Twelve thousand a second is ordinary.</strong> The numbers that shape the design are the 10× campaign peak, which we cause ourselves and therefore shape, and the SMS bill.</li>
+    <li><strong>Intent is made durable first, in a Kafka topic per priority</strong>; policy runs after, as ordered gates: kill switch, dedup, consent, per-user rate, quiet hours, routing.</li>
+    <li><strong>Priorities are isolated at every layer</strong>, from topics to consumer pools, worker lanes and reserved provider capacity, so a password reset never waits behind a 400 M campaign.</li>
+    <li><strong>Fall back only on a definite failure, and be honest about recall:</strong> a sent push, email or SMS can't be taken back, so prevent with canaries and halt within seconds.</li>
+  </ol>
+</div>
+
+<figure><!--SVG:clock-->
+<figcaption><b>The round on a 45-minute clock.</b> Requirements, numbers and API take a third. The design and the deep dives the interviewer chooses take half.</figcaption></figure>
+
+<h2>How to use this</h2>
+<p>Each section is one stage of the round, in the order you'll run it. <strong>Green boxes</strong> are lines to say in the room,
+<strong>purple</strong> are the follow-ups the interviewer asks at that point, <strong>blue</strong> is theory, <strong>amber</strong> a trap,
+<strong>red</strong> a must-know. Why this design matters beyond itself: in any consumer design round, "now notify the user when…" is the
+requirement most likely to be added mid-round. Knowing it lets you answer in two minutes inside another question.</p>
+
+<h2>Contents</h2>
+<ul class="toc">
+  <li><b>1</b>Requirements <span>stage 1</span></li>
+  <li><b>2</b>Back-of-the-envelope <span>cost and peak</span></li>
+  <li><b>3</b>API <span>idempotent intake, campaigns, halt</span></li>
+  <li><b>4</b>Data model and stores <span>Kafka, Redis, Cassandra</span></li>
+  <li><b>5</b>High-level design <span>context, containers, lifecycle</span></li>
+  <li><b>6</b>The governance gates <span>deep dive</span></li>
+  <li><b>7</b>Priority isolation <span>deep dive</span></li>
+  <li><b>8</b>Campaigns and the kill switch <span>deep dive</span></li>
+  <li><b>9</b>Delivery, fallback, providers <span>deep dive</span></li>
+  <li><b>10</b>Requirements added mid-round</li>
+  <li><b>11</b>Failure modes, SLOs, operations</li>
+  <li><b>12</b>The EM layer and the close</li>
+  <li><b>13</b>Rapid-fire follow-ups and self-check</li>
+  <li><b>14</b>One-page cheat sheet</li>
+</ul>
+
+<!-- ============================ 1 ============================ -->
+<div class="section pb">
+<h1><span class="n">1</span>Requirements<span class="slot">STAGE 1 · MIN 0–5</span></h1>
+<p><strong>The prompt:</strong> <em>"Design the platform that sends notifications to users across push, email and SMS, used by every product team in the company."</em>
+Ask six questions; each one changes a box on the whiteboard.</p>
+<table>
+<thead><tr><th style="width:17%">I ask</th><th style="width:33%">Interviewer answers</th><th>Why it changes the design</th></tr></thead>
+<tr><td>Volume and peak?</td><td>500 M users, 1 B notifications/day, 10× peak during campaigns</td><td>Queue sizing. The peak is self-inflicted, so it can be <strong>shaped</strong></td></tr>
+<tr><td>Channels?</td><td>Mobile push, email, SMS, in-app; third-party providers with their own rate limits</td><td>One adapter per provider; provider limits are a hard ceiling</td></tr>
+<tr><td>Latency classes?</td><td>Transactional in seconds, marketing in minutes</td><td>Priority isolation: a campaign must never delay a password reset</td></tr>
+<tr><td>Duplicates?</td><td>A user must never get the same notification twice</td><td>Dedup key and window; careful fallback logic</td></tr>
+<tr><td>Who calls it?</td><td>~20 product teams</td><td>Multi-tenancy: quotas, templates, ownership, on-call boundaries</td></tr>
+<tr><td>Legal? <span class="muted">(you raise it)</span></td><td>Opt-out must be honoured; email and SMS consent rules vary by country</td><td>Consent is a <strong>blocking gate</strong>, not a filter we "try"</td></tr>
+</table>
+
+<div class="cols">
+<div>
+<h3>In scope</h3>
+<p>Intake API, campaigns, policy (consent, dedup, rate, quiet hours), routing and fallback, delivery, in-app inbox, status tracking, kill switch.</p>
+<h3>Out of scope (say it)</h3>
+<p>Content-authoring UI, segmentation and ML targeting, A/B testing of copy, the email and SMS providers themselves.</p>
+<h3>Priority classes</h3>
+<table>
+<thead><tr><th>Class</th><th>Examples</th><th>Target</th></tr></thead>
+<tr><td><strong>P0</strong> critical</td><td>OTP, password reset, fraud alert</td><td>p99 &lt; 5 s, always</td></tr>
+<tr><td><strong>P1</strong> transactional</td><td>order shipped, driver arriving, mention</td><td>p99 &lt; 60 s</td></tr>
+<tr><td><strong>P2</strong> bulk</td><td>marketing, digests, re-engagement</td><td>minutes to hours</td></tr>
+</table>
+</div>
+<div>
+<h3>Non-functional requirements</h3>
+<table>
+<thead><tr><th>Requirement</th><th>Target</th></tr></thead>
+<tr><td>P0 accept → provider</td><td><strong>p99 &lt; 5 s</strong>, even during a campaign</td></tr>
+<tr><td>Duplicates</td><td>none within the window (&lt; 1 in 10⁶)</td></tr>
+<tr><td>Consent</td><td><strong>zero</strong> sends without it, audited</td></tr>
+<tr><td>Campaign halt</td><td>effective within seconds (p99 &lt; 5 s)</td></tr>
+<tr><td>Stale messages</td><td>never sent after <code>expiresAt</code></td></tr>
+<tr><td>Intake</td><td>202 means durably queued</td></tr>
+</table>
+<div class="box key"><span class="t">The insight to land by minute 10</span>
+<p>Sending a push is one API call. The platform's value is everything that stops twenty teams from spamming, duplicating,
+waking up or overcharging 500 million users: consent, dedup, per-user rate limits, quiet hours, priority isolation and a kill switch.
+A design that's only a delivery pipeline has missed the question.</p></div>
+</div>
+</div>
+
+<div class="box say"><span class="t">Say it</span>
+<p>"Before boxes: this is a platform and governance problem. Twenty teams share 500 million users' attention, so the platform has to
+enforce consent, dedup, rate limits and quiet hours centrally, and a campaign must never delay a password reset."</p></div>
+
+<!-- ============================ 2 ============================ -->
+<h1><span class="n">2</span>Back-of-the-envelope<span class="slot">STAGE 2 · MIN 5–10</span></h1>
+<table>
+<thead><tr><th style="width:15%">Quantity</th><th style="width:27%">Arithmetic</th><th style="width:20%">Result</th><th>Consequence</th></tr></thead>
+<tr><td>Average rate</td><td>1,000,000,000 ÷ 86,400</td><td><strong>~12k/s</strong> (11,574)</td><td>Ordinary: Kafka handles it on a handful of brokers</td></tr>
+<tr><td>Peak</td><td>× 10 during campaigns</td><td><strong>~120k/s</strong></td><td>The peak is campaigns, so <strong>throttle the release</strong> instead of provisioning for it</td></tr>
+<tr><td>Channel mix (assumed)</td><td>push 70% · in-app 15% · email 13% · SMS 2%</td><td>700 M · 150 M · 130 M · 20 M per day</td><td>—</td></tr>
+<tr><td>SMS cost</td><td>20 M × ~$0.01 (varies by country)</td><td><strong>~$200k/day, ~$73 M/year</strong></td><td>The dominant cost at 2% of volume → push first, SMS only where required</td></tr>
+<tr><td>Email cost</td><td>130 M × $0.10 per 1,000</td><td>~$13k/day</td><td>Secondary; reputation (bounces, complaints) matters more than price</td></tr>
+<tr><td>A 400 M campaign</td><td>400,000,000 ÷ 50,000/s</td><td>8,000 s ≈ <strong>2.2 hours</strong></td><td>Fine for marketing; leaves headroom for P0 and P1</td></tr>
+<tr><td>Dedup store</td><td>1 B keys/day × ~100 B, 24 h TTL</td><td><strong>~100 GB</strong> RAM</td><td>Redis cluster for 24 h; disk KV with TTL for longer windows</td></tr>
+<tr><td>Preferences</td><td>500 M × ~500 B</td><td>~250 GB; ~120k reads/s at peak</td><td>KV store + local cache in policy workers</td></tr>
+<tr><td>Delivery log</td><td>1 B × ~3 status events × ~200 B</td><td>~0.6 TB/day, <strong>~55 TB</strong> at 90 days</td><td>Wide-column or columnar store, not the OLTP database</td></tr>
+</table>
+
+<figure><!--SVG:cost-->
+<figcaption><b>Where the money goes.</b> SMS is 2% of the messages and about 94% of the provider bill. That's why routing prefers push and in-app, and why every tenant should see its own SMS cost.</figcaption></figure>
+
+<div class="cols">
+<div class="box why"><span class="t">Little's law: L = λ · W</span>
+<p>Items in a system = arrival rate × time each spends there. Three uses here:</p>
+<ul>
+<li><strong>Provider calls in flight:</strong> 120k/s × ~100 ms per call ≈ <strong>12,000 concurrent requests</strong>. So workers need async,
+multiplexed HTTP/2 clients (APNs is HTTP/2), not a thread per call.</li>
+<li><strong>Campaign drain:</strong> W = L / λ = 400 M ÷ 50k/s ≈ 2.2 h, the time the backlog sits in Kafka.</li>
+<li><strong>Policy workers:</strong> at ~2k messages/s each (a few pipelined Redis calls), peak needs ~60 workers, so P2 needs ≥ 64 partitions.</li>
+</ul></div>
+<div class="box why"><span class="t">Shape the peak, don't buy it</span>
+<p>A 10× peak you <em>cause</em> is a scheduling decision. Provisioning every layer, every provider contract and every SMS quota for 120k/s
+would be idle 23 hours a day. Releasing campaigns at a capped rate turns the spike into a 2-hour plateau that fits next to P0 and P1.</p>
+<p><strong>Kafka at peak:</strong> 120k/s × ~1 KB ≈ 120 MB/s in, ×3 replicas ≈ 360 MB/s of disk writes across the cluster: a handful of brokers.</p></div>
+</div>
+<div class="box say"><span class="t">Say it</span>
+<p>"Throughput isn't the hard part: twelve thousand a second is ordinary. The two numbers that shape the design are the SMS bill, about
+seventy million a year at two percent of volume, and the 10× peak, which we create ourselves with campaigns, so I'll shape it rather than buy capacity for it."</p></div>
+
+<!-- ============================ 3 ============================ -->
+<h1><span class="n">3</span>API<span class="slot">STAGE 3 · MIN 10–15</span></h1>
+<table class="api">
+<thead><tr><th>Endpoint</th><th>Returns</th><th>Purpose and notes</th></tr></thead>
+<tr><td>POST /v1/notifications</td><td>202 · 200 · 429</td><td>Send intent from a tenant service (mTLS). Same <code>dedupKey</code> again → 200 with the original id.</td></tr>
+<tr><td>POST /v1/campaigns</td><td>201</td><td><code>{segmentId, template, schedule, ratePerSec}</code> → campaignId.</td></tr>
+<tr><td>POST /v1/campaigns/{id}/halt</td><td>202</td><td>The kill switch; effective within seconds.</td></tr>
+<tr><td>GET /v1/notifications/{id}</td><td>200</td><td>Status per channel, with suppression reasons.</td></tr>
+<tr><td>GET /v1/users/{id}/inbox?cursor=…</td><td>200</td><td>The in-app feed, newest first.</td></tr>
+<tr><td>PUT /v1/users/{id}/preferences</td><td>200</td><td>Category × channel opt-ins, quiet hours, time zone.</td></tr>
+</table>
+<div class="cols">
+<pre><span class="c">// a tenant sends one intent</span>
+POST /v1/notifications
+{ "tenant": "auth",
+  "userId": "9",            <span class="c">// or userIds[] ≤ 1k</span>
+  "category": "security",   <span class="c">// security | order |</span>
+                            <span class="c">// social | marketing</span>
+  "template": "reset_pw", "version": 7,
+  "params": { "link": "…" },
+  "priority": "P0",
+  "dedupKey": "reset:9:req123",
+  "channels": ["push", "email"],   <span class="c">// optional</span>
+  "expiresAt": "2026-10-21T19:15:00Z" }
+
+HTTP/1.1 202 Accepted
+{ "notificationId": "n_8f3c…" }</pre>
+<div>
+<div class="box why"><span class="t">What 202 promises, exactly</span>
+<p><strong>"Durably queued, nothing more."</strong> Intake returns 202 after Kafka acknowledged the write with <code>acks=all</code> and
+<code>min.insync.replicas=2</code>, so the intent survives a broker loss. Delivery happens later, so 200 would be a lie and a synchronous
+call to the provider would couple every tenant to the slowest provider.</p></div>
+<div class="box why"><span class="t">Idempotency vs dedup: two different jobs</span>
+<p><strong>Idempotency</strong> protects against the <em>same request</em> arriving twice (a tenant retry after a timeout): same
+<code>dedupKey</code> → same <code>notificationId</code>. <strong>Dedup</strong> protects the <em>user</em> from two different requests that mean
+the same thing (a retry loop, two services reacting to one event). Making <code>dedupKey</code> mandatory turns both into a contract instead of a hope.</p></div>
+<div class="box probe"><span class="t">Interviewer probes</span>
+<p><b>Why does the tenant send category and priority?</b> Because policy depends on them, and they're validated against the tenant's allowed set:
+no team gets to declare its marketing P0.</p>
+<p><b>Why <code>expiresAt</code>?</b> So "your driver is here" is never delivered an hour late after an outage.</p></div>
+</div>
+</div>
+
+<!-- ============================ 4 ============================ -->
+<h1><span class="n">4</span>Data model and stores<span class="slot">STAGE 3 · MIN 10–15</span></h1>
+<table>
+<thead><tr><th style="width:21%">Store</th><th style="width:24%">Key</th><th>Content and why this store</th></tr></thead>
+<tr><td><strong>Intent</strong> · Kafka topic per priority</td><td>partition by userId</td><td>The durable request: survives worker crashes, gives per-user ordering, replayable after a bad deploy</td></tr>
+<tr><td><strong>Preferences</strong> · KV + cache</td><td>userId</td><td>Opt-in matrix (category × channel), time zone, quiet hours, locale, device tokens</td></tr>
+<tr><td><strong>Dedup / rate</strong> · Redis, TTL</td><td>(userId, dedupKey); (userId, category, day)</td><td>Seen markers; counters. Sub-millisecond on the hottest path</td></tr>
+<tr><td><strong>Templates</strong></td><td>(tenant, template, version)</td><td>Localized bodies per channel; a version is immutable once used</td></tr>
+<tr><td><strong>Delivery log</strong></td><td>(notificationId, channel)</td><td>ACCEPTED … DELIVERED / FAILED / SUPPRESSED + reason; ~1 B rows/day</td></tr>
+<tr><td><strong>Inbox</strong> · Cassandra</td><td>(userId, month)</td><td>In-app items and read state; the only channel where "unsend" works</td></tr>
+<tr><td><strong>Control plane</strong></td><td>tenant, campaignId</td><td>Quotas, kill flags, provider config</td></tr>
+</table>
+<div class="cols">
+<div class="box why"><span class="t">Kafka in five facts</span>
+<ul>
+<li>A <strong>topic</strong> is split into <strong>partitions</strong>; order is guaranteed only within one. Keying by userId keeps one user's notifications in order.</li>
+<li>Each <strong>consumer group</strong> reads every partition once, with its own offsets; partitions cap the group's parallelism.</li>
+<li><strong>Consumer lag</strong> (latest offset − committed offset) is the backlog; for P0 it's the health signal.</li>
+<li>Delivery to consumers is <strong>at-least-once</strong>: after a crash, messages since the last commit are re-read, so everything downstream must be idempotent.</li>
+<li>Retention makes it <strong>replayable</strong>: fix a policy bug, rewind the offsets, re-run.</li>
+</ul></div>
+<div>
+<pre><span class="c">-- in-app inbox, Cassandra</span>
+<span class="k">CREATE TABLE</span> inbox (
+  user_id  text,
+  month    text,          <span class="c">-- '2026-10'</span>
+  ts       timeuuid,
+  notif_id text,
+  title    text,  body text,
+  read     boolean,
+  <span class="k">PRIMARY KEY</span> ((user_id, month), ts)
+) <span class="k">WITH CLUSTERING ORDER BY</span> (ts <span class="k">DESC</span>)
+  <span class="k">AND</span> default_time_to_live = 7776000;  <span class="c">-- 90 d</span></pre>
+<div class="box why"><span class="t">Why Cassandra for inbox and log</span>
+<p>Write-heavy, time-ordered per user, expiring by age: exactly its shape. The month in the partition key keeps partitions bounded; TTL
+does retention. The catch: deletes write <strong>tombstones</strong>, so "delete from every inbox" is expensive and should be rare.</p></div>
+</div>
+</div>
+
+<!-- ============================ 5 ============================ -->
+<h1><span class="n">5</span>High-level design<span class="slot">STAGE 4 · MIN 15–25</span></h1>
+<figure><!--SVG:context-->
+<figcaption><b>System context.</b> Twenty tenants on one side, three paid providers on the other. The platform is the governance layer in between.</figcaption></figure>
+<figure><!--SVG:containers-->
+<figcaption><b>Containers.</b> Intent is made durable and prioritized before any policy runs; delivery is per channel behind provider adapters; feedback closes the loop.</figcaption></figure>
+
+<div class="cols">
+<div>
+<h3>One notification, end to end</h3>
+<ol class="steps">
+<li><strong>Intake</strong> authenticates the tenant, checks its quota, validates template, category and priority, and writes the intent to the topic for its priority. 202.</li>
+<li><strong>Campaigns</strong> don't call intake per user: the campaign service expands the segment in batches and releases into P2 at a configured rate.</li>
+<li><strong>Policy &amp; router</strong> consumes and runs the gates in order: kill switch → dedup → consent → per-user rate → quiet hours → channel choice (§6).</li>
+<li><strong>Channel workers</strong> render the template (locale, version) and call the provider through an adapter: rate limit, retries with jitter, circuit breaker.</li>
+<li><strong>Feedback ingest</strong> takes provider webhooks (receipts, bounces, invalid tokens), updates the delivery log and the token registry; in-app items land in the inbox.</li>
+</ol>
+</div>
+<div>
+<table>
+<thead><tr><th>Choice</th><th>Rejected, and why</th></tr></thead>
+<tr><td>Kafka, one topic per priority</td><td>One queue with a priority field: head-of-line blocking behind 400 M marketing messages</td></tr>
+<tr><td>Redis for dedup and rate</td><td>Database unique constraint: correct, but a write on the hottest path at 120k/s</td></tr>
+<tr><td>Cassandra for inbox and log</td><td>PostgreSQL: fine per row, painful at ~1 B rows a day</td></tr>
+<tr><td>Stateless policy workers</td><td>Rules embedded in each tenant service: the twenty-teams problem again</td></tr>
+<tr><td>Async 202 at intake</td><td>Synchronous provider call from the API: tenants inherit provider latency and outages</td></tr>
+</table>
+</div>
+</div>
+
+<figure><!--SVG:lifecycle-->
+<figcaption><b>The life of one notification.</b> SUPPRESSED is a first-class outcome: most of the platform's value is what it decides not to send. Every state change lands in the delivery log with a reason.</figcaption></figure>
+
+<div class="box say"><span class="t">Say it</span>
+<p>"Three layers: a durable, prioritized intent log; a stateless policy layer that decides whether a notification may exist and where it goes;
+and per-channel delivery behind provider adapters. Tenants only ever talk to the first layer."</p></div>
+
+<!-- ============================ 6 ============================ -->
+<h1><span class="n">6</span>Deep dive: the governance gates<span class="slot">STAGE 5 · MIN 25–38</span></h1>
+<figure><!--SVG:gates-->
+<figcaption><b>Policy &amp; router as ordered gates.</b> Cheapest and most absolute checks first. The router only sees notifications that are allowed to exist.</figcaption></figure>
+<table>
+<thead><tr><th style="width:13%">Gate</th><th style="width:33%">Check</th><th style="width:20%">Data</th><th>Why in this position</th></tr></thead>
+<tr><td>① Kill switch</td><td>Campaign or tenant halted?</td><td>local flag, pushed ≤ 1 s</td><td>Cheap, absolute, must win over everything</td></tr>
+<tr><td>② Dedup</td><td><code>(user, dedupKey)</code> seen in the window (24 h transactional; campaign lifetime for marketing)?</td><td>Redis <code>SET NX EX</code></td><td>Stops a tenant retry loop here, and alerts the tenant on its duplicate rate</td></tr>
+<tr><td>③ Consent</td><td>Category × channel opt-in, plus country law. Security always allowed; marketing never without opt-in</td><td>preferences (cached)</td><td>A blocking legal gate; unsubscribes apply immediately</td></tr>
+<tr><td>④ Rate limit</td><td>Token bucket per (user, category): e.g. ≤ 3 marketing/day, ≤ 20 social/day; P0 exempt</td><td>Redis counters</td><td>The platform's real product: it protects users from the company</td></tr>
+<tr><td>⑤ Quiet hours</td><td>Inside the user's quiet window, in their time zone?</td><td>preferences</td><td>Defer P1/P2 to a delayed queue; P0 is never deferred</td></tr>
+<tr><td>⑥ Route</td><td>Channel(s) by category, preference, device presence and cost</td><td>token registry</td><td>SMS only for OTP/security or where the user chose it</td></tr>
+</table>
+
+<div class="cols">
+<div>
+<div class="box why"><span class="t">Dedup that lets retries through</span>
+<p>Naive <code>SET NX</code> blocks our <em>own</em> retry after a worker crash. Store the notificationId as the value: a different id is a
+duplicate, the same id is a retry.</p>
+<pre><span class="c">-- Redis 7+: set if absent, return the old value</span>
+SET dd:{u9}:reset:9:req123 n_8f3c NX GET EX 86400
+<span class="c">--  nil    → first time: proceed</span>
+<span class="c">--  n_8f3c → my own retry: proceed</span>
+<span class="c">--  other  → duplicate: SUPPRESSED</span></pre>
+<p class="small">The <code>{u9}</code> hash tag keeps a user's dedup and rate keys on one Redis node, so one script can touch both.</p></div>
+</div>
+<div>
+<div class="box why"><span class="t">Token bucket, the formula</span>
+<p>A bucket holds up to <strong>B</strong> tokens and refills at <strong>r</strong> per second. On each request:</p>
+<pre>tokens = min(B, tokens + (now − last) · r)
+allow  = tokens ≥ 1;  if allow: tokens −= 1</pre>
+<p>"3 marketing a day" is B = 3, r = 3 / 86,400 s. Bursts up to B are allowed, the long-run rate is r. Keep <code>{tokens, last}</code> in a Redis hash, updated by one Lua script.</p></div>
+<div class="box why"><span class="t">Quiet hours need a delayed queue</span>
+<p>A deferred item needs a wake-up time: a Redis sorted set scored by due time (<code>ZRANGE … BYSCORE</code>, claim with <code>ZREM</code>),
+or a scheduler table. On wake-up it goes back through the gates, because consent or the kill switch may have changed while it slept.</p></div>
+</div>
+</div>
+<div class="box probe"><span class="t">Interviewer probes</span>
+<p><b>Why dedup before consent?</b> Both are cheap, but dedup is per message and stops tenant bugs early, and its rate is a signal we report back to the tenant.
+Consent then gates what remains. The kill switch beats both because it's free and absolute.</p>
+<p><b>The preference store is down. Do you send?</b> Fail closed for marketing (no consent proof, no send); P0 security proceeds because it's always allowed.</p></div>
+
+<!-- ============================ 7 ============================ -->
+<h1><span class="n">7</span>Deep dive: priority isolation<span class="slot">THE PROBE THAT SEPARATES</span></h1>
+<p><strong>The question:</strong> <em>"A user requests a password reset while a 400 M-message campaign is going out. What happens?"</em></p>
+<figure><!--SVG:isolation-->
+<figcaption><b>Isolation at every layer, not a priority field.</b> Separate topics, consumer groups, worker lanes and reserved provider capacity.</figcaption></figure>
+<figure><!--SVG:p0seq-->
+<figcaption><b>The P0 path during a campaign.</b> The campaign's backlog is invisible to it: P0 has its own topic, consumer pool and worker lane.</figcaption></figure>
+<div class="cols">
+<div class="box why"><span class="t">Head-of-line blocking</span>
+<p>In one FIFO queue, a message waits for everything ahead of it. A "priority field" inside that queue changes nothing for consumers reading in order,
+and Kafka has no per-message priority. Separate topics give each class its own line. The campaign is also rate-released, so it never floods even its own lane.</p></div>
+<div class="box why"><span class="t">Reserved provider capacity</span>
+<p>The last shared resource is the provider's rate limit. Reserve a slice (e.g. 20% of push and SMS quota) for P0, keep a second SMS aggregator for
+P0 failover, and alert on <strong>P0 consumer lag &gt; 2 s</strong>: that's the SLO that matters most.</p></div>
+</div>
+<div class="box say"><span class="t">Say it</span>
+<p>"Isolation is structural: its own topic, its own consumers, its own worker lane and reserved provider capacity. The campaign is invisible to the reset,
+and I alert on P0 lag above two seconds."</p></div>
+
+<!-- ============================ 8 ============================ -->
+<h1><span class="n">8</span>Deep dive: campaigns and the kill switch<span class="slot">DEEP DIVE</span></h1>
+<p><strong>The question:</strong> <em>"The campaign has a typo and 80 million have already gone."</em></p>
+<figure><!--SVG:halt-->
+<figcaption><b>Prevention first, then a fast halt.</b> Canary every campaign to 0.1% and a seed list, hold, release by time-zone bucket at a capped rate. Halting stops everything not yet handed to a provider.</figcaption></figure>
+<table>
+<thead><tr><th style="width:14%">Channel</th><th style="width:30%">Recall after sending?</th><th>What you can do</th></tr></thead>
+<tr><td>Push</td><td>No, once displayed</td><td>If not yet displayed, a message with the same collapse id (<code>apns-collapse-id</code>, FCM <code>collapse_key</code>) replaces it</td></tr>
+<tr><td>Email</td><td>No</td><td>Nothing; a correction email is a business decision, because it doubles the noise</td></tr>
+<tr><td>SMS</td><td>No</td><td>Nothing; and it cost money</td></tr>
+<tr><td>In-app</td><td><strong>Yes</strong></td><td>Delete from inboxes (Cassandra tombstones; batch it)</td></tr>
+</table>
+<div class="cols">
+<div class="box why"><span class="t">Fan-out mechanics</span>
+<p>The campaign service expands the segment with Spark in batches of ~10k user ids, buckets them by time zone for "local 9 a.m." sends, and
+releases each bucket into P2 at <code>ratePerSec</code>. Each item still passes every gate, so consent, caps and quiet hours apply to campaigns too.</p></div>
+<div class="box probe"><span class="t">Interviewer probes</span>
+<p><b>How fast is the halt?</b> Flag set → pushed to policy workers within ~1 s; channel workers re-check just before the provider call. SLO: effective p99 &lt; 5 s.</p>
+<p><b>Who can press it?</b> The tenant that owns the campaign, without paging the platform team.</p></div>
+</div>
+
+<!-- ============================ 9 ============================ -->
+<h1><span class="n">9</span>Deep dive: delivery, fallback and providers<span class="slot">DEEP DIVE</span></h1>
+<p><strong>The question:</strong> <em>"Push fails, you fall back to email, and the push actually arrived."</em></p>
+<figure><!--SVG:fallback-->
+<figcaption><b>Fallback causes duplicates when "failure" is ambiguous.</b> Push receipts are weak, so "no receipt yet" is not a failure. Every fallback carries the same dedupKey, and the inbox shows one item.</figcaption></figure>
+<figure><!--SVG:retry-->
+<figcaption><b>Every provider adapter:</b> a token bucket matching the contract limit, retries with exponential backoff and full jitter on 5xx and timeouts, and a circuit breaker.</figcaption></figure>
+<div class="cols">
+<div>
+<div class="box why"><span class="t">Why full jitter</span>
+<p>Plain exponential backoff keeps clients synchronized: after an outage they all retry at 0.2 s, 0.4 s, 0.8 s… and hit the recovering provider in
+waves. A random wait in [0, base·2ⁿ] spreads them evenly. Retries are safe because the provider call carries an idempotency key or collapse id.</p></div>
+<div class="box why"><span class="t">Push tokens</span>
+<p>A device token identifies one app install. APNs answers <strong>410 Unregistered</strong> (or 400 BadDeviceToken), FCM <strong>UNREGISTERED</strong>,
+when it's dead: remove it from the registry so we stop paying to fail. A user typically has 1–3 tokens; send to each active one.</p></div>
+</div>
+<div>
+<div class="box why"><span class="t">Email deliverability is its own discipline</span>
+<ul>
+<li>Authenticate: <strong>SPF, DKIM, DMARC</strong>; separate sending domains or IPs for transactional and marketing, so a campaign's reputation can't sink password resets.</li>
+<li>Since 2024, Gmail and Yahoo require bulk senders to keep spam complaints <strong>under 0.3%</strong> (aim for 0.1%) and support <strong>one-click unsubscribe</strong> (RFC 8058).</li>
+<li>Hard bounce → suppress the address for good; soft bounce → retry, then suppress.</li>
+</ul></div>
+<div class="box why"><span class="t">SMS realities</span>
+<p>Price varies by country by an order of magnitude; carriers require <strong>STOP</strong> handling and sender registration (e.g. US 10DLC);
+keep two aggregators for failover. Route OTP to push or in-app when the app is installed and active.</p></div>
+</div>
+</div>
+<div class="box trap"><span class="t">Provider outage, and stale messages</span>
+<p>When a breaker opens, P2 simply waits in Kafka (it's durable) and P0 switches to the secondary provider. But when the backlog drains, check
+<code>expiresAt</code>: a "your driver is here" an hour late is worse than none.</p></div>
+
+<!-- ============================ 10 ============================ -->
+<h1><span class="n">10</span>Requirements added mid-round<span class="slot">ANY TIME</span></h1>
+<table>
+<thead><tr><th style="width:27%">New requirement</th><th style="width:44%">Change</th><th>What stays untouched</th></tr></thead>
+<tr><td>"Batch social notifications into one per hour"</td><td>An aggregation stage before routing: buffer per (user, category) in a keyed window, then emit one rendered digest</td><td>Gates, workers, providers</td></tr>
+<tr><td>"Send at the user's local 9 a.m."</td><td>Campaign scheduler buckets recipients by time zone and releases per bucket</td><td>Policy (quiet hours already uses time zones)</td></tr>
+<tr><td>"WhatsApp as a new channel"</td><td>One new adapter and worker; template variants per channel</td><td>Intake API, policy, the tenant contract</td></tr>
+<tr><td>"Tenants want delivery and open analytics"</td><td>Delivery log → columnar store (ClickHouse/BigQuery) → per-tenant dashboards</td><td>Hot path</td></tr>
+<tr><td>"Regulator: prove we honoured an opt-out"</td><td>Immutable audit of preference changes + suppression reason per notification</td><td>Already logged as SUPPRESSED (no consent)</td></tr>
+</table>
+<div class="box say"><span class="t">Say it</span>
+<p>"That's a new stage or a new adapter; the intake contract and the gates don't change. That's the point of separating intent, policy and delivery."</p></div>
+
+<!-- ============================ 11 ============================ -->
+<h1><span class="n">11</span>Failure modes, SLOs and operations<span class="slot">MIN 38–44</span></h1>
+<table>
+<thead><tr><th style="width:22%">Failure</th><th style="width:24%">Blast radius</th><th>Mitigation</th></tr></thead>
+<tr><td>Redis dedup node failover</td><td>Possible duplicates for ~1 s of keys</td><td>Stated, bounded risk; push collapse ids; second-level dedup in the inbox</td></tr>
+<tr><td>Preference store down</td><td>Can't verify consent</td><td>Fail closed for marketing; P0 security proceeds (always allowed)</td></tr>
+<tr><td>A tenant floods the API</td><td>Its own quota</td><td>Per-tenant quotas at intake, 429 on overflow; other tenants unaffected</td></tr>
+<tr><td>Bad template version</td><td>Every message using it</td><td>Versions immutable and pinned; canary send; rollback = pin the previous version</td></tr>
+<tr><td>Provider outage</td><td>One channel</td><td>Breaker + secondary provider for P0; P1/P2 buffered in Kafka with <code>expiresAt</code></td></tr>
+<tr><td>Policy bug suppresses everything</td><td>All notifications</td><td>Alert on suppression-rate anomaly per category; fix, then <strong>replay from Kafka</strong></td></tr>
+</table>
+<div class="cols">
+<div>
+<h3>SLOs</h3>
+<table>
+<tr><td>P0 accept → provider</td><td>p99 &lt; 5 s</td></tr>
+<tr><td>P1 accept → provider</td><td>p99 &lt; 60 s</td></tr>
+<tr><td>Duplicate rate</td><td>&lt; 1 in 10⁶</td></tr>
+<tr><td>Sends without consent</td><td>zero, audited</td></tr>
+<tr><td>Campaign halt effective</td><td>p99 &lt; 5 s</td></tr>
+</table>
+</div>
+<div class="box why"><span class="t">Operations</span>
+<p><strong>Per-tenant dashboards:</strong> volume vs quota, suppression reasons, delivery and open rates, cost. Show each team its own SMS bill;
+that changes behaviour faster than any policy. <strong>On-call boundary:</strong> the platform team owns pipeline, providers and gates; tenants own
+content and volume. Runbooks for provider failover and campaign halt.</p></div>
+</div>
+
+<!-- ============================ 12 ============================ -->
+<h1><span class="n">12</span>The EM layer and the close<span class="slot">MIN 44–45</span></h1>
+<div class="cols">
+<div>
+<table>
+<thead><tr><th style="width:24%">Topic</th><th>What to say</th></tr></thead>
+<tr><td>MVP</td><td>Intake + Kafka + push and email workers + dedup + consent + P0/P2 isolation + kill switch</td></tr>
+<tr><td>Then</td><td>Quiet hours, per-user rate limits, campaign service, SMS with two providers, digests, analytics</td></tr>
+<tr><td>Tenant contract</td><td>Required dedupKey; category and priority validated against the tenant's allowed set; quotas per channel; template review for marketing; deprecation policy for template versions</td></tr>
+<tr><td>Team split</td><td>Platform core (intake, queues, policy) · Channels (adapters, providers, deliverability) · Campaigns &amp; tooling · Developer-experience owner for the twenty tenants</td></tr>
+<tr><td>Cost governance</td><td>SMS budget per tenant with alerts; route OTP to push or in-app where the app is active</td></tr>
+</table>
+</div>
+<div class="box say"><span class="t">The close, nearly verbatim</span>
+<p>"What I built: a durable, prioritized intent pipeline with a policy layer (consent, dedup, per-user rate limits, quiet hours) in front of per-channel
+delivery with provider adapters. Key trade-off: I isolate priorities structurally and shape campaign peaks instead of provisioning for them.
+Biggest risk: a bad campaign or a duplicate storm, contained by the kill switch, canary sends and dedup, with an honest limit: sent messages
+can't be recalled. Next: digests and per-tenant cost dashboards, because SMS is the bill."</p></div>
+</div>
+
+<!-- ============================ 13 ============================ -->
+<h1><span class="n">13</span>Rapid-fire follow-ups and self-check<span class="slot">DRILL</span></h1>
+<div class="cols">
+<div>
+<div class="qa"><div class="q">Exactly-once delivery?</div><div class="a">Not end to end: providers and networks don't offer it. At-least-once from Kafka plus idempotent dedup gives "effectively once" for the user, with a stated ~1 s risk on Redis failover.</div></div>
+<div class="qa"><div class="q">Why partition by userId?</div><div class="a">Per-user ordering (a "shipped" never overtakes "ordered"), and one user's dedup and rate checks stay on one worker at a time.</div></div>
+<div class="qa"><div class="q">A celebrity posts; 50 M followers get a social notification.</div><div class="a">It's a campaign in disguise: route it through the campaign path, rate-released in P2, with per-user social caps applying.</div></div>
+<div class="qa"><div class="q">How do online users get in-app items instantly?</div><div class="a">Write to the inbox, then push a small event over the user's WebSocket/SSE connection if one is open; otherwise they see it on next open.</div></div>
+<div class="qa"><div class="q">How do you test a template change?</div><div class="a">New immutable version, render tests per locale and channel, canary to the seed list, then pin. Rollback is pinning the old version.</div></div>
+</div>
+<div>
+<div class="qa"><div class="q">Why not let each team call providers directly?</div><div class="a">Twenty teams means twenty dedup bugs, no global caps, no shared consent and twenty SMS bills nobody sees. Governance needs one choke point.</div></div>
+<div class="qa"><div class="q">What's your most important alert?</div><div class="a">P0 consumer lag above 2 seconds. Then suppression-rate anomalies, because a policy bug fails silently.</div></div>
+<div class="qa"><div class="q">How long do you keep the dedup window?</div><div class="a">24 hours for transactional (~100 GB in Redis); the campaign's lifetime for marketing, in a disk-based KV with TTL if it's longer.</div></div>
+<div class="qa"><div class="q">Multi-region?</div><div class="a">Intake and policy per region; preferences replicated; a user's notifications processed in their home region so dedup and rate counters stay local.</div></div>
+<div class="qa"><div class="q">How do you cut the SMS bill?</div><div class="a">Push or in-app first for OTP when the app is active, per-tenant SMS budgets and dashboards, and cheaper routes per country.</div></div>
+</div>
+</div>
+<table>
+<thead><tr><th style="width:13%">Signal</th><th style="width:20%">Weak</th><th style="width:22%">Strong</th><th>Exceptional (aim here)</th></tr></thead>
+<tr><td>Framing</td><td>"Call the push provider"</td><td>Intent vs delivery split</td><td>Governance is the product; twenty tenants named</td></tr>
+<tr><td>Estimation</td><td>Average QPS only</td><td>Peak and storage</td><td>SMS cost as the dominant line; peak shaped, not bought</td></tr>
+<tr><td>Priorities</td><td>Priority field</td><td>Separate queues</td><td>Isolation at every layer + reserved provider capacity</td></tr>
+<tr><td>Dedup</td><td>None</td><td>Dedup key</td><td>Window stated; required by contract; tenant retry loop stopped by the platform</td></tr>
+<tr><td>Consent / rate</td><td>Afterthought</td><td>Gates exist</td><td>Ordered gates; fail closed for marketing; P0 exemptions</td></tr>
+<tr><td>Fallback</td><td>Always fall back</td><td>Fallback exists</td><td>Only on definite failure; same dedup key</td></tr>
+<tr><td>Kill switch</td><td>None</td><td>Halt API</td><td>Propagation time, canary sends, honest "can't recall"</td></tr>
+<tr><td>EM layer</td><td>None</td><td>SLOs</td><td>Tenant contract, on-call boundary, per-tenant cost visibility</td></tr>
+</table>
+<div class="box trap"><span class="t">Common traps</span>
+<p>Synchronous calls to providers from the API · one queue for all priorities · fallback on "no receipt" · trusting tenants to dedup · ignoring time zones ·
+forgetting <code>expiresAt</code>, so stale notifications go out after an outage.</p></div>
+
+<!-- ============================ 14 ============================ -->
+<div class="section cheat roomy">
+<h1><span class="n">14</span>One-page cheat sheet</h1>
+<div class="cols3">
+<div>
+<h3>Numbers (1 B/day, 500 M users)</h3>
+<table>
+<tr><td>Average</td><td>~12k/s</td></tr>
+<tr><td>Campaign peak</td><td>~120k/s (10×)</td></tr>
+<tr><td>Mix</td><td>push 70 · in-app 15 · email 13 · SMS 2 %</td></tr>
+<tr><td>SMS</td><td>20 M × $0.01 ≈ $200k/day</td></tr>
+<tr><td>SMS per year</td><td>~$73 M, ~94% of the bill</td></tr>
+<tr><td>Email</td><td>~$13k/day</td></tr>
+<tr><td>400 M campaign</td><td>at 50k/s ≈ 2.2 h</td></tr>
+<tr><td>Dedup (24 h)</td><td>~100 GB Redis</td></tr>
+<tr><td>Preferences</td><td>~250 GB, 120k reads/s</td></tr>
+<tr><td>Delivery log</td><td>0.6 TB/day, 55 TB / 90 d</td></tr>
+<tr><td>Provider calls in flight</td><td>120k/s × 0.1 s = 12k</td></tr>
+</table>
+<h3>SLOs</h3>
+<table>
+<tr><td>P0</td><td>p99 &lt; 5 s</td></tr>
+<tr><td>P1</td><td>p99 &lt; 60 s</td></tr>
+<tr><td>Duplicates</td><td>&lt; 1 in 10⁶</td></tr>
+<tr><td>Halt</td><td>p99 &lt; 5 s</td></tr>
+<tr><td>No consent</td><td>zero sends</td></tr>
+</table>
+</div>
+<div>
+<h3>The gates, in order</h3>
+<table>
+<tr><td>1</td><td>Kill switch: cached flag, ≤ 1 s</td></tr>
+<tr><td>2</td><td>Dedup: SET NX GET EX, own retries pass</td></tr>
+<tr><td>3</td><td>Consent: category × channel + law</td></tr>
+<tr><td>4</td><td>Rate: token bucket, P0 exempt</td></tr>
+<tr><td>5</td><td>Quiet hours: defer P1/P2, never P0</td></tr>
+<tr><td>6</td><td>Route: cheapest valid channel</td></tr>
+</table>
+<h3>Isolation, layer by layer</h3>
+<table>
+<tr><td>Topic</td><td>notif.p0 / p1 / p2</td></tr>
+<tr><td>Consumers</td><td>own group per priority</td></tr>
+<tr><td>Workers</td><td>own lane per priority</td></tr>
+<tr><td>Providers</td><td>20% reserved for P0, 2nd SMS vendor</td></tr>
+<tr><td>Alert</td><td>P0 lag &gt; 2 s</td></tr>
+</table>
+<h3>API</h3>
+<table>
+<tr><td class="m">POST /notifications</td><td>202, dedupKey required</td></tr>
+<tr><td class="m">POST /campaigns</td><td>ratePerSec</td></tr>
+<tr><td class="m">POST …/{id}/halt</td><td>kill switch</td></tr>
+<tr><td class="m">GET …/inbox</td><td>in-app feed</td></tr>
+</table>
+</div>
+<div>
+<h3>Rules to say out loud</h3>
+<table>
+<tr><td>202</td><td>= durably queued, nothing more</td></tr>
+<tr><td>Fallback</td><td>only on definite failure, same key</td></tr>
+<tr><td>Recall</td><td>impossible except in-app</td></tr>
+<tr><td>Campaigns</td><td>canary 0.1% → hold → rate-release</td></tr>
+<tr><td>Stale</td><td>drop after expiresAt</td></tr>
+<tr><td>Prefs down</td><td>closed for marketing, P0 goes</td></tr>
+<tr><td>Policy bug</td><td>fix, replay from Kafka</td></tr>
+</table>
+<h3>Provider adapter</h3>
+<table>
+<tr><td>Rate</td><td>token bucket = contract limit</td></tr>
+<tr><td>Retry</td><td>backoff + full jitter, 5xx only</td></tr>
+<tr><td>Breaker</td><td>closed → open → half-open</td></tr>
+<tr><td>Tokens</td><td>410 / UNREGISTERED → delete</td></tr>
+</table>
+<h3>The one-liner</h3>
+<p><em>"Make intent durable and prioritized, decide centrally whether each message may exist, deliver per channel behind adapters, and
+shape the peaks we create ourselves."</em></p>
+</div>
+</div>
+</div>
+
+</body></html>

@@ -1,0 +1,27 @@
+<svg class="d" viewBox="0 0 720 226" xmlns="http://www.w3.org/2000/svg">
+  <rect x="245" y="2" width="230" height="24" rx="5" class="w"/><text x="360" y="18" class="c tb">GeoDNS: nearest healthy region</text>
+  <rect x="6" y="36" width="338" height="184" rx="6" class="w" style="stroke-dasharray:5 3"/>
+  <text x="16" y="52" class="lab">REGION EU · ID SLICE [0, 1.17 T)</text>
+  <rect x="376" y="36" width="338" height="184" rx="6" class="w" style="stroke-dasharray:5 3"/>
+  <text x="386" y="52" class="lab">REGION US · ID SLICE [1.17 T, 2.35 T)</text>
+
+  <rect x="18" y="62" width="150" height="48" rx="5" class="b"/><text x="93" y="82" class="c tb">Link + redirect</text><text x="93" y="97" class="c ts">services</text>
+  <rect x="18" y="122" width="150" height="34" rx="5" class="r"/><text x="93" y="143" class="c tb">Redis</text>
+  <rect x="182" y="62" width="150" height="48" rx="5" class="g"/><text x="257" y="82" class="c tb">KV store</text><text x="257" y="97" class="c ts">all links, all regions</text>
+  <rect x="182" y="122" width="150" height="34" rx="5" class="bl"/><text x="257" y="143" class="c tb">ID allocator (EU slice)</text>
+
+  <rect x="388" y="62" width="150" height="48" rx="5" class="g"/><text x="463" y="82" class="c tb">KV store</text><text x="463" y="97" class="c ts">all links, all regions</text>
+  <rect x="388" y="122" width="150" height="34" rx="5" class="bl"/><text x="463" y="143" class="c tb">ID allocator (US slice)</text>
+  <rect x="552" y="62" width="150" height="48" rx="5" class="b"/><text x="627" y="82" class="c tb">Link + redirect</text><text x="627" y="97" class="c ts">services</text>
+  <rect x="552" y="122" width="150" height="34" rx="5" class="r"/><text x="627" y="143" class="c tb">Redis</text>
+
+  <line x1="333" y1="78" x2="387" y2="78" class="ln" style="marker-start:url(#ah)"/>
+  <text x="360" y="72" class="c ts tb">async</text><text x="360" y="92" class="c ts">~1 s</text>
+
+  <path d="M552,100 L545,100 L545,206 L340,206 L340,104 L333,104" class="ln-r dash"/>
+  <text x="388" y="176" class="ts tr">New EU code not here yet?</text>
+  <text x="388" y="190" class="ts tr">decode → home EU → read</text>
+  <text x="16" y="174" class="ts">Uniqueness needs no cross-region call:</text>
+  <text x="16" y="188" class="ts">each region leases only from its slice.</text>
+  <text x="16" y="208" class="ts">APAC would own [2.35 T, 3.52 T).</text>
+</svg>
