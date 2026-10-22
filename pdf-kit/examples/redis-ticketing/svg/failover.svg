@@ -1,0 +1,40 @@
+<svg class="d" viewBox="0 0 720 258" xmlns="http://www.w3.org/2000/svg">
+  <text x="6" y="14" class="lab">ONE SHARD WITH SENTINEL</text>
+  <rect x="6" y="26" width="56" height="28" rx="14" class="bl"/><text x="34" y="44" class="c ts">S1</text>
+  <rect x="84" y="26" width="56" height="28" rx="14" class="bl"/><text x="112" y="44" class="c ts">S2</text>
+  <rect x="162" y="26" width="56" height="28" rx="14" class="bl"/><text x="190" y="44" class="c ts">S3</text>
+  <rect x="62" y="84" width="102" height="46" rx="5" class="r"/>
+  <text x="113" y="103" class="c tb">Primary</text><text x="113" y="119" class="c ts">acks writes</text>
+  <rect x="6" y="166" width="96" height="44" rx="5" class="b"/>
+  <text x="54" y="185" class="c tb">Replica 1</text><text x="54" y="200" class="c ts">offset 9,812</text>
+  <rect x="124" y="166" width="96" height="44" rx="5" class="b"/>
+  <text x="172" y="185" class="c tb">Replica 2</text><text x="172" y="200" class="c ts">offset 9,790</text>
+  <line x1="34" y1="54" x2="90" y2="83" class="ln dash"/><line x1="112" y1="54" x2="112" y2="83" class="ln dash"/><line x1="190" y1="54" x2="136" y2="83" class="ln dash"/>
+  <line x1="90" y1="130" x2="60" y2="165" class="ln"/><line x1="136" y1="130" x2="166" y2="165" class="ln"/>
+  <text x="113" y="150" class="c ts">async stream</text>
+  <text x="6" y="230" class="ts">Sentinels PING; SDOWN → ODOWN at quorum;</text>
+  <text x="6" y="243" class="ts">majority elects a leader that promotes Replica 1.</text>
+
+  <line x1="246" y1="8" x2="246" y2="240" style="stroke:#d0d7de"/>
+
+  <text x="262" y="14" class="lab">HOW AN ACKNOWLEDGED WRITE IS LOST</text>
+  <text x="262" y="48" class="tb">Client</text>
+  <text x="262" y="108" class="tb">Primary</text>
+  <text x="262" y="168" class="tb">Replica 1</text>
+  <line x1="330" y1="44" x2="712" y2="44" class="lane"/>
+  <line x1="330" y1="104" x2="712" y2="104" class="lane"/>
+  <line x1="330" y1="164" x2="712" y2="164" class="lane"/>
+
+  <line x1="350" y1="44" x2="350" y2="103" class="ln"/><text x="356" y="66" class="ts">① SET hold:812</text><text x="356" y="78" class="ts">   NX PX 300000</text>
+  <line x1="440" y1="104" x2="440" y2="45" class="ln-g"/><text x="446" y="66" class="ts tg">② OK</text>
+  <text x="500" y="110" class="c tb tr" style="font-size:20px">✕</text><text x="500" y="128" class="c ts tr">③ crash before</text><text x="500" y="140" class="c ts tr">the stream sent it</text>
+  <line x1="500" y1="146" x2="500" y2="163" class="ln-r dash"/>
+  <rect x="548" y="152" width="74" height="24" rx="4" class="r"/><text x="585" y="168" class="c ts">④ promoted</text>
+  <line x1="650" y1="44" x2="650" y2="151" class="ln"/><text x="656" y="66" class="ts">⑤ GET</text><text x="656" y="140" class="ts tr tb">nil</text>
+
+  <rect x="262" y="188" width="452" height="66" rx="5" class="a"/>
+  <text x="272" y="204" class="ts"><tspan class="tb">Result:</tspan> the client was told "held", but the new primary has no hold,</text>
+  <text x="272" y="217" class="ts">so the seat can be held again by someone else.</text>
+  <text x="272" y="232" class="ts"><tspan class="tm">WAIT 1 50</tspan> after the write shrinks the window but isn't consensus: on timeout</text>
+  <text x="272" y="245" class="ts">the write still stands, and a replica without it can still win the election.</text>
+</svg>

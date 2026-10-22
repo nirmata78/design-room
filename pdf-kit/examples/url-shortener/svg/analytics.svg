@@ -1,0 +1,14 @@
+<svg class="d" viewBox="0 0 720 150" xmlns="http://www.w3.org/2000/svg">
+  <rect x="6" y="18" width="126" height="62" rx="5" class="r"/><text x="69" y="38" class="c tb">Redirect svc</text><text x="69" y="54" class="c ts">async producer,</text><text x="69" y="68" class="c ts">drops if Kafka is slow</text>
+  <rect x="151" y="18" width="126" height="62" rx="5" class="b"/><text x="214" y="38" class="c tb">Kafka</text><text x="214" y="54" class="c ts">topic clicks,</text><text x="214" y="68" class="c ts">key = code</text>
+  <rect x="296" y="18" width="126" height="62" rx="5" class="bl"/><text x="359" y="38" class="c tb">Flink</text><text x="359" y="54" class="c ts">1-min windows, bot</text><text x="359" y="68" class="c ts">filter, HLL sketches</text>
+  <rect x="441" y="18" width="126" height="62" rx="5" class="g"/><text x="504" y="38" class="c tb">ClickHouse</text><text x="504" y="54" class="c ts">aggregates by</text><text x="504" y="68" class="c ts">code × minute × dim</text>
+  <rect x="586" y="18" width="126" height="62" rx="5" class="w"/><text x="649" y="38" class="c tb">Stats API</text><text x="649" y="54" class="c ts">owner dashboards,</text><text x="649" y="68" class="c ts">~1–2 min behind</text>
+  <line x1="132" y1="49" x2="150" y2="49" class="ln dash"/><line x1="277" y1="49" x2="295" y2="49" class="ln"/>
+  <line x1="422" y1="49" x2="440" y2="49" class="ln"/><line x1="567" y1="49" x2="585" y2="49" class="ln"/>
+  <rect x="151" y="104" width="126" height="40" rx="5" class="w"/><text x="214" y="121" class="c tb">Object storage</text><text x="214" y="136" class="c ts">raw events, 90-day TTL</text>
+  <line x1="214" y1="80" x2="214" y2="103" class="ln"/>
+  <text x="300" y="112" class="ts"><tspan class="tb">In:</tspan> ~115k events/s average, ~350k/s peak, ~2 TB/day raw.</text>
+  <text x="300" y="128" class="ts"><tspan class="tb">Out:</tspan> one row per link per minute per dimension, not one per click.</text>
+  <text x="300" y="144" class="ts"><tspan class="tb">Rule:</tspan> nothing on this path can slow down or fail a redirect.</text>
+</svg>

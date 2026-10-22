@@ -1,0 +1,29 @@
+@startuml
+hide footbox
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 230
+skinparam noteBackgroundColor #FFF8DC
+skinparam noteBorderColor #C9A227
+actor "Fan A" as A
+actor "Fan B" as B
+participant "Inventory\npod 1" as I1
+participant "Inventory\npod 2" as I2
+database "PostgreSQL" as PG
+A -> I1 : POST /holds [101, 102]
+B -> I2 : POST /holds [102, 103]
+I1 -> PG : BEGIN; SELECT ... seats 101,102\nORDER BY seat_id FOR UPDATE NOWAIT
+PG --> I1 : both rows locked by A
+I2 -> PG : BEGIN; SELECT ... seats 102,103\nORDER BY seat_id FOR UPDATE NOWAIT
+PG --> I2 : ERROR 55P03 lock_not_available (102)
+I2 -> PG : ROLLBACK
+I2 --> B : 409 + fresh availability bitmap
+I1 -> PG : UPDATE ... WHERE state = AVAILABLE\nRETURNING seat_id
+PG --> I1 : 2 rows (= 2 requested)
+I1 -> PG : INSERT INTO outbox ...; COMMIT
+I1 --> A : 201 {holdId, expiresAt = now + 5 min}
+note over B, PG : <b>Without NOWAIT</b>: B waits on the lock instead. When A commits,\nPostgreSQL re-checks B's WHERE against the new row version:\nstate is HELD, so 0 rows match. B rolls back and still gets 409.
+@enduml

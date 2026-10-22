@@ -1,0 +1,15 @@
+<svg class="d" viewBox="0 0 720 150" xmlns="http://www.w3.org/2000/svg">
+  <text x="6" y="12" class="lab">SAFE CAMPAIGN RELEASE, AND HOW A HALT PROPAGATES</text>
+  <rect x="6" y="22" width="126" height="48" rx="5" class="b"/><text x="69" y="42" class="c tb">Expand segment</text><text x="69" y="58" class="c ts">Spark, batches of 10k</text>
+  <rect x="150" y="22" width="126" height="48" rx="5" class="bl"/><text x="213" y="42" class="c tb">Canary 0.1%</text><text x="213" y="58" class="c ts">+ internal seed list</text>
+  <rect x="294" y="22" width="126" height="48" rx="5" class="a"/><text x="357" y="42" class="c tb">Hold, look</text><text x="357" y="58" class="c ts">rendering, complaints</text>
+  <rect x="438" y="22" width="126" height="48" rx="5" class="g"/><text x="501" y="42" class="c tb">Release at rate</text><text x="501" y="58" class="c ts">per time-zone bucket</text>
+  <rect x="582" y="22" width="132" height="48" rx="5" class="r"/><text x="648" y="42" class="c tb">HALT</text><text x="648" y="58" class="c ts">POST …/halt</text>
+  <line x1="132" y1="46" x2="149" y2="46" class="ln"/><line x1="276" y1="46" x2="293" y2="46" class="ln"/>
+  <line x1="420" y1="46" x2="437" y2="46" class="ln"/><line x1="564" y1="46" x2="581" y2="46" class="ln-r"/>
+
+  <text x="6" y="96" class="ts"><tspan class="tb">t = 0</tspan> flag set in the control plane</text>
+  <text x="6" y="112" class="ts"><tspan class="tb">≤ 1 s</tspan> pushed to every policy worker → queued intents become SUPPRESSED (killed)</text>
+  <text x="6" y="128" class="ts"><tspan class="tb">every send</tspan> channel workers re-check the flag right before the provider call</text>
+  <text x="6" y="144" class="ts tr"><tspan class="tb">already sent</tspan> push, email and SMS can't be recalled; in-app items can be deleted from inboxes</text>
+</svg>

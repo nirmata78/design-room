@@ -1,0 +1,25 @@
+<svg class="d" viewBox="0 0 720 252" xmlns="http://www.w3.org/2000/svg">
+  <rect x="10" y="100" width="104" height="34" rx="17" class="b"/><text x="62" y="121" class="c tb">ACCEPTED</text>
+  <rect x="160" y="100" width="104" height="34" rx="17" class="bl"/><text x="212" y="121" class="c tb">ROUTED</text>
+  <rect x="310" y="100" width="104" height="34" rx="17" class="bl"/><text x="362" y="121" class="c tb">SENT</text>
+  <rect x="460" y="100" width="104" height="34" rx="17" class="g"/><text x="512" y="121" class="c tb">DELIVERED</text>
+  <rect x="606" y="100" width="104" height="34" rx="17" class="g"/><text x="658" y="121" class="c tb">OPENED</text>
+  <rect x="160" y="14" width="104" height="34" rx="17" class="a"/><text x="212" y="35" class="c tb">DEFERRED</text>
+  <rect x="10" y="190" width="120" height="34" rx="17" class="r" style="stroke-width:2"/><text x="70" y="211" class="c tb">SUPPRESSED</text>
+  <rect x="310" y="190" width="104" height="34" rx="17" class="a"/><text x="362" y="211" class="c tb">RETRYING</text>
+  <rect x="460" y="190" width="104" height="34" rx="17" class="r"/><text x="512" y="211" class="c tb">FAILED</text>
+
+  <line x1="114" y1="117" x2="159" y2="117" class="ln"/><text x="118" y="110" class="ts">policy ok</text>
+  <line x1="264" y1="117" x2="309" y2="117" class="ln"/><text x="268" y="110" class="ts">accepted</text>
+  <line x1="414" y1="117" x2="459" y2="117" class="ln"/><text x="418" y="110" class="ts">receipt</text>
+  <line x1="564" y1="117" x2="605" y2="117" class="ln"/><text x="568" y="110" class="ts">opened</text>
+  <path d="M62,100 L62,31 L159,31" class="ln"/><text x="68" y="62" class="ts">quiet hours</text>
+  <line x1="212" y1="48" x2="212" y2="99" class="ln"/><text x="218" y="78" class="ts">window opens</text>
+  <line x1="62" y1="134" x2="62" y2="189" class="ln-r"/><text x="68" y="158" class="ts tr">duplicate · no consent ·</text><text x="68" y="171" class="ts tr">rate-capped · killed · expired</text>
+  <line x1="240" y1="134" x2="330" y2="189" class="ln"/><text x="276" y="152" class="ts">5xx / timeout</text>
+  <line x1="362" y1="190" x2="362" y2="135" class="ln-g"/>
+  <line x1="414" y1="207" x2="459" y2="207" class="ln-r"/><text x="417" y="200" class="ts">exhausted</text>
+  <line x1="390" y1="134" x2="480" y2="189" class="ln-r"/><text x="440" y="160" class="ts">bounce / bad token</text>
+  <path d="M512,224 L512,247 L226,247 L226,135" class="ln dash"/>
+  <text x="290" y="241" class="ts">fallback only after a definite failure</text>
+</svg>

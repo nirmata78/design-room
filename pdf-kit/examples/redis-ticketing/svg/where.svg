@@ -1,0 +1,99 @@
+<svg class="d" viewBox="0 0 720 292" xmlns="http://www.w3.org/2000/svg">
+  <!-- Row A: queue path -->
+  <text x="4" y="12" class="lab">QUEUE PATH</text>
+  <rect x="4" y="22" width="96" height="60" rx="5" class="b"/>
+  <text x="52" y="47" class="c tb">1,000,000</text>
+  <text x="52" y="63" class="c ts">waiting fans</text>
+
+  <rect x="122" y="22" width="120" height="60" rx="5" class="b"/>
+  <text x="182" y="42" class="c tb">CDN edge</text>
+  <text x="182" y="57" class="c ts">queue/state, 1 s TTL</text>
+  <text x="182" y="71" class="c ts">100k req/s → ~200/s</text>
+
+  <rect x="264" y="22" width="142" height="60" rx="5" class="b"/>
+  <text x="335" y="42" class="c tb">Waiting-room svc</text>
+  <text x="335" y="57" class="c ts">join · queue/me · admit</text>
+  <text x="335" y="71" class="c ts">≤ 50k req/s at T0</text>
+
+  <rect x="428" y="8" width="176" height="88" rx="5" class="r"/>
+  <text x="516" y="26" class="c tb">Redis · queue state</text>
+  <text x="438" y="44" class="tm">phase  lobby  next  seqOf</text>
+  <text x="438" y="58" class="tm">admittedUpTo  rate  soldOut</text>
+  <text x="438" y="72" class="tm">admitted:{e}:{u}   EX 600</text>
+  <text x="438" y="86" class="tm">leader:{e}         PX 3000</text>
+
+  <rect x="626" y="22" width="90" height="60" rx="5" class="b"/>
+  <text x="671" y="42" class="c tb">Admission</text>
+  <text x="671" y="56" class="c tb">controller</text>
+  <text x="671" y="72" class="c ts">1 tick / s</text>
+
+  <line x1="100" y1="52" x2="121" y2="52" class="ln"/>
+  <line x1="242" y1="52" x2="263" y2="52" class="ln"/>
+  <line x1="406" y1="52" x2="427" y2="52" class="ln"/>
+  <line x1="626" y1="52" x2="605" y2="52" class="ln"/>
+
+  <!-- Row B: read path -->
+  <text x="4" y="114" class="lab">READ PATH</text>
+  <rect x="4" y="124" width="96" height="60" rx="5" class="b"/>
+  <text x="52" y="149" class="c tb">10,000</text>
+  <text x="52" y="165" class="c ts">shoppers (JWT)</text>
+
+  <rect x="122" y="124" width="120" height="60" rx="5" class="b"/>
+  <text x="182" y="144" class="c tb">API gateway</text>
+  <text x="182" y="159" class="c ts">JWT check, no I/O</text>
+  <text x="182" y="173" class="c ts">rate limits</text>
+
+  <rect x="264" y="124" width="142" height="60" rx="5" class="b"/>
+  <text x="335" y="144" class="c tb">Seat-map svc</text>
+  <text x="335" y="159" class="c ts">GET availability?v=</text>
+  <text x="335" y="173" class="c ts">~5k req/s, mostly 304</text>
+
+  <rect x="428" y="118" width="176" height="72" rx="5" class="r"/>
+  <text x="516" y="136" class="c tb">Redis · map snapshots</text>
+  <text x="438" y="156" class="tm">map:{e}:v     → 813</text>
+  <text x="438" y="172" class="tm">map:{e}:813   → 6.25 KB</text>
+
+  <rect x="626" y="124" width="90" height="60" rx="5" class="b"/>
+  <text x="671" y="144" class="c tb">Snapshot</text>
+  <text x="671" y="158" class="c tb">builder</text>
+  <text x="671" y="174" class="c ts">Kafka, 1 SET/s</text>
+
+  <line x1="100" y1="154" x2="121" y2="154" class="ln"/>
+  <line x1="242" y1="154" x2="263" y2="154" class="ln"/>
+  <line x1="406" y1="154" x2="427" y2="154" class="ln"/>
+  <line x1="626" y1="154" x2="605" y2="154" class="ln"/>
+
+  <!-- Row C: write path -->
+  <text x="264" y="214" class="lab">WRITE PATH</text>
+  <rect x="122" y="222" width="120" height="62" rx="5" class="r"/>
+  <text x="182" y="241" class="c tb">Redis · edge state</text>
+  <text x="132" y="259" class="tm">rl:{u}  buckets</text>
+  <text x="132" y="274" class="tm">deny:jti:&lt;id&gt;</text>
+
+  <rect x="264" y="222" width="142" height="62" rx="5" class="b"/>
+  <text x="335" y="246" class="c tb">Inventory svc</text>
+  <text x="335" y="262" class="c ts">atomic claim, 50–500/s</text>
+
+  <rect x="428" y="222" width="176" height="62" rx="5" class="g"/>
+  <text x="516" y="241" class="c tb">PostgreSQL · seats</text>
+  <text x="516" y="257" class="c ts">the source of truth</text>
+  <text x="516" y="272" class="c ts">sync replica, row locks</text>
+
+  <rect x="626" y="222" width="90" height="62" rx="5" class="a"/>
+  <text x="671" y="238" class="c ts tb">Not Redis:</text>
+  <text x="671" y="251" class="c ts">async replicas</text>
+  <text x="671" y="264" class="c ts">can lose an</text>
+  <text x="671" y="277" class="c ts">acked hold</text>
+
+  <line x1="182" y1="184" x2="182" y2="221" class="ln"/>
+  <path d="M242,176 L253,176 L253,253 L263,253" class="ln"/>
+  <line x1="406" y1="253" x2="427" y2="253" class="ln"/>
+
+  <!-- legend -->
+  <rect x="4" y="232" width="12" height="10" class="r"/>
+  <text x="21" y="241" class="ts">Redis</text>
+  <rect x="4" y="252" width="12" height="10" class="g"/>
+  <text x="21" y="261" class="ts">system of record</text>
+  <rect x="4" y="272" width="12" height="10" class="b"/>
+  <text x="21" y="281" class="ts">stateless</text>
+</svg>

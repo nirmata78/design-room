@@ -1,0 +1,39 @@
+@startuml
+hide footbox
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+autonumber
+actor Fan
+participant "Gateway" as GW
+participant "Waiting room" as WR
+participant "Seat map" as MAP
+participant "Inventory" as INV
+participant "Order svc" as ORD
+participant "PSP" as PSP
+Fan -> WR : join(event)  [challenge passed]
+WR --> Fan : queueToken, position
+Fan -> WR : poll every 5-15 s
+WR --> Fan : admissionToken (signed, 10 min)
+Fan -> MAP : GET snapshot v=812
+MAP --> Fan : bitmap (304 if unchanged)
+Fan -> GW : POST /holds {seats, Idempotency-Key}
+GW -> INV : verify token, claim
+INV --> Fan : 201 holdId, expiresAt (+5 min)\nor 409 + fresh availability
+Fan -> ORD : POST /orders {holdId, payToken, key}
+ORD -> INV : HELD -> PAYMENT_PENDING (deadline +10 min)
+ORD -> PSP : authorize(key)
+alt approved
+  PSP --> ORD : authId
+  ORD -> INV : PAYMENT_PENDING -> SOLD
+  ORD -> PSP : capture(authId)
+  ORD --> Fan : CONFIRMED, tickets
+else declined
+  ORD -> INV : release seats
+  ORD --> Fan : FAILED, hold released
+else timeout / unknown
+  ORD -> PSP : status(key)  [retry with backoff]
+  note right of ORD : never release seats\nwhile the outcome is unknown
+end
+@enduml

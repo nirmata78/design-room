@@ -227,9 +227,11 @@ out loud.
   would you detect that a subset of clients had silently stopped syncing?" · "Which part would you
   ship first, and what would you deliberately not support in v1?"
 
-**Curveband:** *"The client must now work with a folder larger than the local disk — selective
+**Curveball:** *"The client must now work with a folder larger than the local disk — selective
 sync."* Tests whether metadata and content were properly separated, and whether they handle a
 placeholder file being opened.
+
+**Drips** (format `drip`, §7.5 — read the prompt above as increment #1): **#2** *"Users can share a folder with edit rights."* · **#3** *"Show the full version history and let users restore any version."* Listen for the delta stated out loud and the seam that absorbs it.
 
 **Weak / Strong / Exceptional.** *Weak* — upload the whole file on any change, server timestamp wins,
 no offline story, rename is delete+create. *Strong* — chunked transfer with hashing, manifest-based

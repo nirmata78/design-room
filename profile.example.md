@@ -40,3 +40,8 @@ them."*
 
 Paths to notes or books the interviewer may point you at **after** a round, in the debrief. It never
 reads long material during a live round.
+
+## Current loop (optional)
+
+*A real loop coming up: the company, the round format (e.g. `data-co`, format `drip`, pace `hour`),
+the date, and where your private brief lives (`private/<company>/`, gitignored).*

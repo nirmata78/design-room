@@ -1,0 +1,25 @@
+% Shared preamble for the SD-* reference-design booklets (solutions/SD-nn-*/).
+% Kept outside YAML because pandoc mangles multi-line LaTeX in header-includes (CLAUDE.md §9.1).
+\usepackage{float}
+\floatplacement{figure}{H}
+\usepackage{etoolbox}
+\AtBeginEnvironment{longtable}{\footnotesize}
+\AtBeginEnvironment{Highlighting}{\footnotesize}
+\usepackage{enumitem}
+\setlist{itemsep=1pt,topsep=3pt}
+\setlength{\parskip}{3pt}
+\usepackage{xcolor}
+\usepackage{framed}
+\setkeys{Gin}{height=0.82\textheight,keepaspectratio}
+\definecolor{keybg}{HTML}{FFF3D1}\definecolor{keyrule}{HTML}{C98A00}
+\definecolor{whybg}{HTML}{E9F1FB}\definecolor{whyrule}{HTML}{2F6DB5}
+\definecolor{saybg}{HTML}{E6F4EA}\definecolor{sayrule}{HTML}{2E8B57}
+\definecolor{warnbg}{HTML}{FBE8E6}\definecolor{warnrule}{HTML}{B03A2E}
+\definecolor{loadbg}{HTML}{F1ECF8}\definecolor{loadrule}{HTML}{6A4C9C}
+% sdbox{background}{rule}{label}: a shaded panel with a coloured left bar; breaks across pages.
+\newenvironment{sdbox}[3]{%
+  \def\FrameCommand{{\color{#2}\vrule width 3pt}\fboxsep=6pt\colorbox{#1}}%
+  \MakeFramed{\advance\hsize-\width\FrameRestore}%
+  \noindent{\color{#2}\sffamily\bfseries\small #3}\par\nopagebreak\small}%
+  {\endMakeFramed}
+\renewenvironment{quote}{\begin{sdbox}{saybg}{sayrule}{Say it in the room}\itshape}{\end{sdbox}}

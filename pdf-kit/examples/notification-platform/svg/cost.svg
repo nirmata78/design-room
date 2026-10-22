@@ -1,0 +1,13 @@
+<svg class="d" viewBox="0 0 720 140" xmlns="http://www.w3.org/2000/svg">
+  <text x="6" y="12" class="lab">2% OF THE VOLUME IS ~94% OF THE BILL</text>
+  <text x="140" y="44" class="tb" text-anchor="end">Volume / day</text><text x="140" y="57" class="ts" text-anchor="end">1 B messages</text>
+  <rect x="150" y="30" width="385" height="28" class="g"/><text x="342" y="48" class="c ts tb">push 700 M · 70%</text>
+  <rect x="535" y="30" width="82" height="28" class="bl"/><text x="576" y="48" class="c ts">in-app 15%</text>
+  <rect x="617" y="30" width="72" height="28" class="b"/><text x="653" y="48" class="c ts">email 13%</text>
+  <rect x="689" y="30" width="11" height="28" class="a"/>
+  <text x="140" y="96" class="tb" text-anchor="end">Cost / day</text><text x="140" y="109" class="ts" text-anchor="end">~$213 k</text>
+  <rect x="150" y="82" width="516" height="28" class="a"/><text x="408" y="100" class="c ts tb">SMS 20 M × ~$0.01 = ~$200 k · ~94%</text>
+  <rect x="666" y="82" width="34" height="28" class="b"/><text x="683" y="100" class="c ts">$13k</text>
+  <text x="694" y="74" class="ts" text-anchor="end">SMS 2% ↓</text>
+  <text x="150" y="132" class="ts">Push and in-app cost nothing per message: every OTP moved from SMS to push saves ~$0.01.</text>
+</svg>

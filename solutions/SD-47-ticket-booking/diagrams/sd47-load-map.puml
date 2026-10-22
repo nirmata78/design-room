@@ -1,0 +1,25 @@
+@startuml
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam wrapWidth 220
+skinparam ranksep 50
+actor "1,000,000 fans\nwaiting" as F
+cloud "CDN, ~200 edge locations" as CDN #EAF1FB
+node "Waiting room + Redis" as WR #F7F9FC
+actor "~10,000 fans\nshopping at once" as S
+node "Seat-map service\n+ Redis snapshot" as MAP #F7F9FC
+node "Inventory service" as INV #F7F9FC
+database "PostgreSQL\n(1 primary for this event)" as DB #DFF1E4
+node "Order service" as ORD #F7F9FC
+cloud "PSP" as PSP #FFF3D1
+F -down-> CDN : <b>~100,000 req/s</b>\nqueue-state polls
+CDN -down-> WR : <b><= ~200 req/s</b>\n1 per edge per second
+F -right-> WR : joins: <b>~50,000/s</b> worst case\n(~600/s with a 30-min lobby)
+WR -down-> S : admitted: <b>~33 fans/s</b>
+S -down-> MAP : <b>~5,000 req/s</b>\nRedis + 304s, never the DB
+S -down-> INV : <b>50-500 holds/s</b>
+INV -down-> DB : same, as transactions
+S -down-> ORD : <b>~25 orders/s</b>
+ORD -right-> PSP : 25 authorizations/s,\n250 in flight
+@enduml

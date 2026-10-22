@@ -1,0 +1,36 @@
+@startuml
+hide footbox
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 230
+skinparam noteBackgroundColor #FFF8DC
+skinparam noteBorderColor #C9A227
+actor "Early fan" as F
+actor "Late fan" as L
+participant "CDN + bot check" as CDN
+participant "Waiting room" as WR
+database "Redis" as R
+== Before T0: the lobby (T-30 min to T0) ==
+F -> CDN : open event page
+CDN --> F : static page + challenge passed (cookie)
+F -> WR : POST /queue (account, challenge cookie)
+WR -> R : join.lua: phase is LOBBY\nZADD NX lobby:{e} <secret random> user
+R --> WR : added (or "already in": same entry returned)
+WR --> F : queueToken {event, user, kind=LOBBY} signed
+note over F : sees a countdown, no number yet.\nArriving at T-30 or T-1 makes no difference
+== T0: the draw becomes final ==
+WR -> R : SET phase:{e} QUEUE\nN = ZCARD lobby:{e} ; SET next:{e} N
+note over R : order of the sorted set = order of the\nrandom scores = the lottery result
+F -> WR : GET /queue/me (sent with 0-20 s random delay)
+WR -> R : ZRANK lobby:{e} user
+R --> WR : rank 412,376
+WR --> F : seq = 412,377 (signed)
+== After T0: plain first come, first served ==
+L -> WR : POST /queue
+WR -> R : join.lua: phase is QUEUE -> INCR next:{e}
+R --> WR : 1,000,214
+WR --> L : queueToken with seq = 1,000,214
+@enduml
