@@ -40,5 +40,5 @@ Reference solution, stage by stage: https://nirmata78.github.io/design-room/solu
 Run this round yourself, with an AI interviewer that won't help you: https://github.com/nirmata78/design-room
 ```
 
-**Media: attach the reference design.** In the post composer, More (+) → Add a document → `/Users/neo.bsuir/Projects/design-room/solutions/SD-09-chat-messaging/SD-09_Chat_Messaging_Reference_Design.pdf` (53 pages, 2.0 MB; limit 300 pages, 100 MB).
+**Media: attach the reference design.** In the post composer, More (+) → Add a document → `../../SD-09_Chat_Messaging_Reference_Design.pdf` (53 pages, 2.0 MB; limit 300 pages, 100 MB).
 Document title, shown on the viewer: **Chat for a billion users: a Staff-level system design, explained**. A post carries one attachment, so the video stays a link in the text, and the document is what shows in the feed.
