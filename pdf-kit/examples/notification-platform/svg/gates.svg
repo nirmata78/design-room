@@ -1,0 +1,19 @@
+<svg class="d" viewBox="0 0 720 176" xmlns="http://www.w3.org/2000/svg">
+  <text x="6" y="12" class="lab">POLICY &amp; ROUTER: CHEAPEST AND MOST ABSOLUTE CHECKS FIRST →</text>
+  <rect x="6"   y="26" width="104" height="60" rx="5" class="r"/><text x="58"  y="46" class="c tb">① Kill switch</text><text x="58"  y="62" class="c ts">cached flag</text><text x="58"  y="76" class="c ts">refreshed ≤ 1 s</text>
+  <rect x="126" y="26" width="104" height="60" rx="5" class="r"/><text x="178" y="46" class="c tb">② Dedup</text><text x="178" y="62" class="c ts">SET NX EX</text><text x="178" y="76" class="c ts">(user, dedupKey)</text>
+  <rect x="246" y="26" width="104" height="60" rx="5" class="r"/><text x="298" y="46" class="c tb">③ Consent</text><text x="298" y="62" class="c ts">category × channel</text><text x="298" y="76" class="c ts">+ country law</text>
+  <rect x="366" y="26" width="104" height="60" rx="5" class="r"/><text x="418" y="46" class="c tb">④ Rate limit</text><text x="418" y="62" class="c ts">token bucket per</text><text x="418" y="76" class="c ts">(user, category)</text>
+  <rect x="486" y="26" width="104" height="60" rx="5" class="a"/><text x="538" y="46" class="c tb">⑤ Quiet hours</text><text x="538" y="62" class="c ts">user's time zone</text><text x="538" y="76" class="c ts">P0 never waits</text>
+  <rect x="606" y="26" width="108" height="60" rx="5" class="g"/><text x="660" y="46" class="c tb">⑥ Router</text><text x="660" y="62" class="c ts">channel, cost,</text><text x="660" y="76" class="c ts">fallback plan</text>
+  <line x1="110" y1="56" x2="125" y2="56" class="ln"/><line x1="230" y1="56" x2="245" y2="56" class="ln"/>
+  <line x1="350" y1="56" x2="365" y2="56" class="ln"/><line x1="470" y1="56" x2="485" y2="56" class="ln"/>
+  <line x1="590" y1="56" x2="605" y2="56" class="ln"/>
+  <line x1="58" y1="86" x2="58" y2="125" class="ln-r"/><line x1="178" y1="86" x2="178" y2="125" class="ln-r"/>
+  <line x1="298" y1="86" x2="298" y2="125" class="ln-r"/><line x1="418" y1="86" x2="418" y2="125" class="ln-r"/>
+  <line x1="538" y1="86" x2="538" y2="125" class="ln"/><line x1="660" y1="86" x2="660" y2="125" class="ln-g"/>
+  <rect x="6" y="126" width="464" height="40" rx="5" class="r" style="fill-opacity:.6"/>
+  <text x="238" y="144" class="c tb">SUPPRESSED, with the reason</text><text x="238" y="159" class="c ts">killed · duplicate · no consent · over the user's cap</text>
+  <rect x="486" y="126" width="104" height="40" rx="5" class="a"/><text x="538" y="144" class="c tb">DEFERRED</text><text x="538" y="159" class="c ts">delayed queue</text>
+  <rect x="606" y="126" width="108" height="40" rx="5" class="g"/><text x="660" y="144" class="c tb">ROUTED</text><text x="660" y="159" class="c ts">to channel workers</text>
+</svg>

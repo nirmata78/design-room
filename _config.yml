@@ -53,6 +53,10 @@ exclude:
   - Progress-Log.md
   - interview.md
   - sessions/
+  - private/
+  - board/
+  - pdf-kit/
+  - solutions/SD-47-ticket-booking/diagrams/
   - LICENSE
   - Gemfile
   - Gemfile.lock
@@ -60,6 +64,8 @@ exclude:
   - scripts/
   - templates/report.css
   - templates/report-template.md
+  - templates/practice-report-template.md
+  - templates/report-kit.html
 
 defaults:
   - scope: { path: "" }
@@ -108,6 +114,8 @@ defaults:
     values: { title: Interviewer guide (for humans), nav_order: 4 }
   - scope: { path: "guides/playbook.md" }
     values: { title: Candidate playbook, nav_order: 5 }
+  - scope: { path: "guides/tool-depth-crib.md" }
+    values: { title: Tool-depth crib, nav_order: 5.5 }
   - scope: { path: "Scorecard-Template.md" }
     values: { title: Scorecard, nav_order: 6 }
   - scope: { path: "prompts/README.md" }

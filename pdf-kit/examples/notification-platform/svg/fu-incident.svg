@@ -1,0 +1,17 @@
+<svg class="d" viewBox="0 0 720 236" xmlns="http://www.w3.org/2000/svg">
+  <text x="6" y="12" class="lab">DUPLICATE STORM: "USERS GET THE SAME ORDER PUSH FOUR TIMES"</text>
+  <line x1="20" y1="70" x2="704" y2="70" class="ln"/>
+  <g>
+  <circle cx="60" cy="70" r="6" class="r"/><text x="60" y="44" class="c tb">0–5 min</text><text x="60" y="58" class="c ts">detect</text>
+  <circle cx="190" cy="70" r="6" class="r"/><text x="190" y="44" class="c tb">5–15 min</text><text x="190" y="58" class="c ts">declare, roles</text>
+  <circle cx="330" cy="70" r="6" class="a"/><text x="330" y="44" class="c tb">15–30 min</text><text x="330" y="58" class="c ts">contain</text>
+  <circle cx="470" cy="70" r="6" class="a"/><text x="470" y="44" class="c tb">30–60 min</text><text x="470" y="58" class="c ts">root cause</text>
+  <circle cx="600" cy="70" r="6" class="g"/><text x="600" y="44" class="c tb">week 1</text><text x="600" y="58" class="c ts">review, fix</text>
+  </g>
+  <rect x="6" y="88" width="118" height="92" rx="5" class="w"/><text x="65" y="106" class="c ts">per-tenant volume</text><text x="65" y="120" class="c ts">3× its baseline;</text><text x="65" y="134" class="c ts">social-cap</text><text x="65" y="148" class="c ts">suppressions spike;</text><text x="65" y="162" class="c ts">support tickets</text>
+  <rect x="132" y="88" width="118" height="92" rx="5" class="w"/><text x="191" y="106" class="c ts">incident lead,</text><text x="191" y="120" class="c ts">comms lead,</text><text x="191" y="134" class="c ts">tenant on-call</text><text x="191" y="148" class="c ts">paged; status</text><text x="191" y="162" class="c ts">every 30 min</text>
+  <rect x="258" y="88" width="144" height="92" rx="5" class="r"/><text x="330" y="106" class="c ts tb">throttle that tenant</text><text x="330" y="120" class="c ts">and category to</text><text x="330" y="134" class="c ts">its baseline;</text><text x="330" y="148" class="c ts">other 19 tenants</text><text x="330" y="162" class="c ts">untouched</text>
+  <rect x="410" y="88" width="120" height="92" rx="5" class="a"/><text x="470" y="106" class="c ts">tenant retry loop</text><text x="470" y="120" class="c ts">mints a new</text><text x="470" y="134" class="c ts">dedupKey per try:</text><text x="470" y="148" class="c ts">our dedup can't</text><text x="470" y="162" class="c ts">see it</text>
+  <rect x="538" y="88" width="176" height="92" rx="5" class="g"/><text x="626" y="106" class="c ts tb">blameless review</text><text x="626" y="120" class="c ts">second-level dedup on</text><text x="626" y="134" class="c ts">a content hash, 10 min;</text><text x="626" y="148" class="c ts">volume anomaly auto-</text><text x="626" y="162" class="c ts">throttle; key lint in SDK</text>
+  <rect x="6" y="192" width="708" height="38" rx="5" class="bl"/><text x="360" y="208" class="c tb">Contain first, explain second. Throttle one tenant, not the platform.</text><text x="360" y="222" class="c ts">The fix that matters is the one that makes the same tenant bug harmless next time, with an owner and a date.</text>
+</svg>

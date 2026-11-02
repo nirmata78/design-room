@@ -1,0 +1,16 @@
+<svg class="d" viewBox="0 0 720 230" xmlns="http://www.w3.org/2000/svg">
+  <g class="lab"><text x="10" y="12">WHAT THE TENANT ASKS</text><text x="262" y="12">CONTRACT CHECK AT INTAKE</text><text x="540" y="12">WHAT HAPPENS</text></g>
+  <rect x="6" y="22" width="220" height="40" rx="5" class="w"/><text x="116" y="39" class="c tb">"Our promo is P0"</text><text x="116" y="54" class="c ts">category marketing, priority P0</text>
+  <rect x="258" y="22" width="250" height="40" rx="5" class="r"/><text x="383" y="39" class="c tb">category fixes priority</text><text x="383" y="54" class="c ts">marketing is P2, always; not a tenant choice</text>
+  <rect x="540" y="22" width="174" height="40" rx="5" class="b"/><text x="627" y="39" class="c tb">422 rejected</text><text x="627" y="54" class="c ts">reason in the response</text>
+  <rect x="6" y="74" width="220" height="40" rx="5" class="w"/><text x="116" y="91" class="c tb">"Lift the caps for Black Friday"</text><text x="116" y="106" class="c ts">3 marketing a day per user</text>
+  <rect x="258" y="74" width="250" height="40" rx="5" class="a"/><text x="383" y="91" class="c tb">caps protect the user, not a quota</text><text x="383" y="106" class="c ts">shared across all twenty teams</text>
+  <rect x="540" y="74" width="174" height="40" rx="5" class="b"/><text x="627" y="91" class="c tb">no global bypass</text><text x="627" y="106" class="c ts">priority inside the cap</text>
+  <rect x="6" y="126" width="220" height="40" rx="5" class="w"/><text x="116" y="143" class="c tb">"Send 400 M by 9 a.m."</text><text x="116" y="158" class="c ts">volume, deadline</text>
+  <rect x="258" y="126" width="250" height="40" rx="5" class="g"/><text x="383" y="143" class="c tb">campaign path, time-zone buckets</text><text x="383" y="158" class="c ts">booked release rate, canary first</text>
+  <rect x="540" y="126" width="174" height="40" rx="5" class="b"/><text x="627" y="143" class="c tb">yes, scheduled</text><text x="627" y="158" class="c ts">capacity reserved in advance</text>
+  <g><line x1="226" y1="42" x2="257" y2="42" class="ln"/><line x1="508" y1="42" x2="539" y2="42" class="ln"/>
+  <line x1="226" y1="94" x2="257" y2="94" class="ln"/><line x1="508" y1="94" x2="539" y2="94" class="ln"/>
+  <line x1="226" y1="146" x2="257" y2="146" class="ln"/><line x1="508" y1="146" x2="539" y2="146" class="ln"/></g>
+  <rect x="6" y="182" width="708" height="40" rx="5" class="bl"/><text x="360" y="199" class="c tb">Exception path: written request · named owner · data on user impact · time-boxed · reviewed after</text><text x="360" y="214" class="c ts">decided by a product owner of the user experience, not by whoever escalates loudest; the platform team brings the data</text>
+</svg>

@@ -1,4 +1,4 @@
-# Question Bank — 92 system-design questions
+# Question Bank — 93 system-design questions
 
 The index. Cue sheets live in `questions/<LETTER>-<archetype>.md`, one file per archetype, each
 question anchored as `### SD-nn`.
@@ -13,7 +13,7 @@ question anchored as `### SD-nn`.
 **Candidates: don't read the cue sheets before a round** — they contain the answer. This index is safe.
 
 **Reference solutions** — full stage-by-stage answer keys — exist for the rows marked
-**solution**: SD-08, SD-09, SD-15, SD-25, SD-44 ([index](solutions/README.md)). Run the round first,
+**solution**: SD-08, SD-09, SD-15, SD-25, SD-44, SD-47 ([index](solutions/README.md)). Run the round first,
 read the solution after. The building blocks they rely on are in [Theory](theory/README.md).
 
 ## How the bank is organised — four ways to slice it
@@ -27,7 +27,7 @@ read the solution after. The building blocks they rely on are in [Theory](theory
 
 **Tiers.** **T1** = full cue sheet: crux, clarification numbers, checklist, phase-by-phase probe
 ladder, curveball, weak/strong/exceptional, traps. **T2** = compact sheet: prompt, numbers,
-checklist, five probes, three bands — enough to run a complete round. **40 T1, 52 T2.**
+checklist, five probes, three bands — enough to run a complete round. **41 T1, 52 T2.**
 
 **Asked by** — where the question shows up: **G** Google · **M** Meta · **A** Amazon · **MS** Microsoft ·
 **N** Netflix · **U** Uber/Lyft/DoorDash-class · **FT** fintech (payment companies, neobanks, issuers,
@@ -119,11 +119,12 @@ See also archetype **I** for AI & LLM systems — SD-42 is the serving prerequis
 | SD-44 | Payment processing & double-entry ledger · [**solution**](solutions/SD-44-payments-ledger.md) | 1 | Build | fintech | Sr St EM | A★ G MS | idempotency, exactly-once effects, sagas, reconciliation |
 | SD-45 | Payment gateway integration (multi-PSP) | 2 | Build | fintech commerce | Sr St EM | A MS | adapter design, retries against third parties, webhooks |
 | SD-46 | Digital wallet & balance transfers | 2 | Build | fintech | Sr St | A G | atomic balance moves, hot accounts, holds, audit |
-| SD-47 | Ticket / seat booking under contention | 1 | Build | commerce | Sr St EM | A★ G MS | holds vs locks, oversell, fairness, expiry |
+| SD-47 | Ticket / seat booking under contention · [**solution**](solutions/SD-47-ticket-booking/SD-47_Ticket_Booking_Reference_Design.md) | 1 | Build | commerce | Sr St EM | A★ G MS | holds vs locks, oversell, fairness, expiry |
 | SD-48 | Inventory & order management at scale | 1 | Build | commerce | St EM | A★ | reservation vs availability, distributed inventory, sagas |
 | SD-49 | Delivery dispatch & order lifecycle | 2 | Build | mobility commerce | St EM | U★ A | long-lived state machines, assignment, real-time tracking |
 | SD-50 | Subscription billing & usage metering | 2 | Build | saas fintech | St EM | A MS G | metering accuracy, proration, idempotent invoicing |
 | SD-77 | Card authorisation & issuer processing | 1 | Build | fintech | Sr St EM | FT★ A MS | holds, stand-in, auth ↔ clearing matching |
+| SD-93 | Personal investment tracker with price alerts | 1 | Build | fintech data | Sr St EM | FT G | two data speeds, inverted alert matching, unreliable third parties, restated history |
 | SD-78 | KYC / AML onboarding & sanctions screening | 2 | Build | fintech | Sr EM | FT★ MS | durable workflow, fuzzy screening, continuous re-screening |
 | SD-79 | Reconciliation & settlement engine | 1 | Build | fintech | St EM SEM | FT★ A MS | multi-pass matching, expectations, exception workflow |
 | SD-80 | Cross-border payments & FX | 2 | Build | fintech | St EM | FT★ A | locked quotes, exposure, prefunding, multi-currency ledger |
@@ -226,7 +227,7 @@ bar on your home domain).
 | Domain | Questions | Core test in this domain |
 |---|---|---|
 | `general` | SD-55 SD-56 SD-57 SD-58 SD-59 SD-60 SD-61 SD-62 SD-83 SD-84 SD-85 SD-86 SD-87 SD-88 SD-90 SD-91 | judgment, sequencing, review — domain-neutral rounds |
-| `fintech` | SD-43 SD-44 SD-45 SD-46 SD-50 SD-71 SD-75 SD-76 SD-77 SD-78 SD-79 SD-80 SD-81 SD-82 SD-84 | correctness under retry; you are not the only ledger |
+| `fintech` | SD-43 SD-44 SD-45 SD-46 SD-50 SD-71 SD-75 SD-76 SD-77 SD-78 SD-79 SD-80 SD-81 SD-82 SD-84 SD-93 | correctness under retry; you are not the only ledger |
 | `crypto` | SD-71 SD-72 SD-73 SD-74 SD-75 SD-76 | irreversible value, key custody, reorgs |
 | `ai` | SD-41 SD-42 SD-43 SD-63 SD-64 SD-65 SD-66 SD-67 SD-68 SD-69 SD-70 SD-82 | expensive, non-deterministic components; evaluation without ground truth |
 | `social` | SD-02 SD-08 SD-09 SD-10 SD-11 SD-12 SD-13 SD-14 SD-68 | fan-out, the celebrity problem, abuse at scale |
@@ -236,13 +237,13 @@ bar on your home domain).
 | `mobility` | SD-39 SD-40 SD-49 | geo indexing, matching under contention |
 | `saas` | SD-17 SD-18 SD-19 SD-23 SD-27 SD-50 SD-89 | tenancy, isolation, collaboration |
 | `infra` | SD-04 SD-05 SD-07 SD-15 SD-16 SD-17 SD-20 SD-24 SD-25 SD-26 SD-27 SD-28 SD-29 SD-30 SD-31 SD-32 SD-33 SD-34 SD-35 SD-53 SD-66 SD-92 | control plane vs data plane, blast radius |
-| `data` | SD-01 SD-03 SD-04 SD-06 SD-07 SD-21 SD-22 SD-54 SD-69 SD-74 | event time, exactly-once accounting, lineage |
+| `data` | SD-01 SD-03 SD-04 SD-06 SD-07 SD-21 SD-22 SD-54 SD-69 SD-74 SD-93 | event time, exactly-once accounting, lineage |
 
 ## Browse by kind
 
 - **Review** (6) — **Inverted** — the interviewer presents an artifact with planted defects and you review it. Rules: top of `H-em-specific-rounds.md`. SD-55 · SD-57 · SD-58 · SD-61 · SD-84 · SD-87
 - **Strategy** (12) — Decide, sequence, invest — the "design" is a plan, a recommendation or an org shape. SD-56 · SD-59 · SD-60 · SD-62 · SD-83 · SD-85 · SD-86 · SD-88 · SD-89 · SD-90 · SD-91 · SD-92
-- **Build** (74) — Classic "design X". Every other question.
+- **Build** (75) — Classic "design X". Every other question.
 
 ---
 
@@ -261,6 +262,7 @@ bar on your home domain).
 | **Crypto exchange / custodian** | SD-71, SD-72, SD-73, SD-44, SD-75, SD-76 |
 | **AI lab / AI platform** | SD-42, SD-63, SD-64, SD-66, SD-65, SD-67 |
 | **Director / Head of Engineering loops** | SD-89, SD-91, SD-90, SD-92, SD-62, SD-60 |
+| **Data-heavy product company, hour-long requirement-drip round** (`data-co`, format `drip`, pace `hour`) | SD-47, SD-18, SD-39, SD-12, SD-93 — each carries two scripted drips |
 
 **If there is no loop yet, go for coverage:** one round in each archetype (A–K) beats ten rounds in the
 two that feel comfortable. `Progress-Log.md` tracks this.
@@ -294,7 +296,7 @@ the next question should load that dimension hard:
 
 1. Build the sheet with `Cue-Sheet-Template.md`.
 2. Append it to the right archetype file as `### SD-nn · Title   [T1 · G★ M]`. **IDs are global and
-   monotonic** — take the next free number (currently **SD-93**) even if it lands in an older
+   monotonic** — take the next free number (currently **SD-94**) even if it lands in an older
    archetype; the archetype file's header lists its ranges.
 3. Add a row here with Kind, Domain and Levels.
 4. Open a pull request — see `CONTRIBUTING.md`.

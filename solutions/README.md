@@ -47,9 +47,47 @@ The boxes: **Say it in the room** — words you can use nearly verbatim · **Why
 behind a term or decision · **The number that matters** · **Trap** — what breaks under a follow-up ·
 **Level lens** — how the bar shifts by level. Method in full: [The interview method](../theory/01-interview-method.md).
 
+## Mock-round videos
+
+A narrated mock round per solution at the **L6 Engineering Manager** bar (1080p, interviewer, candidate, key lines
+spoken slower, coach, burned-in captions, chapters): the design, then four manager follow-ups. Each lives in
+`SD-NN-<name>/video/` with its slides, C4 and sequence diagrams and script, and rebuilds with `video/build-video.sh`.
+The MP4s and frames are gitignored. Built with the `system-design-video` skill.
+
+| ID | Video folder | The four follow-ups |
+|---|---|---|
+| SD-08 | `SD-08-news-feed/video/` | the ranking team wants 300 ms · a lost timeline cluster · pure pull to hybrid in a quarter · the memory bill |
+| SD-09 | `SD-09-chat-messaging/video/` | encryption announced on stage · a deploy restarts a zone · a burning on-call · storage cost −40% |
+| SD-15 | `SD-15-distributed-kv-store/video/` | build or buy · a region goes dark · "strong everywhere" · the transfer bill |
+| SD-25 | `SD-25-rate-limiter/video/` | a customer wants no limits · a zero-limit policy push · billing from the limiter · the decision-log bill |
+| SD-44 | `SD-44-payments-ledger/video/` | approve offline · a processor outage on Black Friday · a second processor · fees growing faster than volume |
+| SD-47 | `SD-47-ticket-booking/video/` | strict first-come · failover mid-sale · three teams, twelve weeks · the CDN bill |
+
+## Booklet-length solutions
+
+Longer, illustrated answer keys, built to PDF. Same stage layout, more depth per stage, plus an
+internals appendix for the "how does that tool actually work?" probe.
+
+| ID | Problem | Source | What's in it |
+|---|---|---|---|
+| [SD-47](SD-47-ticket-booking/SD-47_Ticket_Booking_Reference_Design.md) | Ticket booking under contention | `SD-47-ticket-booking/` | 60-minute script (pace `hour`), 21 PlantUML diagrams, seven deep dives (the same-millisecond click, the lottery waiting room, hold expiry, the expired-hold-paid case, the seat map at 10k shoppers, concurrent on-sales, degradation), three worked requirement drips, PostgreSQL / Redis / Kafka / CDN / card-payment internals, a one-page cheat card |
+
+Build the PDF (needs `pandoc`, `xelatex`, `plantuml`, `rsvg-convert`; the PDF is gitignored):
+
+```bash
+solutions/SD-47-ticket-booking/build-sd-booklet.sh SD-47_Ticket_Booking_Reference_Design             # diagrams + PDF
+solutions/SD-47-ticket-booking/build-sd-booklet.sh SD-47_Ticket_Booking_Reference_Design --no-diagrams
+```
+
+For a guide in the *style* of the URL-shortener and notification-platform reference interviews (cover
+band, coloured callouts, hand-drawn SVG diagrams), use the HTML kit in [`../pdf-kit/`](../pdf-kit/README.md).
+
+**In a practice session** (`CLAUDE.md` §16) the coach reads these one stage at a time and scaffolds
+from them. In a certifying session they stay closed until the debrief.
+
 ## Coming next
 
 The next solutions in the queue, by how often they're asked: SD-12 notification platform · SD-20
-distributed cache · SD-47 ticket booking under contention · SD-18 file sync · SD-39 ride matching ·
+distributed cache · SD-18 file sync · SD-39 ride matching ·
 SD-42 LLM inference serving · SD-55 design review (inverted) · SD-58 SLO design. Contributions
 welcome — follow this layout ([CONTRIBUTING](../CONTRIBUTING.md)).

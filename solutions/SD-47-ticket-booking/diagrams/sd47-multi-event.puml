@@ -1,0 +1,30 @@
+@startuml
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam wrapWidth 220
+skinparam nodesep 25
+skinparam ranksep 40
+cloud "CDN (shared)\ncache key includes event id" as CDN #EAF1FB
+node "Gateway + waiting-room pods\n(stateless, shared, autoscaled)" as GW #F7F9FC
+database "Event directory\nevent_id -> cell, shard,\nqueue on/off, R limits" as DIR #FFF3D1
+database "Redis Cluster\nkeys tagged {event_id}:\none event = one slot" as RC #F7F9FC
+rectangle "Shared cell\n(thousands of small events)" as SC #EAF1FB {
+  node "Inventory + order pods" as SCI
+  database "PostgreSQL shards A1..A4" as SCD
+}
+rectangle "Dedicated cell\n(the stadium tour)" as DC #DFF1E4 {
+  node "Inventory + order pods " as DCI
+  database "PostgreSQL shard T1" as DCD
+}
+cloud "PSP\n(one global budget,\nsplit per event)" as PSP #FFF3D1
+CDN -down-> GW
+GW -right-> DIR : route by event_id
+GW -down-> RC
+GW -down-> SCI
+GW -down-> DCI
+SCI -down-> SCD
+DCI -down-> DCD
+SCI -right-> PSP
+DCI -right-> PSP
+@enduml

@@ -1,0 +1,11 @@
+<svg class="d" viewBox="0 0 720 150" xmlns="http://www.w3.org/2000/svg">
+  <text x="6" y="10" class="lab">PEAK REDIRECT TRAFFIC, LAYER BY LAYER (ILLUSTRATIVE HIT RATES)</text>
+  <text x="200" y="36" class="tb" text-anchor="end">Arrive at the edge</text>
+  <rect x="210" y="22" width="420" height="22" class="b"/><text x="636" y="37" class="ts tb">350k/s</text>
+  <text x="200" y="68" class="tb" text-anchor="end">Reach origin</text><text x="200" y="81" class="ts" text-anchor="end">CDN hit ~40%</text>
+  <rect x="210" y="56" width="252" height="22" class="bl"/><text x="468" y="71" class="ts tb">210k/s</text>
+  <text x="200" y="102" class="tb" text-anchor="end">Reach Redis</text><text x="200" y="115" class="ts" text-anchor="end">local LRU hit ~50%</text>
+  <rect x="210" y="90" width="126" height="22" class="r"/><text x="342" y="105" class="ts tb">105k/s</text>
+  <text x="200" y="136" class="tb" text-anchor="end">Reach KV store</text><text x="200" y="149" class="ts" text-anchor="end">Redis hit ~85%</text>
+  <rect x="210" y="124" width="19" height="22" class="g"/><text x="235" y="139" class="ts tb">~16k/s · 4.5% of traffic</text>
+</svg>

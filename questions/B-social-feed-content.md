@@ -270,6 +270,8 @@ and you fall back to email. The push actually arrived. Now what?"* · *"A team's
 same notification 5 times. Whose job is it to stop that, and how?"* · *(EM bar)* *"Twenty teams
 depend on this. What's the quota model and what's your on-call surface?"*
 
+**Drips** (format `drip`, §7.5 — read the prompt above as increment #1): **#2** *"Users set quiet hours and per-channel preferences."* · **#3** *"Marketing sends a blast to 50M users — transactional messages must not be starved."* Listen for the delta stated out loud and the seam that absorbs it.
+
 **Weak / Strong / Exceptional.** *Weak* — an API that calls the push provider synchronously; no
 dedup, no preferences, no priorities. *Strong* — intent/delivery split, durable queues, priority
 classes, dedup, preference gate, provider adapters with circuit breakers. *Exceptional* — treats

@@ -1,0 +1,29 @@
+<svg class="d" viewBox="0 0 720 222" xmlns="http://www.w3.org/2000/svg">
+  <text x="20" y="14" class="lab">STREAM seat-events:{e} · XADD appends entries with time-ordered IDs</text>
+  <g>
+    <rect x="20"  y="24" width="100" height="40" class="w"/><text x="70"  y="40" class="c tm">1001-0</text><text x="70"  y="55" class="c ts">HELD 101,102</text>
+    <rect x="120" y="24" width="100" height="40" class="w"/><text x="170" y="40" class="c tm">1002-0</text><text x="170" y="55" class="c ts">SOLD 101,102</text>
+    <rect x="220" y="24" width="100" height="40" class="w"/><text x="270" y="40" class="c tm">1003-0</text><text x="270" y="55" class="c ts">HELD 77</text>
+    <rect x="320" y="24" width="100" height="40" class="a"/><text x="370" y="40" class="c tm">1004-0</text><text x="370" y="55" class="c ts">RELEASED 77</text>
+    <rect x="420" y="24" width="100" height="40" class="a"/><text x="470" y="40" class="c tm">1005-0</text><text x="470" y="55" class="c ts">HELD 900</text>
+    <rect x="520" y="24" width="100" height="40" class="g"/><text x="570" y="40" class="c tm">1006-0</text><text x="570" y="55" class="c ts">SOLD 900</text>
+  </g>
+  <text x="632" y="49" class="ts">← XADD *</text>
+
+  <rect x="20" y="92" width="380" height="76" rx="5" class="bl"/>
+  <text x="30" y="110" class="tb">group "notifier"   last-delivered-id = 1005-0</text>
+  <text x="30" y="128" class="ts">Pending Entries List (delivered, not yet XACKed):</text>
+  <text x="40" y="144" class="tm">1004-0 → c1  idle 75 s   (c1 crashed)</text>
+  <text x="40" y="159" class="tm">1005-0 → c2  idle 2 s</text>
+
+  <rect x="20" y="178" width="380" height="36" rx="5" class="b"/>
+  <text x="30" y="200" class="ts"><tspan class="tb">group "analytics"</tspan>   last-delivered-id = 1002-0  · own cursor, own PEL</text>
+
+  <rect x="470" y="92" width="112" height="34" rx="5" class="b" style="opacity:.6"/><text x="526" y="114" class="c ts">consumer c1 ✕</text>
+  <rect x="470" y="140" width="112" height="34" rx="5" class="b"/><text x="526" y="162" class="c ts">consumer c2</text>
+
+  <path d="M570,64 L570,80 L640,80 L640,157 L583,157" class="ln-g"/><text x="646" y="104" class="ts tg">XREADGROUP</text><text x="646" y="117" class="ts tg">… &gt; → 1006-0</text>
+  <path d="M400,144 L440,144 L440,150 L469,150" class="ln-r"/>
+  <text x="414" y="192" class="ts tr">XAUTOCLAIM … 60000 → c2 takes 1004-0</text>
+  <text x="414" y="208" class="ts">XACK when done → entry leaves the PEL</text>
+</svg>

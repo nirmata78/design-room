@@ -1,0 +1,26 @@
+@startuml
+!include <C4/C4_Component>
+HIDE_STEREOTYPE()
+LAYOUT_LEFT_RIGHT()
+Container(gw, "API gateway", "Envoy")
+Container(ord, "Order service", "Java")
+Container_Boundary(inv, "Inventory & holds service") {
+  Component(api, "Hold API", "REST", "POST/DELETE /holds; Idempotency-Key")
+  Component(tok, "Admission check", "HMAC verify", "Only admitted users may hold")
+  Component(claim, "Claim engine", "SQL", "All-or-nothing conditional UPDATE, sorted locks, NOWAIT")
+  Component(lim, "Purchase limits", "Rules", "Max seats per account / card")
+  Component(outbox, "Outbox writer", "Same txn", "SeatHeld / SeatReleased rows")
+  Component(life, "Hold lifecycle", "State machine", "HELD -> PAYMENT_PENDING -> SOLD")
+}
+ContainerDb(db, "Inventory DB", "PostgreSQL")
+ContainerQueue(bus, "Kafka")
+Rel(gw, api, "HTTPS")
+Rel(api, tok, "")
+Rel(api, lim, "")
+Rel(api, claim, "")
+Rel(claim, db, "UPDATE ... RETURNING")
+Rel(claim, outbox, "")
+Rel(life, db, "")
+Rel(outbox, bus, "relay (CDC)")
+Rel(ord, life, "freeze / sell / release")
+@enduml

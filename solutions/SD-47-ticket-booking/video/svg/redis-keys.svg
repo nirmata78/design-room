@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 800" width="1600" height="800">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<rect x="20" y="20" width="500" height="90" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
+<path d="M20,28 a8,8 0 0 1 8,-8 h484 a8,8 0 0 1 8,8 v38 h-500 z" fill="#1f2328"/>
+<text x="34" y="51.28" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="23.1" font-weight="700" fill="#fff">phase:{e}  STRING</text>
+<text x="75.1" y="91.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">value</text>
+<text x="506" y="91.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">LOBBY | QUEUE</text>
+<rect x="20" y="170" width="500" height="199" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
+<path d="M20,178 a8,8 0 0 1 8,-8 h484 a8,8 0 0 1 8,8 v38 h-500 z" fill="#1f2328"/>
+<text x="34" y="201.28" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="23.1" font-weight="700" fill="#fff">lobby:{e}  ZSET</text>
+<text x="75.1" y="241.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">member</text>
+<text x="506" y="241.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">user-48213</text>
+<rect x="21" y="254" width="498" height="38" fill="#f6f8fa"/>
+<text x="75.1" y="279.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">score</text>
+<text x="506" y="279.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">0.73195 (secret)</text>
+<text x="75.1" y="317.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">size</text>
+<text x="506" y="317.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">~1 M · ~100 MB</text>
+<text x="34" y="353.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17.2" font-style="italic" fill="#57606a">ZADD NX at join · ZRANK + 1 = seq</text>
+<rect x="560" y="20" width="480" height="90" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
+<path d="M560,28 a8,8 0 0 1 8,-8 h464 a8,8 0 0 1 8,8 v38 h-480 z" fill="#1f2328"/>
+<text x="574" y="51.28" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="23.1" font-weight="700" fill="#fff">next:{e}  INT</text>
+<text x="615.1" y="91.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">value</text>
+<text x="1026" y="91.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">1,000,412 (last seq)</text>
+<rect x="560" y="170" width="480" height="123" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
+<path d="M560,178 a8,8 0 0 1 8,-8 h464 a8,8 0 0 1 8,8 v38 h-480 z" fill="#c8341f"/>
+<text x="574" y="201.28" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="23.1" font-weight="700" fill="#fff">admittedUpTo:{e}  INT</text>
+<text x="615.1" y="241.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">value</text>
+<text x="1026" y="241.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">31,800</text>
+<text x="574" y="277.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17.2" font-style="italic" fill="#57606a">advance.lua, once a second</text>
+<rect x="560" y="340" width="480" height="128" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
+<path d="M560,348 a8,8 0 0 1 8,-8 h464 a8,8 0 0 1 8,8 v38 h-480 z" fill="#1f2328"/>
+<text x="574" y="371.28" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="23.1" font-weight="700" fill="#fff">rate:{e} · soldOut:{e}</text>
+<text x="615.1" y="411.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">rate</text>
+<text x="1026" y="411.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">2000 per minute</text>
+<rect x="561" y="424" width="478" height="38" fill="#f6f8fa"/>
+<text x="615.1" y="449.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">soldOut</text>
+<text x="1026" y="449.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">false</text>
+<rect x="1080" y="20" width="510" height="161" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
+<path d="M1080,28 a8,8 0 0 1 8,-8 h494 a8,8 0 0 1 8,8 v38 h-510 z" fill="#1f2328"/>
+<text x="1094" y="51.28" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="23.1" font-weight="700" fill="#fff">admitted:{e}:{user}</text>
+<text x="1135.1" y="91.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">value</text>
+<text x="1576" y="91.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">admission JWT</text>
+<rect x="1081" y="104" width="508" height="38" fill="#f6f8fa"/>
+<text x="1135.1" y="129.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">ttl</text>
+<text x="1576" y="129.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">6 h</text>
+<text x="1094" y="165.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17.2" font-style="italic" fill="#57606a">SET NX: a re-admit returns the same token</text>
+<rect x="1080" y="240" width="510" height="161" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
+<path d="M1080,248 a8,8 0 0 1 8,-8 h494 a8,8 0 0 1 8,8 v38 h-510 z" fill="#1f2328"/>
+<text x="1094" y="271.28" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="23.1" font-weight="700" fill="#fff">map:{e}:{v} · map:{e}:v</text>
+<text x="1135.1" y="311.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">map:{e}:812</text>
+<text x="1576" y="311.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">6,250-byte bitmap</text>
+<rect x="1081" y="324" width="508" height="38" fill="#f6f8fa"/>
+<text x="1135.1" y="349.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">map:{e}:v</text>
+<text x="1576" y="349.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">812</text>
+<text x="1094" y="385.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17.2" font-style="italic" fill="#57606a">pointer flipped last; old versions TTL 2 min</text>
+<rect x="20" y="560" width="1570" height="75.6" rx="6" fill="#e8f0fa" stroke="#2f6fb5" stroke-width="1.2"/>
+<text x="34" y="586.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="21.0" fill="#1f2328">{e} is a Redis Cluster hash tag: only the part in braces is hashed, so every key of one event sits on one node and one Lua script can touch</text>
+<text x="34" y="614.6" font-family="Inter, Helvetica, Arial, sans-serif" font-size="21.0" fill="#1f2328">them atomically. Different events land on different nodes.</text>
+</svg>

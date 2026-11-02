@@ -1,0 +1,34 @@
+@startuml
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam wrapWidth 240
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam SwimlaneTitleFontStyle bold
+|Fan|
+start
+:Opens the event page before the sale;
+|Edge and waiting room|
+:Bot challenge;
+:Lobby entry saved with a\nsecret random draw score;
+|Fan|
+:Lobby page: countdown, no seats yet;
+|Edge and waiting room|
+:<b>T0</b>: lobby closes, the draw is final.\nLate arrivals queue behind it, FIFO;
+|Fan|
+:Asks once: "what is my number?";
+repeat
+  :Every ~10 s reads the shared queue state\n(one cached JSON from the CDN);
+  if (soldOut flag set?) then (yes)
+    :"Sold out" page + waitlist offer;
+    stop
+  else (no)
+  endif
+repeat while (my number > admittedUpTo?) is (still waiting)
+->my turn;
+|Edge and waiting room|
+:Issues a signed admission token,\nvalid 10 min;
+|Fan|
+:Goes to the seat map (next figure);
+stop
+@enduml

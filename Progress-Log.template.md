@@ -7,6 +7,8 @@ This is what makes question selection intelligent — `surprise me` reads the we
 `—` = unscored (not probed). **W** = weighted score at the target level (`levels.md` §2). **Out** =
 outcome (SH strong hire · H hire · LN lean no · NH no hire). **Help** = highest hint rung used, with
 count. **Kind** = Build · Review · Strategy.
+**Practice rows** (`Mode = practice`): scores, W and Out are `—`; Help holds the independence counts
+(`U4 H3 S5 W1`). They never enter the weighted trend (`CLAUDE.md` §16.6).
 
 | Date | ID | Question | Arch | Kind | Domain | Co | Level | Mode | Req | Est | HLD | Dep | Trd | Ops | Com | Amb | Ldr | W | Out | Help | Time | One drill | Report |
 |---|---|---|---|---|---|---|---|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|---|---|---|---|

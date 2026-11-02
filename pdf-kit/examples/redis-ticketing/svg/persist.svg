@@ -1,0 +1,43 @@
+<svg class="d" viewBox="0 0 720 222" xmlns="http://www.w3.org/2000/svg">
+  <text x="6" y="14" class="lab">RDB: POINT-IN-TIME SNAPSHOT</text>
+  <rect x="6" y="26" width="130" height="52" rx="5" class="r"/>
+  <text x="71" y="47" class="c tb">Redis main</text><text x="71" y="63" class="c ts">keeps serving writes</text>
+  <rect x="196" y="26" width="140" height="52" rx="5" class="a"/>
+  <text x="266" y="47" class="c tb">child process</text><text x="266" y="63" class="c ts">serialises the snapshot</text>
+  <line x1="136" y1="52" x2="195" y2="52" class="ln"/><text x="166" y="45" class="c ts">fork()</text>
+
+  <text x="6" y="104" class="ts">memory pages shared after fork:</text>
+  <g>
+    <rect x="6" y="112" width="30" height="24" class="w"/><rect x="40" y="112" width="30" height="24" class="w"/>
+    <rect x="74" y="112" width="30" height="24" class="r"/><rect x="108" y="112" width="30" height="24" class="w"/>
+    <rect x="142" y="112" width="30" height="24" class="w"/><rect x="176" y="112" width="30" height="24" class="r"/>
+    <rect x="210" y="112" width="30" height="24" class="w"/><rect x="244" y="112" width="30" height="24" class="w"/>
+  </g>
+  <text x="6" y="154" class="ts">red = page the parent wrote to, so the kernel copied it.</text>
+  <text x="6" y="168" class="ts">Heavy writes during a snapshot → up to 2× RAM.</text>
+  <rect x="196" y="178" width="140" height="34" rx="5" class="b"/>
+  <text x="266" y="199" class="c tm">dump.rdb</text>
+  <line x1="300" y1="78" x2="300" y2="177" class="ln"/>
+
+  <line x1="356" y1="8" x2="356" y2="216" style="stroke:#d0d7de;stroke-width:1"/>
+
+  <text x="372" y="14" class="lab">AOF: APPEND-ONLY LOG OF WRITES</text>
+  <rect x="372" y="26" width="96" height="52" rx="5" class="r"/>
+  <text x="420" y="47" class="c tb">write cmd</text><text x="420" y="63" class="c ts">executed</text>
+  <rect x="490" y="26" width="96" height="52" rx="5" class="b"/>
+  <text x="538" y="47" class="c tb">AOF buffer</text><text x="538" y="63" class="c ts">before reply</text>
+  <rect x="608" y="26" width="106" height="52" rx="5" class="b"/>
+  <text x="661" y="47" class="c tb">write()</text><text x="661" y="63" class="c ts">OS page cache</text>
+  <line x1="468" y1="52" x2="489" y2="52" class="ln"/><line x1="586" y1="52" x2="607" y2="52" class="ln"/>
+
+  <rect x="372" y="98" width="342" height="62" rx="5" class="a"/>
+  <text x="543" y="116" class="c tb">fsync policy (appendfsync)</text>
+  <text x="382" y="134" class="tm">always   fsync before reply   ~0 s lost, slow</text>
+  <text x="382" y="150" class="tm">everysec background, 1/s     ≤ ~1 s lost  ✓</text>
+  <line x1="661" y1="78" x2="661" y2="97" class="ln"/>
+
+  <rect x="372" y="178" width="342" height="34" rx="5" class="b"/>
+  <text x="543" y="192" class="c tm">appendonlydir/  base.rdb + incr.aof + manifest</text>
+  <text x="543" y="206" class="c ts">rewrite = fork, write new base, swap manifest (7.0+)</text>
+  <line x1="543" y1="160" x2="543" y2="177" class="ln"/>
+</svg>

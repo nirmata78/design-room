@@ -1,0 +1,29 @@
+@startuml
+hide footbox
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 230
+skinparam noteBackgroundColor #FFF8DC
+skinparam noteBorderColor #C9A227
+actor "Fan A" as A
+actor "Fan C" as C
+participant "Inventory" as I
+database "PostgreSQL" as PG
+participant "Sweeper\n(every 5 s)" as SW
+queue "Kafka" as K
+A -> I : hold seat 101 (expires 10:07:00)
+note over A : closes the laptop
+... 10:07:00 passes, the sweeper has not run yet ...
+C -> I : hold seat 101 (10:07:02, from a stale map)
+I -> PG : UPDATE ... WHERE state = AVAILABLE\nOR (state = HELD AND expires_at < now())
+PG --> I : 1 row: lazy expiry, C wins
+I --> C : 201
+SW -> PG : SELECT expired HELD rows\nLIMIT 500 FOR UPDATE SKIP LOCKED
+PG --> SW : seats 205-208 (nobody tried them)
+SW -> PG : UPDATE -> AVAILABLE; outbox SeatsReleased; COMMIT
+PG -> K : (relay) SeatsReleased
+note over K : the map now shows 205-208 as free
+@enduml

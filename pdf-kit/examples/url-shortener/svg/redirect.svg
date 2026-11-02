@@ -1,0 +1,23 @@
+<svg class="d" viewBox="0 0 720 262" xmlns="http://www.w3.org/2000/svg">
+  <rect x="10" y="4" width="92" height="26" rx="5" class="b"/><text x="56" y="21" class="c tb">Browser</text>
+  <rect x="128" y="4" width="92" height="26" rx="5" class="bl"/><text x="174" y="21" class="c tb">CDN edge</text>
+  <rect x="250" y="4" width="120" height="26" rx="5" class="r"/><text x="310" y="21" class="c tb">Redirect svc</text>
+  <rect x="402" y="4" width="92" height="26" rx="5" class="r"/><text x="448" y="21" class="c tb">Redis</text>
+  <rect x="520" y="4" width="92" height="26" rx="5" class="g"/><text x="566" y="21" class="c tb">KV store</text>
+  <rect x="632" y="4" width="80" height="26" rx="5" class="b"/><text x="672" y="21" class="c tb">Kafka</text>
+  <line x1="56" y1="30" x2="56" y2="256" class="life"/><line x1="174" y1="30" x2="174" y2="256" class="life"/>
+  <line x1="310" y1="30" x2="310" y2="256" class="life"/><line x1="448" y1="30" x2="448" y2="256" class="life"/>
+  <line x1="566" y1="30" x2="566" y2="256" class="life"/><line x1="672" y1="30" x2="672" y2="256" class="life"/>
+
+  <line x1="56" y1="50" x2="173" y2="50" class="ln"/><text x="62" y="45" class="ts">GET /fN7J2J9</text>
+  <line x1="174" y1="72" x2="309" y2="72" class="ln"/><text x="180" y="67" class="ts">edge miss → origin</text>
+  <rect x="300" y="80" width="20" height="16" rx="2" class="w"/><text x="326" y="92" class="ts">① local LRU: miss (µs)</text>
+  <line x1="310" y1="112" x2="447" y2="112" class="ln"/><text x="316" y="107" class="ts">② GET url:fN7J2J9</text>
+  <line x1="448" y1="128" x2="311" y2="128" class="ln dash"/><text x="380" y="140" class="ts">nil · ~0.5 ms</text>
+  <line x1="310" y1="152" x2="565" y2="152" class="ln"/><text x="458" y="147" class="ts">③ GetItem(code)</text>
+  <line x1="566" y1="170" x2="311" y2="170" class="ln-g"/><text x="458" y="182" class="ts tg">long URL, expires_at · ~3 ms</text>
+  <line x1="310" y1="194" x2="447" y2="194" class="ln dash"/><text x="316" y="189" class="ts">④ SET … EX ttl±jitter</text>
+  <line x1="310" y1="214" x2="671" y2="214" class="ln dash"/><text x="530" y="209" class="ts">⑤ click event, async</text>
+  <line x1="310" y1="232" x2="175" y2="232" class="ln-r"/><text x="190" y="227" class="ts tr tb">302 + Location</text>
+  <line x1="174" y1="250" x2="57" y2="250" class="ln-r"/><text x="64" y="245" class="ts tr">302 (edge keeps 60 s)</text>
+</svg>

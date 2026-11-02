@@ -1,0 +1,24 @@
+<svg class="d" viewBox="0 0 720 210" xmlns="http://www.w3.org/2000/svg">
+  <text x="6" y="12" class="lab">CONSISTENT HASHING WITH VIRTUAL NODES</text>
+  <circle cx="120" cy="112" r="82" style="fill:none;stroke:#aab3bd;stroke-width:2"/>
+  <circle cx="148.0" cy="34.9" r="7" class="r"/><circle cx="172.7" cy="174.8" r="7" class="r"/><circle cx="39.2" cy="126.2" r="7" class="r"/>
+  <circle cx="191.0" cy="71.0" r="7" class="bl"/><circle cx="120" cy="194" r="7" class="bl"/><circle cx="49.0" cy="71.0" r="7" class="bl"/>
+  <circle cx="200.8" cy="126.2" r="7" class="g"/><circle cx="67.3" cy="174.8" r="7" class="g"/><circle cx="92.0" cy="34.9" r="7" class="g"/>
+  <text x="148" y="38.5" class="c" style="font-size:8px;font-weight:700">A</text><text x="172.7" y="178.4" class="c" style="font-size:8px;font-weight:700">A</text><text x="39.2" y="129.8" class="c" style="font-size:8px;font-weight:700">A</text>
+  <text x="191" y="74.6" class="c" style="font-size:8px;font-weight:700">B</text><text x="120" y="197.6" class="c" style="font-size:8px;font-weight:700">B</text><text x="49" y="74.6" class="c" style="font-size:8px;font-weight:700">B</text>
+  <text x="200.8" y="129.8" class="c" style="font-size:8px;font-weight:700">C</text><text x="67.3" y="178.4" class="c" style="font-size:8px;font-weight:700">C</text><text x="92" y="38.5" class="c" style="font-size:8px;font-weight:700">C</text>
+  <circle cx="167" cy="44.8" r="3.5" style="fill:#1f2328"/>
+  <path d="M170,47 A82,82 0 0,1 185,63" class="ln-r"/>
+  <text x="120" y="106" class="c tm">hash(code)</text><text x="120" y="120" class="c ts">→ next node</text><text x="120" y="133" class="c ts">clockwise: B</text>
+
+  <text x="300" y="40" class="tb">Add a 5th server to 4. Share of keys that move:</text>
+  <text x="300" y="64" class="ts">hash(key) mod N</text>
+  <rect x="420" y="53" width="232" height="16" class="r"/><text x="658" y="65" class="ts tb">~80%</text>
+  <text x="300" y="88" class="ts">consistent hashing</text>
+  <rect x="420" y="77" width="58" height="16" class="g"/><text x="484" y="89" class="ts tb">~20% (1/N)</text>
+  <text x="300" y="118" class="ts">• Each server owns many small arcs (virtual nodes), so load stays even</text>
+  <text x="300" y="133" class="ts">   and a new server takes a little from everyone, not half from one.</text>
+  <text x="300" y="152" class="ts">• DynamoDB and Cassandra do this for you: partition key → hash →</text>
+  <text x="300" y="167" class="ts">   token range → partition. You choose a good key; they move data.</text>
+  <text x="300" y="186" class="ts">• A hot key still lands on one partition. Hashing spreads keys, not load.</text>
+</svg>

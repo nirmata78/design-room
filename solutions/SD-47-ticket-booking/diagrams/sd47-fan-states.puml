@@ -1,0 +1,23 @@
+@startuml
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+hide empty description
+skinparam stateBackgroundColor #F7F9FC
+skinparam stateBorderColor #4A6FA5
+[*] --> LOBBY : arrives before T0
+[*] --> QUEUED : arrives after T0\n(next number)
+LOBBY --> QUEUED : T0 draw gives\na random number
+QUEUED --> TOLD_SOLD_OUT : soldOut flag
+QUEUED --> ADMITTED : number <= admittedUpTo\n(token, 10 min)
+ADMITTED --> HOLDING : hold 201
+HOLDING --> ADMITTED : 409, hold expired\nor cancelled
+HOLDING --> PAYING : order submitted
+PAYING --> TICKETED : approved
+PAYING --> ADMITTED : declined\n(seats released)
+ADMITTED --> TIMED_OUT : token expired\nwith no order
+TOLD_SOLD_OUT --> WAITLISTED : opts in
+TICKETED --> [*]
+TIMED_OUT --> [*]
+WAITLISTED --> [*]
+@enduml

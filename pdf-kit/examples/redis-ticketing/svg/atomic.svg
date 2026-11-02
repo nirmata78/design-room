@@ -1,0 +1,40 @@
+<svg class="d" viewBox="0 0 720 236" xmlns="http://www.w3.org/2000/svg">
+  <text x="150" y="12" class="lab">THE SERVER'S SINGLE COMMAND STREAM, LEFT → RIGHT</text>
+  <line x1="150" y1="18" x2="712" y2="18" class="ln"/>
+
+  <!-- Row 1 pipeline -->
+  <text x="6" y="40" class="tb">Pipeline</text><text x="6" y="54" class="ts">batching only</text>
+  <rect x="150" y="30" width="62" height="24" rx="3" class="r"/><text x="181" y="46" class="c tm">A GET</text>
+  <rect x="216" y="30" width="62" height="24" rx="3" class="bl"/><text x="247" y="46" class="c tm">B SET</text>
+  <rect x="282" y="30" width="62" height="24" rx="3" class="r"/><text x="313" y="46" class="c tm">A INCR</text>
+  <rect x="348" y="30" width="62" height="24" rx="3" class="bl"/><text x="379" y="46" class="c tm">B DEL</text>
+  <rect x="414" y="30" width="62" height="24" rx="3" class="r"/><text x="445" y="46" class="c tm">A SET</text>
+  <text x="490" y="40" class="ts">one round trip, but B's commands</text><text x="490" y="53" class="ts">interleave with A's: not atomic</text>
+
+  <!-- Row 2 MULTI -->
+  <text x="6" y="88" class="tb">MULTI / EXEC</text><text x="6" y="102" class="ts">queued, then all at once</text>
+  <rect x="150" y="78" width="62" height="24" rx="3" class="w dash2"/><text x="181" y="94" class="c tm">A INCR</text>
+  <rect x="216" y="78" width="62" height="24" rx="3" class="bl"/><text x="247" y="94" class="c tm">B SET</text>
+  <rect x="282" y="78" width="62" height="24" rx="3" class="w dash2"/><text x="313" y="94" class="c tm">A ZADD</text>
+  <rect x="348" y="78" width="132" height="24" rx="3" class="r"/><text x="414" y="94" class="c tm">EXEC: A INCR, A ZADD</text>
+  <text x="490" y="88" class="ts">queued commands run back-to-back;</text><text x="490" y="101" class="ts">no reads mid-way, no rollback</text>
+
+  <!-- Row 3 WATCH -->
+  <text x="6" y="136" class="tb">WATCH + MULTI</text><text x="6" y="150" class="ts">optimistic CAS</text>
+  <rect x="150" y="126" width="62" height="24" rx="3" class="r"/><text x="181" y="142" class="c tm">A WATCH k</text>
+  <rect x="216" y="126" width="62" height="24" rx="3" class="r"/><text x="247" y="142" class="c tm">A GET k</text>
+  <rect x="282" y="126" width="62" height="24" rx="3" class="bl" style="stroke-width:2.2"/><text x="313" y="142" class="c tm tb">B SET k</text>
+  <rect x="348" y="126" width="132" height="24" rx="3" class="r"/><text x="414" y="142" class="c tm">A EXEC → nil</text>
+  <text x="490" y="136" class="ts">k changed after WATCH, so EXEC</text><text x="490" y="149" class="ts">aborts; A re-reads and retries</text>
+
+  <!-- Row 4 Lua -->
+  <text x="6" y="184" class="tb">Lua / Function</text><text x="6" y="198" class="ts">one atomic unit</text>
+  <rect x="150" y="174" width="62" height="24" rx="3" class="bl"/><text x="181" y="190" class="c tm">B GET</text>
+  <rect x="216" y="174" width="198" height="24" rx="3" class="r"/><text x="315" y="190" class="c tm">A EVAL join: GET→if→ZADD</text>
+  <rect x="418" y="174" width="62" height="24" rx="3" class="bl"/><text x="449" y="190" class="c tm">B SET</text>
+  <text x="490" y="184" class="ts">reads, branches and writes with</text><text x="490" y="197" class="ts">nothing in between: a critical section</text>
+
+  <rect x="150" y="214" width="14" height="12" class="r"/><text x="170" y="224" class="ts">client A</text>
+  <rect x="230" y="214" width="14" height="12" class="bl"/><text x="250" y="224" class="ts">client B</text>
+  <rect x="310" y="214" width="14" height="12" class="w dash2"/><text x="330" y="224" class="ts">queued, not yet executed</text>
+</svg>

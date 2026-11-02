@@ -1,0 +1,1009 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Redis for the Ticket-Booking Round</title>
+<link rel="stylesheet" href="style.css">
+</head><body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L10,5 L0,9 z" fill="#57606a"/></marker>
+<marker id="ahr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,1 L10,5 L0,9 z" fill="#c8341f"/></marker>
+<marker id="ahg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,1 L10,5 L0,9 z" fill="#2d8a4e"/></marker>
+</defs></svg>
+
+<!-- ============================ COVER ============================ -->
+<div class="cover-band">
+  <div class="tag">SD-47 companion · Redis deep dive</div>
+  <h0>Redis, owned.</h0>
+  <div class="sub">The theory, the internals and the commands you'll actually type, each mapped onto the
+  ticket-booking design, so you can answer "how does that work?" three levels down.</div>
+  <div class="meta">21 October 2026 · Redis Open Source 8.x · Valkey 9.x · keys and scripts match the SD-47 reference design</div>
+  <svg class="cube" viewBox="0 0 100 100"><g fill="none" stroke-width="2.4">
+    <path d="M50 8 L88 28 L50 48 L12 28 Z" stroke="#ff7a66" fill="#c8341f" fill-opacity=".35"/>
+    <path d="M12 28 L12 52 L50 72 L50 48" stroke="#ff7a66"/><path d="M88 28 L88 52 L50 72" stroke="#ff7a66"/>
+    <path d="M12 56 L12 76 L50 96 L88 76 L88 56" stroke="#8c959f"/><path d="M50 76 L50 96" stroke="#8c959f"/>
+  </g></svg>
+</div>
+
+<div class="box key">
+  <span class="t">Five sentences that show you own Redis</span>
+  <ol style="margin-bottom:2pt">
+    <li><strong>Redis executes commands on one thread</strong>, so every command (and every Lua script) is atomic without locks. It's fast because the data is in RAM and most commands are O(1) or O(log n).</li>
+    <li><strong>Replication is asynchronous</strong>, so a failover can lose a write the client was told succeeded. That's fine for the queue and fatal for seats, so seats live in PostgreSQL.</li>
+    <li><strong>In Cluster mode a key's slot is CRC16(hash tag) mod 16,384.</strong> I tag every key with <code>{event_id}</code>, so one event's keys share a node and one script can touch them all.</li>
+    <li><strong>The waiting room is a sorted set with a secret random score</strong>, a counter for late arrivals and one pointer that only grows. Every operation is O(log n) or better.</li>
+    <li><strong>Redis locks are for efficiency, not correctness.</strong> Correctness comes from a fencing check in the system of record: here, the conditional <code>UPDATE</code> and <code>UNIQUE(event, seat)</code>.</li>
+  </ol>
+</div>
+
+<h2 style="margin-top:6pt">How to use this</h2>
+<p>Read sections 1–9 once for the theory. Read section 10 twice: it's the part the interviewer will probe,
+because it's where Redis meets <em>your</em> design. Section 16 is a drill: cover the answers and say them out loud.
+The last page is the cheat sheet for the night before. <strong>Green boxes</strong> are lines you can say in the room,
+<strong>blue</strong> explains the why, <strong>amber</strong> is a trap, <strong>red</strong> is a must-know.</p>
+
+<h2>Contents</h2>
+<ul class="toc">
+  <li><b>1</b>Redis in one page <span>where it sits in SD-47</span></li>
+  <li><b>2</b>Why it's fast <span>the execution model</span></li>
+  <li><b>3</b>Data types and their internals</li>
+  <li><b>4</b>The API you'll actually use <span>cheat tables</span></li>
+  <li><b>5</b>Expiry and eviction</li>
+  <li><b>6</b>Atomicity <span>pipelines, MULTI, WATCH, Lua</span></li>
+  <li><b>7</b>Persistence <span>RDB, AOF, what you lose</span></li>
+  <li><b>8</b>Replication and Sentinel</li>
+  <li><b>9</b>Redis Cluster <span>slots, hash tags, hot keys</span></li>
+  <li><b>10</b>Ticket-system patterns <span>the core</span></li>
+  <li><b>11</b>Caching patterns</li>
+  <li><b>12</b>Messaging <span>Pub/Sub vs Streams vs Kafka</span></li>
+  <li><b>13</b>Operating it <span>anti-patterns, metrics, sizing</span></li>
+  <li><b>14</b>Java clients <span>Spring, Lettuce, Redisson</span></li>
+  <li><b>15</b>The 2026 landscape <span>Redis 8, Valkey, managed</span></li>
+  <li><b>16</b>Rapid-fire interview drill</li>
+  <li><b>17</b>One-page cheat sheet</li>
+</ul>
+
+<!-- ============================ 1 ============================ -->
+<div class="section pb">
+<h1><span class="n">1</span>Redis in one page</h1>
+<p>Redis is an <strong>in-memory data-structure server</strong>. Keys map to typed values (strings, hashes, lists,
+sets, sorted sets, streams, bitmaps and more), and each type comes with <strong>server-side operations</strong>.
+You send <em>"add this member with this score"</em> instead of reading a value, changing it and writing it back.
+One thread executes the commands. Persistence to disk is optional, replication is asynchronous, and
+Redis Cluster scales it out by splitting the key space into hash slots.</p>
+
+<table><thead><tr><th style="width:50%">Good at</th><th>Not good at</th></tr></thead>
+<tr><td>Sub-millisecond reads and writes on small, hot state</td><td>Being the system of record for money or inventory (async replication, no consensus)</td></tr>
+<tr><td>Atomic counters, sets, rankings and bitmaps with no read-modify-write races</td><td>Large values or unbounded collections (one slow command stalls the node)</td></tr>
+<tr><td>Short-lived state with TTLs: holds, leases, rate limits, idempotency keys</td><td>Ad-hoc queries, joins, secondary indexes (Redis 8's query engine helps, but it's not SQL)</td></tr>
+<tr><td>Fan-out of small messages; caching anything expensive to compute</td><td>Datasets much larger than RAM (cost grows with memory)</td></tr>
+</table>
+
+<figure>
+<!--SVG:where-->
+<figcaption><b>Figure 1. Where Redis sits in SD-47.</b> Three Redis roles, three different load shapes. None of them is the
+source of truth for a seat. Losing a second of Redis writes pauses the line; it never sells a seat twice.</figcaption>
+</figure>
+
+<div class="cols">
+<div>
+<h3>The three Redis roles in the design</h3>
+<ul>
+<li><strong>Queue state</strong> (the waiting room): the lobby sorted set, the sequence counter, the admission pointer, the sold-out flag, admission markers and the controller's lease.</li>
+<li><strong>Map snapshots</strong>: versioned 6.25 KB availability bitmaps written once a second by the snapshot builder and read ~5,000 times a second.</li>
+<li><strong>Edge state</strong>: rate-limit buckets and the JWT deny-list, read by the gateway.</li>
+</ul>
+</div>
+<div>
+<h3>Why they're separate deployments</h3>
+<p>They differ in <strong>eviction policy</strong> (queue state must never be evicted; map snapshots can be rebuilt),
+<strong>blast radius</strong> (a cache stampede mustn't slow joins at T0) and <strong>scaling</strong> (the queue store
+scales with waiting fans, the map store with shoppers). One shared Redis would force one policy on all three.</p>
+</div>
+</div>
+
+<div class="box say"><span class="t">Say it</span>
+<p>"I use Redis for three things: the waiting-room state, the seat-map snapshots and edge state like rate limits.
+None of them is the source of truth for a seat. That's PostgreSQL, so losing a second of Redis writes costs a pause in
+the line, never a double sale."</p></div>
+</div>
+
+<!-- ============================ 2 ============================ -->
+<div class="section">
+<h1><span class="n">2</span>Why it's fast: the execution model</h1>
+<figure>
+<!--SVG:loop-->
+<figcaption><b>Figure 2. One Redis node.</b> Many sockets, one event loop, one thread that executes commands. I/O
+threads only parse and write bytes. Slow work (fsync, freeing big objects, snapshots) is pushed off the main thread.</figcaption>
+</figure>
+
+<ul>
+<li><strong>Event loop.</strong> One thread multiplexes thousands of sockets with <code>epoll</code>/<code>kqueue</code>.
+It reads a command, <strong>runs it to completion</strong> and queues the reply. The data path has no locks and no context switches.</li>
+<li><strong>I/O threads</strong> (6.0+, reworked in 8.0). Reading and parsing requests and writing replies can be spread over
+<code>io-threads</code>. Execution stays on the main thread, so atomicity is unchanged; throughput rises when the
+network is the bottleneck.</li>
+<li><strong>Background threads</strong> handle AOF <code>fsync</code>, lazy freeing (<code>UNLINK</code>,
+<code>lazyfree-*</code>) and closing files. A <strong>forked child</strong> writes RDB snapshots and AOF rewrites,
+sharing memory copy-on-write.</li>
+<li><strong>Numbers to quote:</strong> a few microseconds of CPU per simple command; ~100k–200k ops/s per node
+without pipelining (bound by syscalls and the network, not execution) and 1M+ with it. A same-zone round trip
+(~0.2–0.5 ms) costs far more than the command itself.</li>
+</ul>
+
+<div class="cols">
+<div class="box why"><span class="t">Why single-threaded is a feature</span>
+<p><strong>Atomic by construction.</strong> <code>INCR</code> needs no compare-and-swap, <code>ZADD NX</code> can't race,
+and a Lua script is a critical section for free. The cost is that latency is shared: one slow command stalls every
+client of that node. That's why the rule is <em>keep every command and script O(1) or O(log n)</em>.</p></div>
+<div class="box trap"><span class="t">What blocks the loop</span>
+<p><code>KEYS *</code>; <code>SMEMBERS</code>, <code>HGETALL</code> or <code>LRANGE 0 -1</code> on huge collections;
+<code>DEL</code> of a million-element key (use <code>UNLINK</code>); long Lua scripts; huge <code>MULTI</code>
+blocks; <code>fork()</code> of a very large dataset (page-table copy; disable transparent huge pages).
+Each is O(N) on the only thread.</p></div>
+</div>
+
+<div class="box say"><span class="t">Say it</span>
+<p>"Redis is fast because the data is in memory, the commands are O(1) or O(log n), and one thread runs them,
+so there's no locking. The same property makes every command atomic, which is why I can do the join and the phase check in one
+script without a distributed lock."</p></div>
+</div>
+
+<!-- ============================ 3 ============================ -->
+<div class="section">
+<h1><span class="n">3</span>Data types and their internals</h1>
+<p>Each type has a compact encoding for small values and a general one for large values. Redis converts automatically
+when a threshold is crossed (set by <code>*-max-listpack-entries</code> / <code>*-max-listpack-value</code>), and a converted key stays converted.
+<code>OBJECT ENCODING key</code> shows which one you have.</p>
+<table><thead><tr><th style="width:12%">Type</th><th style="width:25%">Encoding: small → large</th><th style="width:28%">Key operations and cost</th><th>In the ticket system</th></tr></thead>
+<tr><td><strong>String</strong></td><td>int · embstr (≤ 44 B) · raw SDS; max 512 MB</td><td><code>GET</code>/<code>SET</code>/<code>INCR</code> O(1)</td><td><code>next:{e}</code>, the pointer, flags, idempotency keys, locks</td></tr>
+<tr><td><strong>Hash</strong></td><td>listpack (≤ 128 fields, ≤ 64 B) → hashtable</td><td><code>HSET</code>/<code>HGET</code>/<code>HINCRBY</code> O(1); <code>HGETALL</code> O(N)</td><td><code>seqOf:{e}</code> user → seq; token-bucket state</td></tr>
+<tr><td><strong>List</strong></td><td>listpack → quicklist (linked list of listpacks)</td><td>push/pop at the ends O(1); <code>LINDEX</code> O(N)</td><td>simple work queues (<code>LMOVE</code> for reliability)</td></tr>
+<tr><td><strong>Set</strong></td><td>intset (all integers) / listpack → hashtable</td><td><code>SADD</code>/<code>SISMEMBER</code> O(1); <code>SMEMBERS</code> O(N)</td><td>dedupe, "already notified" sets</td></tr>
+<tr><td><strong>Sorted set</strong></td><td>listpack (≤ 128, ≤ 64 B) → <strong>skiplist + hashtable</strong></td><td><code>ZADD</code>/<code>ZRANK</code>/<code>ZREM</code> O(log N); <code>ZRANGE</code> O(log N + M)</td><td>the lottery lobby; delayed jobs (score = due time); sliding-window limiter</td></tr>
+<tr><td><strong>Stream</strong></td><td>radix tree of listpacks</td><td><code>XADD</code> O(1); <code>XREADGROUP</code> O(M)</td><td>seat-event fan-out, notifications with acks</td></tr>
+<tr><td><strong>Bitmap</strong></td><td>a String addressed by bit</td><td><code>SETBIT</code>/<code>GETBIT</code> O(1); <code>BITCOUNT</code>/<code>BITPOS</code> O(N)</td><td>seat availability: 50,000 seats = 6.25 KB</td></tr>
+<tr><td><strong>HyperLogLog</strong></td><td>a String, ≤ 12 KB</td><td><code>PFADD</code>/<code>PFCOUNT</code> O(1), 0.81% std. error</td><td>unique visitors per event page</td></tr>
+<tr><td><strong>Geo</strong></td><td>a sorted set (geohash as score)</td><td><code>GEOSEARCH</code> O(N + log M)</td><td>"venues near me" (out of scope)</td></tr>
+<tr><td><strong>Built into Redis 8</strong></td><td colspan="2">JSON, Bloom/Cuckoo filters, Count-Min, Top-K, t-digest, time series, vector sets, query engine (formerly modules)</td><td>a Bloom filter of known bot fingerprints, if asked</td></tr>
+</table>
+
+<figure>
+<!--SVG:zset-->
+<figcaption><b>Figure 3. A large sorted set is a hashtable plus a skiplist.</b> The hashtable answers "what's this member's
+score?" in O(1). The skiplist keeps members ordered by score; each forward link stores a <em>span</em> (how many
+elements it skips), so <code>ZRANK</code> sums spans on the way down in O(log n). That's how <code>GET /queue/me</code> answers
+"what's my number?" among a million fans in about 20 steps.</figcaption>
+</figure>
+
+<figure>
+<!--SVG:bitmap-->
+<figcaption><b>Figure 4. The availability bitmap.</b> Dense seat ids (0…49,999) double as bit offsets, so the whole
+map is one 6.25 KB string. Redis numbers bits from the <em>most</em> significant bit of each byte.</figcaption>
+</figure>
+
+<div class="cols">
+<div class="box why"><span class="t">Why a sorted set for the lottery</span>
+<p><code>ZADD NX</code> with a secret random score inserts each fan into a uniformly random order in O(log n), with nothing
+to do at T0. <code>ZRANK</code> gives the position in O(log n), <code>ZCARD</code> the size in O(1). Shuffling a million
+entries at T0 would be O(n) work in the worst second. <code>NX</code> keeps the first draw, so re-joining can't re-roll it.</p></div>
+<div class="box trap"><span class="t">The bit-order trap</span>
+<p>Java's <code>BitSet.toByteArray()</code> puts bit 0 in the <em>least</em> significant bit of byte 0; Redis's
+<code>SETBIT</code>/<code>GETBIT</code>/<code>BITPOS</code> use the <em>most</em> significant. SD-47's builder ships
+<code>BitSet</code> bytes and the client decodes them, which is consistent. Mix in <code>GETBIT</code> on the same key
+and you read the wrong seat.</p></div>
+</div>
+</div>
+
+<!-- ============================ 4 ============================ -->
+<div class="section">
+<h1><span class="n">4</span>The API you'll actually use</h1>
+<p class="small muted">N = elements in the key, M = elements returned. [ ] = optional. A version is shown when a command or
+option is newer than 6.2, so you can say "on 7.0+…" with confidence.</p>
+<table class="api"><thead><tr><th>Command</th><th>Cost</th><th>What it's for</th></tr></thead>
+<tr class="grp"><td colspan="3">Keys and strings</td></tr>
+<tr><td>SET key val [NX|XX] [GET] [EX s|PX ms|EXAT|PXAT|KEEPTTL]</td><td>O(1)</td><td>The workhorse: <strong>create-if-absent with a TTL in one atomic step</strong>. Locks, leases, idempotency keys, admission markers.</td></tr>
+<tr><td>GET key · MGET k1 k2 …</td><td>O(1) · O(N)</td><td><code>MGET</code> reads the pointer, rate and sold-out flag in one round trip.</td></tr>
+<tr><td>INCR / INCRBY / DECRBY / INCRBYFLOAT</td><td>O(1)</td><td>Atomic counters that return the new value: <code>INCR next:{e}</code> hands out seq numbers.</td></tr>
+<tr><td>GETDEL · GETEX key [EX|PX|PERSIST]</td><td>O(1)</td><td>Read and delete; read and touch the TTL.</td></tr>
+<tr><td>DEL k … · UNLINK k …</td><td>O(N) · O(1)</td><td><code>DEL</code> frees memory on the main thread; <code>UNLINK</code> frees it in the background. Use <code>UNLINK</code> for big keys.</td></tr>
+<tr><td>EXPIRE key s [NX|XX|GT|LT] · PEXPIRE · EXPIREAT · PERSIST</td><td>O(1)</td><td>Set the TTL. <code>NX</code> = only if none is set yet (7.0), which makes "first <code>INCR</code> starts the window" race-free.</td></tr>
+<tr><td>TTL / PTTL key</td><td>O(1)</td><td>−1 = no TTL, −2 = no key.</td></tr>
+<tr><td>SCAN cursor [MATCH pat] [COUNT n] [TYPE t]</td><td>O(1)/call</td><td>Incremental iteration. <strong>Never <code>KEYS</code> in production.</strong> Can return a key twice; dedupe client-side.</td></tr>
+<tr><td>OBJECT ENCODING · MEMORY USAGE · TYPE</td><td>O(1)</td><td>Introspection: listpack or hashtable? How many bytes?</td></tr>
+<tr><td>MSETEX n k v … [NX|XX] [EX|PX …] <span class="muted">(8.4)</span></td><td>O(N)</td><td>Set several keys with one TTL; <code>NX</code> = only if <em>none</em> exist (all-or-nothing).</td></tr>
+<tr><td>SET k v IFEQ old · DELEX k IFEQ v <span class="muted">(8.4)</span></td><td>O(1)</td><td>Compare-and-set and compare-and-delete without Lua (e.g. releasing a lock).</td></tr>
+<tr class="grp"><td colspan="3">Hashes</td></tr>
+<tr><td>HSET key f v [f v …] · HGET · HMGET · HSETNX</td><td>O(1)/field</td><td>Small objects; <code>seqOf:{e}</code> user → seq.</td></tr>
+<tr><td>HINCRBY key f n · HDEL · HEXISTS · HLEN</td><td>O(1)</td><td>Per-field counters, e.g. seats sold per section.</td></tr>
+<tr><td>HGETALL key · HSCAN key cursor</td><td>O(N)</td><td>Fine for small hashes; use <code>HSCAN</code> for big ones.</td></tr>
+<tr><td>HEXPIRE key s FIELDS n f … <span class="muted">(7.4)</span> · HGETEX / HSETEX / HGETDEL <span class="muted">(8.0)</span></td><td>O(n)</td><td>Per-field TTLs: one hash per event with expiring entries.</td></tr>
+<tr class="grp"><td colspan="3">Lists</td></tr>
+<tr><td>LPUSH / RPUSH · LPOP / RPOP key [count]</td><td>O(1)</td><td>Queue and stack operations at the ends.</td></tr>
+<tr><td>BLPOP / BRPOP key … timeout</td><td>O(1)</td><td>A blocking consumer: waits for an element.</td></tr>
+<tr><td>LMOVE / BLMOVE src dst LEFT|RIGHT LEFT|RIGHT</td><td>O(1)</td><td>Reliable queue: atomically move a job to a "processing" list, delete it when done.</td></tr>
+<tr><td>LRANGE key start stop · LLEN · LTRIM</td><td>O(S+N)</td><td><code>LTRIM</code> keeps a capped list ("last 100 events").</td></tr>
+<tr class="grp"><td colspan="3">Sets</td></tr>
+<tr><td>SADD / SREM / SISMEMBER / SMISMEMBER · SCARD</td><td>O(1)</td><td>Membership and dedupe ("waitlist notified").</td></tr>
+<tr><td>SINTER / SUNION / SDIFF [STORE] · SINTERCARD n k … [LIMIT] <span class="muted">(7.0)</span></td><td>O(N·M)</td><td>Set algebra; <code>SINTERCARD</code> counts without materialising the result.</td></tr>
+<tr><td>SMEMBERS · SSCAN · SPOP · SRANDMEMBER</td><td>O(N)/O(1)</td><td><code>SPOP</code> draws a random member, e.g. a raffle without replacement.</td></tr>
+</table>
+
+<table class="api"><thead><tr><th>Command</th><th>Cost</th><th>What it's for</th></tr></thead>
+<tr class="grp"><td colspan="3">Sorted sets: the most important type for this round</td></tr>
+<tr><td>ZADD key [NX|XX] [GT|LT] [CH] [INCR] score member …</td><td>O(log N)</td><td><code>NX</code> keeps the first score (the draw); <code>GT</code> only raises a score (high-water marks).</td></tr>
+<tr><td>ZRANK / ZREVRANK key member [WITHSCORE] <span class="muted">(WITHSCORE 7.2)</span></td><td>O(log N)</td><td>0-based position: <code>seq = ZRANK + 1</code>.</td></tr>
+<tr><td>ZSCORE · ZMSCORE · ZCARD</td><td>O(1)</td><td>Is this fan in the lobby? How many are?</td></tr>
+<tr><td>ZRANGE key min max [BYSCORE|BYLEX] [REV] [LIMIT off n] [WITHSCORES]</td><td>O(log N+M)</td><td>Unified range read (6.2). <code>BYSCORE -inf &lt;now&gt; LIMIT 0 100</code> = "what's due?"</td></tr>
+<tr><td>ZCOUNT key min max · ZRANGESTORE</td><td>O(log N)</td><td>Count in a score range; copy a range into a new key.</td></tr>
+<tr><td>ZINCRBY key n member</td><td>O(log N)</td><td>Leaderboards, demand counters.</td></tr>
+<tr><td>ZREM · ZREMRANGEBYSCORE · ZREMRANGEBYRANK</td><td>O(log N+M)</td><td><code>ZREM</code> returning 1 = "I claimed this job"; trimming sliding windows.</td></tr>
+<tr><td>ZPOPMIN / ZPOPMAX [count] · BZPOPMIN key … timeout</td><td>O(log N·M)</td><td>Priority queue pop; blocking variant for workers.</td></tr>
+<tr class="grp"><td colspan="3">Bitmaps, bitfields, HyperLogLog</td></tr>
+<tr><td>SETBIT key offset 0|1 · GETBIT key offset</td><td>O(1)</td><td>One seat's bit. The first high offset allocates the whole string up to it.</td></tr>
+<tr><td>BITCOUNT key [start end [BYTE|BIT]] <span class="muted">(BIT 7.0)</span></td><td>O(N)</td><td>Free seats left.</td></tr>
+<tr><td>BITPOS key 1 [start [end [BYTE|BIT]]]</td><td>O(N)</td><td>First free seat: a "best available" starting point.</td></tr>
+<tr><td>BITOP AND|OR|XOR|NOT dest k … <span class="muted">(8.2: DIFF, DIFF1, ANDOR, ONE)</span></td><td>O(N)</td><td>Free <em>and</em> in section A <em>and</em> accessible: AND three masks.</td></tr>
+<tr><td>BITFIELD key SET u2 #812 2 · GET u2 #812 · INCRBY … OVERFLOW SAT</td><td>O(1)/op</td><td>Packed small integers: 2 bits per seat = 4 states (<code>#</code> scales the offset by the width).</td></tr>
+<tr><td>PFADD key el … · PFCOUNT key … · PFMERGE</td><td>O(1)</td><td>Approximate distinct counts in ≤ 12 KB.</td></tr>
+<tr class="grp"><td colspan="3">Streams and Pub/Sub</td></tr>
+<tr><td>XADD key [MAXLEN|MINID [~] n] *|id field val …</td><td>O(1)</td><td>Append. <code>~</code> trims approximately, which is much cheaper.</td></tr>
+<tr><td>XRANGE / XREVRANGE key start end [COUNT n] · XLEN</td><td>O(log N+M)</td><td>Read history by ID range.</td></tr>
+<tr><td>XGROUP CREATE key group $|0 [MKSTREAM]</td><td>O(1)</td><td>A consumer group: shared cursor plus a pending list.</td></tr>
+<tr><td>XREADGROUP GROUP g c [COUNT n] [BLOCK ms] STREAMS key &gt;</td><td>O(M)</td><td><code>&gt;</code> = entries never delivered to this group.</td></tr>
+<tr><td>XACK key group id … · XPENDING key group [IDLE ms] - + n</td><td>O(1)/id</td><td>Acknowledge; inspect stuck deliveries.</td></tr>
+<tr><td>XAUTOCLAIM key group c min-idle start [COUNT n]</td><td>O(1)/entry</td><td>Take over entries from a dead consumer (6.2).</td></tr>
+<tr><td>PUBLISH ch msg · SUBSCRIBE ch · PSUBSCRIBE pat</td><td>O(N subs)</td><td>Fire-and-forget fan-out: at-most-once, nothing stored.</td></tr>
+<tr><td>SPUBLISH / SSUBSCRIBE <span class="muted">(7.0)</span></td><td>O(N subs)</td><td>Sharded Pub/Sub: a channel lives on one shard, so it scales in Cluster.</td></tr>
+<tr class="grp"><td colspan="3">Atomicity and scripting</td></tr>
+<tr><td>MULTI … EXEC · DISCARD · WATCH k … · UNWATCH</td><td>—</td><td>Queued transaction; <code>WATCH</code> makes <code>EXEC</code> return nil if a watched key changed.</td></tr>
+<tr><td>EVAL script numkeys k … arg … · EVALSHA sha … · SCRIPT LOAD</td><td>script</td><td>Atomic server-side logic. Pass every key in <code>KEYS</code>.</td></tr>
+<tr><td>FUNCTION LOAD "#!lua name=lib …" · FCALL fn numkeys k … <span class="muted">(7.0)</span></td><td>script</td><td>Named, persisted, replicated scripts: stored procedures.</td></tr>
+<tr><td>EVAL_RO · FCALL_RO <span class="muted">(7.0)</span> · SCRIPT KILL</td><td>—</td><td>Read-only scripts (can run on replicas); kill a runaway script that hasn't written yet.</td></tr>
+<tr class="grp"><td colspan="3">Operating</td></tr>
+<tr><td>INFO [memory|stats|replication|persistence|clients]</td><td>—</td><td>Health: memory, ops/s, hits/misses, evictions, replication offsets.</td></tr>
+<tr><td>SLOWLOG GET n · LATENCY DOCTOR · MEMORY DOCTOR</td><td>—</td><td>Find the command that stalled the loop.</td></tr>
+<tr><td>WAIT nreplicas ms · WAITAOF nlocal nreplicas ms <span class="muted">(7.2)</span></td><td>—</td><td>Block until n replicas have the write (or it's fsynced). Narrows the loss window; not consensus.</td></tr>
+<tr><td>CLUSTER SHARDS · CLUSTER KEYSLOT key · READONLY</td><td>—</td><td>Topology; which slot a key maps to; allow reads from a replica.</td></tr>
+<tr><td>CLIENT LIST · CLIENT NO-EVICT on · CONFIG GET/SET · BGSAVE · BGREWRITEAOF</td><td>—</td><td>Connections, protecting admin clients, config, manual persistence.</td></tr>
+</table>
+</div>
+
+<!-- ============================ 5 ============================ -->
+<div class="section">
+<h1><span class="n">5</span>Expiry and eviction</h1>
+<figure>
+<!--SVG:expiry-->
+<figcaption><b>Figure 5. How keys die.</b> Expiry removes keys whose TTL has passed. Eviction removes keys that are
+still valid because memory is full. They're separate mechanisms with separate configuration.</figcaption>
+</figure>
+<div class="cols">
+<div>
+<h3>Expiry</h3>
+<ul>
+<li>A TTL is stored as an absolute Unix time in milliseconds in a separate <em>expires</em> dictionary.</li>
+<li><strong>Passive:</strong> any access checks the TTL first, so an expired key is never returned.</li>
+<li><strong>Active:</strong> about 10 times a second a time-boxed cycle samples keys that have a TTL and deletes the expired
+ones, repeating while many in the sample were expired. Expired keys can linger in memory briefly but are invisible.</li>
+<li><strong>Replicas don't expire keys themselves.</strong> The primary sends a <code>DEL</code>. A replica returns nil for a logically expired key.</li>
+<li>The keyspace notification <code>expired</code> fires when the key is <em>actually deleted</em>, which can be later than the TTL.</li>
+</ul>
+</div>
+<div>
+<h3>Eviction policies (<code>maxmemory-policy</code>)</h3>
+<table><thead><tr><th>Policy</th><th>Evicts</th><th>Use for</th></tr></thead>
+<tr><td><code>noeviction</code> (default)</td><td>nothing: writes fail with OOM</td><td><strong>State</strong>: the queue store</td></tr>
+<tr><td><code>allkeys-lfu</code></td><td>least frequently used (with decay)</td><td>Caches with hot/cold skew</td></tr>
+<tr><td><code>allkeys-lru</code></td><td>least recently used</td><td>General caches</td></tr>
+<tr><td><code>volatile-lru/-lfu/-random</code></td><td>only keys with a TTL</td><td>Mixed instances (avoid mixing)</td></tr>
+<tr><td><code>volatile-ttl</code></td><td>shortest TTL first</td><td>"Soonest to die anyway"</td></tr>
+<tr><td><code>allkeys-random</code></td><td>random</td><td>Uniform access</td></tr>
+</table>
+<p class="small">LRU and LFU are <strong>approximated</strong> by sampling <code>maxmemory-samples</code> (default 5) keys, not by an exact global list.</p>
+</div>
+</div>
+<div class="cols">
+<div class="box trap"><span class="t">Two expiry traps in ticketing</span>
+<p><strong>Don't drive hold expiry from keyspace notifications.</strong> They fire late, Pub/Sub delivery is
+at-most-once, and a disconnected listener misses them. Use the DB predicate (SD-47) or a sorted-set due queue (§10.7).
+<strong>Jitter TTLs:</strong> 50,000 keys written at T0 with the same TTL expire in the same second.</p></div>
+<div class="box say"><span class="t">Say it</span>
+<p>"The queue store runs <code>noeviction</code> with its own memory budget; caches run <code>allkeys-lfu</code> on a
+separate deployment. I never let an LRU decide to drop someone's place in line."</p></div>
+</div>
+
+<!-- ============================ 6 ============================ -->
+<h1 style="margin-top:8pt"><span class="n">6</span>Atomicity: pipelines, transactions, scripts</h1>
+<figure>
+<!--SVG:atomic-->
+<figcaption><b>Figure 6. Four ways to send several commands.</b> Only <code>MULTI/EXEC</code> and scripts run as one unit,
+and only a script can read, decide and write without another client slipping in between.</figcaption>
+</figure>
+</div>
+
+<div>
+<table><thead><tr><th>Mechanism</th><th>Atomic?</th><th>Branch on a read?</th><th>Rollback?</th><th>Use it for</th></tr></thead>
+<tr><td>Single command</td><td>Yes</td><td>—</td><td>—</td><td><code>INCR</code>, <code>SET NX</code>, <code>ZADD NX</code>: prefer these whenever one command does the job</td></tr>
+<tr><td>Pipeline</td><td><strong>No</strong>: batching only</td><td>No</td><td>No</td><td>Bulk loads, cutting round trips (10× throughput)</td></tr>
+<tr><td><code>MULTI</code>/<code>EXEC</code></td><td>Yes: queued commands run back-to-back</td><td>No (results arrive at <code>EXEC</code>)</td><td><strong>No</strong></td><td>Several writes that must land together</td></tr>
+<tr><td><code>WATCH</code> + <code>MULTI</code></td><td>Optimistic: <code>EXEC</code> aborts if a watched key changed</td><td>Yes (read before <code>MULTI</code>)</td><td>Abort, then you retry</td><td>Read-modify-write under low contention</td></tr>
+<tr><td>Lua <code>EVAL</code> / Functions</td><td>Yes: one command</td><td>Yes</td><td><strong>No</strong>: writes before an error stay</td><td>Anything conditional: <code>join.lua</code>, <code>advance.lua</code>, rate limiters</td></tr>
+</table>
+<div class="cols">
+<div class="box why"><span class="t">EVAL vs Functions</span>
+<p><code>EVAL</code> sends the script text; <code>EVALSHA</code> sends its SHA1 and fails with <code>NOSCRIPT</code> after a
+restart or failover, so clients resend the text (Spring Data Redis does this for you). <strong>Functions</strong> (7.0)
+are named libraries stored in the dataset, persisted and replicated with it, like stored procedures.
+Scripts are replicated as their <em>effects</em> (the writes), so calling <code>TIME</code> inside a script is safe.</p></div>
+<div class="box trap"><span class="t">Script and transaction traps</span>
+<p><strong>Declare every key in <code>KEYS</code></strong>: in Cluster, a key built inside the script bypasses routing and
+can fail with <code>CROSSSLOT</code>. <strong>Keep scripts short:</strong> after <code>busy-reply-threshold</code> (5 s) other
+clients get <code>BUSY</code>, and <code>SCRIPT KILL</code> works only if nothing has been written yet.
+<strong><code>MULTI</code> doesn't roll back</strong>: a <code>WRONGTYPE</code> in command 2 of 3 still commits 1 and 3.</p></div>
+</div>
+</div>
+
+<!-- ============================ 7 ============================ -->
+<div class="section">
+<h1><span class="n">7</span>Persistence: RDB, AOF and what you can lose</h1>
+<figure>
+<!--SVG:persist-->
+<figcaption><b>Figure 7. Two persistence mechanisms.</b> RDB is a periodic compact snapshot written by a forked child.
+AOF logs every write and fsyncs it according to policy. Since 7.0 the AOF is a directory: an RDB-format base plus incremental files and a manifest.</figcaption>
+</figure>
+<table><thead><tr><th style="width:20%">Mode</th><th style="width:35%">How it works</th><th style="width:20%">Lost on crash</th><th>Cost</th></tr></thead>
+<tr><td>RDB snapshot</td><td><code>fork()</code>; the child writes a point-in-time file while the parent serves. Default <code>save 3600 1 300 100 60 10000</code></td><td>Everything since the last snapshot (minutes)</td><td>Fork pause (page tables, ms per GB); up to 2× RAM under heavy writes</td></tr>
+<tr><td>AOF <code>everysec</code></td><td>Append each write; fsync once a second in the background</td><td><strong>~1 second</strong></td><td>Small. The usual choice</td></tr>
+<tr><td>AOF <code>always</code></td><td>fsync before replying</td><td>~0 on this node</td><td>Every write waits for the disk</td></tr>
+<tr><td>AOF <code>no</code></td><td>The OS flushes when it wants (~30 s)</td><td>Up to tens of seconds</td><td>Cheapest</td></tr>
+<tr><td>Hybrid (default)</td><td><code>aof-use-rdb-preamble yes</code>: the rewrite produces an RDB base plus an AOF tail</td><td>As AOF</td><td>Fast restarts</td></tr>
+<tr><td>None</td><td>Pure cache; refill from the source</td><td>Everything</td><td>Zero</td></tr>
+</table>
+
+<div class="box key"><span class="t">Persistence ≠ replication</span>
+<p>The AOF protects <em>this node</em> against a restart. It does nothing for a failover: if the primary dies and a replica
+is promoted, whatever the replica hadn't received is gone, even with <code>appendfsync always</code> on the old primary.
+That is the real reason Redis is not the seat store (§8).</p></div>
+
+<div class="box say"><span class="t">Say it</span>
+<p>"The queue store runs AOF <code>everysec</code> plus a replica. The worst case is losing about a second of joins. The signed queue
+tokens carry each fan's seq, so I can re-seed <code>next:{e}</code> from the highest seq seen since. Nobody pays twice, and nothing is sold twice."</p></div>
+
+<!-- ============================ 8 ============================ -->
+<h1 style="margin-top:10pt"><span class="n">8</span>Replication and Sentinel</h1>
+<figure>
+<!--SVG:failover-->
+<figcaption><b>Figure 8. High availability for one shard, and its price.</b> Sentinel gives automatic failover. Asynchronous
+replication means the promoted replica may be missing the last writes the old primary acknowledged.</figcaption>
+</figure>
+</div>
+<div class="cols">
+<div>
+<h3>Replication mechanics</h3>
+<ul>
+<li><code>REPLICAOF host port</code>. The primary streams its writes to replicas and <strong>acks the client first</strong>.</li>
+<li><strong>Full sync:</strong> RDB (diskless by default since 7.0) plus the writes buffered meanwhile.
+<strong>Partial resync</strong> after a blip: <code>PSYNC replid offset</code>, if the gap still fits in
+<code>repl-backlog-size</code> (default 1 MB; size it for ~60 s of writes).</li>
+<li><code>WAIT n ms</code> blocks the caller until n replicas acked and returns how many did. It doesn't undo the write on timeout.</li>
+<li><code>min-replicas-to-write 1</code> + <code>min-replicas-max-lag 10</code>: an isolated primary refuses writes after ~10 s, which bounds split-brain loss.</li>
+<li>Replica reads are <strong>stale by ms to seconds</strong>. That's fine for <code>ZRANK</code> after T0 (the lobby is frozen),
+and a stale <code>admittedUpTo</code> is safe because the pointer only grows: a stale read can delay admission but never admit early.</li>
+</ul>
+</div>
+<div>
+<h3>Sentinel</h3>
+<ul>
+<li>At least <strong>3 Sentinel processes</strong> on separate hosts monitor the primary.</li>
+<li>One Sentinel marks it <strong>SDOWN</strong> (subjectively down) after <code>down-after-milliseconds</code>;
+<strong>ODOWN</strong> (objectively down) when <code>quorum</code> Sentinels agree.</li>
+<li>A <strong>majority</strong> of Sentinels elects a leader, which promotes the best replica (priority, then the largest
+replication offset), repoints the others and publishes the new address.</li>
+<li>Clients ask Sentinel <code>get-master-addr-by-name</code> and reconnect on a switch message.</li>
+<li><strong>Sentinel = HA for one shard. Cluster = sharding plus built-in failover</strong>; you don't run both.</li>
+</ul>
+<div class="box say" style="margin-top:6pt"><span class="t">Say it</span>
+<p>"Redis replication is asynchronous, so failover can lose acknowledged writes. <code>WAIT</code> narrows the window but
+isn't consensus. That's why seat state is in PostgreSQL with a synchronous standby."</p></div>
+</div>
+</div>
+
+<!-- ============================ 9 ============================ -->
+<div class="section">
+<h1><span class="n">9</span>Redis Cluster: slots, hash tags, hot keys</h1>
+<figure>
+<!--SVG:cluster-->
+<figcaption><b>Figure 9. Three primaries, each with a replica.</b> Event 7731's keys all hash on <code>evt-7731</code>
+(slot 500, node A), and event 7732's on slot 12695 (node C). The client caches the slot map and corrects it from
+<code>MOVED</code> replies. (Slots computed with Redis's CRC16 for these exact strings.)</figcaption>
+</figure>
+<div class="cols">
+<div>
+<ul>
+<li><strong>16,384 hash slots</strong>; <code>slot = CRC16(key) mod 16384</code>. Each primary owns slot ranges; each has replicas.</li>
+<li><strong>Hash tags:</strong> if a key contains <code>{…}</code> with something inside, only that part is hashed, and only the
+<em>first</em> tag counts. <code>admitted:{evt-7731}:{user-48213}</code> lands in slot 500 with the rest of the event.</li>
+<li>Multi-key commands, <code>MULTI</code> and scripts must stay in one slot, or you get <code>CROSSSLOT</code>.</li>
+<li><code>MOVED</code> = the slot lives elsewhere permanently: update the map. <code>ASK</code> = a slot is mid-migration: send
+<code>ASKING</code> plus the command to the target once, and keep the map.</li>
+<li>Nodes gossip on the <strong>cluster bus</strong> (port + 10000). PFAIL → FAIL needs a majority of primaries; replicas are
+promoted by their vote. <code>cluster-node-timeout</code> (default 15 s) bounds both unavailability and how long a
+minority-side primary keeps accepting writes it will lose.</li>
+<li>Resharding is online: per-key <code>MIGRATE</code>, or whole-slot <strong>atomic slot migration</strong> (Redis 8.4 <code>CLUSTER MIGRATION</code>; also in Valkey 9).</li>
+<li>Cluster has only database 0, and no strong consistency.</li>
+</ul>
+</div>
+<div>
+<div class="box key"><span class="t">Hot key: one mega event = one slot = one node = one thread</span>
+<p>At T0, ~50,000 <code>queue/me</code> calls per second hit one sorted set. Mitigations, in order:</p>
+<ol>
+<li><strong>Shed before Redis:</strong> the CDN absorbs polling; 0–20 s client jitter flattens <code>queue/me</code>.</li>
+<li><strong>Make it O(1):</strong> precompute <code>seqOf:{e}</code> with one <code>ZRANGE</code> walk in chunks of 10,000,
+so <code>queue/me</code> becomes <code>HGET</code>.</li>
+<li><strong>Read replicas</strong> (<code>READONLY</code>). Safe here because after T0 the lobby sorted set never changes.</li>
+<li><strong>Pin the slot</strong> to its own node the day before. On-sales are scheduled, so place them, don't react.</li>
+<li><strong>Split counters</strong> (<code>key#0…#N</code>, sum on read) for write-hot counters. Not needed here: the pointer moves once a second.</li>
+</ol></div>
+<div class="box trap"><span class="t">Trap</span>
+<p>"Just add nodes" doesn't help a hot <em>key</em>: one key always lives on one node. Scaling out spreads
+<em>events</em>, not one event's load.</p></div>
+</div>
+</div>
+</div>
+
+<!-- ============================ 10 ============================ -->
+<div class="section">
+<h1><span class="n">10</span>Ticket-system patterns</h1>
+<p>Every pattern below is something you might be asked to <em>build on the whiteboard</em>. Each has the data structure,
+the exact commands, and the failure mode the interviewer will poke at.</p>
+
+<h2>10.1 The waiting room</h2>
+<figure>
+<!--SVG:queue-->
+<figcaption><b>Figure 10. The line as Redis sees it.</b> Lobby fans get seq numbers 1…n from their rank in the random draw;
+later arrivals get n+1, n+2… from a counter. One pointer, <code>admittedUpTo</code>, only ever moves right.</figcaption>
+</figure>
+<table><thead><tr><th>Call</th><th>Redis work</th><th>Cost</th><th>Load at peak</th></tr></thead>
+<tr><td><code>POST /queue</code> (join)</td><td><code>join.lua</code>: <code>GET phase</code> → <code>ZADD NX</code> (lobby) or <code>HGET</code>/<code>INCR</code>/<code>HSET</code> (late)</td><td>O(log n)</td><td>~600/s with a lobby; 50k/s without one</td></tr>
+<tr><td>T0 flip</td><td><code>open_queue.lua</code>: <code>SET phase</code>, <code>ZCARD</code>, <code>SET next</code>; safe to run twice</td><td>O(1)</td><td>once</td></tr>
+<tr><td><code>GET /queue/me</code></td><td><code>ZRANK lobby:{e} user</code> (+1), or <code>HGET seqOf:{e}</code> if precomputed</td><td>O(log n) / O(1)</td><td>~50k/s for 20 s</td></tr>
+<tr><td><code>GET /queue/state</code></td><td><code>MGET admittedUpTo:{e} rate:{e} soldOut:{e}</code></td><td>O(1)</td><td>~200/s (the CDN takes 100k/s)</td></tr>
+<tr><td>Controller tick</td><td><code>advance.lua</code>: <code>min(cur + n, next)</code>, publish rate and flag</td><td>O(1)</td><td>1/s per event</td></tr>
+<tr><td><code>POST /admit</code></td><td><code>GET admittedUpTo</code>; <code>SET admitted:{e}:{u} &lt;jti&gt; NX EX 600</code></td><td>O(1)</td><td>~33/s</td></tr>
+</table>
+<div class="cols">
+<div class="box why"><span class="t">Why the join is a script, not two commands</span>
+<p>The phase check and the write must be one step. Otherwise a join that read <code>LOBBY</code> could write into the lobby
+<em>after</em> <code>open_queue.lua</code> took <code>ZCARD</code>. Every lobby fan behind it would shift back one place, and the last
+one would collide with the first late arrival at seq n+1. Inside one script, a join lands cleanly on one side of the flip.</p></div>
+<div class="box why"><span class="t">Why <code>SET … NX EX 600</code> at admission</span>
+<p>It makes admission <strong>idempotent</strong>: the first call wins and stores the token id; a retry finds the key and
+returns the <em>same</em> token, never a fresh 10 minutes. The TTL frees the slot by itself.</p></div>
+</div>
+
+<h2>10.2 The admission controller's lease, with the fence inside the script</h2>
+<p>Exactly one controller instance may move an event's pointer. It holds a lease: <code>SET leader:{e} &lt;instanceId&gt; NX PX 3000</code>,
+renewed every second with a compare-and-extend. Because the lease and the pointer share the <code>{e}</code> slot,
+<strong><code>advance.lua</code> can check the lease in the same atomic step</strong>. A paused ex-leader that wakes up can't
+move the pointer, which is the fencing check done right where the write happens.</p>
+<div class="cols">
+<pre><span class="c">-- acquire: any instance tries every second</span>
+SET leader:{e} &lt;myId&gt; NX PX 3000
+
+<span class="c">-- renew.lua   KEYS: leader:{e}
+--             ARGV: myId, ttlMs</span>
+<span class="k">if</span> redis.call('GET', KEYS[1]) == ARGV[1] <span class="k">then</span>
+  <span class="k">return</span> redis.call('PEXPIRE', KEYS[1], ARGV[2])
+<span class="k">end</span>
+<span class="k">return</span> 0          <span class="c">-- lease lost: stop ticking</span></pre>
+<pre><span class="c">-- advance.lua (SD-47) + the fence
+-- KEYS: admittedUpTo, next, rate, soldOut,
+--       leader            (all tagged {e})
+-- ARGV: n, rate, soldOut, myId</span>
+<span class="k">local function</span> num(k)
+  <span class="k">return</span> tonumber(redis.call('GET', k) <span class="k">or</span> '0')
+<span class="k">end</span>
+<span class="k">if</span> redis.call('GET', KEYS[5]) ~= ARGV[4] <span class="k">then</span>
+  <span class="k">return</span> -1                <span class="c">-- not the leader</span>
+<span class="k">end</span>
+<span class="k">local</span> new = math.min(num(KEYS[1]) + ARGV[1],
+                     num(KEYS[2]))
+redis.call('SET', KEYS[1], new)
+redis.call('SET', KEYS[3], ARGV[2])
+redis.call('SET', KEYS[4], ARGV[3])
+<span class="k">return</span> new</pre>
+</div>
+
+<h2>10.3 Versioned seat-map snapshots</h2>
+<figure>
+<!--SVG:snapshot-->
+<figcaption><b>Figure 11. Write the bytes, then flip the pointer.</b> A reader never sees a version whose bytes don't exist.
+Old versions age out on their own TTL, and a client holding the current version gets <code>304</code> with no body.</figcaption>
+</figure>
+<pre><span class="c">// builder, once a second per dirty event (the Kafka offset doubles as the version)</span>
+SET map:{e}:813 &lt;6.25 KB&gt; EX 120          <span class="c">① bytes first</span>
+SET map:{e}:v 813                          <span class="c">② then the pointer</span>
+<span class="c">// reader:  v = GET map:{e}:v ; if v == client's v → 304 ; else GET map:{e}:&lt;v&gt; → 200</span></pre>
+<div class="box why"><span class="t">Alternatives you should be able to compare</span>
+<p><strong>A live bitmap</strong> (<code>SETBIT</code> on every hold, plus <code>INCR</code> of a version in the same <code>MULTI</code>)
+is simpler but gives ~50 versions a second, so almost no 304s, and it puts Redis writes on the hold path.
+<strong>One key holding version + bytes</strong> saves a round trip but every check costs 6 KB.
+<strong>Pub/Sub or SSE deltas</strong> to 10,000 admitted fans is a phase-2 upgrade. SD-47's "≤ 1 version a second" is the sweet spot.</p></div>
+</div>
+
+<div>
+<h2>10.4 "Why not hold seats in Redis?" The question you will get</h2>
+<p>It's tempting: an all-or-nothing hold is one command on 8.4+, or a short script anywhere.</p>
+<div class="cols">
+<pre><span class="c">-- 8.4+: set all keys only if none exist</span>
+MSETEX 2 seat:{e}:101 h-5521
+         seat:{e}:102 h-5521 NX PX 300000
+
+<span class="c">-- any version: hold.lua
+-- KEYS: seat:{e}:&lt;id&gt; …   ARGV: holdId, ttlMs</span>
+<span class="k">for</span> i = 1, #KEYS <span class="k">do</span>
+  <span class="k">if</span> redis.call('EXISTS', KEYS[i]) == 1 <span class="k">then</span>
+    <span class="k">return</span> 0                <span class="c">-- one is taken</span>
+  <span class="k">end</span>
+<span class="k">end</span>
+<span class="k">for</span> i = 1, #KEYS <span class="k">do</span>
+  redis.call('SET', KEYS[i], ARGV[1],
+             'PX', ARGV[2])
+<span class="k">end</span>
+<span class="k">return</span> 1</pre>
+<div>
+<p><strong>Why it's rejected as the source of truth:</strong> Figure 8. The primary acks the hold, dies before the replica
+has it, the replica is promoted, and seat 101 is free again: an oversell. The hold path only does 50–500 writes a second,
+which PostgreSQL handles easily, so there's nothing to gain for that risk.</p>
+<p><strong>Where Redis <em>does</em> help:</strong> as a <strong>fast-reject gate</strong> in front of the database in a
+flash sale without a waiting room: <code>DECRBY avail:{e}:A 2</code>; if the result is negative, <code>INCRBY</code> it
+back and return 409 without touching PostgreSQL. The gate may be wrong in the <em>safe</em> direction; the database claim
+stays authoritative and <code>UNIQUE(event, seat)</code> is the last line.</p>
+<p><strong>If the interviewer insists on Redis semantics:</strong> a durable Redis-compatible store such as
+Amazon MemoryDB, which acknowledges a write only after a multi-AZ transaction log commits.</p>
+</div>
+</div>
+
+<div class="cols">
+<div>
+<h2>10.5 Rate limiting at the gateway</h2>
+<table><thead><tr><th>Algorithm</th><th>Redis shape</th><th>Trade-off</th></tr></thead>
+<tr><td>Fixed window</td><td><code>INCR rl:{u}:&lt;minute&gt;</code> + <code>EXPIRE … 60 NX</code></td><td>1 key, O(1); allows 2× bursts at window edges</td></tr>
+<tr><td>Sliding log</td><td>ZSET of timestamps; trim, count, add</td><td>Exact; memory O(limit) per user</td></tr>
+<tr><td>Token bucket</td><td>HASH {tokens, ts} + Lua</td><td>Smooth, allows bursts up to the bucket size; O(1)</td></tr>
+</table>
+<p class="small">Redis 8.8 adds <code>INCREX</code>, a built-in window counter for this job; the scripts below work on any version.</p>
+<pre><span class="c">-- token_bucket.lua   KEYS: tb:{u}
+-- ARGV: ratePerSec, burst, cost</span>
+<span class="k">local</span> t     = redis.call('TIME')  <span class="c">-- server clock</span>
+<span class="k">local</span> now   = t[1]*1000 + math.floor(t[2]/1000)
+<span class="k">local</span> rate  = tonumber(ARGV[1])
+<span class="k">local</span> burst = tonumber(ARGV[2])
+<span class="k">local</span> cost  = tonumber(ARGV[3])
+<span class="k">local</span> h = redis.call('HMGET', KEYS[1],
+                    'tokens', 'ts')
+<span class="k">local</span> tokens = tonumber(h[1]) <span class="k">or</span> burst
+<span class="k">local</span> ts     = tonumber(h[2]) <span class="k">or</span> now
+tokens = math.min(burst,
+  tokens + (now - ts) / 1000 * rate)
+<span class="k">local</span> ok = tokens &gt;= cost
+<span class="k">if</span> ok <span class="k">then</span> tokens = tokens - cost <span class="k">end</span>
+redis.call('HSET', KEYS[1], 'tokens', tokens,
+           'ts', now)
+redis.call('PEXPIRE', KEYS[1],
+           math.ceil(burst / rate * 1000))
+<span class="k">return</span> ok <span class="k">and</span> 1 <span class="k">or</span> 0</pre>
+</div>
+<div>
+<h2>10.6 Idempotency keys</h2>
+<pre>SET idem:{u-48213}:k-77 PENDING NX EX 86400
+→ OK   first time: do the work, then
+       SET idem:{u-48213}:k-77 &lt;result&gt;
+           XX KEEPTTL
+→ nil  duplicate: GET it. PENDING means
+       "still working"; else replay result</pre>
+<p class="small">A fast path only. SD-47 keeps <code>UNIQUE(user_id, idem_key)</code> in the database as the guarantee,
+because a Redis failover could forget a key.</p>
+
+<h2>10.7 Delayed jobs: a hold-expiry due queue</h2>
+<pre>ZADD holds:due:{e} &lt;expiresAtMs&gt; h-5521
+ZRANGE holds:due:{e} -inf &lt;nowMs&gt; BYSCORE
+       LIMIT 0 100
+ZREM holds:due:{e} h-5521
+  → 1  I own it: release the hold
+  → 0  another worker already got it</pre>
+<p class="small">Score = due time, so "what's due?" is one range read. <code>ZREM</code>'s return value is the claim, so
+several workers never release the same hold twice. SD-47's sweeper uses a partial index instead; both are valid.</p>
+
+<h2>10.8 Distributed locks, done right</h2>
+<pre>SET lock:{e}:sweeper &lt;uuid&gt; NX PX 30000
+<span class="c">-- release only if it's still mine (Lua):</span>
+<span class="k">if</span> redis.call('GET', KEYS[1]) == ARGV[1] <span class="k">then</span>
+  <span class="k">return</span> redis.call('DEL', KEYS[1])
+<span class="k">end</span>
+<span class="k">return</span> 0
+<span class="c">-- 8.4+, no Lua needed:</span>
+DELEX lock:{e}:sweeper IFEQ &lt;uuid&gt;</pre>
+</div>
+</div>
+</div>
+
+<div>
+<figure>
+<!--SVG:fencing-->
+<figcaption><b>Figure 12. Why a lease alone can't guarantee mutual exclusion.</b> A paused client outlives its lease. Only a
+monotonically increasing <em>fencing token</em>, checked by the storage that receives the write, rejects the stale writer.</figcaption>
+</figure>
+<div class="cols">
+<div class="box why"><span class="t">Redlock, and the critique</span>
+<p><strong>Redlock</strong> acquires the same lock on a majority of N (usually 5) independent primaries, within a validity time of
+TTL minus elapsed time minus clock drift. <strong>Kleppmann's critique:</strong> it depends on bounded pauses and clock
+behaviour, and it issues no fencing token, so a GC pause still breaks it. <strong>Antirez's reply:</strong> with sane
+clocks and a check of the elapsed time it's safe enough for many uses. The interview answer is to avoid needing the argument at all.</p></div>
+<div class="box say"><span class="t">Say it</span>
+<p>"I'd use a Redis lock for efficiency, like making sure one sweeper runs, not for correctness. Correctness comes from a
+fencing check in the system of record: the conditional <code>UPDATE … WHERE state = 'AVAILABLE'</code>, a version column,
+or the lease check inside the same Redis script that does the write."</p></div>
+</div>
+</div>
+
+<!-- ============================ 11 ============================ -->
+<div class="section">
+<h1><span class="n">11</span>Caching patterns</h1>
+<figure>
+<!--SVG:cache-->
+<figcaption><b>Figure 13. Cache-aside with a stampede guard.</b> When a popular key expires, one request rebuilds it and the
+rest don't hit the database.</figcaption>
+</figure>
+<table><thead><tr><th style="width:17%">Pattern</th><th style="width:43%">How</th><th>When</th></tr></thead>
+<tr><td>Cache-aside</td><td>Read the cache; on a miss read the DB and <code>SET … EX</code>. On a write, update the DB, then <code>DEL</code> the key</td><td>Default. Event pages, pricing, venue metadata</td></tr>
+<tr><td>Read-through</td><td>A library loads on miss (Caffeine, Redisson <code>RMapCache</code> loader)</td><td>Same as cache-aside, less code</td></tr>
+<tr><td>Write-through</td><td>Write the cache and the DB together</td><td>Read-heavy data that must be fresh right after a write</td></tr>
+<tr><td>Write-behind</td><td>Write the cache; flush to the DB asynchronously</td><td>Counters and analytics. <strong>Never for inventory</strong></td></tr>
+<tr><td>Client-side cache</td><td><code>CLIENT TRACKING on</code> (6.0+): the server pushes invalidations to the client's local cache</td><td>Hot keys read by every pod</td></tr>
+</table>
+<div class="cols">
+<div class="box trap"><span class="t">Invalidation traps</span>
+<ul>
+<li><strong>Delete, don't set, on write.</strong> Two writers that each "update the DB, then SET the cache" can finish in the
+opposite order and leave the older value cached.</li>
+<li>The race that remains (a reader repopulates the old value just before the DB commit) is closed by a short TTL or a delayed second <code>DEL</code>.</li>
+<li>For ordered invalidations, drive them from CDC (the outbox/Debezium stream), not from application code.</li>
+</ul></div>
+<div class="box why"><span class="t">What to cache in ticketing, and where</span>
+<p><strong>Immutable</strong> (venue layout, images): the CDN, versioned URLs, cached for a year.
+<strong>Shared and slowly changing</strong> (event page, prices): Redis cache-aside with jitter.
+<strong>Live but tolerant</strong> (availability): versioned snapshots (§10.3).
+<strong>Authoritative</strong> (claims, orders): never cached for decisions.</p></div>
+</div>
+
+<!-- ============================ 12 ============================ -->
+<h1 style="margin-top:8pt"><span class="n">12</span>Messaging: Pub/Sub vs Streams vs Kafka</h1>
+<figure>
+<!--SVG:streams-->
+<figcaption><b>Figure 14. A stream with two consumer groups.</b> Each group has its own cursor and its own Pending Entries List
+(PEL). <code>XAUTOCLAIM</code> hands a dead consumer's pending entries to a live one. (IDs shortened; real ones are
+<code>&lt;ms-timestamp&gt;-&lt;seq&gt;</code>.)</figcaption>
+</figure>
+</div>
+<div>
+<table><thead><tr><th style="width:15%"></th><th style="width:27%">Redis Pub/Sub</th><th style="width:29%">Redis Streams</th><th>Kafka</th></tr></thead>
+<tr><td>Delivery</td><td>At-most-once; offline subscribers miss messages</td><td>At-least-once with groups, acks and the PEL</td><td>At-least-once (exactly-once with transactions)</td></tr>
+<tr><td>Storage</td><td>None</td><td>In memory (trim with <code>MAXLEN ~</code>), persisted like other keys</td><td>On disk, retention measured in days, replayable</td></tr>
+<tr><td>Ordering</td><td>Per channel</td><td>Per stream (one key = one shard)</td><td>Per partition</td></tr>
+<tr><td>Scale</td><td>Sharded Pub/Sub (7.0) in Cluster</td><td>One stream lives on one node; shard by key yourself</td><td>Partitions across brokers</td></tr>
+<tr><td>Durability</td><td>—</td><td>Same as Redis: async replication</td><td>Replicated log with <code>acks=all</code> and min ISR</td></tr>
+<tr><td>Fit in SD-47</td><td>Nudge 10k admitted clients via SSE nodes ("map v814 is out")</td><td>Small internal queues: waitlist offers, email jobs</td><td><strong>The seat-event log</strong>: outbox → Kafka → builder, notifier, analytics</td></tr>
+</table>
+<div class="box say"><span class="t">Say it</span>
+<p>"Seat events go to Kafka because they come from the database's outbox and must be durable and replayable to rebuild a
+snapshot. Redis Streams would work for small job queues, and Pub/Sub only for best-effort nudges where a missed
+message just means the next poll catches up."</p></div>
+</div>
+
+<!-- ============================ 13 ============================ -->
+<div class="section">
+<h1><span class="n">13</span>Operating it: anti-patterns, metrics, sizing</h1>
+<div class="cols">
+<div>
+<h3>Anti-patterns and fixes</h3>
+<table><thead><tr><th>Don't</th><th>Do</th></tr></thead>
+<tr><td><code>KEYS user:*</code></td><td><code>SCAN 0 MATCH user:* COUNT 1000</code></td></tr>
+<tr><td>Big keys (&gt; 1 MB value, millions of members)</td><td>Split by bucket; <code>redis-cli --bigkeys</code> / <code>--memkeys</code> to find them</td></tr>
+<tr><td><code>DEL</code> on a huge set</td><td><code>UNLINK</code>; <code>lazyfree-lazy-user-del yes</code></td></tr>
+<tr><td><code>HGETALL</code>/<code>SMEMBERS</code> on big keys</td><td><code>HSCAN</code>/<code>SSCAN</code>, or model smaller keys</td></tr>
+<tr><td>One round trip per command in a loop</td><td>Pipeline, <code>MGET</code>/<code>MSET</code>, or a script</td></tr>
+<tr><td>Same TTL for a burst of keys</td><td>TTL ± 10% jitter</td></tr>
+<tr><td>Cache and state in one instance</td><td>Separate deployments, separate eviction policies</td></tr>
+<tr><td>A new connection per request</td><td>A shared multiplexed connection (Lettuce) or a pool (Jedis)</td></tr>
+<tr><td>No client timeout</td><td>50–200 ms command timeout plus a circuit breaker; decide fail-open or fail-closed per use</td></tr>
+<tr><td><code>MONITOR</code> in production</td><td><code>SLOWLOG</code>, <code>LATENCY</code>, metrics</td></tr>
+<tr><td>Transparent huge pages on</td><td><code>echo never &gt; …/transparent_hugepage/enabled</code></td></tr>
+</table>
+</div>
+<div>
+<h3>Metrics to watch (from <code>INFO</code>)</h3>
+<table><thead><tr><th>Metric</th><th>Why</th></tr></thead>
+<tr><td><code>instantaneous_ops_per_sec</code>, CPU of the main thread</td><td>Near 100% of one core = the node is saturated</td></tr>
+<tr><td>p99 command latency, <code>SLOWLOG</code> length</td><td>Shared latency: one slow command shows up for everyone</td></tr>
+<tr><td><code>used_memory</code> vs <code>maxmemory</code>, <code>mem_fragmentation_ratio</code></td><td>OOM risk; fragmentation &gt; 1.5 wastes RAM</td></tr>
+<tr><td><code>evicted_keys</code>, <code>expired_keys</code></td><td>Evictions on a state store = an incident</td></tr>
+<tr><td><code>keyspace_hits / misses</code></td><td>Cache hit ratio</td></tr>
+<tr><td><code>connected_clients</code>, <code>blocked_clients</code>, <code>rejected_connections</code></td><td>Connection leaks, misused blocking commands</td></tr>
+<tr><td><code>master_repl_offset</code> − replica offset, <code>master_link_status</code></td><td>Replication lag = your failover loss window</td></tr>
+<tr><td><code>rdb_last_bgsave_status</code>, <code>aof_last_write_status</code>, <code>latest_fork_usec</code></td><td>Persistence health; fork stalls</td></tr>
+</table>
+</div>
+</div>
+
+<h3>Sizing SD-47's Redis, out loud</h3>
+<table><thead><tr><th style="width:22%">Question</th><th style="width:40%">Arithmetic</th><th>Conclusion</th></tr></thead>
+<tr><td>Lobby memory</td><td>1M members × ~100 B (member, score, skiplist node, dict entry)</td><td>~100 MB: one node, easily. 2M fans → 200 MB</td></tr>
+<tr><td><code>queue/me</code> burst</td><td>1M calls over a 20 s jitter window = 50k/s of O(log n) <code>ZRANK</code></td><td>Close to one node's ceiling → precompute <code>seqOf</code> or read from replicas</td></tr>
+<tr><td>Map bandwidth</td><td>5k req/s × 6.25 KB = 31 MB/s ≈ 250 Mbit/s</td><td>The biggest Redis cost in the design. 304s cut it to ~1 MB/s</td></tr>
+<tr><td>Admission markers</td><td>~29k admitted × ~120 B, TTL 600 s</td><td>~3.5 MB, expires by itself</td></tr>
+<tr><td>Controller writes</td><td>1 script per second per event</td><td>Negligible. Correctness matters here (the lease), not load</td></tr>
+<tr><td>Connections</td><td>~200 pods × 1 multiplexed Lettuce connection per node</td><td>Hundreds, not tens of thousands</td></tr>
+</table>
+<div class="box trap"><span class="t">Decide fail-open or fail-closed for each Redis use, before the incident</span>
+<p><strong>Queue store down:</strong> fail closed. Joins get 503 with <code>Retry-After</code>; admitted fans are unaffected because the JWT is
+verified without Redis. <strong>Rate limiter down:</strong> fail open at the gateway (the waiting room already meters the shop).
+<strong>Map store down:</strong> serve the last bitmap from the service's memory; holds stay correct because PostgreSQL decides.</p></div>
+</div>
+
+<!-- ============================ 14 ============================ -->
+<div class="section">
+<h1><span class="n">14</span>Java clients: Spring Data Redis, Lettuce, Redisson</h1>
+<table><thead><tr><th style="width:15%">Client</th><th style="width:44%">Model</th><th>Use it when</th></tr></thead>
+<tr><td><strong>Lettuce</strong></td><td>Netty-based, async/reactive/sync APIs; <strong>one thread-safe connection multiplexes</strong> all callers; Cluster- and Sentinel-aware; default in Spring Boot</td><td>Default choice. Don't run blocking commands (<code>BLPOP</code>) on the shared connection</td></tr>
+<tr><td><strong>Jedis</strong></td><td>Simple, synchronous; one connection per thread from a pool</td><td>Simple code, short commands, predictable pooling</td></tr>
+<tr><td><strong>Redisson</strong></td><td>High-level distributed objects: <code>RLock</code>, <code>RRateLimiter</code>, <code>RMapCache</code>, <code>RDelayedQueue</code>, <code>RBloomFilter</code></td><td>You want the pattern ready-made. Know what it does underneath (Lua, Pub/Sub)</td></tr>
+<tr><td><strong>Spring Data Redis</strong></td><td><code>RedisTemplate</code>/<code>StringRedisTemplate</code> over Lettuce or Jedis; <code>opsForValue/Hash/ZSet/…</code>; <code>@Cacheable</code></td><td>Spring services. Watch the serializer: use <code>StringRedisTemplate</code> for Lua arguments</td></tr>
+</table>
+
+<pre><span class="c">// ---- Spring Data Redis: the SD-47 calls ----</span>
+<span class="k">private static</span> String k(String name, String evt) { <span class="k">return</span> name + ":{" + evt + "}"; }   <span class="c">// hash tag!</span>
+
+<span class="c">// join, lobby phase:  ZADD lobby:{e} NX score user</span>
+redis.opsForZSet().addIfAbsent(k("lobby", evt), userId, secureRandom.nextDouble());
+
+<span class="c">// queue/me:  ZRANK lobby:{e} user  (+1 = seq)</span>
+Long rank = redis.opsForZSet().rank(k("lobby", evt), userId);
+
+<span class="c">// queue/state:  MGET admittedUpTo rate soldOut   (one round trip)</span>
+List&lt;String&gt; s = redis.opsForValue().multiGet(
+    List.of(k("admittedUpTo", evt), k("rate", evt), k("soldOut", evt)));
+
+<span class="c">// admit once:  SET admitted:{e}:{u} jti NX EX 600</span>
+Boolean first = redis.opsForValue().setIfAbsent(k("admitted", evt) + ":{" + userId + "}", jti, Duration.ofSeconds(600));
+
+<span class="c">// Lua: loaded once, sent by SHA, resent automatically on NOSCRIPT</span>
+<span class="k">static final</span> RedisScript&lt;Long&gt; ADVANCE = RedisScript.of(<span class="k">new</span> ClassPathResource("advance.lua"), Long.<span class="k">class</span>);
+Long upTo = redis.execute(ADVANCE,
+    List.of(k("admittedUpTo", evt), k("next", evt), k("rate", evt), k("soldOut", evt), k("leader", evt)),
+    String.valueOf(n), String.valueOf(rate), String.valueOf(soldOut), instanceId);
+
+<span class="c">// pipeline: many commands, one round trip (not atomic)</span>
+List&lt;Object&gt; ranks = redis.executePipelined((RedisCallback&lt;Object&gt;) c -&gt; {
+    <span class="k">for</span> (String u : users) c.zSetCommands().zRank(bytes(k("lobby", evt)), bytes(u));
+    <span class="k">return null</span>;
+});</pre>
+<div class="cols">
+<pre><span class="c">// ---- Lettuce, Cluster ----</span>
+<span class="k">var</span> client = RedisClusterClient.create(
+    "redis://queue-redis:6379");
+<span class="k">var</span> conn = client.connect();   <span class="c">// share it</span>
+RedisAdvancedClusterCommands&lt;String, String&gt; r
+    = conn.sync();
+
+r.set("leader:{evt-7731}", instanceId,
+      SetArgs.Builder.nx().px(3000));
+r.zadd("lobby:{evt-7731}",
+       ZAddArgs.Builder.nx(), score, userId);
+Long rank = r.zrank("lobby:{evt-7731}", userId);
+Long v = r.evalsha(sha, ScriptOutputType.INTEGER,
+                   keys, args);</pre>
+<pre><span class="c">// ---- Redisson ----</span>
+RLock lock =
+    redisson.getLock("lock:{evt-7731}:sweeper");
+<span class="c">// explicit lease time = no watchdog</span>
+<span class="k">if</span> (lock.tryLock(0, 30, TimeUnit.SECONDS)) {
+  <span class="k">try</span> { sweep(); } <span class="k">finally</span> { lock.unlock(); }
+}
+<span class="c">// lock() with no lease time starts a watchdog:
+// renews every 10 s (lockWatchdogTimeout 30 s)</span>
+
+RRateLimiter rl =
+    redisson.getRateLimiter("rl:{u-48213}");
+rl.trySetRate(RateType.OVERALL, 10,
+              Duration.ofSeconds(1));
+<span class="k">boolean</span> allowed = rl.tryAcquire();</pre>
+</div>
+<div class="cols">
+<div class="box trap"><span class="t">Client-side traps</span>
+<ul>
+<li><strong>Serializer mismatch:</strong> the default <code>RedisTemplate</code> uses JDK serialization, so <code>"42"</code> isn't
+stored as <code>42</code> and Lua's <code>tonumber</code> returns nil. Use <code>StringRedisTemplate</code>.</li>
+<li><strong>Cluster topology refresh:</strong> enable Lettuce's adaptive refresh (on <code>MOVED</code>/<code>ASK</code>,
+reconnects), or a failover leaves clients talking to a demoted node.</li>
+<li><strong>Timeouts:</strong> set the command timeout explicitly; the defaults are far longer than a 300 ms hold SLO.</li>
+</ul></div>
+<div class="box why"><span class="t">What Redisson's <code>RLock</code> does underneath</span>
+<p>A hash per lock (owner id → re-entry count) with <code>PEXPIRE</code>, acquired by a Lua script; waiters subscribe to
+a Pub/Sub channel to learn when it's released; a watchdog renews the TTL. It's re-entrant and convenient, and it still
+has the Figure 12 problem, so the same rule applies: fence in the system of record.</p></div>
+</div>
+</div>
+
+<!-- ============================ 15 ============================ -->
+<div class="section">
+<h1><span class="n">15</span>The 2026 landscape</h1>
+<table><thead><tr><th style="width:18%">Option</th><th style="width:47%">What it is</th><th>Say this about it</th></tr></thead>
+<tr><td><strong>Redis Open Source 8.x</strong></td><td>Redis Ltd.'s server. 7.4 (2024) moved to RSALv2/SSPLv1; 8.0 (2025) added <strong>AGPLv3</strong> as an option and folded JSON, search/query, time series, probabilistic structures and vector sets into the core. 8.4 added <code>MSETEX</code>, <code>DELEX</code>, <code>SET … IFEQ</code> and atomic slot migration; 8.8 adds <code>INCREX</code></td><td>"Redis-compatible: everything I've described works on 7.x, 8.x or Valkey."</td></tr>
+<tr><td><strong>Valkey 9.x</strong></td><td>The Linux Foundation fork of Redis 7.2.4, BSD-licensed, backed by AWS, Google and others. Wire-compatible; adds its own performance work and cluster features</td><td>Offered on ElastiCache and Memorystore, priced below the Redis OSS engine on AWS</td></tr>
+<tr><td><strong>Memcached</strong></td><td>Multithreaded, strings only, LRU, no persistence or replication</td><td>Fine for a pure cache. No sorted sets, so no waiting room</td></tr>
+<tr><td><strong>Dragonfly, KeyDB</strong></td><td>Multithreaded Redis-protocol servers</td><td>More throughput per node, smaller ecosystem. Not needed at this load</td></tr>
+<tr><td><strong>ElastiCache</strong> / Memorystore / Azure Managed Redis</td><td>Managed Redis/Valkey: Multi-AZ failover, Cluster mode, backups</td><td>"Managed, Cluster mode, Multi-AZ, one replica per shard."</td></tr>
+<tr><td><strong>Amazon MemoryDB</strong></td><td>Redis/Valkey API with a <strong>durable multi-AZ transaction log</strong>: a write is acknowledged after the log commits</td><td>The answer to "what if Redis must not lose acknowledged writes?"</td></tr>
+</table>
+<div class="box say"><span class="t">Say it</span>
+<p>"I'd run Valkey or Redis on a managed service in Cluster mode with Multi-AZ replicas. The waiting room doesn't need anything
+newer than 7.0. If I needed durable acknowledged writes I'd look at MemoryDB, but for seats I'd still choose PostgreSQL,
+because I want constraints and transactions, not just durability."</p></div>
+
+<!-- ============================ 16 ============================ -->
+<h1 style="margin-top:10pt"><span class="n">16</span>Rapid-fire interview drill</h1>
+<p class="small muted">Cover the answer, say yours out loud, then compare. Each answer is a sentence or two, which is the length the room wants.</p>
+<div class="cols">
+<div>
+<div class="qa"><div class="q">Redis is single-threaded. How is it fast?</div><div class="a">The data is in RAM, commands are O(1)/O(log n), and there are no locks or context switches. Network I/O can use extra threads; execution stays on one thread, which is also why each command is atomic.</div></div>
+<div class="qa"><div class="q">Is Redis durable?</div><div class="a">Per node, with AOF <code>everysec</code> you lose up to ~1 s on a crash. Across a failover, async replication can lose acknowledged writes. <code>WAIT</code> narrows that but isn't consensus.</div></div>
+<div class="qa"><div class="q">So why not keep seats in Redis?</div><div class="a">A lost acknowledged hold is an oversell. The write path is only 50–500/s after the queue, so PostgreSQL's row locks and sync replica cost nothing at that rate.</div></div>
+<div class="qa"><div class="q">MULTI vs Lua?</div><div class="a"><code>MULTI</code> runs queued commands back-to-back but can't branch on a read and doesn't roll back. Lua can read, decide and write atomically. I use Lua for anything conditional.</div></div>
+<div class="qa"><div class="q">What does WATCH do?</div><div class="a">Optimistic locking: if a watched key changes before <code>EXEC</code>, <code>EXEC</code> returns nil and you retry. Good under low contention; under high contention a script is better.</div></div>
+<div class="qa"><div class="q">How does Cluster decide where a key lives?</div><div class="a">CRC16 of the key, or of its first <code>{hash tag}</code>, mod 16,384 gives the slot; each primary owns slot ranges. Wrong node → <code>MOVED</code>; slot mid-migration → <code>ASK</code>.</div></div>
+<div class="qa"><div class="q">Why <code>{event_id}</code> in every key?</div><div class="a">So one event's keys share a slot. Scripts and multi-key commands must stay in one slot, and different events still spread across nodes.</div></div>
+<div class="qa"><div class="q">One event is too hot for its node. Now what?</div><div class="a">Shed before Redis (CDN, jitter), make the hot call O(1) (precomputed <code>seqOf</code>), read from replicas (the lobby is frozen after T0), and pin the slot to its own node ahead of the sale.</div></div>
+<div class="qa"><div class="q">What happens when the primary dies?</div><div class="a">Sentinel or the Cluster's primaries detect it, a majority agrees, and the replica with the most data is promoted. Clients follow the new address. The last unreplicated writes are lost.</div></div>
+<div class="qa"><div class="q">Is a Redis lock safe?</div><div class="a">For efficiency, yes: <code>SET NX PX</code> plus a compare-and-delete release. For correctness, no: a paused client outlives its lease. You need a fencing token checked by the storage.</div></div>
+</div>
+<div>
+<div class="qa"><div class="q">How do keys expire?</div><div class="a">Passively on access, and actively by a sampling cycle about 10 times a second. Expired keys are never returned, but the <code>expired</code> notification can arrive late.</div></div>
+<div class="qa"><div class="q">Which eviction policy for the queue store?</div><div class="a"><code>noeviction</code>: it's state, not cache. A full store should refuse writes loudly, not silently drop places in line. Caches get <code>allkeys-lfu</code> on separate nodes.</div></div>
+<div class="qa"><div class="q">Pub/Sub vs Streams?</div><div class="a">Pub/Sub is fire-and-forget: offline means missed. Streams store entries and have consumer groups, acks and a pending list. For the durable seat-event log I use Kafka.</div></div>
+<div class="qa"><div class="q">How do you rate-limit per user?</div><div class="a">A token bucket in a hash, updated by one Lua script using server <code>TIME</code>, or <code>INCR</code> + <code>EXPIRE NX</code> for a fixed window. Fail open if Redis is down; the waiting room still meters the shop.</div></div>
+<div class="qa"><div class="q">How do you prevent a cache stampede?</div><div class="a">TTL jitter, one rebuilder per key via <code>SET lock NX PX</code>, serve stale while it refreshes, cache negatives briefly, and refresh hot keys early.</div></div>
+<div class="qa"><div class="q">Pipelining vs transactions?</div><div class="a">Pipelining saves round trips but isn't atomic. Transactions are atomic but still cost a round trip per command unless you pipeline them too.</div></div>
+<div class="qa"><div class="q">How big is the lobby?</div><div class="a">About 100 bytes per member: ~100 MB for a million fans, on one node.</div></div>
+<div class="qa"><div class="q">What would you monitor?</div><div class="a">Main-thread CPU, p99 latency and slowlog, memory vs <code>maxmemory</code>, evictions (zero on state stores), replication lag, fork time and persistence status.</div></div>
+<div class="qa"><div class="q">What if Redis is down at T0?</div><div class="a">Joins fail closed with 503 and <code>Retry-After</code>, and the CDN keeps serving the last queue state (<code>stale-if-error</code>). Admitted fans keep shopping because the JWT is checked without Redis. After failover, re-seed <code>next:{e}</code> from the highest seq seen in tokens.</div></div>
+<div class="qa"><div class="q">What if the T0 scheduler fires twice?</div><div class="a"><code>open_queue.lua</code> checks the phase first and returns the existing <code>next</code> if it's already <code>QUEUE</code>, so the second run changes nothing. Make every scheduled script idempotent.</div></div>
+<div class="qa"><div class="q">Redis crashes in the middle of a Lua script. What's left?</div><div class="a">The script's writes go to the AOF and replicas wrapped in <code>MULTI/EXEC</code>, so a restart or a replica sees all of them or none. An <em>error</em> inside the script is different: writes made before it stay.</div></div>
+<div class="qa"><div class="q">Why not Kafka for the waiting room?</div><div class="a">The access pattern is "what's my position?" and "move the pointer by 33", not "consume the next message". A sorted set and a counter answer both in O(log n); a log would need a consumer walking a million join events.</div></div>
+<div class="qa"><div class="q">How do you stop a fan being admitted twice?</div><div class="a"><code>SET admitted:{e}:{u} &lt;jti&gt; NX EX 600</code>. The first call wins; a retry reads the key and gets the same token back, never a fresh 10 minutes.</div></div>
+<div class="qa"><div class="q">One key per seat, or a bitmap?</div><div class="a">50,000 keys cost ~3–5 MB and 50,000 reads for a map; a bitmap is 6.25 KB and one <code>GET</code>. Per-seat keys only make sense if each seat needs its own TTL, and then the hold belongs in PostgreSQL anyway.</div></div>
+<div class="qa"><div class="q">"Best available" with Redis?</div><div class="a"><code>BITPOS</code> on a per-section bitmap finds a free run to suggest; the claim still happens in PostgreSQL with the conditional <code>UPDATE</code>, and a 409 moves on to the next run.</div></div>
+<div class="qa"><div class="q">Redis or Valkey?</div><div class="a">Protocol-compatible for everything here. Valkey is BSD-licensed and cheaper on AWS; Redis 8 is AGPL/RSAL/SSPL with the query engine built in. I'd let the platform team's standard decide.</div></div>
+</div>
+</div>
+</div>
+
+<!-- ============================ 17 ============================ -->
+<div class="section pb cheat">
+<h1><span class="n">17</span>One-page cheat sheet</h1>
+<div class="cols3">
+<div>
+<h3>Numbers</h3>
+<table>
+<tr><td>Simple command</td><td>µs of CPU; RTT 0.2–0.5 ms</td></tr>
+<tr><td>Ops per node</td><td>100–200k; 1M+ pipelined</td></tr>
+<tr><td>Hash slots</td><td>16,384 · CRC16 mod</td></tr>
+<tr><td>Key overhead</td><td>~50–100 B</td></tr>
+<tr><td>Sorted-set entry</td><td>~100 B → 1M fans = 100 MB</td></tr>
+<tr><td>Bitmap, 50k seats</td><td>6.25 KB</td></tr>
+<tr><td>HyperLogLog</td><td>≤ 12 KB · 0.81% error</td></tr>
+<tr><td>Max string</td><td>512 MB</td></tr>
+<tr><td>listpack limit</td><td>128 entries / 64 B values</td></tr>
+<tr><td>AOF everysec loss</td><td>≤ ~1 s</td></tr>
+<tr><td>Repl. backlog</td><td>1 MB default</td></tr>
+<tr><td>Script busy</td><td>5 s → BUSY replies</td></tr>
+<tr><td>Cluster node timeout</td><td>15 s default</td></tr>
+<tr><td>Eviction sample</td><td>5 keys</td></tr>
+<tr><td>Active expiry</td><td>~10×/s, sampled</td></tr>
+</table>
+<h3>SD-47 keys (all tagged <code>{e}</code>)</h3>
+<table>
+<tr><td class="m">phase:{e}</td><td>LOBBY | QUEUE</td></tr>
+<tr><td class="m">lobby:{e}</td><td>ZSET user → secret score</td></tr>
+<tr><td class="m">next:{e}</td><td>last issued seq (INCR)</td></tr>
+<tr><td class="m">seqOf:{e}</td><td>HASH user → seq</td></tr>
+<tr><td class="m">admittedUpTo:{e}</td><td>pointer, only grows</td></tr>
+<tr><td class="m">rate:{e} soldOut:{e}</td><td>published with it</td></tr>
+<tr><td class="m">admitted:{e}:{u}</td><td>jti, EX 600</td></tr>
+<tr><td class="m">leader:{e}</td><td>controller lease, PX 3000</td></tr>
+<tr><td class="m">map:{e}:v</td><td>current map version</td></tr>
+<tr><td class="m">map:{e}:&lt;v&gt;</td><td>6.25 KB bitmap, EX 120</td></tr>
+</table>
+</div>
+<div>
+<h3>The ten commands that matter</h3>
+<table>
+<tr><td class="m">SET k v NX PX ms</td><td>lock, lease, idempotency</td></tr>
+<tr><td class="m">INCR next:{e}</td><td>seq numbers</td></tr>
+<tr><td class="m">ZADD lobby NX s u</td><td>the draw</td></tr>
+<tr><td class="m">ZRANK lobby u</td><td>position, O(log n)</td></tr>
+<tr><td class="m">MGET a b c</td><td>one round trip</td></tr>
+<tr><td class="m">SETBIT/BITCOUNT</td><td>seat bitmap</td></tr>
+<tr><td class="m">EVAL / FCALL</td><td>atomic logic</td></tr>
+<tr><td class="m">EXPIRE k s NX</td><td>start a window once</td></tr>
+<tr><td class="m">SCAN 0 MATCH p</td><td>never KEYS</td></tr>
+<tr><td class="m">UNLINK big</td><td>free off the main thread</td></tr>
+</table>
+<h3>Atomicity ladder</h3>
+<table>
+<tr><td>1 command</td><td>atomic</td></tr>
+<tr><td>Pipeline</td><td>not atomic</td></tr>
+<tr><td>MULTI/EXEC</td><td>atomic; no branching, no rollback</td></tr>
+<tr><td>WATCH</td><td>optimistic CAS; retry on nil</td></tr>
+<tr><td>Lua / Function</td><td>atomic; branches; no rollback</td></tr>
+</table>
+<h3>Durability ladder</h3>
+<table>
+<tr><td>No persistence</td><td>lose everything</td></tr>
+<tr><td>RDB</td><td>lose minutes</td></tr>
+<tr><td>AOF everysec</td><td>lose ~1 s</td></tr>
+<tr><td>AOF always</td><td>~0 on this node</td></tr>
+<tr><td>+ replica, WAIT</td><td>smaller window, never 0</td></tr>
+<tr><td>MemoryDB / Postgres</td><td>acknowledged = durable</td></tr>
+</table>
+<h3>Hot-key playbook</h3>
+<table>
+<tr><td>1</td><td>Shed before Redis: CDN, jitter</td></tr>
+<tr><td>2</td><td>Make it O(1): precompute</td></tr>
+<tr><td>3</td><td>Read replicas if data is frozen</td></tr>
+<tr><td>4</td><td>Pin the slot before the sale</td></tr>
+<tr><td>5</td><td>Split write-hot counters</td></tr>
+</table>
+</div>
+<div>
+<h3>Lock release (Lua)</h3>
+<pre>if redis.call('GET', KEYS[1])
+   == ARGV[1] then
+  return redis.call('DEL', KEYS[1])
+end
+return 0
+-- 8.4+: DELEX k IFEQ &lt;uuid&gt;</pre>
+<h3>Fixed-window limiter</h3>
+<pre>n = INCR rl:{u}:&lt;minute&gt;
+EXPIRE rl:{u}:&lt;minute&gt; 60 NX
+if n &gt; limit → 429</pre>
+<h3>Delayed job claim</h3>
+<pre>ZRANGE due -inf &lt;now&gt; BYSCORE
+       LIMIT 0 100
+ZREM due &lt;id&gt;    → 1 = mine</pre>
+<h3>Snapshot flip</h3>
+<pre>SET map:{e}:813 &lt;bytes&gt; EX 120
+SET map:{e}:v 813      -- last</pre>
+<h3>Eviction policy</h3>
+<table>
+<tr><td>State store</td><td><code>noeviction</code></td></tr>
+<tr><td>Cache</td><td><code>allkeys-lfu</code></td></tr>
+</table>
+<h3>Cluster replies</h3>
+<table>
+<tr><td><code>MOVED</code></td><td>permanent: update the slot map</td></tr>
+<tr><td><code>ASK</code></td><td>one-off: <code>ASKING</code> + retry</td></tr>
+<tr><td><code>CROSSSLOT</code></td><td>keys in different slots: add a hash tag</td></tr>
+</table>
+<h3>Fail open or closed</h3>
+<table>
+<tr><td>Queue store</td><td>closed: 503 + Retry-After</td></tr>
+<tr><td>Rate limiter</td><td>open</td></tr>
+<tr><td>Map store</td><td>serve last bitmap from memory</td></tr>
+</table>
+<h3>The one-liner</h3>
+<p><em>"Redis is fast and can lose a second, which suits the queue. PostgreSQL is strict and transactional, which
+suits the seats. The design puts each piece of state where its failure is survivable."</em></p>
+</div>
+</div>
+</div>
+
+</body></html>

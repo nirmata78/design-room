@@ -1,0 +1,788 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>URL Shortener Reference Interview</title>
+<link rel="stylesheet" href="style.css">
+</head><body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L10,5 L0,9 z" fill="#57606a"/></marker>
+<marker id="ahr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,1 L10,5 L0,9 z" fill="#c8341f"/></marker>
+<marker id="ahg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,1 L10,5 L0,9 z" fill="#2d8a4e"/></marker>
+</defs></svg>
+
+<!-- ============================ COVER ============================ -->
+<div class="cover-band">
+  <div class="tag">Reference interview · System design</div>
+  <h0>URL Shortener, passed.</h0>
+  <div class="sub">A complete reference round, stage by stage: what to ask, what to compute, what to draw and what to say,
+  with the theory behind each choice, so you can defend it when the interviewer asks "why?"</div>
+  <div class="meta">21 October 2026 · companion to the 30-minute audio mock interview · numbers match the transcript</div>
+  <svg class="link" viewBox="0 0 100 100"><g transform="rotate(-40 50 50)" fill="none" stroke-width="7" stroke-linecap="round">
+    <rect x="8" y="35" width="50" height="30" rx="15" stroke="#ff7a66"/>
+    <rect x="42" y="35" width="50" height="30" rx="15" stroke="#8c959f"/></g></svg>
+</div>
+
+<div class="box key">
+  <span class="t">Five sentences that pass this round</span>
+  <ol style="margin-bottom:2pt">
+    <li><strong>This is a read-heavy key-value lookup.</strong> A hundred reads per write and 350,000 redirects a second at peak, so the design is mostly about making reads cheap.</li>
+    <li><strong>Seven base62 characters give 3.5 trillion codes</strong>, about twenty times what five years at 100 million links a day needs.</li>
+    <li><strong>Codes come from leased counter ranges passed through a keyed permutation.</strong> They're unique without collision checks and unguessable without a central bottleneck.</li>
+    <li><strong>Redirects return 302 with short cache lifetimes</strong>, because analytics, expiry and takedowns all need clicks to keep reaching us.</li>
+    <li><strong>Analytics leave through an asynchronous stream.</strong> Nothing on that path can slow down or fail a redirect.</li>
+  </ol>
+</div>
+
+<figure><!--SVG:clock-->
+<figcaption><b>The round on a clock.</b> Requirements, numbers and API take fifteen minutes together. The design and the deep dives the interviewer chooses take half the hour.</figcaption></figure>
+
+<h2>How to use this</h2>
+<p>Each section is one stage of the round, in the order you'll run it. <strong>Green boxes</strong> are lines you can say
+in the room. <strong>Purple boxes</strong> are the follow-up questions the interviewer will ask at that point, with a short answer.
+<strong>Blue</strong> is the theory behind a choice, <strong>amber</strong> is a trap, and <strong>red</strong> is a must-know.
+Listen to the audio once, read this once, then run the round out loud from the cheat sheet on the last page.</p>
+
+<h2>Contents</h2>
+<ul class="toc">
+  <li><b>1</b>Requirements <span>stage 1</span></li>
+  <li><b>2</b>Back-of-the-envelope <span>stage 2</span></li>
+  <li><b>3</b>API design <span>301 vs 302, idempotency</span></li>
+  <li><b>4</b>Data model and storage <span>KV vs SQL, hashing</span></li>
+  <li><b>5</b>High-level design <span>write and read paths</span></li>
+  <li><b>6</b>Generating short codes <span>deep dive</span></li>
+  <li><b>7</b>Redirect path and caching <span>deep dive</span></li>
+  <li><b>8</b>Replication and multi-region <span>deep dive</span></li>
+  <li><b>9</b>Analytics <span>deep dive</span></li>
+  <li><b>10</b>Abuse, security, expiry</li>
+  <li><b>11</b>Failure modes</li>
+  <li><b>12</b>Rapid-fire follow-ups <span>drill</span></li>
+  <li><b>13</b>Build order</li>
+  <li><b>14</b>One-page cheat sheet</li>
+</ul>
+
+<!-- ============================ 1 ============================ -->
+<div class="section pb">
+<h1><span class="n">1</span>Requirements<span class="slot">STAGE 1 · MIN 0–5</span></h1>
+<p>Ask five or six questions, and say why you're asking each one. A good question visibly changes a box on the whiteboard;
+"what cloud do you use?" doesn't.</p>
+<table>
+<thead><tr><th style="width:24%">I ask</th><th style="width:24%">Interviewer answers</th><th>Why it changes the design</th></tr></thead>
+<tr><td>Do users pick custom aliases?</td><td>Yes, logged-in users</td><td>A second way to create keys: user-chosen strings need a conditional insert and a rule so they never collide with generated codes</td></tr>
+<tr><td>Can links expire?</td><td>Optional, default never</td><td>Expiry is stored per link and checked on every read, including cache hits</td></tr>
+<tr><td>Do owners need click analytics?</td><td>Basic, a minute or two of delay is fine</td><td>Every click must reach us, so the redirect is a 302, and events need their own asynchronous pipeline</td></tr>
+<tr><td>Edit and delete?</td><td>Delete yes, edit not required</td><td>Deletion must propagate through three cache layers; codes are never reused</td></tr>
+<tr><td>What scale?</td><td>You propose it</td><td>I propose 100 million new links a day and 100 reads per write; it sizes everything in Stage 2</td></tr>
+<tr><td>Who can create links?</td><td>Public API and logged-in users</td><td>Abuse protection and rate limits are needed from day one</td></tr>
+</table>
+
+<div class="cols">
+<div>
+<h3>Functional (in scope)</h3>
+<ul>
+<li>Shorten a long URL; optional custom alias and expiry.</li>
+<li>Redirect a short URL to the original.</li>
+<li>Owners list, view and delete their links.</li>
+<li>Per-link click analytics: totals, by time, country, device, referrer.</li>
+</ul>
+<h3>Out of scope (say it, write it in a box)</h3>
+<p>Web UI, billing, link-in-bio pages, the account system (treated as an existing service). Abuse comes back near the end.</p>
+</div>
+<div>
+<h3>Non-functional</h3>
+<table>
+<thead><tr><th>Requirement</th><th>Target</th></tr></thead>
+<tr><td>Redirect availability</td><td><strong>99.99%</strong> (~53 min/year)</td></tr>
+<tr><td>Redirect latency, server side</td><td><strong>p99 &lt; 50 ms</strong></td></tr>
+<tr><td>Create availability</td><td>99.9%; may degrade without hurting redirects</td></tr>
+<tr><td>Durability of mappings</td><td>never lost, never reused</td></tr>
+<tr><td>Codes</td><td>not guessable, not enumerable</td></tr>
+<tr><td>Analytics freshness</td><td>eventual, ≤ 2 minutes</td></tr>
+</table>
+</div>
+</div>
+
+<div class="cols">
+<div class="box why"><span class="t">Nines, and what they allow</span>
+<table style="margin-bottom:3pt">
+<thead><tr><th>Availability</th><th>Downtime / year</th><th>Downtime / month</th></tr></thead>
+<tr><td>99.9%</td><td>8.8 hours</td><td>43.8 minutes</td></tr>
+<tr><td>99.99%</td><td>52.6 minutes</td><td>4.4 minutes</td></tr>
+<tr><td>99.999%</td><td>5.3 minutes</td><td>26 seconds</td></tr>
+</table>
+<p><strong>Why redirects get more nines than creates:</strong> a broken redirect breaks every link ever printed, emailed or
+encoded in a QR code; a failed create is one user retrying. Different targets justify separate services (§5).</p></div>
+<div class="box why"><span class="t">What "p99 &lt; 50 ms" means</span>
+<p>99 out of 100 requests finish within 50 ms. Averages hide the slow tail, and at 115,000 redirects a second the slowest 1%
+is still 1,150 users every second. "Server side" means from the request reaching our edge to the response leaving it;
+the user's own network round trip isn't ours to promise.</p></div>
+</div>
+
+<div class="box say"><span class="t">Say it</span>
+<p>"The redirect is the product, so it gets four nines and a 50 ms p99, and it must keep working when link creation is degraded.
+Once a code is issued it must always resolve to the same URL, never lost and never reused, and codes shouldn't be guessable,
+because people shorten links to private documents."</p></div>
+
+<!-- ============================ 2 ============================ -->
+<h1><span class="n">2</span>Back-of-the-envelope<span class="slot">STAGE 2 · MIN 5–10</span></h1>
+<p>Compute the few numbers that decide the design, and say each one as <em>number → consequence</em>. Round hard:
+"about twelve hundred a second", not 1,157.</p>
+<table>
+<thead><tr><th style="width:15%">Quantity</th><th style="width:27%">Arithmetic</th><th style="width:21%">Result</th><th>Consequence</th></tr></thead>
+<tr><td>Writes</td><td>100 M / day ÷ 86,400 s</td><td><strong>~1,200/s</strong>, ~3,500/s peak</td><td>One good database could take it. Writes don't drive the architecture</td></tr>
+<tr><td>Reads</td><td>100 × writes = 10 B / day ÷ 86,400</td><td><strong>~115k/s</strong>, ~350k/s peak</td><td><strong>This drives the design:</strong> caching and a stateless, horizontally scaled read tier</td></tr>
+<tr><td>Storage</td><td>100 M × 365 × 5 years × 500 B</td><td>~182 B links, <strong>~90 TB</strong> (~270 TB with 3 replicas)</td><td>Doesn't fit one machine: a partitioned store</td></tr>
+<tr><td>Code length</td><td>62⁷ vs 182 B</td><td>3.52 T codes, ~19× headroom</td><td>Seven characters. Six would run out in ~1.6 years</td></tr>
+<tr><td>Cache</td><td>200 M hot links × ~300 B</td><td><strong>~60 GB</strong></td><td>A small Redis cluster holds the whole hot set</td></tr>
+<tr><td>Bandwidth</td><td>115k/s × ~500 B</td><td>~60 MB/s (~0.5 Gbit/s)</td><td>Not a concern</td></tr>
+<tr><td>Click events</td><td>10 B / day × ~200 B</td><td><strong>~2 TB / day</strong></td><td>The largest volume in the system: its own asynchronous pipeline, off the hot path</td></tr>
+</table>
+
+<figure><!--SVG:keyspace-->
+<figcaption><b>Why seven characters.</b> Each extra base62 character multiplies the space by 62. Six characters (56.8 B) last about a year and a half
+at 100 M links a day; seven (3.52 T) cover the five-year need about nineteen times over.</figcaption></figure>
+
+<div class="cols">
+<div class="box why"><span class="t">Estimation toolkit</span>
+<ul>
+<li><strong>A day is 86,400 s ≈ 10⁵.</strong> Divide by 10⁵ for speed, then add ~15%. 1 M/day ≈ 12/s; 1 B/day ≈ 12k/s.</li>
+<li><strong>Peak ≈ 2–3× average</strong> for daily cycles; events and launches spike higher.</li>
+<li><strong>Powers of two:</strong> 2¹⁰ ≈ 10³, 2²⁰ ≈ 10⁶, 2³⁰ ≈ 10⁹, 2⁴⁰ ≈ 1.1 × 10¹².</li>
+<li><strong>Bits per base62 character:</strong> log₂ 62 ≈ 5.95, so 7 characters ≈ 41.7 bits; a 64-bit ID needs 11 characters.</li>
+<li><strong>Storage per record:</strong> sum the fields, then roughly double for indexes and overhead.</li>
+</ul></div>
+<div class="box why"><span class="t">Latency numbers to reason with</span>
+<table style="margin-bottom:2pt">
+<tr><td>RAM access / in-process cache hit</td><td>~0.1–1 µs</td></tr>
+<tr><td>NVMe random read</td><td>~20–100 µs</td></tr>
+<tr><td>Same-zone network round trip</td><td>~0.2–0.5 ms</td></tr>
+<tr><td>Redis GET, including network</td><td>~0.3–1 ms</td></tr>
+<tr><td>DynamoDB GetItem</td><td>~2–5 ms typical</td></tr>
+<tr><td>Cross-zone round trip</td><td>~1 ms</td></tr>
+<tr><td>Europe ↔ US East round trip</td><td>~70–90 ms</td></tr>
+</table>
+<p class="small">The last line is why cross-region writes stay asynchronous (§8).</p></div>
+</div>
+
+<div class="box say"><span class="t">Say it</span>
+<p>"Three things fall out of the numbers. The read path is the scale problem, 350,000 a second at peak, so I cache aggressively and keep
+redirects stateless. The mappings are about 90 terabytes, so they need a partitioned key-value store. And click events are the biggest
+volume, so they go through an asynchronous stream, off the hot path."</p></div>
+<div class="box trap"><span class="t">Trap</span>
+<p>Computing ten numbers and concluding nothing. The interviewer scores the consequence column. A number you don't use later is time lost.</p></div>
+
+<!-- ============================ 3 ============================ -->
+<h1><span class="n">3</span>API design<span class="slot">STAGE 3 · MIN 10–13</span></h1>
+<p>Two kinds of endpoints: a versioned, authenticated management API, and the public redirect on the short domain.</p>
+<table class="api">
+<thead><tr><th>Endpoint</th><th>Returns</th><th>Purpose and notes</th></tr></thead>
+<tr><td>POST /v1/links</td><td>201 · 400 · 409 · 429</td><td>Create. Body: long URL, optional alias and expiry. <code>Idempotency-Key</code> header.</td></tr>
+<tr><td>GET /v1/links/{code}</td><td>200 · 404</td><td>Metadata of one link (owner only).</td></tr>
+<tr><td>GET /v1/links?cursor=…&amp;limit=50</td><td>200</td><td>My links, newest first, cursor-paginated.</td></tr>
+<tr><td>DELETE /v1/links/{code}</td><td>204 · 404</td><td>Delete: retire the code, invalidate caches.</td></tr>
+<tr><td>GET /v1/links/{code}/stats?from&amp;to&amp;granularity=hour</td><td>200</td><td>Aggregated clicks from the analytics store.</td></tr>
+<tr><td>GET /{code} <span class="muted">(short domain)</span></td><td>302 · 404 · 410</td><td>The redirect. Public, unversioned, no auth.</td></tr>
+</table>
+<div class="cols">
+<pre><span class="c">// create</span>
+POST /v1/links
+Authorization: Bearer &lt;token&gt;
+Idempotency-Key: 6f1c2b9e-0d4a-4c1e-9a77-2f3e1d5b8c10
+{ "longUrl": "https://example.com/q3?id=42",
+  "expiresAt": "2027-01-01T00:00:00Z" }
+
+HTTP/1.1 201 Created
+Location: /v1/links/fN7J2J9
+{ "code": "fN7J2J9",
+  "shortUrl": "https://sho.rt/fN7J2J9",
+  "longUrl": "https://example.com/q3?id=42",
+  "expiresAt": "2027-01-01T00:00:00Z" }</pre>
+<pre><span class="c">// redirect</span>
+GET /fN7J2J9
+Host: sho.rt
+
+HTTP/1.1 302 Found
+Location: https://example.com/q3?id=42
+Cache-Control: private, max-age=60
+CDN-Cache-Control: max-age=60
+
+<span class="c">// errors carry a machine-readable code</span>
+HTTP/1.1 409 Conflict
+{ "error": "ALIAS_TAKEN" }
+HTTP/1.1 429 Too Many Requests
+Retry-After: 30</pre>
+</div>
+
+<table>
+<thead><tr><th style="width:13%">Status</th><th style="width:17%">Cached by default?</th><th style="width:20%">Method on follow</th><th>When to use it here</th></tr></thead>
+<tr><td><strong>301</strong> Moved Permanently</td><td>Yes, often for a long time</td><td>may change to GET</td><td>Cheapest, but clicks stop reaching us: no analytics, no expiry, no takedown</td></tr>
+<tr><td><strong>302</strong> Found</td><td>Only if headers allow</td><td>may change to GET</td><td><strong>Our choice:</strong> every click comes back; cache lifetime set explicitly</td></tr>
+<tr><td><strong>307</strong> Temporary</td><td>Only if headers allow</td><td>preserved</td><td>Same as 302 for GET links; matters for POST</td></tr>
+<tr><td><strong>308</strong> Permanent</td><td>Yes</td><td>preserved</td><td>Same trade-off as 301</td></tr>
+</table>
+
+<div class="cols">
+<div class="box why"><span class="t">Caching headers on the redirect</span>
+<p><code>private, max-age=60</code> lets the browser reuse the redirect for a minute but tells shared caches not to store it.
+<code>CDN-Cache-Control</code> (RFC 9213) gives our own CDN a separate lifetime that overrides <code>Cache-Control</code> for the edge.
+If your CDN doesn't support it, use <code>public, max-age=60, s-maxage=60</code> or set the TTL in CDN config.
+Either way, deleting or disabling a link takes effect within about a minute.</p></div>
+<div class="box why"><span class="t">Idempotency keys and cursors</span>
+<p><strong>Idempotency key:</strong> the client generates a UUID per user action and resends it on retry. The server stores
+<code>(owner, key) → response</code> for 24 hours with a conditional insert; a duplicate gets the stored response, not a second link.
+<strong>Cursor pagination:</strong> the cursor is an opaque encoding of the last <code>(created_at, code)</code> seen. Unlike
+<code>OFFSET</code>, it costs the same on page 1,000 and doesn't skip or repeat rows when new links arrive.</p></div>
+</div>
+
+<div class="box probe"><span class="t">Interviewer probes</span>
+<p><b>Why isn't the redirect versioned?</b> Short links are printed and shared forever, so the URL format is a permanent contract.
+Only the management API is versioned.</p>
+<p><b>Why 302 and not 301?</b> Analytics, expiry and deletion are requirements, and a cached 301 bypasses all three.
+If the business later valued cost over analytics, switching is a one-line change.</p></div>
+
+<!-- ============================ 4 ============================ -->
+<h1><span class="n">4</span>Data model and storage<span class="slot">STAGE 3 · MIN 13–15</span></h1>
+<div class="cols">
+<div>
+<h3>Tables</h3>
+<table>
+<thead><tr><th>links</th><th>Type</th><th>Notes</th></tr></thead>
+<tr><td><strong>code</strong> (PK)</td><td>string 7–30</td><td>partition key</td></tr>
+<tr><td>long_url</td><td>string ≤ 2 KB</td><td>normalized</td></tr>
+<tr><td>owner_id</td><td>string</td><td>null for anonymous</td></tr>
+<tr><td>created_at, expires_at</td><td>epoch ms</td><td>expires_at nullable</td></tr>
+<tr><td>status</td><td>enum</td><td>ACTIVE, DISABLED, DELETED</td></tr>
+<tr><td>custom</td><td>bool</td><td>user-chosen alias</td></tr>
+</table>
+<table>
+<thead><tr><th>Other stores</th><th>Key</th><th>Holds</th></tr></thead>
+<tr><td>user_links (GSI)</td><td>owner_id + created_at</td><td>code, for "my links"</td></tr>
+<tr><td>idempotency</td><td>owner_id + key</td><td>response, TTL 24 h</td></tr>
+<tr><td>click aggregates</td><td>code + minute + dims</td><td>clicks, HLL state (ClickHouse)</td></tr>
+</table>
+</div>
+<div>
+<h3>Access patterns</h3>
+<table>
+<thead><tr><th>Query</th><th>Rate</th><th>Served by</th></tr></thead>
+<tr><td>Get link by code</td><td>350k/s peak, ~16k/s after caches</td><td>PK lookup</td></tr>
+<tr><td>Create if absent</td><td>3.5k/s peak</td><td>conditional put</td></tr>
+<tr><td>List my links</td><td>low</td><td>GSI query</td></tr>
+<tr><td>Stats for a link</td><td>low</td><td>analytics store</td></tr>
+<tr><td>Delete</td><td>low</td><td>update status + invalidate</td></tr>
+</table>
+<p>One hot access pattern, a point lookup by key, with no joins and no ad hoc queries. That's the textbook case for a key-value store.</p>
+</div>
+</div>
+
+<table>
+<thead><tr><th style="width:16%"></th><th style="width:28%">Postgres, sharded by you</th><th style="width:28%">DynamoDB</th><th>Cassandra</th></tr></thead>
+<tr><td>Partitioning</td><td>you build routing, resharding, failover</td><td>automatic, by hashed partition key</td><td>automatic, token ring</td></tr>
+<tr><td>Insert-if-absent</td><td><code>UNIQUE</code> / <code>ON CONFLICT DO NOTHING</code></td><td><code>attribute_not_exists(code)</code></td><td><code>IF NOT EXISTS</code>: a Paxos round, ~4× the cost</td></tr>
+<tr><td>Read consistency</td><td>strong on the primary</td><td>eventual, or strongly consistent read</td><td>tunable: ONE, QUORUM, ALL</td></tr>
+<tr><td>Multi-region</td><td>you build it</td><td>global tables, async</td><td>multi-DC replication, async</td></tr>
+<tr><td>Fit here</td><td>start here at small scale</td><td><strong>chosen:</strong> managed, conditional writes</td><td>good if self-hosting</td></tr>
+</table>
+
+<figure><!--SVG:ring-->
+<figcaption><b>How a key-value store spreads 180 billion keys.</b> Hash the partition key onto a ring; each server owns many small arcs.
+Adding a server moves about 1/N of the keys instead of nearly all of them.</figcaption></figure>
+
+<div class="cols">
+<div class="box why"><span class="t">DynamoDB facts worth knowing</span>
+<ul>
+<li>Items up to <strong>400 KB</strong>. A partition holds ~10 GB and serves up to <strong>3,000 reads and 1,000 writes per second</strong>
+(capacity units); adaptive capacity splits hot partitions, but one key can't exceed one partition's limit.</li>
+<li>Global secondary indexes are <strong>eventually consistent</strong>: "my links" may lag a new link by a moment.</li>
+<li><strong>TTL deletion is lazy</strong>, typically within days, not seconds, so expiry is checked on read.</li>
+<li><strong>Global tables</strong> replicate asynchronously between regions, last writer wins.</li>
+</ul></div>
+<div>
+<pre><span class="c">// create-if-absent, AWS SDK for Java v2</span>
+PutItemRequest req = PutItemRequest.builder()
+    .tableName("links")
+    .item(Map.of(
+        "code",     AttributeValue.fromS(code),
+        "long_url", AttributeValue.fromS(url),
+        "owner_id", AttributeValue.fromS(owner),
+        "created",  AttributeValue.fromN(now)))
+    .conditionExpression(
+        "attribute_not_exists(code)")
+    .build();
+<span class="k">try</span> {
+  ddb.putItem(req);
+} <span class="k">catch</span> (ConditionalCheckFailedException e) {
+  <span class="c">// alias taken → 409; generated clash → next ID</span>
+}</pre>
+<div class="box trap"><span class="t">The hot-partition trap</span>
+<p>Sequential codes in a <em>range</em>-partitioned table send every new link, which is also the most-clicked one, to the last partition.
+Hash partitioning on a randomized code avoids it.</p></div>
+</div>
+</div>
+
+<div class="box probe"><span class="t">Interviewer probes</span>
+<p><b>Why not just Postgres?</b> It works, and at small scale I'd start there. At 90 TB I'd be building sharding, routing, resharding and per-shard
+failover myself, for a workload that uses nothing relational. The ad hoc queries I'd miss belong in the analytics store anyway.</p>
+<p><b>How is the table partitioned?</b> By a hash of the short code. Codes are uniformly random (§6), so load spreads evenly.</p></div>
+
+<!-- ============================ 5 ============================ -->
+<h1><span class="n">5</span>High-level design<span class="slot">STAGE 4 · MIN 15–25</span></h1>
+<figure><!--SVG:hld-->
+<figcaption><b>Two paths with different load and different SLOs.</b> Green arrows are the write path, red the read path, dashed arrows are asynchronous.
+The redirect service talks only to its cache, Redis, the key-value store and (asynchronously) Kafka.</figcaption></figure>
+
+<div class="cols">
+<div>
+<h3>Write path: <code>POST /v1/links</code></h3>
+<ol class="steps">
+<li><strong>Authenticate and rate-limit</strong> by API key and IP.</li>
+<li><strong>Validate and normalize</strong> the URL (box below), and check it against a local blocklist.</li>
+<li><strong>Take the next ID</strong> from this instance's leased block; permute and encode it into a 7-character code (§6).</li>
+<li><strong>Conditional put</strong> into the key-value store.</li>
+<li><strong>Write the mapping to Redis</strong> too: new links are usually clicked within seconds.</li>
+<li><strong>Return 201.</strong> The deep safety scan runs asynchronously and can disable the link later.</li>
+</ol>
+</div>
+<div>
+<h3>Read path: <code>GET /{code}</code></h3>
+<ol class="steps">
+<li><strong>CDN:</strong> popular links are answered at the edge.</li>
+<li><strong>In-process LRU</strong> in the redirect instance: microseconds.</li>
+<li><strong>Redis:</strong> the broad hot set, sub-millisecond.</li>
+<li><strong>Key-value store</strong> only on a miss; populate Redis on the way back.</li>
+<li><strong>Check status and expiry</strong>, return 302, 404 or 410.</li>
+<li><strong>Emit a click event</strong> to Kafka without waiting.</li>
+</ol>
+</div>
+</div>
+
+<div class="cols">
+<div class="box why"><span class="t">URL validation and normalization</span>
+<ul>
+<li>Only <code>http</code> and <code>https</code>: reject <code>javascript:</code>, <code>data:</code>, <code>file:</code>.</li>
+<li>Max ~2,048 characters; must parse as a URL with a host.</li>
+<li>Lowercase scheme and host, drop default ports, convert international domains to punycode.</li>
+<li>Don't touch path or query semantics: <code>/A</code> and <code>/a</code> can be different pages.</li>
+<li>Reject our own short domain as a destination, which prevents redirect loops and link laundering.</li>
+</ul></div>
+<div class="box why"><span class="t">Why stateless services matter</span>
+<p>Neither service keeps anything it can't lose: the ID block and the LRU are caches of state that lives elsewhere. So any instance
+can serve any request, autoscaling is just adding pods, and a crash costs at most one unused ID block.
+At ~10k requests per second per redirect pod, origin peak (~210k/s after the CDN) needs a few dozen pods.</p></div>
+</div>
+
+<div class="box probe"><span class="t">Interviewer probes</span>
+<p><b>Why split the link service and the redirect service?</b> They scale on different curves (100×), have different targets
+(four nines vs three), and have different dependencies. The redirect service must not depend on the ID allocator, auth or the scanner.
+If those fail, creation degrades and every existing link keeps working. Separation makes that isolation structural instead of hopeful.</p></div>
+<div class="box say"><span class="t">Say it</span>
+<p>"Writes are small and must be unique; reads are huge and must be fast; events are the biggest volume and can be late.
+So: a small write service with a conditional insert, a stateless read service behind three cache layers, and an asynchronous stream for clicks."</p></div>
+
+<!-- ============================ 6 ============================ -->
+<h1><span class="n">6</span>Deep dive: generating short codes<span class="slot">STAGE 5 · DEEP DIVE</span></h1>
+<p>Lay out the options in one breath, name the trade-off of each, then pick. This is the deep dive interviewers choose most often.</p>
+<table>
+<thead><tr><th style="width:17%">Approach</th><th style="width:12%">Unique by</th><th style="width:15%">Check on write?</th><th style="width:15%">Coordination</th><th style="width:12%">Guessable?</th><th>Catch</th></tr></thead>
+<tr><td>Hash URL, take 7 chars</td><td>luck</td><td>yes, rehash with salt</td><td>none</td><td>no</td><td>Same URL → same code: breaks per-owner analytics and deletion</td></tr>
+<tr><td>Random 7 chars</td><td>luck</td><td>yes, conditional insert</td><td>none</td><td>no</td><td>Retries grow as the space fills: ~1 in 20 by year five</td></tr>
+<tr><td>Global counter + base62</td><td>construction</td><td>no</td><td>one hot counter</td><td><strong>yes</strong></td><td>Bottleneck and single point of failure; sequential codes</td></tr>
+<tr><td>Key generation service</td><td>pre-generation</td><td>at generation</td><td>KGS + key table</td><td>no</td><td>A counter with an extra service and table to run</td></tr>
+<tr><td>Snowflake → base62</td><td>construction</td><td>no</td><td>worker IDs</td><td>partly</td><td>64 bits = 11 chars, and leaks creation time</td></tr>
+<tr><td><strong>Leased ranges + permutation</strong></td><td>construction</td><td>safety net only</td><td>1 lease / ~5 min</td><td>no</td><td><strong>Chosen.</strong> A small permutation function to own</td></tr>
+</table>
+
+<div class="box why"><span class="t">The birthday problem, for random codes</span>
+<p>With n codes taken out of N, a new random code collides with probability n/N, about 5% by year five. But the <em>first</em>
+collision arrives after only about √(πN/2) ≈ <strong>2.35 million</strong> codes, within the first hour at our rate. So random codes need
+a conditional insert from day one.</p></div>
+
+<figure><!--SVG:idgen-->
+<figcaption><b>The chosen scheme in two halves.</b> Range leasing removes the hot counter; a keyed Feistel permutation removes guessability
+while keeping uniqueness. The example codes are real outputs of the code below, with demo keys.</figcaption></figure>
+
+<div class="cols">
+<div>
+<pre><span class="k">static final</span> String ALPHA = "0123456789"
+    + "abcdefghijklmnopqrstuvwxyz"
+    + "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+<span class="c">// 62^7 codes; 4 secret round keys</span>
+<span class="k">static final long</span> SPACE  = 3_521_614_606_208L;
+<span class="k">static final long</span> MASK21 = (1L &lt;&lt; 21) - 1;
+<span class="k">static final long</span>[] KEYS = loadKeysFromVault();
+
+<span class="c">// round function: splitmix64 finalizer</span>
+<span class="k">static long</span> mix(<span class="k">long</span> z) {
+  z = (z ^ (z &gt;&gt;&gt; 30)) * 0xBF58476D1CE4E5B9L;
+  z = (z ^ (z &gt;&gt;&gt; 27)) * 0x94D049BB133111EBL;
+  <span class="k">return</span> z ^ (z &gt;&gt;&gt; 31);
+}
+<span class="c">// a bijection on [0, 2^42)</span>
+<span class="k">static long</span> permute(<span class="k">long</span> x) {
+  <span class="k">long</span> l = x &gt;&gt;&gt; 21, r = x &amp; MASK21;
+  <span class="k">for</span> (<span class="k">long</span> k : KEYS) {
+    <span class="k">long</span> t = l ^ (mix(r ^ k) &amp; MASK21);
+    l = r; r = t;
+  }
+  <span class="k">return</span> (l &lt;&lt; 21) | r;
+}
+<span class="k">static</span> String toCode(<span class="k">long</span> id) {  <span class="c">// id &lt; SPACE</span>
+  <span class="k">long</span> y = permute(id);
+  <span class="k">while</span> (y &gt;= SPACE) y = permute(y); <span class="c">// cycle walk</span>
+  <span class="k">char</span>[] c = <span class="k">new char</span>[7];
+  <span class="k">for</span> (<span class="k">int</span> i = 6; i &gt;= 0; i--) {
+    c[i] = ALPHA.charAt((<span class="k">int</span>) (y % 62)); y /= 62;
+  }
+  <span class="k">return new</span> String(c);
+}</pre>
+</div>
+<div>
+<div class="box why"><span class="t">How a Feistel network works</span>
+<p>Split the 42-bit number into two 21-bit halves, L and R. Each round sets <code>L, R = R, L xor F(R, key)</code>.
+Any function F works, because each round can be undone: knowing the new L (old R) you recompute F and xor it away.
+So the whole thing is a <strong>bijection</strong>: different IDs always give different outputs, and it's reversible with the keys.</p>
+<p><strong>Cycle walking:</strong> the permutation covers 2⁴² values but codes must stay below 62⁷, which is 80% of that.
+If the output is too big, permute it again; on average 1.25 passes. The result is still a bijection on [0, 62⁷).</p>
+<p><strong>Round function:</strong> splitmix stops casual enumeration. For real secrecy, use AES-based FF1 format-preserving encryption
+(NIST SP 800-38G) or HMAC-SHA-256 as F.</p></div>
+
+</div>
+</div>
+
+<div class="box probe"><span class="t">Interviewer probes</span>
+<p><b>Do you still need the conditional write?</b> Yes: as a safety net, and because a custom alias might equal a code the generator
+produces later. On a clash the service skips to the next ID. To make it near-impossible, aliases must be ≥ 8 characters or contain a hyphen,
+which isn't in the generated alphabet. Plus a reserved-word list (api, admin, login…) and an offensive-terms filter.</p>
+<p><b>Same long URL submitted twice?</b> Separate codes by default: two owners need separate analytics and separate deletion. For per-user
+deduplication, add an index on <code>(owner_id, hash(normalized URL))</code>. Retries are covered by the idempotency key.</p>
+<p><b>The allocator is down.</b> Instances keep issuing from the blocks they hold, minutes of headroom at peak. Only then does creation stop;
+redirects never notice.</p>
+<p><b>Why not Snowflake?</b> 64 bits is 11 base62 characters, and the embedded timestamp leaks creation time. We need only ~42 bits.</p></div>
+
+<!-- ============================ 7 ============================ -->
+<h1><span class="n">7</span>Deep dive: the redirect path and caching<span class="slot">DEEP DIVE</span></h1>
+<figure><!--SVG:redirect-->
+<figcaption><b>A cold redirect, end to end.</b> The worst case (miss everywhere) is a few milliseconds of Redis and key-value reads.
+The click event leaves asynchronously, after the response is decided.</figcaption></figure>
+<figure><!--SVG:funnel-->
+<figcaption><b>Each layer shrinks the next one's load.</b> With these illustrative hit rates, about 95% of redirects never touch the database:
+~16k reads per second at peak instead of 350k.</figcaption></figure>
+
+<div class="cols">
+<div>
+<h3>Latency budget (p99, server side)</h3>
+<table>
+<thead><tr><th>Step</th><th>p99</th></tr></thead>
+<tr><td>CDN hit</td><td>&lt; 5 ms at the edge</td></tr>
+<tr><td>In-process LRU hit</td><td>&lt; 0.1 ms</td></tr>
+<tr><td>Redis hit (same zone)</td><td>~1 ms</td></tr>
+<tr><td>Key-value read on miss</td><td>~5–10 ms</td></tr>
+<tr><td>Service overhead, serialization</td><td>~1–2 ms</td></tr>
+<tr><td><strong>Worst case, all misses</strong></td><td><strong>~15 ms</strong>: 3× headroom vs 50 ms</td></tr>
+</table>
+<h3>Three layers, three jobs</h3>
+<ul>
+<li><strong>CDN</strong> absorbs viral links: a million clicks a minute cost one origin request per edge per minute. Counts come from CDN logs.</li>
+<li><strong>In-process LRU</strong> (Caffeine), top ~100k links: shields Redis from hot keys.</li>
+<li><strong>Redis</strong>, cache-aside with LFU eviction: the ~60 GB hot set. For links, popularity predicts the next click better than recency.</li>
+</ul>
+</div>
+<div>
+<div class="box why"><span class="t">Cache-stampede protection (single-flight)</span>
+<p>When a hot key expires, thousands of requests miss at once. Coalesce them so one does the load and the rest wait for its result:</p>
+<pre><span class="c">// Caffeine coalesces concurrent loads per key</span>
+AsyncLoadingCache&lt;String, Link&gt; local =
+  Caffeine.newBuilder()
+    .maximumSize(100_000)
+    .expireAfterWrite(Duration.ofSeconds(30))
+    .buildAsync((code, ex) -&gt; supplyAsync(
+        () -&gt; redisThenStore(code), ex));
+<span class="c">// 10,000 concurrent get("fN7J2J9")
+//   → one redisThenStore() call</span></pre>
+<p>Also add <strong>TTL jitter</strong> (±10%) so keys written together don't expire together.</p></div>
+<div class="box why"><span class="t">Bloom filter math, and why it's optional</span>
+<p>Bits needed: m = −n·ln p / (ln 2)². For n = 180 billion codes and p = 1%, that's ~1.75 × 10¹² bits ≈ <strong>219 GB</strong>,
+with k = 7 hash functions. Far too big for every pod, so the first defenses against scanning are negative caching and 404 rate limits.</p></div>
+</div>
+</div>
+
+<div class="box probe"><span class="t">Interviewer probes</span>
+<p><b>Someone scans random codes.</b> Cache a "not found" marker for a few minutes, so repeated misses don't reach the store; rate-limit
+clients with many 404s, which is the signature of enumeration. A Bloom filter only if it becomes a real problem.</p>
+<p><b>How do expiry and deletion interact with three caches?</b> Expiry: the timestamp travels with the cached value and is checked on every hit,
+so links die on time whatever the TTL. Deletion: delete the record, delete the Redis key, broadcast an invalidation so pods drop it from
+their LRU, and purge the CDN, which is mandatory for malicious-link takedowns.</p>
+<p><b>A single link gets millions of clicks per second.</b> The CDN takes nearly all of it. If it couldn't, every pod's LRU would, since one
+code and its URL fit in every instance's memory.</p></div>
+
+<!-- ============================ 8 ============================ -->
+<h1><span class="n">8</span>Deep dive: replication, consistency, multi-region<span class="slot">DEEP DIVE</span></h1>
+<figure><!--SVG:quorum-->
+<figcaption><b>Quorums.</b> With three replicas, writing to two and reading from two guarantees the reader sees the latest acknowledged write.
+Reading from one is faster and may be stale.</figcaption></figure>
+
+<div class="cols">
+<div>
+<h3>Consistency, chosen per data type</h3>
+<table>
+<thead><tr><th>Data</th><th>Model</th><th>How</th></tr></thead>
+<tr><td>Code uniqueness</td><td><strong>strong</strong></td><td>allocator leases + conditional write</td></tr>
+<tr><td>Link lookups</td><td>eventual</td><td>replicas, caches</td></tr>
+<tr><td>Read right after create</td><td>read-your-writes</td><td>create writes Redis too</td></tr>
+<tr><td>"My links" list</td><td>eventual (seconds)</td><td>GSI</td></tr>
+<tr><td>Cross-region</td><td>eventual (~1 s)</td><td>global tables</td></tr>
+<tr><td>Analytics</td><td>eventual (minutes)</td><td>stream aggregation</td></tr>
+</table>
+</div>
+<div class="box why"><span class="t">CAP and PACELC, applied</span>
+<p><strong>CAP:</strong> during a network partition you choose consistency or availability, <em>per operation</em>. Redirects choose
+availability: serve a possibly stale mapping, since a mapping never changes once issued. Creation chooses consistency: if uniqueness
+can't be guaranteed (no lease, no conditional write), refuse with 503.</p>
+<p><strong>PACELC:</strong> "else" (no partition) you trade latency against consistency. A synchronous cross-region write would cost
+70–90 ms per create, so replication between regions is asynchronous, and we accept a tiny loss window.</p></div>
+</div>
+
+<figure><!--SVG:regions-->
+<figcaption><b>Active-active regions.</b> Each region creates links from its own slice of the ID space, so uniqueness needs no cross-region
+call. The Feistel permutation is reversible, so a redirect pod can decode a code back to its ID and know the link's home region.</figcaption></figure>
+
+<div class="box probe"><span class="t">Interviewer probes</span>
+<p><b>Two regions could hand out the same code.</b> Not with region slices: EU leases only from [0, 1.17 T), US only from [1.17 T, 2.35 T).</p>
+<p><b>A link created in Europe is clicked in the US 300 ms later.</b> It may not have replicated yet. On a miss, decode the code → ID →
+home region, and read from there. A rare, slower path that gives read-your-writes across regions.</p>
+<p><b>A whole region goes down.</b> GeoDNS health checks move traffic (RTO ≈ DNS TTL + detection, keep TTLs at 30–60 s). Redirects keep
+working because every link is replicated. Loss (RPO): links created in the last ~second before the failure, which hadn't replicated.
+That's the price of not paying 70–90 ms on every create.</p></div>
+
+<!-- ============================ 9 ============================ -->
+<h1><span class="n">9</span>Deep dive: analytics<span class="slot">DEEP DIVE</span></h1>
+<figure><!--SVG:analytics-->
+<figcaption><b>Clicks leave the hot path immediately.</b> The redirect hands the event to an in-memory producer buffer and returns.
+Aggregation turns a million events into one row per link per minute.</figcaption></figure>
+
+<div class="cols">
+<div>
+<pre><span class="c">// click event (one per redirect, ~200 bytes)</span>
+{ "code": "fN7J2J9",
+  "ts": 1792575125123,
+  "country": "PL",     <span class="c">// derived from the IP</span>
+  "device": "mobile", "browser": "Safari",
+  "referrerDomain": "linkedin.com",
+  "botScore": 0.03 }</pre>
+<ul>
+<li><strong>Producer:</strong> asynchronous, batched, bounded buffer. When Kafka is slow, drop events rather than block.
+Losing clicks in an incident is acceptable; failing redirects isn't.</li>
+<li><strong>Partition by code</strong>, so one link's events stay ordered and land on one Flink task.</li>
+<li><strong>One-minute tumbling windows on event time</strong>, with watermarks and ~2 minutes of allowed lateness for stragglers.</li>
+<li><strong>Delivery:</strong> Kafka is at-least-once; Flink checkpoints give exactly-once <em>state</em>; ClickHouse keeps aggregates in a
+<code>ReplacingMergeTree</code> keyed by (code, minute, dims), so a replayed window replaces its row instead of double counting.</li>
+</ul>
+</div>
+<div>
+<div class="box why"><span class="t">Why not increment a counter on the link row?</span>
+<p>A viral link would turn its row into a write hot spot: hundreds of thousands of increments a second on one key, beyond any partition's
+1,000 writes/s, competing with redirect reads on the same table. Aggregating first turns a million events into one write per minute.</p></div>
+<div class="box why"><span class="t">Unique visitors: HyperLogLog</span>
+<p>Exact distinct counts need memory proportional to the visitors. A HyperLogLog sketch estimates them in ~12 KB with ~0.8% error,
+and sketches <strong>merge</strong>: hourly sketches combine into daily or monthly uniques without rescanning. ClickHouse
+(<code>uniqHLL12</code>, <code>uniqCombined</code>) and Redis (<code>PFADD</code>/<code>PFCOUNT</code>) both have them.</p></div>
+<div class="box why"><span class="t">Bots and privacy</span>
+<p>Filter known crawler user agents, link-preview fetchers (Slack, LinkedIn, iMessage) and datacenter IP ranges, and flag
+inhuman click rates. Keep raw events 90 days, derive country then drop the IP, and support per-user deletion.</p></div>
+</div>
+</div>
+<div class="box say"><span class="t">Say it</span>
+<p>"Analytics never slows a redirect. Events go to an asynchronous producer that drops rather than blocks, Kafka keyed by code, Flink
+one-minute windows, ClickHouse for the stats API. Uniques via HyperLogLog. And no counters on the links table: a viral link would melt its partition."</p></div>
+
+<!-- ============================ 10 ============================ -->
+<h1><span class="n">10</span>Abuse, security and expiration<span class="slot">MIN 45–52</span></h1>
+<p>Shorteners are a favorite tool for hiding phishing and malware. Treat abuse as a core requirement; interviewers notice when you raise it unprompted.</p>
+<table>
+<thead><tr><th style="width:18%">Layer</th><th style="width:44%">Mechanism</th><th>Catches</th></tr></thead>
+<tr><td>Rate limits</td><td>Token bucket per API key and per IP; tighter for anonymous users; quotas per plan</td><td>Bulk spam creation, enumeration</td></tr>
+<tr><td>Synchronous check</td><td>Domain blocklist plus Google Safe Browsing <em>Update API</em>, which keeps a local hash-prefix database, so there's no network call per create</td><td>Known-bad domains, instantly</td></tr>
+<tr><td>Asynchronous scan</td><td>Fetch in a sandbox, follow the redirect chain, classify the page; can disable after creation</td><td>New phishing pages, cloaking</td></tr>
+<tr><td>Re-scan</td><td>On edit, and periodically for popular links</td><td>"Harmless now, phishing later"</td></tr>
+<tr><td>Disable, don't delete</td><td>Status DISABLED → interstitial warning page instead of the redirect; CDN purge</td><td>Takedowns within a minute</td></tr>
+<tr><td>Reporting</td><td>Abuse-report endpoint and an internal takedown tool</td><td>What automation misses</td></tr>
+</table>
+<div class="cols">
+<div class="box key"><span class="t">Never reuse a code</span>
+<p>Old short links live on in emails, documents and printed QR codes. If an expired code later pointed somewhere else, we'd send
+those people to a stranger's, possibly malicious, destination. With 3.5 trillion codes there's no shortage, so reuse buys nothing.
+Expired links return <strong>410 Gone</strong>; the code stays retired forever.</p></div>
+<div class="box why"><span class="t">Expiry mechanics and enumeration</span>
+<p><strong>Expiry:</strong> checked on every read (cheap, exact); the database TTL attribute deletes the item in the background, days later.
+<strong>Enumeration:</strong> the keyed permutation makes codes non-sequential, and 404 rate limits slow scanners. Tell users plainly that a
+short link isn't access control: private documents need their own authentication.</p></div>
+</div>
+
+<!-- ============================ 11 ============================ -->
+<h1><span class="n">11</span>Failure modes<span class="slot">MIN 45–52</span></h1>
+<table>
+<thead><tr><th style="width:14%">Component</th><th style="width:19%">Failure</th><th style="width:22%">Impact</th><th>Mitigation</th></tr></thead>
+<tr><td>Redis cluster</td><td>down or flushed</td><td>all misses go to the store</td><td>Circuit breaker, single-flight, LRU and CDN absorb the hottest keys; store sized and <strong>load-tested</strong> for cache loss</td></tr>
+<tr><td>KV partition</td><td>correlated failure</td><td>codes on it fail</td><td>3 replicas, quorum writes; one node or zone loss is invisible</td></tr>
+<tr><td>KV region</td><td>region outage</td><td>region's traffic</td><td>GeoDNS failover; ~1 s RPO for new links</td></tr>
+<tr><td>ID allocator</td><td>unavailable</td><td>none for minutes</td><td>Held blocks keep issuing; then creates fail; redirects unaffected</td></tr>
+<tr><td>Kafka</td><td>down or slow</td><td>some clicks lost</td><td>Bounded buffer, drop not block; alert on drop rate</td></tr>
+<tr><td>Safety service</td><td>down</td><td>creates can't be vetted</td><td>Fail closed for anonymous users, open for verified accounts; async scan catches up</td></tr>
+<tr><td>Bad deploy</td><td>redirect bug</td><td>every link, everywhere</td><td>Canary by region and percentage, automatic rollback on 5xx or p99 regression</td></tr>
+<tr><td>Hot key</td><td>one viral link</td><td>one partition, one Redis shard</td><td>CDN, then pod LRUs; the store never sees it</td></tr>
+</table>
+<div class="cols">
+<div class="box trap"><span class="t">The failure people forget</span>
+<p>A bad deploy of the redirect service breaks every link ever issued, at once. It's the highest-impact failure in the system, and the
+mitigation is process, not architecture: canaries, small blast radius, fast automated rollback.</p></div>
+<div class="box why"><span class="t">What to monitor</span>
+<p>Redirect success rate and p99 per region; cache hit ratio per layer; 404 and 410 rates (scanning, bad deploys); create error rate;
+allocator lease latency; Kafka producer drop rate and consumer lag; disabled-link count (abuse waves).</p></div>
+</div>
+
+<!-- ============================ 12 ============================ -->
+<h1><span class="n">12</span>Rapid-fire follow-ups<span class="slot">MIN 52–57</span></h1>
+<p class="small muted">Cover the answer, say yours out loud, compare. One or two sentences each.</p>
+<div class="cols">
+<div>
+<div class="qa"><div class="q">What consistency model do you use?</div><div class="a">Strong where it matters: code uniqueness, via leases and conditional writes. Eventual everywhere else, with the cache write on create covering read-after-create.</div></div>
+<div class="qa"><div class="q">Could the codes be shorter?</div><div class="a">Start at six characters and move to seven when the space runs out, about 1.6 years in. Old codes keep working: the redirect just looks up whatever string it gets.</div></div>
+<div class="qa"><div class="q">How do you stop enumeration?</div><div class="a">Keyed permutation, 404 rate limits, and honesty that short links aren't access control.</div></div>
+<div class="qa"><div class="q">A user asks to delete all their data.</div><div class="a">Delete their links and invalidate all three cache layers; codes stay retired. Raw click events are deleted or anonymized; aggregates hold no personal data.</div></div>
+<div class="qa"><div class="q">How would you support editing the destination?</div><div class="a">With 302 it's an update plus the same invalidation as deletion. Keep a history for audit and re-run the safety scan: "harmless, then phishing" is a known trick.</div></div>
+<div class="qa"><div class="q">Custom domains per customer (brand.co/sale)?</div><div class="a">Make the key <code>(domain, code)</code>; codes are unique per domain. Route by Host header; TLS certificates via ACME automation.</div></div>
+</div>
+<div>
+<div class="qa"><div class="q">Why not cache the redirect forever with 301?</div><div class="a">Then we can't count clicks, expire, delete or take down a malicious link for anyone who clicked once.</div></div>
+<div class="qa"><div class="q">How do you load-test this?</div><div class="a">Replay a skewed (Zipf) click distribution at 2× peak, then kill Redis mid-test: the store must survive the cache loss.</div></div>
+<div class="qa"><div class="q">What's the first bottleneck at 10× traffic?</div><div class="a">Hot keys. The CDN and pod LRUs absorb them; the store and Redis scale horizontally for the rest.</div></div>
+<div class="qa"><div class="q">Why not Kafka or a queue for creating links?</div><div class="a">Creation must answer synchronously with the code, and the write rate (3.5k/s) is easy for the store. A queue adds latency and nothing else.</div></div>
+<div class="qa"><div class="q">What would you build first?</div><div class="a">One region: both services, Redis, DynamoDB, leased IDs, 302s, rate limits and the blocklist (abuse arrives on day one). Then analytics, then CDN caching, then multi-region.</div></div>
+</div>
+</div>
+
+<!-- ============================ 13 ============================ -->
+<h1><span class="n">13</span>Build order<span class="slot">MIN 55–57</span></h1>
+<table>
+<thead><tr><th style="width:12%">Phase</th><th style="width:44%">What ships</th><th>Why in this order</th></tr></thead>
+<tr><td>1 · MVP</td><td>Link + redirect services, Redis, DynamoDB, leased IDs + permutation, 302, rate limits, blocklist</td><td>Correct codes and abuse protection can't be retrofitted</td></tr>
+<tr><td>2 · Insight</td><td>Click events → Kafka → Flink → ClickHouse; stats API</td><td>Owners pay for analytics; the redirect path doesn't change</td></tr>
+<tr><td>3 · Scale</td><td>CDN caching of 302s, pod LRUs, negative caching</td><td>Only once real traffic shows the skew</td></tr>
+<tr><td>4 · Reach</td><td>Second region, region ID slices, global tables, GeoDNS</td><td>When latency or availability needs it; IDs were sliced from day one</td></tr>
+</table>
+<div class="box say"><span class="t">Close the round</span>
+<p>"None of these phases changes the core design; they're additions. The two decisions that are expensive to change later, how codes are
+generated and how redirects are cached, are the ones I made carefully at the start."</p></div>
+
+<!-- ============================ 14 ============================ -->
+<div class="section pb cheat roomy">
+<h1><span class="n">14</span>One-page cheat sheet</h1>
+<div class="cols3">
+<div>
+<h3>Numbers (100 M links/day, 100:1)</h3>
+<table>
+<tr><td>Writes</td><td>~1,200/s · peak 3.5k/s</td></tr>
+<tr><td>Redirects</td><td>~115k/s · peak 350k/s</td></tr>
+<tr><td>Links in 5 years</td><td>~182 B</td></tr>
+<tr><td>Bytes per link</td><td>~500 B</td></tr>
+<tr><td>Storage</td><td>~90 TB (×3 = 270 TB)</td></tr>
+<tr><td>62⁶ / 62⁷</td><td>56.8 B / 3.52 T</td></tr>
+<tr><td>Headroom at 7</td><td>~19×</td></tr>
+<tr><td>Hot cache</td><td>~60 GB</td></tr>
+<tr><td>Bandwidth</td><td>~60 MB/s</td></tr>
+<tr><td>Click data</td><td>~2 TB/day raw</td></tr>
+<tr><td>DB reads after caches</td><td>~16k/s at peak</td></tr>
+<tr><td>First random collision</td><td>after ~2.35 M codes</td></tr>
+<tr><td>Bloom, 180 B @ 1%</td><td>~219 GB, k = 7</td></tr>
+</table>
+<h3>SLOs</h3>
+<table>
+<tr><td>Redirect</td><td>99.99%, p99 &lt; 50 ms</td></tr>
+<tr><td>Create</td><td>99.9%</td></tr>
+<tr><td>Analytics lag</td><td>≤ 2 min</td></tr>
+<tr><td>Region RPO</td><td>~1 s of new links</td></tr>
+</table>
+</div>
+<div>
+<h3>API</h3>
+<table>
+<tr><td class="m">POST /v1/links</td><td>201 · 409 · 429</td></tr>
+<tr><td class="m">GET /v1/links/{c}</td><td>metadata</td></tr>
+<tr><td class="m">GET /v1/links</td><td>cursor list</td></tr>
+<tr><td class="m">DELETE /v1/links/{c}</td><td>204</td></tr>
+<tr><td class="m">GET …/{c}/stats</td><td>aggregates</td></tr>
+<tr><td class="m">GET /{c}</td><td>302 · 404 · 410</td></tr>
+</table>
+<h3>Code generation recipe</h3>
+<table>
+<tr><td>1</td><td>Lease 100k IDs from etcd (region slice)</td></tr>
+<tr><td>2</td><td>Feistel-permute the ID (42 bits, keyed)</td></tr>
+<tr><td>3</td><td>Cycle-walk until &lt; 62⁷</td></tr>
+<tr><td>4</td><td>Base62 → 7 chars</td></tr>
+<tr><td>5</td><td>Conditional put (safety net)</td></tr>
+</table>
+<h3>Read path</h3>
+<table>
+<tr><td>CDN</td><td>302 cached 60 s</td></tr>
+<tr><td>Pod LRU</td><td>top 100k, single-flight</td></tr>
+<tr><td>Redis</td><td>cache-aside, LFU, TTL jitter</td></tr>
+<tr><td>KV store</td><td>hash on code, 3 replicas</td></tr>
+<tr><td>Kafka</td><td>click event, async, drop on overload</td></tr>
+</table>
+</div>
+<div>
+<h3>Redirect status</h3>
+<table>
+<tr><td>301 / 308</td><td>permanent, cached: no analytics</td></tr>
+<tr><td><strong>302 / 307</strong></td><td>temporary: every click reaches us</td></tr>
+<tr><td>404</td><td>never existed (negative-cache)</td></tr>
+<tr><td>410</td><td>expired or deleted</td></tr>
+</table>
+<h3>Consistency</h3>
+<table>
+<tr><td>Uniqueness</td><td>strong</td></tr>
+<tr><td>Lookups</td><td>eventual + cache on create</td></tr>
+<tr><td>Cross-region</td><td>async ~1 s; decode → home</td></tr>
+<tr><td>Analytics</td><td>minutes</td></tr>
+</table>
+<h3>Failure playbook</h3>
+<table>
+<tr><td>Redis down</td><td>breaker + LRU + CDN</td></tr>
+<tr><td>Allocator down</td><td>held blocks; reads fine</td></tr>
+<tr><td>Kafka down</td><td>drop clicks, never block</td></tr>
+<tr><td>Scanner down</td><td>closed anon, open verified</td></tr>
+<tr><td>Bad deploy</td><td>canary + auto-rollback</td></tr>
+</table>
+<h3>The one-liner</h3>
+<p><em>"Writes are small and must be unique; reads are huge and must be fast; events are huge and can be late. So: a conditional insert
+for writes, three cache layers for reads, and a stream for events."</em></p>
+</div>
+</div>
+<div class="cols" style="margin-top:4pt">
+<div>
+<h3>Deep dives, one line each</h3>
+<table>
+<tr><td><strong>Codes</strong></td><td>Leased ranges + keyed Feistel + base62; conditional put as a safety net; aliases ≥ 8 chars</td></tr>
+<tr><td><strong>Caching</strong></td><td>CDN 60 s → pod LRU → Redis LFU; single-flight; jitter; negative cache</td></tr>
+<tr><td><strong>Storage</strong></td><td>KV store hashed on code; 3 replicas, quorum; GSI for "my links"</td></tr>
+<tr><td><strong>Regions</strong></td><td>Active-active; ID slices per region; async replication; decode → home on miss</td></tr>
+<tr><td><strong>Analytics</strong></td><td>Async producer → Kafka by code → Flink 1-min → ClickHouse; HLL uniques</td></tr>
+<tr><td><strong>Abuse</strong></td><td>Rate limits, Safe Browsing local list, async scan, disable → warning page, never reuse codes</td></tr>
+</table>
+</div>
+<div>
+<h3>Opening questions (and what each changes)</h3>
+<table>
+<tr><td>Custom aliases?</td><td>conditional insert, alias rules</td></tr>
+<tr><td>Expiry?</td><td>check on every read; 410</td></tr>
+<tr><td>Analytics?</td><td>302 not 301; event stream</td></tr>
+<tr><td>Delete / edit?</td><td>invalidation through 3 caches</td></tr>
+<tr><td>Scale?</td><td>propose 100 M/day, 100:1</td></tr>
+<tr><td>Who creates links?</td><td>abuse defenses from day one</td></tr>
+</table>
+<h3>Words that signal seniority</h3>
+<p>"per-operation CAP choice" · "fail open vs fail closed" · "blast radius" · "single-flight" · "cycle walking" ·
+"read-your-writes" · "RPO / RTO" · "never reuse an identifier"</p>
+</div>
+</div>
+</div>
+
+</body></html>

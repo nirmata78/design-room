@@ -1,0 +1,21 @@
+@startuml
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+hide empty description
+skinparam stateBackgroundColor #F7F9FC
+skinparam stateBorderColor #4A6FA5
+[*] --> PENDING : POST /orders
+PENDING --> AUTHORIZING : seats frozen,\nauthorize sent
+AUTHORIZING --> CONFIRMED : approved\n(seats SOLD)
+AUTHORIZING --> FAILED : definite decline\n(seats released)
+AUTHORIZING --> UNKNOWN : timeout / 5xx
+UNKNOWN --> CONFIRMED : status query\nor webhook: approved
+UNKNOWN --> FAILED : status: declined
+UNKNOWN --> VOIDED : deadline passed:\nvoid sent, seats released
+CONFIRMED --> CAPTURED : capture ok
+VOIDED --> REFUNDED : PSP later reports\nsuccess anyway
+CAPTURED --> [*]
+FAILED --> [*]
+REFUNDED --> [*]
+@enduml

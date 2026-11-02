@@ -1,0 +1,24 @@
+<svg class="d" viewBox="0 0 720 196" xmlns="http://www.w3.org/2000/svg">
+  <g class="lab"><text x="96" y="12">KAFKA TOPIC</text><text x="262" y="12">CONSUMER POOL</text><text x="428" y="12">WORKER LANE</text><text x="594" y="12">PROVIDERS</text></g>
+  <text x="44" y="46" class="c tb tr">P0</text><text x="44" y="60" class="c ts">security, OTP</text>
+  <rect x="90" y="22" width="152" height="46" rx="5" class="r"/><text x="166" y="42" class="c ts tb">notif.p0 · 32 partitions</text><text x="166" y="57" class="c ts">lag alert &gt; 2 s</text>
+  <rect x="256" y="22" width="152" height="46" rx="5" class="r"/><text x="332" y="42" class="c ts tb">own consumer group</text><text x="332" y="57" class="c ts">over-provisioned</text>
+  <rect x="422" y="22" width="152" height="46" rx="5" class="r"/><text x="498" y="42" class="c ts tb">own push / SMS lane</text><text x="498" y="57" class="c ts">no shared queue</text>
+  <rect x="588" y="22" width="126" height="46" rx="5" class="r"/><text x="651" y="42" class="c ts tb">20% reserved</text><text x="651" y="57" class="c ts">+ second SMS vendor</text>
+
+  <text x="44" y="102" class="c tb" style="fill:#a86a12">P1</text><text x="44" y="116" class="c ts">orders, social</text>
+  <rect x="90" y="78" width="152" height="46" rx="5" class="a"/><text x="166" y="98" class="c ts tb">notif.p1 · 64 partitions</text><text x="166" y="113" class="c ts">SLO: p99 &lt; 60 s</text>
+  <rect x="256" y="78" width="152" height="46" rx="5" class="a"/><text x="332" y="98" class="c ts tb">own consumer group</text><text x="332" y="113" class="c ts">autoscaled on lag</text>
+  <rect x="422" y="78" width="152" height="46" rx="5" class="a"/><text x="498" y="98" class="c ts tb">own lane</text><text x="498" y="113" class="c ts">per channel</text>
+  <rect x="588" y="78" width="126" height="46" rx="5" class="a"/><text x="651" y="98" class="c ts tb">shared remainder</text><text x="651" y="113" class="c ts">P1 before P2</text>
+
+  <text x="44" y="158" class="c tb sp">P2</text><text x="44" y="172" class="c ts">marketing</text>
+  <rect x="90" y="134" width="152" height="46" rx="5" class="bl"/><text x="166" y="154" class="c ts tb">notif.p2 · 128 partitions</text><text x="166" y="169" class="c ts">lag is expected</text>
+  <rect x="256" y="134" width="152" height="46" rx="5" class="bl"/><text x="332" y="154" class="c ts tb">own consumer group</text><text x="332" y="169" class="c ts">batched</text>
+  <rect x="422" y="134" width="152" height="46" rx="5" class="bl"/><text x="498" y="154" class="c ts tb">own lane</text><text x="498" y="169" class="c ts">released ≤ 50k/s</text>
+  <rect x="588" y="134" width="126" height="46" rx="5" class="bl"/><text x="651" y="154" class="c ts tb">what's left</text><text x="651" y="169" class="c ts">waits in Kafka</text>
+  <g><line x1="242" y1="45" x2="255" y2="45" class="ln"/><line x1="408" y1="45" x2="421" y2="45" class="ln"/><line x1="574" y1="45" x2="587" y2="45" class="ln"/>
+  <line x1="242" y1="101" x2="255" y2="101" class="ln"/><line x1="408" y1="101" x2="421" y2="101" class="ln"/><line x1="574" y1="101" x2="587" y2="101" class="ln"/>
+  <line x1="242" y1="157" x2="255" y2="157" class="ln"/><line x1="408" y1="157" x2="421" y2="157" class="ln"/><line x1="574" y1="157" x2="587" y2="157" class="ln"/></g>
+  <text x="360" y="194" class="c ts">A 400 M-message backlog in P2 shares nothing with P0 except the providers, and P0's share of those is reserved.</text>
+</svg>

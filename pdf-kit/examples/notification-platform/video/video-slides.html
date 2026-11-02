@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Notification platform mock video slides</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="deck.css">
+<link rel="stylesheet" href="video.css">
+</head><body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L10,5 L0,9 z" fill="#57606a"/></marker>
+<marker id="ahr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,1 L10,5 L0,9 z" fill="#c8341f"/></marker>
+<marker id="ahg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,1 L10,5 L0,9 z" fill="#2d8a4e"/></marker>
+</defs></svg>
+
+<!-- v-01 title -->
+<div class="slide th">
+  <div class="lbl">Mock system design round · L6 Engineering Manager</div>
+  <div class="s">Notification platform:<br>how the round could go.</div>
+  <div class="sub">Push, email, SMS and in-app for twenty product teams and 500 million users. The design, then four manager follow-ups.</div>
+  <div class="foot"><span>design-room · SD-12</span><span>interviewer · candidate · coach</span></div>
+</div>
+
+<!-- v-02 what is scored -->
+<div class="slide">
+<div class="k">Before you start</div>
+<h1>What an L6 EM panel weighs most</h1>
+<div class="cards c3">
+<div class="cd red"><h3>Operations and cost</h3><p>Failure modes, SLOs, on-call, the bill.</p></div>
+<div class="cd"><h3>Leadership</h3><p>MVP first, team seams, the tenant contract.</p></div>
+<div class="cd grn"><h3>Depth, once</h3><p>One component, two levels down. The interviewer picks it.</p></div>
+</div>
+<div class="line a">The curveball at this level: an incident or a cost spike, then "how would you staff it?"</div>
+<div class="foot"><span>Notification platform · mock round</span><span>levels: em = L6 / M1</span></div>
+</div>
+
+<!-- v-03 prompt -->
+<div class="slide qs">
+<div class="who">Interviewer · the prompt</div>
+<div class="qq">"Design the platform that sends notifications across push, email and SMS, used by every product team."</div>
+<div class="hint">Ask before you draw. Every answer should move a box.</div>
+</div>
+
+<!-- v-04 scale -->
+<div class="slide">
+<div class="k">Requirements · minutes 0–5</div>
+<h1>The scale, in four numbers</h1>
+<div class="tiles">
+<div class="tile"><b>500 M</b><span>users</span></div>
+<div class="tile"><b>1 B</b><span>notifications a day</span></div>
+<div class="tile"><b>10×</b><span>peak, during campaigns</span></div>
+<div class="tile blue"><b>20</b><span>product teams calling it</span></div>
+</div>
+<div class="line">The peak is campaigns, which we cause ourselves. So it can be shaped.</div>
+<div class="foot"><span>Notification platform · requirements</span><span>stage 1</span></div>
+</div>
+
+<!-- v-05 priority classes -->
+<div class="slide">
+<div class="k">Requirements · latency</div>
+<h1>Three priority classes</h1>
+<div class="cards c3">
+<div class="cd red"><h3>P0 · critical</h3><p>One-time codes, password resets, fraud alerts.</p><p><b>p99 under 5 s, always</b></p></div>
+<div class="cd amb"><h3>P1 · transactional</h3><p>Order shipped, driver arriving, a mention.</p><p><b>p99 under 60 s</b></p></div>
+<div class="cd"><h3>P2 · bulk</h3><p>Marketing, digests, re-engagement.</p><p><b>minutes to hours</b></p></div>
+</div>
+<div class="line r">A campaign must never delay a password reset.</div>
+<div class="foot"><span>Notification platform · requirements</span><span>stage 1</span></div>
+</div>
+
+<!-- v-06 scope and consent -->
+<div class="slide">
+<div class="k">Requirements · scope</div>
+<h1>Consent is a gate, not a filter</h1>
+<div class="cards c2">
+<div class="cd grn"><h3>In scope</h3><p>Intake, campaigns, policy, routing and fallback, delivery, in-app inbox, status, kill switch.</p></div>
+<div class="cd"><h3>Out of scope, said aloud</h3><p>Authoring UI, segmentation and targeting, copy testing, the providers themselves.</p></div>
+</div>
+<div class="line a">You raise legal yourself: opt-out is honoured, consent rules vary by country.</div>
+<div class="foot"><span>Notification platform · requirements</span><span>stage 1</span></div>
+</div>
+
+<!-- v-07 THESIS 1 -->
+<div class="slide th">
+  <div class="lbl">Key line · by minute ten</div>
+  <div class="s">This is a <em>governance</em> problem,<br>not a delivery problem.</div>
+  <div class="sub">Sending a push is one API call. The value is stopping twenty teams from spamming, duplicating, waking up or overcharging 500 million users.</div>
+  <div class="foot"><span>Notification platform · thesis 1</span><span>framing</span></div>
+</div>
+
+<!-- v-08 NFRs -->
+<div class="slide">
+<div class="k">Requirements · targets</div>
+<h1>Five targets to design against</h1>
+<table class="bt"><tr><th>Requirement</th><th>Target</th></tr>
+<tr><td>P0, accepted to provider</td><td><b>p99 under 5 s</b>, even during a campaign</td></tr>
+<tr><td>Duplicates</td><td>under 1 in a million</td></tr>
+<tr><td>Sends without consent</td><td><b>zero</b>, audited</td></tr>
+<tr><td>Campaign halt</td><td>effective within 5 s</td></tr>
+<tr><td>Stale messages</td><td>never sent after <code>expiresAt</code></td></tr>
+</table>
+<div class="foot"><span>Notification platform · requirements</span><span>stage 1</span></div>
+</div>
+
+<!-- v-09 traffic -->
+<div class="slide">
+<div class="k">Estimation · minutes 5–10</div>
+<h1>Throughput is not the hard part</h1>
+<div class="tiles" style="--n:3">
+<div class="tile blue"><b>12k/s</b><span>average: 1 B ÷ 86,400</span></div>
+<div class="tile"><b>120k/s</b><span>campaign peak</span></div>
+<div class="tile blue"><b>2.2 h</b><span>a 400 M campaign at 50k/s</span></div>
+</div>
+<div class="line">Shape the peak, don't buy it: release campaigns at a capped rate.</div>
+<div class="foot"><span>Notification platform · estimation</span><span>stage 2</span></div>
+</div>
+
+<!-- v-10 cost -->
+<div class="slide dia">
+<div class="k">Estimation · the bill</div>
+<h1>SMS: 2% of the messages, ~94% of the cost</h1>
+<figure class="grow"><!--SVG:cost--></figure>
+<div class="line r">20 M SMS a day × ~$0.01 ≈ $200k a day, about $73 M a year.</div>
+<div class="foot"><span>Notification platform · estimation</span><span>channel mix assumed</span></div>
+</div>
+
+<!-- v-11 storage -->
+<div class="slide">
+<div class="k">Estimation · storage and concurrency</div>
+<h1>Three more numbers, each with a consequence</h1>
+<div class="tiles" style="--n:3">
+<div class="tile blue"><b>100 GB</b><span>dedup keys for 24 h → Redis cluster</span></div>
+<div class="tile blue"><b>55 TB</b><span>delivery log, 90 days → wide-column</span></div>
+<div class="tile blue"><b>12k</b><span>provider calls in flight → async clients</span></div>
+</div>
+<div class="foot"><span>Notification platform · estimation</span><span>Little's law: L = λ · W</span></div>
+</div>
+
+<!-- v-12 API -->
+<div class="slide">
+<div class="k">API · minutes 10–15</div>
+<h1>One idempotent intake</h1>
+<div class="cols" style="grid-template-columns:1.25fr 1fr; gap:0 26pt">
+<pre class="big">POST /v1/notifications
+{ "tenant": "auth",
+  "userId": "9",
+  "category": "security",
+  "template": "reset_pw", "version": 7,
+  "priority": "P0",
+  "dedupKey": "reset:9:req123",
+  "expiresAt": "…19:15:00Z" }
+
+202 Accepted  { "notificationId": "n_8f3c" }</pre>
+<div><p class="lead"><b>202 means durably queued, nothing more.</b> Kafka acknowledged with acks=all.</p>
+<p class="lead">Also: create a campaign, <b>halt</b> it, read status, read the inbox.</p></div>
+</div>
+<div class="foot"><span>Notification platform · API</span><span>tenants authenticate with mTLS</span></div>
+</div>
+
+<!-- v-13 idempotency vs dedup -->
+<div class="slide">
+<div class="k">API · two different jobs</div>
+<h1>Idempotency protects the request. Dedup protects the user.</h1>
+<div class="cards c2">
+<div class="cd"><h3>Idempotency</h3><p>The <b>same request</b> twice, after a timeout.</p><p>Same dedupKey → same id back.</p></div>
+<div class="cd red"><h3>Dedup</h3><p><b>Two requests</b> that mean the same thing.</p><p>Second one → SUPPRESSED.</p></div>
+</div>
+<div class="line">Make the dedupKey mandatory: both become a contract, not a hope.</div>
+<div class="foot"><span>Notification platform · API</span><span>stage 3</span></div>
+</div>
+
+<!-- v-14 stores -->
+<div class="slide">
+<div class="k">Data model</div>
+<h1>Each store for a reason</h1>
+<table class="bt"><tr><th>Store</th><th>Why this one</th></tr>
+<tr><td><b>Kafka</b>, topic per priority</td><td>durable, per-user order, replayable</td></tr>
+<tr><td><b>Redis</b>, with TTL</td><td>dedup and rate counters on the hottest path</td></tr>
+<tr><td><b>KV + cache</b></td><td>preferences: opt-ins, time zone, quiet hours, tokens</td></tr>
+<tr><td><b>Cassandra</b></td><td>in-app inbox and delivery log: write-heavy, by time</td></tr>
+<tr><td><b>Control plane</b></td><td>quotas, kill flags, provider config</td></tr>
+</table>
+<div class="line a">Kafka is at-least-once: everything downstream must be idempotent.</div>
+<div class="foot"><span>Notification platform · stores</span><span>stage 3</span></div>
+</div>
+
+<!-- v-15 C4 context -->
+<div class="slide dia">
+<div class="k">High-level design · C4 level 1 · system context</div>
+<h1>Twenty teams, three paid providers, one governance layer</h1>
+<figure class="grow"><!--SVG:c4-context--></figure>
+<div class="foot"><span>Notification platform · C4 context</span><span>stage 4</span></div>
+</div>
+
+<!-- v-16 C4 containers send -->
+<div class="slide dia">
+<div class="k">High-level design · C4 level 2 · containers, the send path</div>
+<h1>Durable intent first, policy second, delivery per channel</h1>
+<figure class="grow"><!--SVG:c4-containers-send--></figure>
+<div class="foot"><span>Notification platform · C4 containers</span><span>stage 4</span></div>
+</div>
+
+<!-- v-17 C4 containers feedback -->
+<div class="slide dia">
+<div class="k">High-level design · C4 level 2 · feedback and read path</div>
+<h1>Feedback closes the loop; the inbox is the only "unsend"</h1>
+<figure class="grow"><!--SVG:c4-containers-feedback--></figure>
+<div class="foot"><span>Notification platform · C4 containers</span><span>stage 4</span></div>
+</div>
+
+<!-- v-18 lifecycle -->
+<div class="slide dia">
+<div class="k">High-level design · the life of one notification</div>
+<h1>SUPPRESSED is a first-class outcome</h1>
+<figure class="grow"><!--SVG:lifecycle--></figure>
+<div class="foot"><span>Notification platform · lifecycle</span><span>every state change is logged with a reason</span></div>
+</div>
+
+<!-- v-19 THESIS 2 -->
+<div class="slide th">
+  <div class="lbl">Key line · the design in one breath</div>
+  <div class="s">Make intent <em>durable</em> first.<br>Decide <em>centrally</em> if it may exist.<br>Deliver <em>per channel</em>.</div>
+  <div class="sub">Tenants only ever talk to the first layer.</div>
+  <div class="foot"><span>Notification platform · thesis 2</span><span>three layers</span></div>
+</div>
+
+<!-- v-20 C4 component policy -->
+<div class="slide dia">
+<div class="k r">Deep dive 1 · C4 level 3 · components of Policy &amp; router</div>
+<h1>Six gates, cheapest and most absolute first</h1>
+<figure class="grow"><!--SVG:c4-component-policy--></figure>
+<div class="foot"><span>Notification platform · component view</span><span>deep dive 1</span></div>
+</div>
+
+<!-- v-21 gates -->
+<div class="slide dia">
+<div class="k r">Deep dive 1 · the gates</div>
+<h1>Most of the value is what it decides not to send</h1>
+<figure class="grow"><!--SVG:gates--></figure>
+<div class="line">Kill switch beats everything. P0 is exempt from caps and never deferred.</div>
+<div class="foot"><span>Notification platform · gates</span><span>deep dive 1</span></div>
+</div>
+
+<!-- v-22 seq dedup -->
+<div class="slide dia">
+<div class="k r">Deep dive 1 · sequence · dedup that lets your own retries through</div>
+<h1>Store the id as the value: same id is a retry, another id is a duplicate</h1>
+<figure class="grow"><!--SVG:seq-dedup--></figure>
+<div class="foot"><span>Notification platform · dedup sequence</span><span>SET key id NX GET EX 86400</span></div>
+</div>
+
+<!-- v-23 prefs down -->
+<div class="slide qs">
+<div class="who">Interviewer · probe</div>
+<div class="qq">"The preference store is down. Do you send?"</div>
+<div class="ans"><b>Marketing: fail closed.</b> No proof of consent, no send.<br><b>P0 security: proceed.</b> It is always allowed.</div>
+</div>
+
+<!-- v-24 Q isolation -->
+<div class="slide qs">
+<div class="who">Interviewer · the probe that separates</div>
+<div class="qq">"A user requests a password reset while a 400-million-message campaign is going out. What happens?"</div>
+<div class="hint">Weak: a priority field. Strong: separate queues. Exceptional: every layer, down to the provider.</div>
+</div>
+
+<!-- v-25 isolation -->
+<div class="slide dia">
+<div class="k r">Deep dive 2 · priority isolation</div>
+<h1>Isolation at every layer, not a priority field</h1>
+<figure class="grow"><!--SVG:isolation--></figure>
+<div class="foot"><span>Notification platform · isolation</span><span>deep dive 2</span></div>
+</div>
+
+<!-- v-26 seq P0 -->
+<div class="slide dia">
+<div class="k r">Deep dive 2 · sequence · the reset during the campaign</div>
+<h1>The campaign backlog is invisible to the reset</h1>
+<figure class="grow"><!--SVG:seq-p0--></figure>
+<div class="foot"><span>Notification platform · P0 sequence</span><span>deep dive 2</span></div>
+</div>
+
+<!-- v-27 THESIS 3 -->
+<div class="slide th">
+  <div class="lbl">Key line · isolation</div>
+  <div class="s">Isolation is <em>structural</em>:<br>own topic, own consumers,<br>own lane, reserved capacity.</div>
+  <div class="sub">And the alert that matters most: P0 consumer lag above two seconds.</div>
+  <div class="foot"><span>Notification platform · thesis 3</span><span>priority isolation</span></div>
+</div>
+
+<!-- v-28 Q typo -->
+<div class="slide qs">
+<div class="who">Interviewer · deep dive 3</div>
+<div class="qq">"The campaign has a typo, and 80 million have already gone."</div>
+<div class="hint">Say the honest limit first, then the mechanism.</div>
+</div>
+
+<!-- v-29 seq campaign -->
+<div class="slide dia">
+<div class="k r">Deep dive 3 · sequence · canary and release</div>
+<h1>Prevention first: canary, hold, release at a capped rate</h1>
+<figure class="grow"><!--SVG:seq-campaign--></figure>
+<div class="foot"><span>Notification platform · campaign sequence</span><span>deep dive 3</span></div>
+</div>
+
+<!-- v-30 seq halt -->
+<div class="slide dia">
+<div class="k r">Deep dive 3 · sequence · the kill switch</div>
+<h1>Halt: effective within five seconds, pressed by the owning tenant</h1>
+<figure class="grow"><!--SVG:seq-halt--></figure>
+<div class="foot"><span>Notification platform · halt sequence</span><span>deep dive 3</span></div>
+</div>
+
+<!-- v-31 recall -->
+<div class="slide">
+<div class="k r">Deep dive 3 · the honest limit</div>
+<h1>What can be taken back</h1>
+<table class="bt"><tr><th>Channel</th><th>Recall?</th><th>What you can do</th></tr>
+<tr><td>Push</td><td>No, once shown</td><td>same collapse id replaces it if not yet shown</td></tr>
+<tr><td>Email</td><td>No</td><td>a correction is a business decision</td></tr>
+<tr><td>SMS</td><td>No</td><td>nothing, and it cost money</td></tr>
+<tr><td>In-app</td><td><b>Yes</b></td><td>delete from inboxes, in batches</td></tr>
+</table>
+<div class="line">The owning tenant can press halt without paging the platform team.</div>
+<div class="foot"><span>Notification platform · recall</span><span>deep dive 3</span></div>
+</div>
+
+<!-- v-31 Q fallback -->
+<div class="slide qs">
+<div class="who">Interviewer · deep dive 4</div>
+<div class="qq">"Push fails, you fall back to email, and the push actually arrived."</div>
+<div class="hint">When is a failure really a failure?</div>
+</div>
+
+<!-- v-32 seq fallback -->
+<div class="slide dia">
+<div class="k r">Deep dive 4 · sequence · fallback</div>
+<h1>Fall back only on a definite failure, with the same dedupKey</h1>
+<figure class="grow"><!--SVG:seq-fallback--></figure>
+<div class="foot"><span>Notification platform · fallback sequence</span><span>deep dive 4</span></div>
+</div>
+
+<!-- v-33 adapter -->
+<div class="slide dia">
+<div class="k r">Deep dive 4 · every provider adapter</div>
+<h1>Rate limit, backoff with full jitter, circuit breaker</h1>
+<figure class="grow"><!--SVG:retry--></figure>
+<div class="line a">After an outage, drop anything past expiresAt: "your driver is here" an hour late is worse than nothing.</div>
+<div class="foot"><span>Notification platform · provider adapter</span><span>deep dive 4</span></div>
+</div>
+
+<!-- v-34 mid-round -->
+<div class="slide">
+<div class="k">Any time · a requirement added mid-round</div>
+<h1>A new stage or a new adapter; the contract stays</h1>
+<table class="bt"><tr><th>New requirement</th><th>What changes</th></tr>
+<tr><td>"Batch social into one an hour"</td><td>an aggregation stage before routing</td></tr>
+<tr><td>"WhatsApp as a channel"</td><td>one adapter, one worker</td></tr>
+<tr><td>"Tenants want analytics"</td><td>delivery log → columnar store</td></tr>
+<tr><td>"A second region"</td><td>each user processed in a home region</td></tr>
+</table>
+<div class="foot"><span>Notification platform · extensions</span><span>any time</span></div>
+</div>
+
+<!-- v-35 failure modes -->
+<div class="slide">
+<div class="k">Operations · minutes 38–44</div>
+<h1>How it fails, and how far the damage spreads</h1>
+<table class="bt"><tr><th>Failure</th><th>Blast radius</th><th>Mitigation</th></tr>
+<tr><td>Redis failover</td><td>~1 s of keys</td><td>stated risk; collapse ids</td></tr>
+<tr><td>Preferences down</td><td>consent unknown</td><td>closed for marketing</td></tr>
+<tr><td>A tenant floods intake</td><td>its own quota</td><td>429; others unaffected</td></tr>
+<tr><td>Provider outage</td><td>one channel</td><td>breaker, second vendor for P0</td></tr>
+<tr><td><b>Policy bug suppresses all</b></td><td><b>everything, silently</b></td><td>anomaly alert, then replay</td></tr>
+</table>
+<div class="foot"><span>Notification platform · operations</span><span>platform owns pipeline and gates · tenants own content and volume</span></div>
+</div>
+
+<!-- v-36 SLOs -->
+<div class="slide">
+<div class="k">Operations · SLOs</div>
+<h1>Five SLOs, one alert above all</h1>
+<div class="tiles" style="--n:5">
+<div class="tile"><b>5 s</b><span>P0 p99</span></div>
+<div class="tile blue"><b>60 s</b><span>P1 p99</span></div>
+<div class="tile blue"><b>10⁻⁶</b><span>duplicates</span></div>
+<div class="tile"><b>0</b><span>sends without consent</span></div>
+<div class="tile blue"><b>5 s</b><span>halt effective</span></div>
+</div>
+<div class="line r">Page on P0 consumer lag above 2 s. Then on suppression-rate anomalies.</div>
+<div class="foot"><span>Notification platform · SLOs</span><span>operations</span></div>
+</div>
+
+<!-- v-37 MVP -->
+<div class="slide">
+<div class="k">The EM layer</div>
+<h1>MVP first: what loses trust if it's missing</h1>
+<div class="cards c2">
+<div class="cd red"><h3>MVP</h3><p>Intake, Kafka, push and email, dedup, consent, P0 and P2 isolation, kill switch.</p></div>
+<div class="cd"><h3>Then</h3><p>Quiet hours, per-user caps, campaign service, SMS with two vendors, digests, analytics.</p></div>
+</div>
+<div class="foot"><span>Notification platform · EM layer</span><span>riskiest work first</span></div>
+</div>
+
+<!-- v-38 teams -->
+<div class="slide">
+<div class="k">The EM layer</div>
+<h1>Three teams, along the seams of the design</h1>
+<div class="cards c3">
+<div class="cd red"><h3>Platform core</h3><p>Intake, queues, the gates.</p></div>
+<div class="cd"><h3>Channels</h3><p>Adapters, providers, deliverability.</p></div>
+<div class="cd grn"><h3>Campaigns and DevEx</h3><p>The campaign service and the twenty tenant teams.</p></div>
+</div>
+<div class="line">On call: the platform owns pipeline, providers and gates. Tenants own content and volume.</div>
+<div class="foot"><span>Notification platform · EM layer</span><span>team seams</span></div>
+</div>
+
+<!-- v-39 contract -->
+<div class="slide">
+<div class="k">The EM layer</div>
+<h1>The tenant contract, written down</h1>
+<ul class="big">
+<li>The dedupKey is mandatory.</li>
+<li>The category fixes the priority. No team declares its marketing P0.</li>
+<li>Quotas per channel; marketing templates reviewed.</li>
+<li>Each team sees its own SMS bill.</li>
+</ul>
+<div class="foot"><span>Notification platform · EM layer</span><span>cost governance</span></div>
+</div>
+
+<!-- v-40 close -->
+<div class="slide th">
+  <div class="lbl">Key line · the close</div>
+  <div class="s" style="font-size:36pt">I isolate priorities <em>structurally</em> and <em>shape</em> the peaks we create, instead of buying capacity for them.</div>
+  <div class="sub">Biggest risk: a bad campaign or a duplicate storm, contained by the kill switch, canaries and dedup. Honest limit: sent messages can't be recalled. Next: digests and per-tenant cost, because SMS is the bill.</div>
+  <div class="foot"><span>Notification platform · the close</span><span>what · trade-off · risk · next</span></div>
+</div>
+
+<!-- v-41 FU1 Q -->
+<div class="slide qs">
+<div class="who">Follow-up 1 · stakeholder pressure</div>
+<div class="qq">"The growth VP wants the Black Friday promo sent as P0 and the caps lifted. They've gone to your director."</div>
+<div class="hint">Separate what they need from what they asked for.</div>
+</div>
+
+<!-- v-42 FU1 diagram -->
+<div class="slide dia">
+<div class="k r">Follow-up 1 · the answer</div>
+<h1>Yes to the volume, no to the bypass, and a named decision owner</h1>
+<figure class="grow"><!--SVG:fu-tenant--></figure>
+<div class="line">The caps protect the user, and the user is shared by twenty teams.</div>
+<div class="foot"><span>Notification platform · follow-up 1</span><span>leadership</span></div>
+</div>
+
+<!-- v-43 FU2 Q -->
+<div class="slide qs">
+<div class="who">Follow-up 2 · the incident curveball</div>
+<div class="qq">"Two weeks after a tenant migrates, users get the same push four times. Your dedup is in place."</div>
+<div class="hint">The first hour, then the week after.</div>
+</div>
+
+<!-- v-44 FU2 diagram -->
+<div class="slide dia">
+<div class="k r">Follow-up 2 · the answer</div>
+<h1>Contain first, explain second</h1>
+<figure class="grow"><!--SVG:fu-incident--></figure>
+<div class="line">The platform exists to make tenant bugs harmless to users.</div>
+<div class="foot"><span>Notification platform · follow-up 2</span><span>operations</span></div>
+</div>
+
+<!-- v-45 FU3 Q -->
+<div class="slide qs">
+<div class="who">Follow-up 3 · delivery through a team</div>
+<div class="qq">"Twelve engineers and a year. Today all twenty teams call providers directly."</div>
+<div class="hint">Sequence it, and get twenty teams to move.</div>
+</div>
+
+<!-- v-46 FU3 diagram -->
+<div class="slide dia">
+<div class="k r">Follow-up 3 · the answer</div>
+<h1>Pilots chosen for risk; migration treated as a product</h1>
+<figure class="grow"><!--SVG:fu-roadmap--></figure>
+<div class="foot"><span>Notification platform · follow-up 3</span><span>sequencing</span></div>
+</div>
+
+<!-- v-47 FU4 Q -->
+<div class="slide qs">
+<div class="who">Follow-up 4 · the cost spike</div>
+<div class="qq">"The SMS bill doubled last month. Nobody launched anything. Finance asks you why."</div>
+<div class="hint">Slice before you guess.</div>
+</div>
+
+<!-- v-48 FU4 diagram -->
+<div class="slide dia">
+<div class="k r">Follow-up 4 · the answer</div>
+<h1>Tenant, category, country: then SMS pumping</h1>
+<figure class="grow"><!--SVG:fu-cost--></figure>
+<div class="line r">Contain without breaking P0: cap by country and category, never globally.</div>
+<div class="foot"><span>Notification platform · follow-up 4</span><span>cost</span></div>
+</div>
+
+<!-- v-49 scorecard -->
+<div class="slide">
+<div class="k">Debrief</div>
+<h1>Where the round lands</h1>
+<table class="bt"><tr><th>Signal</th><th>Strong</th><th>Exceptional</th></tr>
+<tr><td>Framing</td><td>intent vs delivery</td><td>governance is the product</td></tr>
+<tr><td>Estimation</td><td>peak and storage</td><td>SMS bill; peak shaped</td></tr>
+<tr><td>Priorities</td><td>separate queues</td><td>every layer, to the provider</td></tr>
+<tr><td>Kill switch</td><td>halt API</td><td>propagation time, honest "can't recall"</td></tr>
+<tr><td>EM layer</td><td>team split</td><td>tenant contract, migration as a product</td></tr>
+</table>
+<div class="foot"><span>Notification platform · scorecard</span><span>debrief</span></div>
+</div>
+
+<!-- v-50 checks -->
+<div class="slide th">
+  <div class="lbl">Debrief</div>
+  <div class="s" style="font-size:38pt">Five checks before the real round.</div>
+  <ol class="check" style="padding-left:30pt">
+    <li>The governance sentence before the first box.</li>
+    <li>Every number followed by its consequence.</li>
+    <li>Isolation layer by layer, ending at the provider.</li>
+    <li>Every hard answer names an owner.</li>
+    <li>Incidents: contain first, explain second.</li>
+  </ol>
+  <div class="foot"><span>Notification platform · mock round</span><span>end</span></div>
+</div>
+</body></html>

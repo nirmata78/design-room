@@ -1,0 +1,33 @@
+@startuml
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam wrapWidth 240
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam SwimlaneTitleFontStyle bold
+|Fan|
+start
+:Holds an admission token;
+:Loads the seat map: layout from CDN\n+ availability bitmap;
+repeat
+  :Picks seats, sends POST /holds;
+  |Inventory|
+  :All-or-nothing claim in PostgreSQL;
+repeat while (409: a seat was taken?) is (pick again from\nthe fresh map)
+->201: held for 5 min;
+|Fan|
+:Enters card details, submits the order;
+|Orders and payments|
+:Seats frozen as PAYMENT_PENDING;
+:Ask the PSP to authorize the card;
+if (PSP answer?) then (approved)
+  :SOLD, capture,\ntickets sent;
+elseif (declined) then
+  :Seats released;\nfan may retry;
+else (no answer)
+  :Keep frozen,\nask again;
+endif
+|Fan|
+:Sees the result on\nthe order page;
+stop
+@enduml

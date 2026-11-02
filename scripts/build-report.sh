@@ -6,15 +6,17 @@
 #   scripts/build-report.sh path/to/any-report.md   # render a single file next to itself
 #
 # Needs pandoc. Prints to PDF with the first engine it finds:
-#   1. a Chromium-family browser, headless (Chrome · Chromium · Edge · Brave)   ← best output
-#   2. weasyprint
-#   3. pandoc's LaTeX path (xelatex / lualatex)                                ← plainer output
-# Force one with REPORT_ENGINE=browser|weasyprint|latex.
+#   1. the PDF kit (pdf-kit/, once its .venv is set up — see pdf-kit/README.md)  ← best output
+#   2. a Chromium-family browser, headless (Chrome · Chromium · Edge · Brave)
+#   3. weasyprint
+#   4. pandoc's LaTeX path (xelatex / lualatex)                                ← plainer output
+# Force one with REPORT_ENGINE=kit|browser|weasyprint|latex.
 # The PDF lands next to report.md. Both are under sessions/, which is gitignored.
 
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CSS="$ROOT/templates/report.css"
+KIT="$ROOT/pdf-kit"; KITPY="$KIT/.venv/bin/python"
 
 die() { echo "build-report: $*" >&2; exit 1; }
 command -v pandoc >/dev/null || die "pandoc is required (https://pandoc.org/installing.html)"
@@ -43,6 +45,17 @@ build_one() {
   [[ -f "$md" ]] || die "no report.md in $dir"
 
   local want="${REPORT_ENGINE:-auto}" ws=""
+  if [[ "$want" == auto || "$want" == kit ]] && [[ -x "$KITPY" ]]; then
+    local title
+    pandoc "$md" --standalone --template "$ROOT/templates/report-kit.html" \
+      --from markdown+pipe_tables+smart -o "$html"
+    title="$(sed -n 's/^title: *"\(.*\)"$/\1/p' "$md" | head -1)"
+    "$KITPY" "$KIT/build.py" "$html" -o "$pdf" --footer "design-room · ${title:-$base}" >/dev/null
+    rm -f "$html"
+    [[ -s "$pdf" ]] || die "PDF was not produced for $dir"
+    echo "✓ $pdf  (pdf-kit)"; return
+  fi
+  [[ "$want" == kit ]] && die "REPORT_ENGINE=kit but $KITPY is missing — set up pdf-kit/ first"
   browser=""; [[ "$want" == auto || "$want" == browser ]] && browser="$(find_browser || true)"
   [[ "$want" == auto || "$want" == weasyprint ]] && command -v weasyprint >/dev/null && ws=1
   [[ "$want" == browser && -z "$browser" ]] && die "REPORT_ENGINE=browser but no Chromium-family browser found"

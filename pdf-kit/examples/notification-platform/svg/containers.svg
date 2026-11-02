@@ -1,0 +1,41 @@
+<svg class="d" viewBox="0 0 720 344" xmlns="http://www.w3.org/2000/svg">
+  <rect x="180" y="6" width="130" height="36" rx="5" class="b"/><text x="245" y="28" class="c tb">Tenant services</text>
+  <rect x="340" y="6" width="130" height="36" rx="5" class="b"/><text x="405" y="28" class="c tb">Marketing ops</text>
+  <rect x="180" y="62" width="130" height="50" rx="5" class="w"/>
+  <text x="245" y="80" class="c tb">Intake API</text><text x="245" y="94" class="c ts">auth, quota, dedupKey</text><text x="245" y="106" class="c ts">→ 202 when durable</text>
+  <rect x="340" y="62" width="130" height="50" rx="5" class="w"/>
+  <text x="405" y="80" class="c tb">Campaign service</text><text x="405" y="94" class="c ts">expand segment (Spark)</text><text x="405" y="106" class="c ts">release at a set rate</text>
+  <rect x="180" y="134" width="290" height="46" rx="5" class="a"/>
+  <text x="325" y="153" class="c tb">Kafka: P0 · P1 · P2 topics</text><text x="325" y="169" class="c ts">durable intent, keyed by userId, replayable</text>
+  <rect x="180" y="202" width="290" height="46" rx="5" class="r"/>
+  <text x="325" y="221" class="c tb">Policy &amp; router (stateless)</text><text x="325" y="237" class="c ts">kill → dedup → consent → rate → quiet hours → route</text>
+  <rect x="180" y="272" width="290" height="48" rx="5" class="g"/>
+  <text x="325" y="291" class="c tb">Channel workers: push · email · SMS · in-app</text><text x="325" y="307" class="c ts">render, provider adapter, retries, breaker</text>
+
+  <rect x="6" y="134" width="150" height="46" rx="5" class="bl"/><text x="81" y="153" class="c tb">Control plane</text><text x="81" y="169" class="c ts">kill flags, quotas, config</text>
+  <rect x="6" y="190" width="150" height="46" rx="5" class="r"/><text x="81" y="209" class="c tb">Redis: dedup + rate</text><text x="81" y="225" class="c ts">SET NX EX, counters</text>
+  <rect x="6" y="246" width="150" height="46" rx="5" class="g"/><text x="81" y="265" class="c tb">Preference store</text><text x="81" y="281" class="c ts">KV + local cache</text>
+  <rect x="6" y="302" width="150" height="38" rx="5" class="w"/><text x="81" y="319" class="c tb">In-app inbox</text><text x="81" y="333" class="c ts">Cassandra</text>
+
+  <rect x="500" y="134" width="214" height="46" rx="5" class="b"/><text x="607" y="153" class="c tb">Delivery log</text><text x="607" y="169" class="c ts">Cassandra / ClickHouse, 90 days</text>
+  <rect x="500" y="202" width="100" height="46" rx="5" class="w"/><text x="550" y="221" class="c tb">Templates</text><text x="550" y="237" class="c ts">versioned</text>
+  <rect x="614" y="202" width="100" height="46" rx="5" class="w"/><text x="664" y="221" class="c tb">Feedback</text><text x="664" y="237" class="c ts">receipts, bounces</text>
+  <rect x="500" y="272" width="214" height="48" rx="5" class="a"/><text x="607" y="291" class="c tb">Providers</text><text x="607" y="307" class="c ts">APNs/FCM · email · 2 SMS aggregators</text>
+
+  <rect x="500" y="6" width="214" height="106" rx="5" class="w" style="stroke-dasharray:4 3"/>
+  <text x="510" y="26" class="ts tb">Read it top to bottom:</text>
+  <text x="510" y="44" class="ts">1. intent becomes durable (Kafka)</text>
+  <text x="510" y="60" class="ts">2. policy decides if it may exist</text>
+  <text x="510" y="76" class="ts">3. channels deliver behind adapters</text>
+  <text x="510" y="92" class="ts">4. feedback closes the loop</text>
+
+  <line x1="245" y1="42" x2="245" y2="61" class="ln"/><line x1="405" y1="42" x2="405" y2="61" class="ln"/>
+  <line x1="245" y1="112" x2="245" y2="133" class="ln"/><line x1="405" y1="112" x2="405" y2="133" class="ln"/>
+  <line x1="325" y1="180" x2="325" y2="201" class="ln"/><line x1="325" y1="248" x2="325" y2="271" class="ln"/>
+  <line x1="180" y1="212" x2="157" y2="168" class="ln"/><line x1="180" y1="224" x2="157" y2="214" class="ln"/><line x1="180" y1="238" x2="157" y2="262" class="ln"/>
+  <line x1="180" y1="312" x2="157" y2="320" class="ln"/>
+  <line x1="470" y1="300" x2="499" y2="300" class="ln-g"/>
+  <line x1="470" y1="282" x2="549" y2="249" class="ln"/>
+  <line x1="664" y1="272" x2="664" y2="249" class="ln dash"/>
+  <line x1="664" y1="202" x2="664" y2="181" class="ln"/>
+</svg>

@@ -1,0 +1,25 @@
+@startuml
+hide footbox
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 230
+skinparam noteBackgroundColor #FFF8DC
+skinparam noteBorderColor #C9A227
+queue "Kafka" as K
+participant "Waitlist\nservice" as W
+participant "Inventory" as I
+participant "Notification" as N
+actor "Waitlisted fan" as F
+participant "Order\nservice" as O
+K -> W : SeatsReleased(e, [301, 302])
+W -> W : next fan(s) wanting 2 seats in that\nsection, in waitlist order
+W -> I : targeted hold: seats 301-302,\nhold_for_user = U, 10 min
+I --> W : 201 holdId
+W -> N : "2 seats are yours for 10 minutes"
+N -> F : push + email with a deep link
+F -> O : POST /orders {holdId}  (link carries\na one-off admission token for U)
+O -> I : freeze, then the normal checkout
+@enduml

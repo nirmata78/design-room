@@ -1,0 +1,39 @@
+@startuml
+hide footbox
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 170
+skinparam noteBackgroundColor #FFF8DC
+skinparam noteBorderColor #C9A227
+actor Fan as F
+participant "CDN edge" as CDN
+participant "Waiting room" as WR
+database "Redis" as R
+participant "Admission\ncontroller" as AC
+participant "Gateway" as GW
+loop every 1 s
+  AC -> AC : read health: shoppers, hold p99,\nDB load, PSP errors -> choose R
+  AC -> R : INCRBY admittedUpTo:{e} R (capped at next:{e})
+end
+loop every ~10 s, with jitter
+  F -> CDN : GET /events/e/queue/state
+  alt cached copy younger than 1 s
+    CDN --> F : {admittedUpTo, rate, soldOut}
+  else expired: one request per edge
+    CDN -> WR : GET /queue/state
+    WR -> R : MGET admittedUpTo, rate, soldOut
+    WR --> CDN : JSON, Cache-Control: max-age=1
+    CDN --> F : same JSON for every fan
+  end
+  F -> F : position = seq - admittedUpTo\neta = position / rate
+end
+F -> WR : POST /admit {queueToken}   (my seq <= admittedUpTo)
+WR -> WR : verify signature, seq <= admittedUpTo
+WR -> R : SET admitted:{e}:user NX EX 600
+WR --> F : admission token (signed, exp 10 min)
+F -> GW : POST /holds  Authorization: Bearer <admission token>
+GW -> GW : verify signature + exp locally,\nno network call
+@enduml

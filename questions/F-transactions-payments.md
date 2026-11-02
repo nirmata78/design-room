@@ -1,6 +1,6 @@
 # Archetype F · Transactions, payments & commerce
 
-**SD-44 – SD-50, plus the fintech expansion SD-77 – SD-82.** Slice with `grep -n '^### SD-44' questions/F-transactions-payments.md`, then Read
+**SD-44 – SD-50, plus the fintech expansion SD-77 – SD-82 and SD-93.** Slice with `grep -n '^### SD-44' questions/F-transactions-payments.md`, then Read
 with `offset`. Do not read this file whole.
 
 **What this archetype tests as a family:** **correctness under retry and partial failure.** Every
@@ -257,6 +257,8 @@ from an engineer's answer.
 
 **Curveball:** *"The promoter wants to release 5,000 more seats mid-sale."* Tests whether inventory
 addition is safe under live contention, and whether cached seat maps and the waiting room cope.
+
+**Drips** (format `drip`, §7.5 — read the prompt above as increment #1): **#2** *"Add a waitlist for when it sells out."* · **#3** *"A celebrity tour: ten times the traffic, and bots."* Listen for the delta stated out loud and the seam that absorbs it.
 
 **Weak / Strong / Exceptional.** *Weak* — check availability then insert a booking, no hold state, no
 queue, seat map queried live by a million clients. *Strong* — three-state seats with atomic
@@ -726,3 +728,84 @@ job. *Strong* — budgeted pipeline with bureau fallback policy, versioned repro
 codes, champion/challenger, ledger-backed servicing. *Exceptional* — treats every timeout as a risk
 decision with an owner, monitors fairness and drift as SLIs, and separates model, policy and pricing
 versions so each can change independently with audit.
+
+---
+
+### SD-93 · Personal investment tracker with price alerts   [T1 · FT G]
+
+**Read aloud:** *"Design a personal investment tracker. Users link their brokerage and bank accounts,
+see their total portfolio value and performance, and set price alerts on stocks they care about."*
+
+**Crux.** **Two data shapes at very different speeds.** Holdings change slowly and come from
+**unreliable external institutions**; prices change constantly and come from **one market-data feed
+shared by everyone**. Portfolio value is holdings × prices, so the design has to decide **what to
+precompute and what to compute at read time**. Alerts **invert the query**: index alerts by *ticker
+and threshold*, not by user. The data-company signal is how the design handles **corrections and
+history**.
+
+**If they ask:**
+
+| Question | Answer |
+|---|---|
+| Scale? | 10M users, 3M daily active; average 3 linked accounts and 30 holdings per user |
+| Instruments? | ~10k distinct tickers held; US equities and ETFs to start |
+| Price feed? | Licensed vendor feed. During market hours, an update per ticker roughly every second. Treat it as a stream |
+| Account data? | Through an aggregator or broker APIs: pull-based, rate-limited, sometimes down for hours, sometimes returns corrected history |
+| Freshness? | Portfolio value within ~a minute of the market during trading hours. Holdings within a day is acceptable |
+| Alerts? | Up to 20 per user, e.g. "AAPL above 250". Deliver within ~30 seconds. Don't spam |
+| Performance? | Day change on the home screen at launch. Historical charts are a later requirement |
+| Accuracy? | Money is shown exactly (no floating-point drift). A displayed value must say how stale it is |
+
+**Listen for:**
+- **Separate ingestion pipelines for holdings and prices**, each with its own store and SLO.
+- **Holdings ingestion as idempotent batch pulls**, keyed by `(institution, account, external_txn_id)`;
+  a **raw landing zone kept for reprocessing**, and a normalised model of transactions from which
+  positions are derived.
+- **Third-party failure handled as a product state**: retries with backoff, per-institution circuit
+  breakers, and *"last synced 3h ago"* shown to the user rather than a wrong number.
+- **Price fan-out per ticker, not per user**: one latest-price cache; the home screen computes value at
+  read time from 30 holdings × cached prices, which is cheap. **Don't push 10M portfolio recomputations
+  on every tick.**
+- **Alert matching as a range query.** Per ticker, keep "above" and "below" thresholds sorted (a sorted
+  set or an in-memory structure partitioned by ticker); on each move from p0 to p1, fire exactly the
+  thresholds crossed in (p0, p1]. Partitioned by ticker so it scales out.
+- **Alert hygiene**: fire once per crossing, with hysteresis or re-arm rules, dedup on retry, and
+  delivery through a notification service (SD-12) that respects user preferences.
+- **Decimal money types** and a currency on every amount.
+- **A daily snapshot job** of position values, which becomes the history store when charts arrive.
+
+**Probe ladder:**
+- *Requirements:* "Which number has to be right, and which only has to be recent?" · "What do you show
+  when a bank connection has been failing for two days?"
+- *Estimation:* "How many price updates per second at peak, and how many alert evaluations does that
+  trigger?" (10k tickers at ~1/s ≈ 10k updates/s; the second number depends entirely on whether
+  matching is indexed — that is the point of the probe) · "How much do daily snapshots add per year?"
+- *Design:* "Walk me from 'AAPL ticks to 251' to a phone buzzing." · "Walk me from 'user opens the app'
+  to the total value on screen."
+- *Deep dives:* **"A broker sends corrected transactions for last month. What changes, and what does
+  the user see?"** (the best probe: restating history, recomputing derived positions and snapshots,
+  *as-of* versus *as-known* time) · "A ticker splits 4:1 overnight." · "Your price feed stalls for 90
+  seconds during market open." · "A hot ticker has 2M alerts on it."
+- *EM bar:* "What are the SLOs for value freshness and alert latency, and which one do you page on?" ·
+  "Who owns the institution connectors, and how do you stop that team drowning in breakage?" · "What
+  ships in the first six weeks?"
+
+**Curveball:** *"A broker restates last month's transactions."* Tests whether derived positions and
+snapshots can be recomputed from a retained raw zone, and whether the design distinguishes what the
+value *was* from what we *believed* it was.
+
+**Drips** (format `drip`, §7.5 — read the prompt above as increment #1): **#2** *"Show 5-year
+performance charts, including time-weighted return."* · **#3** *"Add multi-currency: a user in Warsaw
+holding US stocks."* Listen for the delta stated out loud and the seam that absorbs it.
+
+**Weak / Strong / Exceptional.** *Weak* — one store, polls prices per user, recomputes every portfolio
+on every tick, matches alerts by scanning all users, uses floats, treats aggregator data as
+authoritative and final. *Strong* — the two pipelines, read-time valuation from a price cache, indexed
+alert matching partitioned by ticker, idempotent ingestion with a raw zone, staleness shown to the
+user. *Exceptional* — also brings in **bitemporal history** (what the value was vs what we believed it
+was) for corrections, models corporate actions as events, separates connector reliability into its
+own team and SLO, and states which numbers are approximations.
+
+**Traps.** Confusing *portfolio value* (needs prices) with *holdings* (needs only the broker).
+Over-engineering streaming for holdings that change daily. Forgetting that markets close: off-hours
+load is nearly zero and batch work belongs there.

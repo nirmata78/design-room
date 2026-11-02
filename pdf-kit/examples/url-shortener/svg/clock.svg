@@ -1,0 +1,17 @@
+<svg class="d" viewBox="0 0 720 74" xmlns="http://www.w3.org/2000/svg">
+  <!-- 700 px for 60 min: 11.667 px/min, x0 = 10 -->
+  <rect x="10"  y="14" width="58"  height="30" class="bl"/><text x="39"  y="33" class="c ts tb">Reqs</text>
+  <rect x="68"  y="14" width="58"  height="30" class="bl"/><text x="97"  y="33" class="c ts tb">Numbers</text>
+  <rect x="126" y="14" width="58"  height="30" class="bl"/><text x="155" y="33" class="c ts tb">API, data</text>
+  <rect x="184" y="14" width="117" height="30" class="g"/><text x="242" y="33" class="c ts tb">High-level design</text>
+  <rect x="301" y="14" width="233" height="30" class="r"/><text x="417" y="33" class="c ts tb">Deep dives: 2–3 topics, interviewer picks</text>
+  <rect x="534" y="14" width="82"  height="30" class="a"/><text x="575" y="33" class="c ts tb">Failures</text>
+  <rect x="616" y="14" width="59"  height="30" class="b"/><text x="645" y="33" class="c ts tb">Probes</text>
+  <rect x="675" y="14" width="35"  height="30" class="w"/><text x="692" y="33" class="c ts">Q&amp;A</text>
+  <g class="ts">
+    <text x="10" y="58" class="c">0</text><text x="68" y="58" class="c">5</text><text x="126" y="58" class="c">10</text>
+    <text x="184" y="58" class="c">15</text><text x="301" y="58" class="c">25</text><text x="534" y="58" class="c">45</text>
+    <text x="616" y="58" class="c">52</text><text x="675" y="58" class="c">57</text><text x="710" y="58" class="c">60</text>
+  </g>
+  <text x="10" y="8" class="lab">THE 60-MINUTE CLOCK (MINUTES)</text>
+</svg>

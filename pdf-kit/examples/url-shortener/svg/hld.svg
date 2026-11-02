@@ -1,0 +1,74 @@
+<svg class="d" viewBox="0 0 720 316" xmlns="http://www.w3.org/2000/svg">
+  <!-- clients -->
+  <rect x="4" y="138" width="86" height="58" rx="5" class="b"/>
+  <text x="47" y="161" class="c tb">Browsers,</text><text x="47" y="176" class="c tb">API clients</text>
+
+  <!-- edge -->
+  <text x="112" y="40" class="lab">EDGE</text>
+  <rect x="112" y="48" width="112" height="36" rx="5" class="w"/>
+  <text x="168" y="64" class="c tb">GeoDNS</text><text x="168" y="77" class="c ts">nearest region</text>
+  <rect x="112" y="108" width="112" height="62" rx="5" class="bl"/>
+  <text x="168" y="128" class="c tb">CDN edge</text><text x="168" y="144" class="c ts">caches 302s 60 s</text><text x="168" y="158" class="c ts">TLS, WAF, bot rules</text>
+  <rect x="112" y="196" width="112" height="40" rx="5" class="w"/>
+  <text x="168" y="214" class="c tb">Load balancer</text><text x="168" y="228" class="c ts">L7, health checks</text>
+  <line x1="90" y1="152" x2="111" y2="72" class="ln dash"/>
+  <line x1="90" y1="168" x2="111" y2="142" class="ln"/>
+  <line x1="168" y1="170" x2="168" y2="195" class="ln"/>
+
+  <!-- services -->
+  <text x="252" y="32" class="lab">STATELESS SERVICES</text>
+  <rect x="252" y="40" width="168" height="88" rx="5" class="g"/>
+  <text x="336" y="60" class="c tb">Link service · write</text>
+  <text x="336" y="77" class="c ts">create, list, delete, stats</text>
+  <text x="336" y="92" class="c ts">auth, rate limit, validate</text>
+  <text x="336" y="107" class="c ts">holds a leased ID block</text>
+  <text x="336" y="121" class="c ts">~3.5k writes/s at peak</text>
+
+  <rect x="252" y="170" width="168" height="88" rx="5" class="r"/>
+  <text x="336" y="190" class="c tb">Redirect service · read</text>
+  <text x="336" y="207" class="c ts">GET /{code} → 302</text>
+  <text x="336" y="222" class="c ts">in-process LRU, top 100k</text>
+  <text x="336" y="237" class="c ts">~350k req/s at peak (edge)</text>
+  <text x="336" y="251" class="c ts">no write-path dependencies</text>
+
+  <path d="M224,210 L238,210 L238,84 L251,84" class="ln"/>
+  <line x1="224" y1="222" x2="251" y2="222" class="ln"/>
+
+  <!-- data -->
+  <text x="452" y="8" class="lab">STATE</text>
+  <rect x="452" y="14" width="132" height="38" rx="5" class="bl"/>
+  <text x="518" y="30" class="c tb">ID allocator</text><text x="518" y="44" class="c ts">etcd · range leases</text>
+  <rect x="452" y="60" width="132" height="38" rx="5" class="a"/>
+  <text x="518" y="76" class="c tb">Safety scanner</text><text x="518" y="90" class="c ts">async deep scan</text>
+  <rect x="452" y="108" width="132" height="44" rx="5" class="r"/>
+  <text x="518" y="126" class="c tb">Redis cluster</text><text x="518" y="141" class="c ts">hot set ~60 GB, LFU</text>
+  <rect x="452" y="164" width="132" height="58" rx="5" class="g"/>
+  <text x="518" y="182" class="c tb">Key-value store</text><text x="518" y="197" class="c ts">DynamoDB / Cassandra</text><text x="518" y="211" class="c ts">~90 TB, hash on code</text>
+  <rect x="452" y="248" width="132" height="40" rx="5" class="b"/>
+  <text x="518" y="265" class="c tb">Kafka</text><text x="518" y="279" class="c ts">click events</text>
+
+  <!-- write path (green) -->
+  <line x1="420" y1="50" x2="451" y2="33" class="ln-g"/>
+  <line x1="420" y1="76" x2="451" y2="79" class="ln dash"/>
+  <line x1="420" y1="100" x2="451" y2="122" class="ln-g"/>
+  <line x1="420" y1="118" x2="451" y2="178" class="ln-g"/>
+  <!-- read path (red) -->
+  <line x1="420" y1="186" x2="451" y2="140" class="ln-r"/>
+  <line x1="420" y1="206" x2="451" y2="200" class="ln-r"/>
+  <line x1="420" y1="244" x2="451" y2="266" class="ln dash"/>
+
+  <!-- right column -->
+  <rect x="606" y="150" width="110" height="74" rx="5" class="w" style="stroke-dasharray:4 3"/>
+  <text x="661" y="170" class="c tb">Region B, C…</text><text x="661" y="186" class="c ts">same stack,</text><text x="661" y="200" class="c ts">own ID slice,</text><text x="661" y="214" class="c ts">async replication</text>
+  <line x1="584" y1="190" x2="605" y2="190" class="ln dash"/>
+  <rect x="606" y="242" width="110" height="64" rx="5" class="bl"/>
+  <text x="661" y="261" class="c tb">Flink →</text><text x="661" y="276" class="c tb">ClickHouse</text><text x="661" y="293" class="c ts">serves stats API</text>
+  <line x1="584" y1="268" x2="605" y2="268" class="ln"/>
+
+  <!-- legend -->
+  <line x1="606" y1="40" x2="636" y2="40" class="ln-g"/><text x="642" y="44" class="ts">write path</text>
+  <line x1="606" y1="60" x2="636" y2="60" class="ln-r"/><text x="642" y="64" class="ts">read path</text>
+  <line x1="606" y1="80" x2="636" y2="80" class="ln dash"/><text x="642" y="84" class="ts">async</text>
+  <text x="606" y="108" class="ts">W: lease → put →</text><text x="606" y="121" class="ts">   cache → scan</text>
+  <text x="606" y="136" class="ts">R: LRU → Redis → KV</text>
+</svg>

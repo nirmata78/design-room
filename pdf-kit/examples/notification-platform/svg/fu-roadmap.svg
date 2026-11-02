@@ -1,0 +1,18 @@
+<svg class="d" viewBox="0 0 720 236" xmlns="http://www.w3.org/2000/svg">
+  <g class="lab"><text x="10" y="12">TEAM</text><text x="196" y="12">QUARTER 1</text><text x="330" y="12">QUARTER 2</text><text x="464" y="12">QUARTER 3</text><text x="598" y="12">QUARTER 4</text></g>
+  <line x1="168" y1="18" x2="168" y2="196" class="lane"/><line x1="302" y1="18" x2="302" y2="196" class="lane"/><line x1="436" y1="18" x2="436" y2="196" class="lane"/><line x1="570" y1="18" x2="570" y2="196" class="lane"/>
+  <text x="10" y="44" class="tb">Platform core</text><text x="10" y="58" class="ts">intake, Kafka, gates</text>
+  <rect x="172" y="26" width="128" height="40" rx="5" class="r"/><text x="236" y="43" class="c ts tb">intake, P0 and P2,</text><text x="236" y="57" class="c ts">dedup, consent, halt</text>
+  <rect x="306" y="26" width="128" height="40" rx="5" class="a"/><text x="370" y="43" class="c ts tb">rate caps,</text><text x="370" y="57" class="c ts">quiet hours, P1</text>
+  <rect x="440" y="26" width="270" height="40" rx="5" class="bl"/><text x="575" y="43" class="c ts tb">replay tooling, second region readiness</text><text x="575" y="57" class="c ts">harden, no new gates</text>
+  <text x="10" y="98" class="tb">Channels</text><text x="10" y="112" class="ts">adapters, providers</text>
+  <rect x="172" y="80" width="128" height="40" rx="5" class="r"/><text x="236" y="97" class="c ts tb">push and email</text><text x="236" y="111" class="c ts">adapters, tokens</text>
+  <rect x="306" y="80" width="128" height="40" rx="5" class="a"/><text x="370" y="97" class="c ts tb">SMS, two vendors</text><text x="370" y="111" class="c ts">deliverability</text>
+  <rect x="440" y="80" width="270" height="40" rx="5" class="bl"/><text x="575" y="97" class="c ts tb">in-app inbox, new channels on demand</text><text x="575" y="111" class="c ts">cost routing per country</text>
+  <text x="10" y="152" class="tb">Campaigns, DevEx</text><text x="10" y="166" class="ts">tenants, tooling</text>
+  <rect x="172" y="134" width="128" height="40" rx="5" class="g"/><text x="236" y="151" class="c ts tb">SDK, 3 pilot</text><text x="236" y="165" class="c ts">tenants, dashboards</text>
+  <rect x="306" y="134" width="128" height="40" rx="5" class="g"/><text x="370" y="151" class="c ts tb">campaign service,</text><text x="370" y="165" class="c ts">canary and release</text>
+  <rect x="440" y="134" width="270" height="40" rx="5" class="g"/><text x="575" y="151" class="c ts tb">migrate the other 17, retire direct provider keys</text><text x="575" y="165" class="c ts">per-tenant cost reports</text>
+  <g><text x="300" y="190" class="c ts tr tb">◆ MVP live, 3 tenants</text><text x="434" y="190" class="c ts tr tb">◆ half of traffic</text><text x="705" y="190" class="ts tr tb" style="text-anchor:end">◆ all 20, keys revoked</text></g>
+  <rect x="6" y="202" width="708" height="30" rx="5" class="b"/><text x="360" y="221" class="c ts">Riskiest first: P0 isolation and dedup ship in the MVP, because a late password reset or a double charge-alert is the failure that loses trust.</text>
+</svg>

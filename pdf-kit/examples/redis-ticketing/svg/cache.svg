@@ -1,0 +1,29 @@
+<svg class="d" viewBox="0 0 720 176" xmlns="http://www.w3.org/2000/svg">
+  <rect x="6" y="58" width="104" height="58" rx="5" class="b"/>
+  <text x="58" y="82" class="c tb">App pods</text><text x="58" y="98" class="c ts">500 at once</text>
+
+  <rect x="214" y="6" width="214" height="62" rx="5" class="r"/>
+  <text x="321" y="24" class="c tb">Redis cache</text>
+  <text x="224" y="42" class="tm">event:{id}       EX 300±30</text>
+  <text x="224" y="58" class="tm">lock:event:{id}  NX PX 2000</text>
+
+  <rect x="214" y="108" width="214" height="62" rx="5" class="g"/>
+  <text x="321" y="132" class="c tb">PostgreSQL</text>
+  <text x="321" y="149" class="c ts">expensive query, 40 ms</text>
+
+  <line x1="110" y1="66" x2="213" y2="30" class="ln"/><text x="122" y="38" class="ts">① GET → miss</text>
+  <line x1="110" y1="82" x2="213" y2="54" class="ln"/><text x="132" y="78" class="ts">② SET lock NX</text>
+  <line x1="110" y1="104" x2="213" y2="132" class="ln-g"/><text x="114" y="132" class="ts tg">③ winner only</text>
+  <path d="M428,140 L450,140 L450,40 L429,40" class="ln-g"/><text x="456" y="94" class="ts tg">④ SET value</text>
+
+  <rect x="532" y="6" width="182" height="164" rx="5" class="w"/>
+  <text x="542" y="24" class="tb">Losers of ② don't hit the DB:</text>
+  <text x="542" y="44" class="ts">• serve a stale copy (soft TTL</text>
+  <text x="542" y="57" class="ts">  stored in the value), or</text>
+  <text x="542" y="73" class="ts">• sleep 20–50 ms, GET again</text>
+  <text x="542" y="96" class="tb">Also:</text>
+  <text x="542" y="114" class="ts">• jitter TTLs so keys written</text>
+  <text x="542" y="127" class="ts">  together don't expire together</text>
+  <text x="542" y="143" class="ts">• cache "not found" briefly</text>
+  <text x="542" y="159" class="ts">• refresh early, probabilistically</text>
+</svg>

@@ -1,0 +1,32 @@
+@startuml
+hide footbox
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 150
+skinparam noteBackgroundColor #FFF8DC
+skinparam noteBorderColor #C9A227
+participant "Inventory" as I
+database "PostgreSQL" as PG
+participant "Outbox relay\n(Debezium)" as REL
+queue "Kafka\nseat-events" as K
+participant "Snapshot\nbuilder" as SB
+database "Redis" as R
+participant "Seat-map\nservice" as M
+actor Fan as F
+I -> PG : COMMIT {seat rows + outbox row}
+REL -> PG : read the write-ahead log
+REL -> K : SeatsHeld(e, [101,102]) key = event_id
+K -> SB : consume (in order, per event)
+SB -> SB : clear bits 101,102 in BitSet; dirty = true
+loop every 1 s, only if dirty
+  SB -> R : SET map:{e}:812 <6 KB bitmap>; SET map:{e}:v 812
+end
+F -> M : GET /availability?v=811
+M -> R : GET map:{e}:v -> 812
+M --> F : 200 bitmap v812
+F -> M : GET /availability?v=812 (2 s later)
+M --> F : 304 Not Modified (empty body)
+@enduml

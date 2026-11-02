@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>SD-15 KV store video slides</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="deck.css">
+<link rel="stylesheet" href="video.css">
+</head><body>
+<!-- One idea per slide, ≤ ~25 words of body, one figure max. Content follows ../../SD-15-distributed-kv-store.md;
+     the four follow-ups are new for this video. -->
+
+<!-- v-01 title -->
+<div class="slide th">
+  <div class="lbl">Mock system design round · L6 Engineering Manager</div>
+  <div class="s">A global key-value store:<br>how the round could go.</div>
+  <div class="sub">Five regions, three continents, reads and writes everywhere. The design, then four manager follow-ups.</div>
+  <div class="foot"><span>design-room · SD-15</span><span>interviewer · candidate · coach</span></div>
+</div>
+
+<!-- v-02 weighed -->
+<div class="slide">
+<div class="k">Before you start</div>
+<h1>What an L6 EM panel weighs most</h1>
+<div class="cards c3">
+<div class="cd red"><h3>Operations and cost</h3><p>Region loss and RPO, SLOs per tier, replication egress.</p></div>
+<div class="cd"><h3>Leadership</h3><p>Buy or build, safe defaults, who owns failover.</p></div>
+<div class="cd grn"><h3>Depth, once</h3><p>The thirty-second partition, second by second.</p></div>
+</div>
+<div class="line a">The curveball: build or buy, a lost region, a team that wants "strong everywhere", an egress bill.</div>
+<div class="foot"><span>KV store · mock round</span><span>levels: em = L6 / M1</span></div>
+</div>
+
+<!-- v-03 prompt -->
+<div class="slide qs">
+<div class="who">Interviewer · the prompt</div>
+<div class="qq">"Design a key-value store that serves reads and writes from five regions on three continents."</div>
+<div class="hint">Put the impossibility on the table early.</div>
+</div>
+
+<!-- v-04 scale -->
+<div class="slide">
+<div class="k">Clarify · minutes 0–6</div>
+<h1>Data and traffic</h1>
+<table class="bt"><tr><th>I ask</th><th>They answer</th><th>Why it matters</th></tr>
+<tr><td>Regions?</td><td>5, three continents</td><td>cross-continent round trips</td></tr>
+<tr><td>Data?</td><td>1 KB average, 100 TB, 10 B keys</td><td>partitions, storage bill</td></tr>
+<tr><td>Traffic?</td><td>1 M reads/s, 100 k writes/s</td><td>read-heavy: local reads win</td></tr>
+<tr><td>Read latency?</td><td>p99 under 10 ms, locally</td><td>reads served in-region</td></tr>
+</table>
+<div class="foot"><span>KV store · clarify</span><span>stage 1</span></div>
+</div>
+
+<!-- v-05 consistency questions -->
+<div class="slide">
+<div class="k">Clarify · the questions that decide it</div>
+<h1>What can you promise?</h1>
+<table class="bt"><tr><th>I ask</th><th>They answer</th><th>Why it matters</th></tr>
+<tr><td>Write latency?</td><td>"what can you promise?"</td><td>the question: answer with a number</td></tr>
+<tr><td>Consistency?</td><td>"what can you offer, at what cost?"</td><td>tiers, not one answer</td></tr>
+<tr><td>Durability?</td><td>survive losing a region</td><td>replicas in 3+ regions</td></tr>
+<tr><td>Who writes a key?</td><td>mostly one region</td><td>home keys near their writers</td></tr>
+</table>
+<div class="foot"><span>KV store · clarify</span><span>stage 1</span></div>
+</div>
+
+<!-- v-06 impossibility -->
+<div class="slide th">
+  <div class="lbl">Key line · say it before designing</div>
+  <div class="s">Strong, local and fast, in five regions: <em>pick two</em>.</div>
+  <div class="sub">Under a partition, refuse writes or accept divergence. Without one, a quorum across continents costs a cross-continent round trip.</div>
+  <div class="foot"><span>KV store · the impossibility</span><span>key line</span></div>
+</div>
+
+<!-- v-07 THESIS -->
+<div class="slide th">
+  <div class="lbl">Key line · land it by minute ten</div>
+  <div class="s">Consistency is a <em>per-operation</em> choice. Say what each one costs.</div>
+  <div class="sub">A home region with a consensus group per key range; local reads everywhere, with a stated staleness.</div>
+  <div class="foot"><span>KV store · the thesis</span><span>key line</span></div>
+</div>
+
+<!-- v-08 scope / NFRs -->
+<div class="slide">
+<div class="k">Scope and targets</div>
+<h1>Single-key operations, honest guarantees</h1>
+<div class="cards c2">
+<div class="cd grn"><h3>In scope</h3><p>get, put, delete, compare-and-set; placement; failover; residency.</p></div>
+<div class="cd amb"><h3>Out, said aloud</h3><p>Multi-key transactions (an extension), secondary indexes, a query language.</p></div>
+</div>
+<div class="line">Local reads p99 &lt; 10 ms · RPO zero for strong writes · eventual reads always available.</div>
+<div class="foot"><span>KV store · scope</span><span>stage 1</span></div>
+</div>
+
+<!-- v-09 number 1 -->
+<div class="slide">
+<div class="k">Estimation · write latency</div>
+<h1>Where the quorum lives decides the latency</h1>
+<div class="tiles" style="--n:3">
+<div class="tile"><b>100–200 ms</b><span>a majority of 5 regions, across continents</span></div>
+<div class="tile blue"><b>2–5 ms</b><span>a majority of 3 zones, in one region</span></div>
+<div class="tile"><b>~220 ms</b><span>strong write, Singapore client, us-east home</span></div>
+</div>
+<div class="line r">Say the 220 ms, then decide what to do about it. That's the moment the round turns.</div>
+<div class="foot"><span>KV store · estimation</span><span>stage 2</span></div>
+</div>
+
+<!-- v-10 number 2 -->
+<div class="slide">
+<div class="k">Estimation · storage and partitions</div>
+<h1>Replication factor is a cost dial</h1>
+<div class="tiles">
+<div class="tile blue"><b>100 TB</b><span>raw</span></div>
+<div class="tile"><b>× 7</b><span>3 in the home region + 1 in each other region</span></div>
+<div class="tile blue"><b>~700 TB</b><span>stored</span></div>
+<div class="tile blue"><b>~10 k</b><span>ranges of ~10 GB, one consensus group each</span></div>
+</div>
+<div class="line">About 200 k reads a second per region, served by local followers.</div>
+<div class="foot"><span>KV store · estimation</span><span>stage 2</span></div>
+</div>
+
+<!-- v-11 API -->
+<div class="slide">
+<div class="k">API · minutes 11–17</div>
+<h1>Consistency is a parameter</h1>
+<pre class="big">put(key, value, {consistency: strong | eventual, ifVersion?}) → {version, commitTs}
+get(key, {consistency: strong | bounded(5s) | session(token) | eventual})
+                                                     → {value, version, commitTs}
+cas(key, expectedVersion, value)          delete(key, …)</pre>
+<div class="line">The session token is the commitTs of your last write: read-your-writes anywhere.</div>
+<div class="foot"><span>KV store · API</span><span>stage 3</span></div>
+</div>
+
+<!-- v-12 tiers -->
+<div class="slide dia">
+<div class="k">The consistency menu</div>
+<h1>Four tiers, four prices</h1>
+<figure class="grow"><!--SVG:tiers--></figure>
+<div class="foot"><span>KV store · tiers</span><span>stage 3</span></div>
+</div>
+
+<!-- v-13 C4 context -->
+<div class="slide dia">
+<div class="k">Architecture · C4 level 1 · system context</div>
+<h1>Services in five regions; the network sets the price</h1>
+<figure class="grow"><!--SVG:c4-context--></figure>
+<div class="foot"><span>KV store · C4 context</span><span>stage 4</span></div>
+</div>
+
+<!-- v-14 C4 containers -->
+<div class="slide dia">
+<div class="k">Architecture · C4 level 2 · containers</div>
+<h1>SDK, directory, home Raft groups, followers</h1>
+<figure class="grow"><!--SVG:c4-containers--></figure>
+<div class="foot"><span>KV store · containers</span><span>stage 4</span></div>
+</div>
+
+<!-- v-15 deployment -->
+<div class="slide dia">
+<div class="k">Deployment · one range across five regions</div>
+<h1>Raft in three zones at home, followers everywhere else</h1>
+<figure class="grow"><!--SVG:c4-deployment--></figure>
+<div class="foot"><span>KV store · deployment</span><span>stage 4</span></div>
+</div>
+
+<!-- v-16 seq strong write -->
+<div class="slide dia">
+<div class="k">Sequence · a strong write from Tokyo</div>
+<h1>Forward to the home leader, commit in-region</h1>
+<figure class="grow"><!--SVG:seq-strong-write--></figure>
+<div class="foot"><span>KV store · write path</span><span>stage 4</span></div>
+</div>
+
+<!-- v-17 seq reads -->
+<div class="slide dia">
+<div class="k">Sequence · reads at three levels</div>
+<h1>Local unless you ask for more</h1>
+<figure class="grow"><!--SVG:seq-reads--></figure>
+<div class="foot"><span>KV store · read path</span><span>stage 4</span></div>
+</div>
+
+<!-- v-18 tech -->
+<div class="slide">
+<div class="k">Technology choices</div>
+<h1>Each choice, and why not the alternative</h1>
+<table class="bt"><tr><th>Decision</th><th>Choice and why</th></tr>
+<tr><td><b>Partitioning</b></td><td>ranges + a directory: can express home and residency; a hash ring can't</td></tr>
+<tr><td><b>Replication</b></td><td>Raft per range at home + async followers; global Raft is 100–200 ms for all</td></tr>
+<tr><td><b>Engine</b></td><td>LSM per node, for 100 k writes a second</td></tr>
+<tr><td><b>Time</b></td><td>hybrid logical clocks; wall clocks can't order</td></tr>
+<tr><td><b>Directory</b></td><td>small consensus group, cached everywhere</td></tr>
+</table>
+<div class="foot"><span>KV store · technology</span><span>stage 5</span></div>
+</div>
+
+<!-- v-19 component -->
+<div class="slide dia">
+<div class="k">C4 level 3 · inside a storage node</div>
+<h1>Raft per range, applied-timestamp tracking, fencing</h1>
+<figure class="grow"><!--SVG:c4-component-node--></figure>
+<div class="foot"><span>KV store · component</span><span>stage 5</span></div>
+</div>
+
+<!-- v-20 Q partition -->
+<div class="slide qs">
+<div class="who">Interviewer · deep dive one</div>
+<div class="qq">"The link between Europe and the US drops for thirty seconds. What happens, second by second?"</div>
+<div class="hint">Writes and reads, on each side, by where the key is homed.</div>
+</div>
+
+<!-- v-21 partition dia -->
+<div class="slide dia">
+<div class="k">Deep dive one · the partition</div>
+<h1>Each side keeps its own keys and stale reads for the rest</h1>
+<figure class="grow"><!--SVG:partition--></figure>
+<div class="foot"><span>KV store · partition</span><span>stage 6</span></div>
+</div>
+
+<!-- v-22 partition reads table -->
+<div class="slide">
+<div class="k">Deep dive one · reads during the cut</div>
+<h1>The tiers behave as promised</h1>
+<table class="bt"><tr><th>Read</th><th>During the 30 seconds</th></tr>
+<tr><td><b>Eventual</b></td><td>served locally on both sides; staleness grows to 30 s</td></tr>
+<tr><td><b>Bounded 5 s</b></td><td>fine for local homes; across the cut, forward or error after 5 s</td></tr>
+<tr><td><b>Session</b></td><td>fine if the token's commitTs was already applied locally</td></tr>
+<tr><td><b>Strong</b></td><td>only for keys homed on your side</td></tr>
+</table>
+<div class="foot"><span>KV store · partition</span><span>stage 6</span></div>
+</div>
+
+<!-- v-23 partition key line -->
+<div class="slide th">
+  <div class="lbl">Key line · the partition</div>
+  <div class="s">That's the C in CAP, chosen deliberately, for the <em>cross-homed fraction</em> only.</div>
+  <div class="foot"><span>KV store · partition</span><span>key line</span></div>
+</div>
+
+<!-- v-24 AP mode -->
+<div class="slide">
+<div class="k">Deep dive · the optional AP mode</div>
+<h1>Multi-home writes, for data that tolerates it</h1>
+<div class="cards c2">
+<div class="cd grn"><h3>CRDT merge</h3><p>Counters, sets, presence, carts: writes accepted anywhere, merged safely.</p></div>
+<div class="cd red"><h3>Never silent last-write-wins</h3><p>Clocks skew, and LWW drops writes. Only where losing one is acceptable.</p></div>
+</div>
+<div class="foot"><span>KV store · AP mode</span><span>stage 6</span></div>
+</div>
+
+<!-- v-25 seq session -->
+<div class="slide dia">
+<div class="k">Deep dive two · read-your-writes from another region</div>
+<h1>The token carries the commit timestamp</h1>
+<figure class="grow"><!--SVG:seq-session--></figure>
+<div class="foot"><span>KV store · session</span><span>stage 6</span></div>
+</div>
+
+<!-- v-26 Q region loss -->
+<div class="slide qs">
+<div class="who">Interviewer · deep dive three</div>
+<div class="qq">"us-east is gone. Not the link, the whole region."</div>
+<div class="hint">What's unavailable, what's lost, and who decides.</div>
+</div>
+
+<!-- v-27 seq failover -->
+<div class="slide dia">
+<div class="k">Sequence · re-homing after region loss</div>
+<h1>Promote the freshest follower; name the RPO</h1>
+<figure class="grow"><!--SVG:seq-failover--></figure>
+<div class="foot"><span>KV store · region loss</span><span>stage 6</span></div>
+</div>
+
+<!-- v-28 RPO key line -->
+<div class="slide th">
+  <div class="lbl">Key line · region loss</div>
+  <div class="s">Async followers mean <em>RPO above zero</em>. Tables that can't accept it pay for a cross-region quorum.</div>
+  <div class="sub">Two replicas at home plus one nearby: 10–70 ms writes, for those tables only.</div>
+  <div class="foot"><span>KV store · region loss</span><span>key line</span></div>
+</div>
+
+<!-- v-29 hot key -->
+<div class="slide dia">
+<div class="k">Deep dive four · one key at 100 k writes a second</div>
+<h1>A linearizable key has a ceiling</h1>
+<figure class="grow"><!--SVG:hotkey--></figure>
+<div class="foot"><span>KV store · hot key</span><span>stage 6</span></div>
+</div>
+
+<!-- v-30 sixth region -->
+<div class="slide">
+<div class="k">Deep dive · adding a sixth region</div>
+<h1>Without downtime, one range at a time</h1>
+<div class="cards c3">
+<div class="cd"><h3>Bootstrap</h3><p>New followers from snapshots and logs, throttled to protect leaders.</p></div>
+<div class="cd grn"><h3>Serve</h3><p>Reads only once caught up; the directory updated per range.</p></div>
+<div class="cd amb"><h3>Re-home</h3><p>Later, where writers moved: leadership transfer and a membership change.</p></div>
+</div>
+<div class="foot"><span>KV store · new region</span><span>stage 6</span></div>
+</div>
+
+<!-- v-31 Q residency -->
+<div class="slide qs">
+<div class="who">Interviewer · a requirement added mid-round</div>
+<div class="qq">"EU users' data must stay in the EU. The key space stays globally addressable."</div>
+<div class="hint">A policy, not a rewrite.</div>
+</div>
+
+<!-- v-32 residency dia -->
+<div class="slide dia">
+<div class="k">Mid-round · the delta</div>
+<h1>Residency is a placement policy per range</h1>
+<figure class="grow"><!--SVG:residency--></figure>
+<div class="foot"><span>KV store · mid-round</span><span>stage 7</span></div>
+</div>
+
+<!-- v-33 failures -->
+<div class="slide">
+<div class="k">Failure modes · minutes 45–50</div>
+<h1>What breaks, and the response</h1>
+<table class="bt"><tr><th>Failure</th><th>Response</th></tr>
+<tr><td><b>Zone lost at home</b></td><td>nothing visible: 2 of 3 remain</td></tr>
+<tr><td><b>Home region lost</b></td><td>failover runbook; RPO stated; quorum tables for zero</td></tr>
+<tr><td><b>Leader pause, two leaders</b></td><td>Raft terms, fencing, leases with bounded skew</td></tr>
+<tr><td><b>Directory down</b></td><td>clients use cached placement</td></tr>
+<tr><td><b>Lag spike</b></td><td>bounded reads forward or fail; alert per region</td></tr>
+</table>
+<div class="foot"><span>KV store · failures</span><span>stage 8</span></div>
+</div>
+
+<!-- v-34 SLOs -->
+<div class="slide">
+<div class="k">SLOs and observability</div>
+<h1>The honest view is a matrix</h1>
+<div class="cards c3">
+<div class="cd"><h3>Reads</h3><p>Local p99, per region.</p></div>
+<div class="cd red"><h3>Strong writes</h3><p>Latency by client region × home region.</p></div>
+<div class="cd amb"><h3>Replication lag</h3><p>Per region: it drives the bounded-read SLO.</p></div>
+</div>
+<div class="foot"><span>KV store · SLOs</span><span>stage 9</span></div>
+</div>
+
+<!-- v-35 cost -->
+<div class="slide">
+<div class="k">Cost</div>
+<h1>Storage and egress, both with dials</h1>
+<div class="tiles" style="--n:3">
+<div class="tile blue"><b>~700 TB</b><span>stored at replication factor 7</span></div>
+<div class="tile"><b>~35 TB/day</b><span>replication egress: 100 k/s × 1 KB × 4 regions</span></div>
+<div class="tile blue"><b>per table</b><span>RF and follower regions are the dials</span></div>
+</div>
+<div class="foot"><span>KV store · cost</span><span>stage 9</span></div>
+</div>
+
+<!-- v-36 phases -->
+<div class="slide dia">
+<div class="k">The manager layer · how you'd build it</div>
+<h1>Buy first; build only for a reason</h1>
+<figure class="grow"><!--SVG:em-phases--></figure>
+<div class="foot"><span>KV store · delivery</span><span>stage 10</span></div>
+</div>
+
+<!-- v-37 teams -->
+<div class="slide">
+<div class="k">The manager layer · team seams</div>
+<h1>Three teams</h1>
+<div class="cards c3">
+<div class="cd red"><h3>Storage and replication</h3><p>Raft, the engine, followers. Owns the RPO.</p></div>
+<div class="cd"><h3>Placement and directory</h3><p>Splits, re-homing, residency, failover tooling.</p></div>
+<div class="cd grn"><h3>Client SDK and API</h3><p>The consistency contract: the one-way door.</p></div>
+</div>
+<div class="line">SLOs per consistency tier, each with an owner.</div>
+<div class="foot"><span>KV store · teams</span><span>stage 10</span></div>
+</div>
+
+<!-- v-38 close -->
+<div class="slide th">
+  <div class="lbl">Key line · the close</div>
+  <div class="s">The cross-continent cost appears <em>only when a caller asks</em> for it.</div>
+  <div class="sub">Range-partitioned, homed Raft groups, local followers, four tiers. Next: zero-RPO tables and residency-aware placement.</div>
+  <div class="foot"><span>KV store · the close</span><span>stage 11</span></div>
+</div>
+
+<!-- v-39 FU1 Q -->
+<div class="slide qs">
+<div class="who">Follow-up 1 · build or buy</div>
+<div class="qq">"Your CTO wants us to build this in-house. A managed global database covers most of it. What do you recommend?"</div>
+<div class="hint">Requirements, total cost, exit cost, a review date.</div>
+</div>
+
+<!-- v-40 FU1 dia -->
+<div class="slide dia">
+<div class="k">Follow-up 1 · the recommendation</div>
+<h1>A decision with a trigger to revisit it</h1>
+<figure class="grow"><!--SVG:fu-buy--></figure>
+<div class="foot"><span>KV store · follow-up 1</span><span>build or buy</span></div>
+</div>
+
+<!-- v-41 FU2 Q -->
+<div class="slide qs">
+<div class="who">Follow-up 2 · an incident</div>
+<div class="qq">"Saturday night, us-east goes dark. Failing over loses the last few hundred milliseconds of writes. Do you?"</div>
+<div class="hint">Who decides, on what information, how fast.</div>
+</div>
+
+<!-- v-42 FU2 dia -->
+<div class="slide dia">
+<div class="k">Follow-up 2 · the region-loss runbook</div>
+<h1>A decision with a named owner, not a reflex</h1>
+<figure class="grow"><!--SVG:fu-failover--></figure>
+<div class="foot"><span>KV store · follow-up 2</span><span>incident</span></div>
+</div>
+
+<!-- v-43 FU3 Q -->
+<div class="slide qs">
+<div class="who">Follow-up 3 · stakeholder pressure</div>
+<div class="qq">"The payments team says eventual consistency is dangerous. They want strong to be the default for everyone."</div>
+<div class="hint">A safe default, with the price visible.</div>
+</div>
+
+<!-- v-44 FU3 dia -->
+<div class="slide dia">
+<div class="k">Follow-up 3 · defaults</div>
+<h1>Session by default; strong by choice, with its cost shown</h1>
+<figure class="grow"><!--SVG:fu-defaults--></figure>
+<div class="foot"><span>KV store · follow-up 3</span><span>defaults</span></div>
+</div>
+
+<!-- v-45 FU4 Q -->
+<div class="slide qs">
+<div class="who">Follow-up 4 · a cost spike</div>
+<div class="qq">"The inter-region transfer bill is now the biggest line in our cloud invoice."</div>
+<div class="hint">Slice by table.</div>
+</div>
+
+<!-- v-46 FU4 dia -->
+<div class="slide dia">
+<div class="k">Follow-up 4 · the levers</div>
+<h1>Replicate where it's read, and make the cost visible</h1>
+<figure class="grow"><!--SVG:fu-egress--></figure>
+<div class="foot"><span>KV store · follow-up 4</span><span>cost</span></div>
+</div>
+
+<!-- v-47 scorecard -->
+<div class="slide">
+<div class="k">Debrief</div>
+<h1>Where the round lands</h1>
+<table class="bt"><tr><th>Signal</th><th>Strong</th><th>Exceptional</th></tr>
+<tr><td>Framing</td><td>names CAP</td><td>CAP plus latency: the 220 ms, said aloud</td></tr>
+<tr><td>Design</td><td>replication</td><td>Raft at home, async followers, a directory</td></tr>
+<tr><td>Consistency</td><td>strong or eventual</td><td>four tiers, each with a cost and an SLO</td></tr>
+<tr><td>Partition</td><td>"we choose C"</td><td>second by second, by home region</td></tr>
+<tr><td>EM layer</td><td>failover</td><td>RPO named, buy vs build, cost dials per table</td></tr>
+</table>
+<div class="foot"><span>KV store · scorecard</span><span>debrief</span></div>
+</div>
+
+<!-- v-48 checks -->
+<div class="slide th">
+  <div class="lbl">Debrief</div>
+  <div class="s" style="font-size:38pt">Five checks before the real round.</div>
+  <ol class="check" style="padding-left:30pt">
+    <li>The impossibility, on the table first.</li>
+    <li>A number for a cross-continent strong write.</li>
+    <li>Consistency per operation, with its price.</li>
+    <li>The partition, second by second.</li>
+    <li>RPO on region loss, said honestly.</li>
+  </ol>
+  <div class="foot"><span>KV store · mock round</span><span>end</span></div>
+</div>
+</body></html>

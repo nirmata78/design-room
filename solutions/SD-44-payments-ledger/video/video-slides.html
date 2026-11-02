@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>SD-44 payments ledger video slides</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="deck.css">
+<link rel="stylesheet" href="video.css">
+</head><body>
+<!-- One idea per slide, ≤ ~25 words of body, one figure max. Content follows ../../SD-44-payments-ledger.md;
+     the four follow-ups are new for this video. -->
+
+<!-- v-01 title -->
+<div class="slide th">
+  <div class="lbl">Mock system design round · L6 Engineering Manager</div>
+  <div class="s">Payments and a double-entry ledger:<br>how the round could go.</div>
+  <div class="sub">Take a payment, record it, never lose or double-charge. The design, then four manager follow-ups.</div>
+  <div class="foot"><span>design-room · SD-44</span><span>interviewer · candidate · coach</span></div>
+</div>
+
+<!-- v-02 weighed -->
+<div class="slide">
+<div class="k">Before you start</div>
+<h1>What an L6 EM panel weighs most</h1>
+<div class="cards c3">
+<div class="cd red"><h3>Operations and cost</h3><p>UNKNOWN rate, the balance check, reconciliation breaks, processor fees.</p></div>
+<div class="cd"><h3>Leadership</h3><p>The one-way doors, team seams, who decides risk.</p></div>
+<div class="cd grn"><h3>Depth, once</h3><p>The bank timed out: the next ten minutes and the next ten days.</p></div>
+</div>
+<div class="line a">The curveball: "approve offline", a processor outage, a second processor, the fee bill.</div>
+<div class="foot"><span>Payments · mock round</span><span>levels: em = L6 / M1</span></div>
+</div>
+
+<!-- v-03 prompt -->
+<div class="slide qs">
+<div class="who">Interviewer · the prompt</div>
+<div class="qq">"Design the system that takes a payment and records it: the ledger the company's money is accounted for in."</div>
+<div class="hint">Ask what must never happen, in order.</div>
+</div>
+
+<!-- v-04 clarify 1 -->
+<div class="slide">
+<div class="k">Clarify · minutes 0–6</div>
+<h1>Volume, latency, and the outside world</h1>
+<table class="bt"><tr><th>I ask</th><th>They answer</th><th>Why it matters</th></tr>
+<tr><td>Volume?</td><td>10 k payments/s peak, 50 currencies</td><td>ledger write rate</td></tr>
+<tr><td>Latency?</td><td>a decision within 2 s</td><td>the processor call dominates</td></tr>
+<tr><td>External parties?</td><td>time out, answer ambiguously, go down</td><td><b>unknown outcomes</b> are the core</td></tr>
+<tr><td>Ledger rule?</td><td>always balances, no exceptions</td><td>double entry, atomic posting</td></tr>
+</table>
+<div class="foot"><span>Payments · clarify</span><span>stage 1</span></div>
+</div>
+
+<!-- v-05 clarify 2 -->
+<div class="slide">
+<div class="k">Clarify · audit, refunds, retries</div>
+<h1>Every number explainable for seven years</h1>
+<table class="bt"><tr><th>I ask</th><th>They answer</th><th>Why it matters</th></tr>
+<tr><td>Audit?</td><td>every balance from immutable records</td><td>append-only, no UPDATE</td></tr>
+<tr><td>Refunds?</td><td>partial, months later; chargebacks</td><td>adjusting entries</td></tr>
+<tr><td>Retries?</td><td>"what do you require of clients?"</td><td>idempotency keys</td></tr>
+</table>
+<div class="line">Never, in order: lose money or double-charge · an unbalanced ledger · a slow payment.</div>
+<div class="foot"><span>Payments · clarify</span><span>stage 1</span></div>
+</div>
+
+<!-- v-06 scope -->
+<div class="slide">
+<div class="k">Clarify · scope</div>
+<h1>In and out, said aloud</h1>
+<div class="cards c2">
+<div class="cd grn"><h3>In scope</h3><p>Authorise, capture, refund, the state machine, the ledger, webhooks, reconciliation.</p></div>
+<div class="cd amb"><h3>Out of scope</h3><p>Fraud scoring, card vaulting, FX pricing, merchant onboarding, payouts.</p></div>
+</div>
+<div class="foot"><span>Payments · scope</span><span>stage 1</span></div>
+</div>
+
+<!-- v-07 THESIS -->
+<div class="slide th">
+  <div class="lbl">Key line · land it by minute ten</div>
+  <div class="s">Exactly-once does not exist <em>across the bank boundary</em>.</div>
+  <div class="sub">At-least-once delivery, idempotent operations, a pending state for unknowns, and reconciliation, on an immutable double-entry journal.</div>
+  <div class="foot"><span>Payments · the thesis</span><span>key line</span></div>
+</div>
+
+<!-- v-08 NFRs -->
+<div class="slide">
+<div class="k">Non-functional targets</div>
+<h1>Four commitments</h1>
+<div class="tiles">
+<div class="tile"><b>zero</b><span>double charges</span></div>
+<div class="tile blue"><b>every commit</b><span>the ledger balances</span></div>
+<div class="tile blue"><b>2 s</b><span>payment decision, p99</span></div>
+<div class="tile"><b>daily</b><span>reconciliation, breaks owned</span></div>
+</div>
+<div class="foot"><span>Payments · targets</span><span>stage 1</span></div>
+</div>
+
+<!-- v-09 numbers -->
+<div class="slide">
+<div class="k">Estimation · writes and storage</div>
+<h1>Partition by account; immutable makes archiving easy</h1>
+<div class="tiles" style="--n:3">
+<div class="tile blue"><b>~40 k/s</b><span>journal entries: 10 k payments × ~4</span></div>
+<div class="tile blue"><b>~500–600 TB</b><span>over seven years</span></div>
+<div class="tile"><b>&lt; 200 ms</b><span>for everything we own; the processor takes the rest</span></div>
+</div>
+<div class="foot"><span>Payments · estimation</span><span>stage 2</span></div>
+</div>
+
+<!-- v-10 hot merchant -->
+<div class="slide th">
+  <div class="lbl">Estimation · the number that shapes the data model</div>
+  <div class="s">One merchant, <em>5,000 updates a second</em> to one balance row.</div>
+  <div class="sub">It serialises on the row lock. So entries are appended and the balance is derived, which is what auditors want anyway.</div>
+  <div class="foot"><span>Payments · estimation</span><span>key number</span></div>
+</div>
+
+<!-- v-11 API -->
+<div class="slide">
+<div class="k">API · minutes 11–17</div>
+<h1>Every mutating call carries an idempotency key</h1>
+<pre class="big">POST /v1/payments     Idempotency-Key: &lt;uuid&gt;
+  {merchantId, amount: {value: 1050, currency: "EUR"},   -- integer minor units
+   paymentMethodToken, capture: auto | manual}
+  → 201 {paymentId, status: authorized | captured | declined | pending}
+POST /v1/payments/{id}/capture     POST /v1/payments/{id}/refunds
+Webhooks: signed, event IDs, retried; merchants dedupe</pre>
+<div class="foot"><span>Payments · API</span><span>stage 3</span></div>
+</div>
+
+<!-- v-12 states -->
+<div class="slide dia">
+<div class="k">The payment state machine</div>
+<h1>UNKNOWN is a real state</h1>
+<figure class="grow"><!--SVG:states--></figure>
+<div class="foot"><span>Payments · states</span><span>stage 3</span></div>
+</div>
+
+<!-- v-13 ledger tables -->
+<div class="slide">
+<div class="k">The ledger</div>
+<h1>Immutable journal; balances are a projection</h1>
+<table class="bt"><tr><th>Table</th><th>Holds</th><th>Mutability</th></tr>
+<tr><td><b>accounts</b></td><td>owner, type, currency</td><td>rarely changes</td></tr>
+<tr><td><b>journal_transactions</b></td><td>idempotency key, payment, type</td><td><b>immutable</b></td></tr>
+<tr><td><b>journal_entries</b></td><td>account, debit or credit, minor units</td><td><b>immutable</b></td></tr>
+<tr><td><b>balances</b></td><td>derived, as of an entry</td><td>rebuildable</td></tr>
+<tr><td><b>idempotency, outbox</b></td><td>stored response; events to publish</td><td>TTL; relayed</td></tr>
+</table>
+<div class="foot"><span>Payments · ledger</span><span>stage 3</span></div>
+</div>
+
+<!-- v-14 example entries -->
+<div class="slide">
+<div class="k">Double entry · €10.50 captured, €0.30 fee</div>
+<h1>Debits equal credits, in every transaction</h1>
+<table class="bt"><tr><th>Account</th><th style="text-align:right">Debit</th><th style="text-align:right">Credit</th></tr>
+<tr><td>Processor receivable</td><td style="text-align:right">1,050</td><td></td></tr>
+<tr><td>Merchant payable</td><td></td><td style="text-align:right">1,020</td></tr>
+<tr><td>Fee revenue</td><td></td><td style="text-align:right">30</td></tr>
+</table>
+<div class="line">Enforced in the posting code and checked in the database, in one transaction.</div>
+<div class="foot"><span>Payments · ledger</span><span>stage 3</span></div>
+</div>
+
+<!-- v-15 C4 context -->
+<div class="slide dia">
+<div class="k">Architecture · C4 level 1 · system context</div>
+<h1>Merchants in; processors and banks are the uncertain outside</h1>
+<figure class="grow"><!--SVG:c4-context--></figure>
+<div class="foot"><span>Payments · C4 context</span><span>stage 4</span></div>
+</div>
+
+<!-- v-16 C4 containers -->
+<div class="slide dia">
+<div class="k">Architecture · C4 level 2 · containers</div>
+<h1>One transaction per transition; inquiry and reconciliation beside</h1>
+<figure class="grow"><!--SVG:c4-containers--></figure>
+<div class="foot"><span>Payments · containers</span><span>stage 4</span></div>
+</div>
+
+<!-- v-17 seq pay -->
+<div class="slide dia">
+<div class="k">Sequence · one successful payment</div>
+<h1>Commit before the call; commit everything after it</h1>
+<figure class="grow"><!--SVG:seq-pay--></figure>
+<div class="foot"><span>Payments · happy path</span><span>stage 4</span></div>
+</div>
+
+<!-- v-18 tech -->
+<div class="slide">
+<div class="k">Technology choices</div>
+<h1>Mechanism and reason</h1>
+<table class="bt"><tr><th>Component</th><th>Choice and reason</th></tr>
+<tr><td><b>Ledger and state</b></td><td>relational, by account: atomic postings, constraints</td></tr>
+<tr><td><b>Events</b></td><td>transactional outbox: no dual writes</td></tr>
+<tr><td><b>Processors</b></td><td>an adapter each; retry only with idempotent references</td></tr>
+<tr><td><b>Reconciliation</b></td><td>batch over raw files and ledger expectations</td></tr>
+<tr><td><b>Money</b></td><td>integer minor units and a currency: floats lose cents</td></tr>
+</table>
+<div class="foot"><span>Payments · technology</span><span>stage 5</span></div>
+</div>
+
+<!-- v-19 component -->
+<div class="slide dia">
+<div class="k">C4 level 3 · inside the payment service</div>
+<h1>Guard, state machine, postings, the invariant, the outbox</h1>
+<figure class="grow"><!--SVG:c4-component-payment--></figure>
+<div class="foot"><span>Payments · component</span><span>stage 5</span></div>
+</div>
+
+<!-- v-20 Q timeout -->
+<div class="slide qs">
+<div class="who">Interviewer · deep dive one</div>
+<div class="qq">"The authorisation call to the bank timed out. Was the customer charged?"</div>
+<div class="hint">The next ten minutes, and the next ten days.</div>
+</div>
+
+<!-- v-21 seq timeout -->
+<div class="slide dia">
+<div class="k">Sequence · the timeout</div>
+<h1>UNKNOWN, inquiry by our reference, the settlement file</h1>
+<figure class="grow"><!--SVG:seq-timeout--></figure>
+<div class="foot"><span>Payments · unknown outcome</span><span>stage 6</span></div>
+</div>
+
+<!-- v-22 timeout key line -->
+<div class="slide th">
+  <div class="lbl">Key line · the timeout</div>
+  <div class="s">A timeout is an <em>unknown</em>, not a failure.</div>
+  <div class="sub">No retry creates a second charge, because every call carries the same reference.</div>
+  <div class="foot"><span>Payments · unknown outcome</span><span>key line</span></div>
+</div>
+
+<!-- v-23 Q idempotency -->
+<div class="slide qs">
+<div class="who">Interviewer · deep dive two</div>
+<div class="qq">"Three retries arrive at once. And then a fourth, with the same key and a different amount."</div>
+<div class="hint">One wins. And the fourth?</div>
+</div>
+
+<!-- v-24 seq idem -->
+<div class="slide dia">
+<div class="k">Sequence · idempotency</div>
+<h1>One insert wins; a changed payload is a 422</h1>
+<figure class="grow"><!--SVG:seq-idem--></figure>
+<div class="foot"><span>Payments · idempotency</span><span>stage 6</span></div>
+</div>
+
+<!-- v-25 seq outbox -->
+<div class="slide dia">
+<div class="k">Deep dive · crash between ledger and publish</div>
+<h1>It can't be inconsistent: one transaction, then the relay</h1>
+<figure class="grow"><!--SVG:seq-outbox--></figure>
+<div class="foot"><span>Payments · outbox</span><span>stage 6</span></div>
+</div>
+
+<!-- v-26 hot account -->
+<div class="slide dia">
+<div class="k">Deep dive three · the hot merchant account</div>
+<h1>Append, derive, and check only where it matters</h1>
+<figure class="grow"><!--SVG:hot-account--></figure>
+<div class="foot"><span>Payments · hot account</span><span>stage 6</span></div>
+</div>
+
+<!-- v-27 refunds -->
+<div class="slide">
+<div class="k">Deep dive · refunds and chargebacks</div>
+<h1>New entries, never edits</h1>
+<div class="cards c3">
+<div class="cd"><h3>Refund</h3><p>A new transaction referencing the original payment.</p></div>
+<div class="cd amb"><h3>The limit</h3><p>Refunds plus this one ≤ captured, under a conditional update.</p></div>
+<div class="cd red"><h3>Chargeback</h3><p>Posted dated now, with the original reference. Closed periods stay closed.</p></div>
+</div>
+<div class="foot"><span>Payments · refunds</span><span>stage 6</span></div>
+</div>
+
+<!-- v-28 seq recon -->
+<div class="slide dia">
+<div class="k">Deep dive four · reconciliation, a permanent component</div>
+<h1>The settlement file is the final word</h1>
+<figure class="grow"><!--SVG:seq-recon--></figure>
+<div class="foot"><span>Payments · reconciliation</span><span>stage 6</span></div>
+</div>
+
+<!-- v-29 Q midround -->
+<div class="slide qs">
+<div class="who">Interviewer · a requirement added mid-round</div>
+<div class="qq">"A bug double-posted forty thousand entries last night. Some of that money has already been paid out."</div>
+<div class="hint">Stop, find, correct, recover. Never DELETE.</div>
+</div>
+
+<!-- v-30 midround dia -->
+<div class="slide dia">
+<div class="k">Mid-round · the correction</div>
+<h1>Reversing entries, tagged with an incident ID</h1>
+<figure class="grow"><!--SVG:midround-fix--></figure>
+<div class="foot"><span>Payments · mid-round</span><span>stage 7</span></div>
+</div>
+
+<!-- v-31 failures -->
+<div class="slide">
+<div class="k">Failure modes · minutes 45–50</div>
+<h1>What breaks, and the response</h1>
+<table class="bt"><tr><th>Failure</th><th>Response</th></tr>
+<tr><td><b>Processor outage</b></td><td>secondary processor where contracts allow; never approve offline by default</td></tr>
+<tr><td><b>Processor slow</b></td><td>timeout to UNKNOWN and inquiry, not retry loops</td></tr>
+<tr><td><b>Database failover</b></td><td>clients retry with the same key: safe</td></tr>
+<tr><td><b>Outbox lag</b></td><td>alert on outbox age; merchants can poll</td></tr>
+<tr><td><b>Breaks growing</b></td><td>an ageing SLO, owners, escalation</td></tr>
+</table>
+<div class="foot"><span>Payments · failures</span><span>stage 8</span></div>
+</div>
+
+<!-- v-32 SLOs -->
+<div class="slide">
+<div class="k">SLOs and observability</div>
+<h1>The alerts that fire before finance notices</h1>
+<div class="cards c3">
+<div class="cd"><h3>Decisions</h3><p>API success excluding real declines; p99 under 2 s.</p></div>
+<div class="cd red"><h3>Unknowns and balance</h3><p>UNKNOWN rate and age; any imbalance pages immediately.</p></div>
+<div class="cd amb"><h3>Approval and breaks</h3><p>Approval rate per processor vs baseline; unreconciled amount by age.</p></div>
+</div>
+<div class="foot"><span>Payments · SLOs</span><span>stage 9</span></div>
+</div>
+
+<!-- v-33 cost -->
+<div class="slide th">
+  <div class="lbl">Cost · say it plainly</div>
+  <div class="s">Processor fees dwarf the servers. The levers are <em>routing</em> and <em>false declines</em>.</div>
+  <div class="foot"><span>Payments · cost</span><span>stage 9</span></div>
+</div>
+
+<!-- v-34 phases -->
+<div class="slide dia">
+<div class="k">The manager layer · how you'd build it</div>
+<h1>An MVP, then refunds, then a second processor</h1>
+<figure class="grow"><!--SVG:em-phases--></figure>
+<div class="foot"><span>Payments · delivery</span><span>stage 10</span></div>
+</div>
+
+<!-- v-35 teams -->
+<div class="slide">
+<div class="k">The manager layer · team seams</div>
+<h1>Four teams; the ledger is a contract</h1>
+<div class="cards c4">
+<div class="cd"><h3>API and states</h3><p>The idempotency contract.</p></div>
+<div class="cd red"><h3>Ledger</h3><p>Owned centrally; a contract for everyone else.</p></div>
+<div class="cd grn"><h3>Processors</h3><p>Adapters, inquiry, routing.</p></div>
+<div class="cd amb"><h3>Reconciliation</h3><p>Finance tooling, breaks.</p></div>
+</div>
+<div class="line">A 3 a.m. runbook for "payments failing", with a named owner.</div>
+<div class="foot"><span>Payments · teams</span><span>stage 10</span></div>
+</div>
+
+<!-- v-36 close -->
+<div class="slide th">
+  <div class="lbl">Key line · the close</div>
+  <div class="s">Every transition commits with <em>balanced, immutable</em> entries and its event.</div>
+  <div class="sub">Idempotent by key, unknowns resolved by inquiry, reconciliation for the rest. Next: the inquiry protocol per processor; breaks as an owned workflow.</div>
+  <div class="foot"><span>Payments · the close</span><span>stage 11</span></div>
+</div>
+
+<!-- v-37 FU1 Q -->
+<div class="slide qs">
+<div class="who">Follow-up 1 · stakeholder pressure</div>
+<div class="qq">"Product wants us to approve payments offline when the processor is down. We lose sales otherwise."</div>
+<div class="hint">Price the risk; let the right owner decide.</div>
+</div>
+
+<!-- v-38 FU1 dia -->
+<div class="slide dia">
+<div class="k">Follow-up 1 · offline approval</div>
+<h1>A risk policy with a cap, or not at all</h1>
+<figure class="grow"><!--SVG:fu-offline--></figure>
+<div class="foot"><span>Payments · follow-up 1</span><span>stakeholder</span></div>
+</div>
+
+<!-- v-39 FU2 Q -->
+<div class="slide qs">
+<div class="who">Follow-up 2 · an incident</div>
+<div class="qq">"Black Friday, our main processor starts timing out. UNKNOWN climbs to fifteen percent."</div>
+<div class="hint">What do you say first?</div>
+</div>
+
+<!-- v-40 FU2 dia -->
+<div class="slide dia">
+<div class="k">Follow-up 2 · the first hour</div>
+<h1>Route around it, and drain the unknowns safely</h1>
+<figure class="grow"><!--SVG:fu-outage--></figure>
+<div class="foot"><span>Payments · follow-up 2</span><span>incident</span></div>
+</div>
+
+<!-- v-41 FU3 Q -->
+<div class="slide qs">
+<div class="who">Follow-up 3 · a migration</div>
+<div class="qq">"We're adding a second processor next quarter, for cost and resilience. Three teams. How?"</div>
+<div class="hint">The ledger shouldn't change.</div>
+</div>
+
+<!-- v-42 FU3 dia -->
+<div class="slide dia">
+<div class="k">Follow-up 3 · the plan</div>
+<h1>Contract, shadow, reconcile, ramp</h1>
+<figure class="grow"><!--SVG:fu-processor--></figure>
+<div class="foot"><span>Payments · follow-up 3</span><span>migration</span></div>
+</div>
+
+<!-- v-43 FU4 Q -->
+<div class="slide qs">
+<div class="who">Follow-up 4 · a cost question</div>
+<div class="qq">"The CFO asks why processing fees grew faster than volume this year."</div>
+<div class="hint">Slice by route.</div>
+</div>
+
+<!-- v-44 FU4 dia -->
+<div class="slide dia">
+<div class="k">Follow-up 4 · the levers</div>
+<h1>Route for cost where approval holds</h1>
+<figure class="grow"><!--SVG:fu-fees--></figure>
+<div class="foot"><span>Payments · follow-up 4</span><span>cost</span></div>
+</div>
+
+<!-- v-45 scorecard -->
+<div class="slide">
+<div class="k">Debrief</div>
+<h1>Where the round lands</h1>
+<table class="bt"><tr><th>Signal</th><th>Strong</th><th>Exceptional</th></tr>
+<tr><td>Framing</td><td>"we'll use transactions"</td><td>exactly-once doesn't exist across the boundary</td></tr>
+<tr><td>Ledger</td><td>a balance column</td><td>immutable double entry, derived balances</td></tr>
+<tr><td>Timeout</td><td>retry</td><td>UNKNOWN, inquiry, reversal, settlement file</td></tr>
+<tr><td>Idempotency</td><td>a key</td><td>same transaction; different payload is 422</td></tr>
+<tr><td>EM layer</td><td>monitoring</td><td>balance check pages, breaks owned, fees as the cost</td></tr>
+</table>
+<div class="foot"><span>Payments · scorecard</span><span>debrief</span></div>
+</div>
+
+<!-- v-46 checks -->
+<div class="slide th">
+  <div class="lbl">Debrief</div>
+  <div class="s" style="font-size:38pt">Five checks before the real round.</div>
+  <ol class="check" style="padding-left:30pt">
+    <li>"Exactly-once doesn't exist across the boundary."</li>
+    <li>Double entry, derived balances, integer minor units.</li>
+    <li>The idempotency key in the same transaction.</li>
+    <li>The timeout walk: UNKNOWN, inquiry, settlement.</li>
+    <li>Corrections are new entries, never edits.</li>
+  </ol>
+  <div class="foot"><span>Payments · mock round</span><span>end</span></div>
+</div>
+</body></html>

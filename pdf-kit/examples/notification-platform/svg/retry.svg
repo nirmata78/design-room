@@ -1,0 +1,21 @@
+<svg class="d" viewBox="0 0 720 176" xmlns="http://www.w3.org/2000/svg">
+  <text x="6" y="12" class="lab">EXPONENTIAL BACKOFF, FULL JITTER (base 200 ms, cap 10 s)</text>
+  <line x1="40" y1="150" x2="340" y2="150" class="lane"/>
+  <text x="34" y="44" class="ts" text-anchor="end">try 1</text><rect x="40" y="34" width="12" height="14" class="bl"/><text x="58" y="45" class="ts">wait 0–0.2 s</text>
+  <text x="34" y="72" class="ts" text-anchor="end">try 2</text><rect x="40" y="62" width="24" height="14" class="bl"/><text x="70" y="73" class="ts">wait 0–0.4 s</text>
+  <text x="34" y="100" class="ts" text-anchor="end">try 3</text><rect x="40" y="90" width="48" height="14" class="bl"/><text x="94" y="101" class="ts">wait 0–0.8 s</text>
+  <text x="34" y="128" class="ts" text-anchor="end">try 4</text><rect x="40" y="118" width="96" height="14" class="bl"/><text x="142" y="129" class="ts">wait 0–1.6 s … up to the cap</text>
+  <circle cx="44" cy="41" r="3" style="fill:#c8341f"/><circle cx="57" cy="69" r="3" style="fill:#c8341f"/><circle cx="62" cy="97" r="3" style="fill:#c8341f"/><circle cx="111" cy="125" r="3" style="fill:#c8341f"/>
+  <text x="40" y="166" class="ts">sleep = random(0, min(cap, base · 2ⁿ)) · red dot = one client's draw</text>
+
+  <line x1="372" y1="10" x2="372" y2="170" class="lane"/>
+  <text x="390" y="12" class="lab">CIRCUIT BREAKER PER PROVIDER</text>
+  <rect x="392" y="62" width="96" height="36" rx="18" class="g"/><text x="440" y="84" class="c tb">CLOSED</text>
+  <rect x="604" y="62" width="96" height="36" rx="18" class="r"/><text x="652" y="84" class="c tb">OPEN</text>
+  <rect x="498" y="128" width="106" height="36" rx="18" class="a"/><text x="551" y="150" class="c tb">HALF-OPEN</text>
+  <line x1="488" y1="74" x2="603" y2="74" class="ln-r"/><text x="546" y="66" class="c ts">&gt; 50% errors / 20 calls</text>
+  <path d="M652,98 L652,146 L605,146" class="ln"/><text x="658" y="124" class="ts">after 30 s</text>
+  <path d="M498,146 L440,146 L440,99" class="ln-g"/><text x="434" y="124" class="ts tg" text-anchor="end">probe ok</text>
+  <path d="M590,128 L630,99" class="ln-r"/><text x="586" y="114" class="ts tr" text-anchor="end">probe fails</text>
+  <text x="392" y="40" class="ts">OPEN: fail fast. P2 waits in Kafka;</text><text x="392" y="53" class="ts">P0 switches to the secondary provider.</text>
+</svg>
