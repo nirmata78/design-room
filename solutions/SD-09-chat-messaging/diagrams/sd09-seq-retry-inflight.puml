@@ -1,0 +1,24 @@
+@startuml
+hide footbox
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 230
+skinparam noteBackgroundColor #FFF8DC
+skinparam noteBorderColor #C9A227
+participant "Phone" as P
+participant "Partition leader" as L
+participant "Followers" as F
+P -> L : SEND {c-77} (first try)
+L -> L : not in dedup, not in flight:\nseq = 1234, in_flight[c-77] = entry
+L -> F : append entry 1234
+P -> L : SEND {c-77} (retry, 300 ms later)
+L -> L : in_flight[c-77] exists:\nattach to the same entry.\nNo second number
+F --> L : majority has entry 1234
+L -> L : commit; dedup row visible;\nremove from in_flight
+L --> P : ACK {c-77, seq 1234}
+L --> P : ACK {c-77, seq 1234}
+note over P, F : <b>Without the in-flight check</b> both tries read "not in dedup", because the first\nhas not committed yet. They would get 1234 and 1235: a duplicate on every screen.\nThe dedup table protects against retries after commit; the in-flight map, before it.
+@enduml

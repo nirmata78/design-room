@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 820" width="1600" height="820">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="40" y="44" text-anchor="start" font-family="Inter, Helvetica, Arial, sans-serif" font-size="22" fill="#1f2328" font-weight="700">messages · conv_id picks the Raft group · bucket splits it inside · clustering key = seq: the order</text>
+<rect x="40" y="80" width="480" height="560" rx="12" fill="#f6f8fa" stroke="#8c959f" stroke-width="1.6"/>
+<text x="60" y="116" text-anchor="start" font-family="Inter, Helvetica, Arial, sans-serif" font-size="20" fill="#57606a" font-weight="700">Raft group 7 · one leader, 2 followers</text>
+<rect x="60" y="140" width="440" height="225" rx="8" fill="#ffffff" stroke="#c8341f" stroke-width="3"/>
+<rect x="60" y="140" width="440" height="40" rx="8" fill="#c8341f"/>
+<text x="76" y="168" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#ffffff" font-weight="700">partition: 9001, b0</text>
+<text x="80" y="214" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">1235 → Hi, on my way</text>
+<text x="80" y="254" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">1236 → See you there</text>
+<text x="80" y="294" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">1237 → ok!</text>
+<text x="80" y="334" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#8c959f">…in seq order</text>
+<rect x="60" y="385" width="440" height="225" rx="8" fill="#ffffff" stroke="#1168bd" stroke-width="1.4"/>
+<rect x="60" y="385" width="440" height="40" rx="8" fill="#1168bd"/>
+<text x="76" y="413" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#ffffff" font-weight="700">partition: 4410, b3</text>
+<text x="80" y="459" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">251 → Hi, on my way</text>
+<text x="80" y="499" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">252 → See you there</text>
+<text x="80" y="539" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">253 → ok!</text>
+<text x="80" y="579" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#8c959f">…in seq order</text>
+<rect x="560" y="80" width="480" height="560" rx="12" fill="#f6f8fa" stroke="#8c959f" stroke-width="1.6"/>
+<text x="580" y="116" text-anchor="start" font-family="Inter, Helvetica, Arial, sans-serif" font-size="20" fill="#57606a" font-weight="700">Raft group 8 · one leader, 2 followers</text>
+<rect x="580" y="140" width="440" height="225" rx="8" fill="#ffffff" stroke="#1168bd" stroke-width="1.4"/>
+<rect x="580" y="140" width="440" height="40" rx="8" fill="#1168bd"/>
+<text x="596" y="168" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#ffffff" font-weight="700">partition: 31, b0</text>
+<text x="600" y="214" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">77 → Hi, on my way</text>
+<text x="600" y="254" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">78 → See you there</text>
+<text x="600" y="294" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">79 → ok!</text>
+<text x="600" y="334" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#8c959f">…in seq order</text>
+<rect x="580" y="385" width="440" height="225" rx="8" fill="#ffffff" stroke="#1168bd" stroke-width="1.4"/>
+<rect x="580" y="385" width="440" height="40" rx="8" fill="#1168bd"/>
+<text x="596" y="413" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#ffffff" font-weight="700">partition: 7770, b1</text>
+<text x="600" y="459" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">288 → Hi, on my way</text>
+<text x="600" y="499" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">289 → See you there</text>
+<text x="600" y="539" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">290 → ok!</text>
+<text x="600" y="579" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#8c959f">…in seq order</text>
+<rect x="1080" y="80" width="480" height="560" rx="12" fill="#f6f8fa" stroke="#8c959f" stroke-width="1.6"/>
+<text x="1100" y="116" text-anchor="start" font-family="Inter, Helvetica, Arial, sans-serif" font-size="20" fill="#57606a" font-weight="700">Raft group 9 · one leader, 2 followers</text>
+<rect x="1100" y="140" width="440" height="225" rx="8" fill="#ffffff" stroke="#1168bd" stroke-width="1.4"/>
+<rect x="1100" y="140" width="440" height="40" rx="8" fill="#1168bd"/>
+<text x="1116" y="168" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#ffffff" font-weight="700">partition: 5120, b2</text>
+<text x="1120" y="214" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">114 → Hi, on my way</text>
+<text x="1120" y="254" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">115 → See you there</text>
+<text x="1120" y="294" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">116 → ok!</text>
+<text x="1120" y="334" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#8c959f">…in seq order</text>
+<rect x="1100" y="385" width="440" height="225" rx="8" fill="#ffffff" stroke="#1168bd" stroke-width="1.4"/>
+<rect x="1100" y="385" width="440" height="40" rx="8" fill="#1168bd"/>
+<text x="1116" y="413" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#ffffff" font-weight="700">partition: 66, b0</text>
+<text x="1120" y="459" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">325 → Hi, on my way</text>
+<text x="1120" y="499" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">326 → See you there</text>
+<text x="1120" y="539" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">327 → ok!</text>
+<text x="1120" y="579" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#8c959f">…in seq order</text>
+<rect x="40" y="660" width="1520" height="72.0" rx="6" fill="#e8f0fa" stroke="#2f6fb5" stroke-width="1.2"/>
+<text x="54" y="685.0" font-family="Inter, Helvetica, Arial, sans-serif" font-size="20.0" fill="#1f2328">Query: conversation 9001, everything after 1234 = one partition, one sequential read, already in order. That is sync and history. Fan-out never</text>
+<text x="54" y="712.0" font-family="Inter, Helvetica, Arial, sans-serif" font-size="20.0" fill="#1f2328">rewrites it, and a bucket caps its size.</text>
+</svg>
