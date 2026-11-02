@@ -47,6 +47,22 @@ The boxes: **Say it in the room** — words you can use nearly verbatim · **Why
 behind a term or decision · **The number that matters** · **Trap** — what breaks under a follow-up ·
 **Level lens** — how the bar shifts by level. Method in full: [The interview method](../theory/01-interview-method.md).
 
+## Mock-round videos
+
+A narrated mock round per solution at the **L6 Engineering Manager** bar (1080p, interviewer, candidate, key lines
+spoken slower, coach, burned-in captions, chapters): the design, then four manager follow-ups. Each lives in
+`SD-NN-<name>/video/` with its slides, C4 and sequence diagrams and script, and rebuilds with `video/build-video.sh`.
+The MP4s and frames are gitignored. Built with the `system-design-video` skill.
+
+| ID | Video folder | The four follow-ups |
+|---|---|---|
+| SD-08 | `SD-08-news-feed/video/` | the ranking team wants 300 ms · a lost timeline cluster · pure pull to hybrid in a quarter · the memory bill |
+| SD-09 | `SD-09-chat-messaging/video/` | encryption announced on stage · a deploy restarts a zone · a burning on-call · storage cost −40% |
+| SD-15 | `SD-15-distributed-kv-store/video/` | build or buy · a region goes dark · "strong everywhere" · the transfer bill |
+| SD-25 | `SD-25-rate-limiter/video/` | a customer wants no limits · a zero-limit policy push · billing from the limiter · the decision-log bill |
+| SD-44 | `SD-44-payments-ledger/video/` | approve offline · a processor outage on Black Friday · a second processor · fees growing faster than volume |
+| SD-47 | `SD-47-ticket-booking/video/` | strict first-come · failover mid-sale · three teams, twelve weeks · the CDN bill |
+
 ## Booklet-length solutions
 
 Longer, illustrated answer keys, built to PDF. Same stage layout, more depth per stage, plus an

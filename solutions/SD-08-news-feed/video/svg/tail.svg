@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 640" width="1600" height="640">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="40" y="50" text-anchor="start" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24" fill="#57606a" font-weight="700">Followers per account · log scale · illustrative</text>
+<text x="310" y="148" text-anchor="end" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24" fill="#1f2328" font-weight="700">median account</text>
+<rect x="330" y="112" width="322" height="56" rx="6" fill="#2f6fb5"/>
+<text x="666.1441993929574" y="150" text-anchor="start" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24" fill="#2f6fb5" font-weight="700">~200 followers</text>
+<text x="310" y="253" text-anchor="end" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24" fill="#1f2328" font-weight="700">top 1%</text>
+<rect x="330" y="217" width="560" height="56" rx="6" fill="#2f6fb5"/>
+<text x="904.0" y="255" text-anchor="start" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24" fill="#2f6fb5" font-weight="700">~10 k</text>
+<text x="310" y="358" text-anchor="end" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24" fill="#1f2328" font-weight="700">top 0.01%</text>
+<rect x="330" y="322" width="840" height="56" rx="6" fill="#a86a12"/>
+<text x="1184.0" y="360" text-anchor="start" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24" fill="#a86a12" font-weight="700">~1 M</text>
+<text x="310" y="463" text-anchor="end" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24" fill="#1f2328" font-weight="700">the largest</text>
+<rect x="330" y="427" width="1120" height="56" rx="6" fill="#c8341f"/>
+<text x="1464.0" y="465" text-anchor="start" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24" fill="#c8341f" font-weight="700">100 M+</text>
+<line x1="330" y1="90" x2="330" y2="520" stroke="#d0d7de" stroke-dasharray="4 4"/>
+<text x="330" y="545" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="18" fill="#57606a">1</text>
+<line x1="610" y1="90" x2="610" y2="520" stroke="#d0d7de" stroke-dasharray="4 4"/>
+<text x="610" y="545" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="18" fill="#57606a">10^2</text>
+<line x1="890" y1="90" x2="890" y2="520" stroke="#d0d7de" stroke-dasharray="4 4"/>
+<text x="890" y="545" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="18" fill="#57606a">10^4</text>
+<line x1="1170" y1="90" x2="1170" y2="520" stroke="#d0d7de" stroke-dasharray="4 4"/>
+<text x="1170" y="545" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="18" fill="#57606a">10^6</text>
+<line x1="1450" y1="90" x2="1450" y2="520" stroke="#d0d7de" stroke-dasharray="4 4"/>
+<text x="1450" y="545" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="18" fill="#57606a">10^8</text>
+<rect x="40" y="570" width="1520" height="47.2" rx="6" fill="#fdecea" stroke="#c8341f" stroke-width="1.2"/>
+<text x="54" y="596.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="21.0" fill="#1f2328">One post&#x27;s push cost = its author&#x27;s followers. The few accounts on the right decide the design.</text>
+</svg>

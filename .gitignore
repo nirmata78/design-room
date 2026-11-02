@@ -22,7 +22,7 @@ Gemfile.lock
 .vscode/
 *.swp
 
-# ── Per-attempt reports (also under sessions/, belt and braces) ──
+# ── Rendered PDFs: every one is rebuilt from tracked sources (reports, booklets, slide decks) ──
 *.pdf
 .report.html
 !examples/*.pdf
@@ -31,3 +31,21 @@ Gemfile.lock
 pdf-kit/.venv/
 *.built.html
 *_pages/
+
+# ── Mock-interview videos: rebuildable, too large for the repo ──
+# Sources stay tracked (script.md, video-slides.html, *.css, diagrams.py, svg/, build-video.sh);
+# everything build-video.sh produces is ignored.
+**/video/frames/
+**/video/audio/
+**/video/.v[0-9]*/
+**/video/.*.v[0-9]*.md
+*.mp4
+*.m4a
+*.mov
+*.webm
+*.wav
+*.mp3
+
+# ── Python ──
+__pycache__/
+*.pyc

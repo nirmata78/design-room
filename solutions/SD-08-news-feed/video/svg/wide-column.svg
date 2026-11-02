@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 820" width="1600" height="820">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="40" y="44" text-anchor="start" font-family="Inter, Helvetica, Arial, sans-serif" font-size="22" fill="#1f2328" font-weight="700">author_posts · partition key = author_id (which node) · clustering key = created_at DESC (order inside)</text>
+<rect x="40" y="80" width="480" height="560" rx="12" fill="#f6f8fa" stroke="#8c959f" stroke-width="1.6"/>
+<text x="60" y="116" text-anchor="start" font-family="Inter, Helvetica, Arial, sans-serif" font-size="22" fill="#57606a" font-weight="700">Node A</text>
+<rect x="60" y="140" width="440" height="225" rx="8" fill="#ffffff" stroke="#c8341f" stroke-width="3"/>
+<rect x="60" y="140" width="440" height="40" rx="8" fill="#c8341f"/>
+<text x="76" y="168" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#ffffff" font-weight="700">partition: author_id = 48213</text>
+<text x="80" y="214" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">10:00:05 → 17905512…</text>
+<text x="80" y="254" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">09:41:12 → 17905433…</text>
+<text x="80" y="294" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">08:02:47 → 17905029…</text>
+<text x="80" y="334" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#8c959f">…older, newest first</text>
+<rect x="60" y="385" width="440" height="225" rx="8" fill="#ffffff" stroke="#1168bd" stroke-width="1.4"/>
+<rect x="60" y="385" width="440" height="40" rx="8" fill="#1168bd"/>
+<text x="76" y="413" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#ffffff" font-weight="700">partition: author_id = 90017</text>
+<text x="80" y="459" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">10:00:05 → 17905512…</text>
+<text x="80" y="499" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">09:41:12 → 17905433…</text>
+<text x="80" y="539" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">08:02:47 → 17905029…</text>
+<text x="80" y="579" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#8c959f">…older, newest first</text>
+<rect x="560" y="80" width="480" height="560" rx="12" fill="#f6f8fa" stroke="#8c959f" stroke-width="1.6"/>
+<text x="580" y="116" text-anchor="start" font-family="Inter, Helvetica, Arial, sans-serif" font-size="22" fill="#57606a" font-weight="700">Node B</text>
+<rect x="580" y="140" width="440" height="225" rx="8" fill="#ffffff" stroke="#1168bd" stroke-width="1.4"/>
+<rect x="580" y="140" width="440" height="40" rx="8" fill="#1168bd"/>
+<text x="596" y="168" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#ffffff" font-weight="700">partition: author_id = 31</text>
+<text x="600" y="214" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">10:00:05 → 17905512…</text>
+<text x="600" y="254" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">09:41:12 → 17905433…</text>
+<text x="600" y="294" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">08:02:47 → 17905029…</text>
+<text x="600" y="334" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#8c959f">…older, newest first</text>
+<rect x="580" y="385" width="440" height="225" rx="8" fill="#ffffff" stroke="#1168bd" stroke-width="1.4"/>
+<rect x="580" y="385" width="440" height="40" rx="8" fill="#1168bd"/>
+<text x="596" y="413" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#ffffff" font-weight="700">partition: author_id = 777001</text>
+<text x="600" y="459" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">10:00:05 → 17905512…</text>
+<text x="600" y="499" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">09:41:12 → 17905433…</text>
+<text x="600" y="539" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">08:02:47 → 17905029…</text>
+<text x="600" y="579" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#8c959f">…older, newest first</text>
+<rect x="1080" y="80" width="480" height="560" rx="12" fill="#f6f8fa" stroke="#8c959f" stroke-width="1.6"/>
+<text x="1100" y="116" text-anchor="start" font-family="Inter, Helvetica, Arial, sans-serif" font-size="22" fill="#57606a" font-weight="700">Node C</text>
+<rect x="1100" y="140" width="440" height="225" rx="8" fill="#ffffff" stroke="#1168bd" stroke-width="1.4"/>
+<rect x="1100" y="140" width="440" height="40" rx="8" fill="#1168bd"/>
+<text x="1116" y="168" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#ffffff" font-weight="700">partition: author_id = 5120</text>
+<text x="1120" y="214" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">10:00:05 → 17905512…</text>
+<text x="1120" y="254" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">09:41:12 → 17905433…</text>
+<text x="1120" y="294" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">08:02:47 → 17905029…</text>
+<text x="1120" y="334" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#8c959f">…older, newest first</text>
+<rect x="1100" y="385" width="440" height="225" rx="8" fill="#ffffff" stroke="#1168bd" stroke-width="1.4"/>
+<rect x="1100" y="385" width="440" height="40" rx="8" fill="#1168bd"/>
+<text x="1116" y="413" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#ffffff" font-weight="700">partition: author_id = 66</text>
+<text x="1120" y="459" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">10:00:05 → 17905512…</text>
+<text x="1120" y="499" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">09:41:12 → 17905433…</text>
+<text x="1120" y="539" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#1f2328">08:02:47 → 17905029…</text>
+<text x="1120" y="579" text-anchor="start" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19" fill="#8c959f">…older, newest first</text>
+<rect x="40" y="660" width="1520" height="72.0" rx="6" fill="#e8f0fa" stroke="#2f6fb5" stroke-width="1.2"/>
+<text x="54" y="685.0" font-family="Inter, Helvetica, Arial, sans-serif" font-size="20.0" fill="#1f2328">Query: author 48213&#x27;s posts since 48 h ago = one partition on one node, one sequential read in time order. A row store does the same with an</text>
+<text x="54" y="712.0" font-family="Inter, Helvetica, Arial, sans-serif" font-size="20.0" fill="#1f2328">index on (author_id, created_at); a wide-column store makes that layout the table itself, and spreads partitions over nodes by hash.</text>
+</svg>

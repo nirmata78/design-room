@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>SD-09 chat video slides</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="deck.css">
+<link rel="stylesheet" href="video.css">
+</head><body>
+<!-- One idea per slide, ≤ ~25 words of body, one figure max. Content follows ../../SD-09-chat-messaging.md;
+     the four follow-ups are new for this video. -->
+
+<!-- v-01 title -->
+<div class="slide th">
+  <div class="lbl">Mock system design round · L6 Engineering Manager</div>
+  <div class="s">Chat and messaging:<br>how the round could go.</div>
+  <div class="sub">One-to-one and groups, a billion users, receipts, devices that go offline. The design, then four manager follow-ups.</div>
+  <div class="foot"><span>design-room · SD-09</span><span>interviewer · candidate · coach</span></div>
+</div>
+
+<!-- v-02 weighed -->
+<div class="slide">
+<div class="k">Before you start</div>
+<h1>What an L6 EM panel weighs most</h1>
+<div class="cards c3">
+<div class="cd red"><h3>Operations and cost</h3><p>Reconnect storms, delivery-latency SLO, twenty petabytes a year.</p></div>
+<div class="cd"><h3>Leadership</h3><p>Phasing, team seams, who decides encryption, the on-call load.</p></div>
+<div class="cd grn"><h3>Depth, once</h3><p>Ordering and idempotent send, two levels down.</p></div>
+</div>
+<div class="line a">The curveball: a privacy decision, an incident, a burning on-call, a storage bill.</div>
+<div class="foot"><span>Chat · mock round</span><span>levels: em = L6 / M1</span></div>
+</div>
+
+<!-- v-03 prompt -->
+<div class="slide qs">
+<div class="who">Interviewer · the prompt</div>
+<div class="qq">"Design a messaging system: one-to-one and group chats, a billion users, delivery and read receipts, and clients that go offline."</div>
+<div class="hint">Ask what "never lose" and "never duplicate" mean here.</div>
+</div>
+
+<!-- v-04 scale -->
+<div class="slide">
+<div class="k">Clarify · minutes 0–6</div>
+<h1>Scale and shape</h1>
+<table class="bt"><tr><th>I ask</th><th>They answer</th><th>Why it matters</th></tr>
+<tr><td>Scale?</td><td>1 B users, <b>100 M connected</b></td><td>the connection tier is a cost</td></tr>
+<tr><td>Message rate?</td><td>1 M a second at peak</td><td>log and storage sizing</td></tr>
+<tr><td>Group size?</td><td>up to 1,000</td><td>fan-out model, receipt traffic</td></tr>
+<tr><td>Devices?</td><td>up to 5 per user</td><td>per-device cursors</td></tr>
+</table>
+<div class="foot"><span>Chat · clarify</span><span>stage 1</span></div>
+</div>
+
+<!-- v-05 guarantees -->
+<div class="slide">
+<div class="k">Clarify · the guarantees</div>
+<h1>Never lose, never show twice, one order for everyone</h1>
+<table class="bt"><tr><th>I ask</th><th>They answer</th><th>Why it matters</th></tr>
+<tr><td>Receipts?</td><td>sent, delivered, read</td><td>a second flow, maybe bigger than the first</td></tr>
+<tr><td>History?</td><td>full, years, searchable</td><td>storage tier and a search index</td></tr>
+<tr><td>Encryption?</td><td>not end to end; say what it changes</td><td>search versus privacy</td></tr>
+</table>
+<div class="line">Losing and duplicating are both banned: durable write plus idempotency.</div>
+<div class="foot"><span>Chat · clarify</span><span>stage 1</span></div>
+</div>
+
+<!-- v-06 scope -->
+<div class="slide">
+<div class="k">Clarify · scope</div>
+<h1>In and out, said aloud</h1>
+<div class="cards c2">
+<div class="cd grn"><h3>In scope</h3><p>Send, deliver, sync, groups, receipts, history, multi-device.</p></div>
+<div class="cd amb"><h3>Out of scope</h3><p>Media, calls, spam, the push platform. Encryption as a delta.</p></div>
+</div>
+<div class="foot"><span>Chat · scope</span><span>stage 1</span></div>
+</div>
+
+<!-- v-07 THESIS -->
+<div class="slide th">
+  <div class="lbl">Key line · land it by minute twelve</div>
+  <div class="s">Start from the <em>mailbox</em>, not the socket.</div>
+  <div class="sub">Stored with a sequence number before anything is acknowledged. Every device catches up by cursor. The socket only delivers early.</div>
+  <div class="foot"><span>Chat · the thesis</span><span>key line</span></div>
+</div>
+
+<!-- v-08 NFRs -->
+<div class="slide">
+<div class="k">Non-functional targets</div>
+<h1>Four numbers to design against</h1>
+<div class="tiles">
+<div class="tile"><b>500 ms</b><span>delivery to online recipients, p99</span></div>
+<div class="tile blue"><b>zero</b><span>loss after the sender's tick</span></div>
+<div class="tile blue"><b>total</b><span>order per conversation</span></div>
+<div class="tile"><b>99.99%</b><span>send availability</span></div>
+</div>
+<div class="foot"><span>Chat · targets</span><span>stage 1</span></div>
+</div>
+
+<!-- v-09 connections -->
+<div class="slide">
+<div class="k">Estimation · number one</div>
+<h1>Connections: a tier of its own</h1>
+<div class="tiles" style="--n:3">
+<div class="tile blue"><b>100 M</b><span>sockets × ~20 KB</span></div>
+<div class="tile blue"><b>~2 TB</b><span>of RAM, just to stay connected</span></div>
+<div class="tile"><b>~250</b><span>gateway hosts at ~500 k each, plus headroom</span></div>
+</div>
+<div class="line">Keep logic out of the gateways. Heartbeats, ~3 M a second, stay there too.</div>
+<div class="foot"><span>Chat · estimation</span><span>stage 2</span></div>
+</div>
+
+<!-- v-10 storage -->
+<div class="slide">
+<div class="k">Estimation · number two</div>
+<h1>Storage: partition by conversation, tier the old</h1>
+<div class="tiles" style="--n:3">
+<div class="tile blue"><b>1 M/s</b><span>× ~200 bytes</span></div>
+<div class="tile blue"><b>~20 TB</b><span>a day raw, ~60 TB replicated</span></div>
+<div class="tile"><b>~20 PB</b><span>a year</span></div>
+</div>
+<div class="foot"><span>Chat · estimation</span><span>stage 2</span></div>
+</div>
+
+<!-- v-11 receipts number -->
+<div class="slide th">
+  <div class="lbl">Estimation · the trap</div>
+  <div class="s">A thousand readers, each told to 999 others: <em>a million receipts</em> per message.</div>
+  <div class="sub">So in large groups, receipts are aggregated, never fanned out.</div>
+  <div class="foot"><span>Chat · estimation</span><span>key number</span></div>
+</div>
+
+<!-- v-12 API -->
+<div class="slide">
+<div class="k">API · WebSocket frames · minutes 11–17</div>
+<h1>Send, receive, acknowledge, sync</h1>
+<pre class="big">→ SEND      {convId, clientMsgId, body}    ← ACK {clientMsgId, seq, serverTs}
+← MSG       {convId, seq, senderId, body}  → DELIVERED {convId, upToSeq}
+→ READ      {convId, upToSeq}
+→ SYNC      {cursors: {convId: lastSeq}}   ← MSG …, then LIVE</pre>
+<div class="line">History over REST: messages before a seq, create a conversation, add members.</div>
+<div class="foot"><span>Chat · API</span><span>stage 3</span></div>
+</div>
+
+<!-- v-13 data -->
+<div class="slide">
+<div class="k">Data model</div>
+<h1>The message row and the cursor</h1>
+<table class="bt"><tr><th>Store</th><th>Key</th><th>Holds</th></tr>
+<tr><td><b>Messages</b></td><td>conv_id, then seq</td><td>sender, clientMsgId, body, server time</td></tr>
+<tr><td><b>Sequencer</b></td><td>conv_id</td><td>last_seq, one owner</td></tr>
+<tr><td><b>Device cursors</b></td><td>user, device, conv</td><td>delivered_seq, read_seq</td></tr>
+<tr><td><b>Inbox index</b></td><td>user_id</td><td>conversations that changed</td></tr>
+<tr><td><b>Session registry</b></td><td>user, device</td><td>which gateway, with a TTL</td></tr>
+</table>
+<div class="foot"><span>Chat · data</span><span>stage 3</span></div>
+</div>
+
+<!-- v-14 C4 context -->
+<div class="slide dia">
+<div class="k">Architecture · C4 level 1 · system context</div>
+<h1>Users on sockets; push wakes the offline</h1>
+<figure class="grow"><!--SVG:c4-context--></figure>
+<div class="foot"><span>Chat · C4 context</span><span>stage 4</span></div>
+</div>
+
+<!-- v-15 C4 send -->
+<div class="slide dia">
+<div class="k">Architecture · C4 level 2 · send and deliver</div>
+<h1>Append, acknowledge, then deliver from the log</h1>
+<figure class="grow"><!--SVG:c4-containers-send--></figure>
+<div class="foot"><span>Chat · containers</span><span>stage 4</span></div>
+</div>
+
+<!-- v-16 C4 sync -->
+<div class="slide dia">
+<div class="k">Architecture · C4 level 2 · sync and receipts</div>
+<h1>Catch up by cursor; receipts on their own path</h1>
+<figure class="grow"><!--SVG:c4-containers-sync--></figure>
+<div class="foot"><span>Chat · containers</span><span>stage 4</span></div>
+</div>
+
+<!-- v-17 seq send -->
+<div class="slide dia">
+<div class="k">Sequence · Alice sends to Bob, who is offline</div>
+<h1>The tick means stored, not sent</h1>
+<figure class="grow"><!--SVG:seq-send--></figure>
+<div class="foot"><span>Chat · send</span><span>stage 4</span></div>
+</div>
+
+<!-- v-18 seq sync -->
+<div class="slide dia">
+<div class="k">Sequence · Bob comes back</div>
+<h1>Everything after my cursor, then live</h1>
+<figure class="grow"><!--SVG:seq-sync--></figure>
+<div class="foot"><span>Chat · sync</span><span>stage 4</span></div>
+</div>
+
+<!-- v-19 key line -->
+<div class="slide th">
+  <div class="lbl">Key line · why it's one code path</div>
+  <div class="s">Online and offline are the same path. The push only <em>delivers early</em>.</div>
+  <div class="foot"><span>Chat · design</span><span>key line</span></div>
+</div>
+
+<!-- v-20 tech -->
+<div class="slide">
+<div class="k">Technology choices</div>
+<h1>Mechanism and trade-off</h1>
+<table class="bt"><tr><th>Component</th><th>Choice and reason</th></tr>
+<tr><td><b>Gateways</b></td><td>WebSocket servers holding only connections</td></tr>
+<tr><td><b>Messages</b></td><td>wide-column, partition conv_id, cluster seq: append-heavy, read in order</td></tr>
+<tr><td><b>Sequencer</b></td><td>the partition leader per conversation: one authority, one order</td></tr>
+<tr><td><b>Log</b></td><td>by conv_id: ordered, replayable for delivery, push and search</td></tr>
+<tr><td><b>Registry</b></td><td>in-memory KV with TTLs; tolerates staleness</td></tr>
+</table>
+<div class="foot"><span>Chat · technology</span><span>stage 5</span></div>
+</div>
+
+<!-- v-21 Q ordering -->
+<div class="slide qs">
+<div class="who">Interviewer · deep dive one</div>
+<div class="qq">"Two people in a group send at the same instant. Who decides the order?"</div>
+<div class="hint">Not the clocks.</div>
+</div>
+
+<!-- v-22 seq order -->
+<div class="slide dia">
+<div class="k">Sequence · concurrent sends</div>
+<h1>One sequencer per conversation</h1>
+<figure class="grow"><!--SVG:seq-order--></figure>
+<div class="foot"><span>Chat · ordering</span><span>stage 6</span></div>
+</div>
+
+<!-- v-23 why per conv -->
+<div class="slide">
+<div class="k">Deep dive one · why not one global order?</div>
+<h1>Per conversation is what users see, and it partitions</h1>
+<div class="cards c2">
+<div class="cd red"><h3>Global sequencer</h3><p>A bottleneck, and meaningless across conversations.</p></div>
+<div class="cd grn"><h3>Per conversation</h3><p>1 M a second spread over hundreds of millions of conversations.</p></div>
+</div>
+<div class="line">A hot group: thousands a second is still within one leader's capacity.</div>
+<div class="foot"><span>Chat · ordering</span><span>stage 6</span></div>
+</div>
+
+<!-- v-24 component -->
+<div class="slide dia">
+<div class="k">C4 level 3 · inside the message service</div>
+<h1>Route, sequence, dedup, write, then ACK</h1>
+<figure class="grow"><!--SVG:c4-component-message--></figure>
+<div class="foot"><span>Chat · component</span><span>stage 6</span></div>
+</div>
+
+<!-- v-25 Q lost ack -->
+<div class="slide qs">
+<div class="who">Interviewer · deep dive two</div>
+<div class="qq">"The server stored the message, but the phone went into a tunnel and never got the ACK. What happens?"</div>
+<div class="hint">Retry is safe only if the server can recognise it.</div>
+</div>
+
+<!-- v-26 seq lost ack -->
+<div class="slide dia">
+<div class="k">Sequence · the lost ACK</div>
+<h1>Same clientMsgId, original seq, no duplicate</h1>
+<figure class="grow"><!--SVG:seq-lost-ack--></figure>
+<div class="foot"><span>Chat · idempotent send</span><span>stage 6</span></div>
+</div>
+
+<!-- v-27 key line -->
+<div class="slide th">
+  <div class="lbl">Key line · idempotent send</div>
+  <div class="s">The tick appears only after a <em>real ACK</em>.</div>
+  <div class="sub">So a message is never shown as sent when it wasn't, and a retry never shows twice.</div>
+  <div class="foot"><span>Chat · idempotent send</span><span>key line</span></div>
+</div>
+
+<!-- v-28 groups -->
+<div class="slide dia">
+<div class="k">Deep dive three · groups</div>
+<h1>One shared log, not a thousand inboxes</h1>
+<figure class="grow"><!--SVG:groups--></figure>
+<div class="foot"><span>Chat · groups</span><span>stage 6</span></div>
+</div>
+
+<!-- v-29 receipts -->
+<div class="slide dia">
+<div class="k">Deep dive three · receipts</div>
+<h1>Receipts are cursors; big groups count on demand</h1>
+<figure class="grow"><!--SVG:seq-receipts--></figure>
+<div class="foot"><span>Chat · receipts</span><span>stage 6</span></div>
+</div>
+
+<!-- v-30 Q gateway -->
+<div class="slide qs">
+<div class="who">Interviewer · deep dive four</div>
+<div class="qq">"A gateway dies with half a million connections on it."</div>
+<div class="hint">The messages are safe. What isn't?</div>
+</div>
+
+<!-- v-31 seq reconnect -->
+<div class="slide dia">
+<div class="k">Sequence · the reconnect storm</div>
+<h1>Jitter, resume, sync deltas, admit gradually</h1>
+<figure class="grow"><!--SVG:seq-reconnect--></figure>
+<div class="foot"><span>Chat · reconnect</span><span>stage 6</span></div>
+</div>
+
+<!-- v-32 month offline -->
+<div class="slide">
+<div class="k">Deep dive · back after a month</div>
+<h1>Newest first, backfill as you scroll</h1>
+<div class="cards c3">
+<div class="cd"><h3>What changed?</h3><p>The inbox index lists changed conversations since the last sync.</p></div>
+<div class="cd grn"><h3>Newest page first</h3><p>The UI is useful in a second.</p></div>
+<div class="cd amb"><h3>Backfill lazily</h3><p>Older messages as the user scrolls; burst capped per device.</p></div>
+</div>
+<div class="foot"><span>Chat · sync</span><span>stage 6</span></div>
+</div>
+
+<!-- v-33 Q midround -->
+<div class="slide qs">
+<div class="who">Interviewer · a requirement added mid-round</div>
+<div class="qq">"Users want to edit a message, and delete it for everyone."</div>
+<div class="hint">The delta, and what stays untouched.</div>
+</div>
+
+<!-- v-34 midround dia -->
+<div class="slide dia">
+<div class="k">Mid-round · the delta</div>
+<h1>An event in the conversation, not a thousand updates</h1>
+<figure class="grow"><!--SVG:midround-edit--></figure>
+<div class="foot"><span>Chat · mid-round</span><span>stage 7</span></div>
+</div>
+
+<!-- v-35 failures -->
+<div class="slide">
+<div class="k">Failure modes · minutes 45–50</div>
+<h1>What breaks, and the response</h1>
+<table class="bt"><tr><th>Failure</th><th>Response</th></tr>
+<tr><td><b>Gateway lost</b></td><td>jitter, resumption, cursor sync, admission control</td></tr>
+<tr><td><b>Registry stale</b></td><td>delivery fails; the message waits in the log</td></tr>
+<tr><td><b>Leader failover</b></td><td>sends pause seconds; retry with the same clientMsgId</td></tr>
+<tr><td><b>Log consumer lag</b></td><td>delivery outranks search and indexing</td></tr>
+<tr><td><b>Region outage</b></td><td>conversations homed per region; state the reorder risk</td></tr>
+</table>
+<div class="foot"><span>Chat · failures</span><span>stage 8</span></div>
+</div>
+
+<!-- v-36 SLOs -->
+<div class="slide">
+<div class="k">SLOs and observability</div>
+<h1>Probe devices talking to each other, all day</h1>
+<div class="cards c3">
+<div class="cd"><h3>Send</h3><p>ACK received, as a success rate.</p></div>
+<div class="cd red"><h3>Delivery</h3><p>End-to-end latency to online recipients, from synthetic conversations.</p></div>
+<div class="cd amb"><h3>Integrity</h3><p>Loss and duplicate rate on probe traffic: should be zero.</p></div>
+</div>
+<div class="foot"><span>Chat · SLOs</span><span>stage 9</span></div>
+</div>
+
+<!-- v-37 cost -->
+<div class="slide">
+<div class="k">Cost</div>
+<h1>Two items dominate</h1>
+<div class="cards c2">
+<div class="cd"><h3>The gateway fleet</h3><p>RAM for 100 M connections. Plan capacity by connections, not requests.</p></div>
+<div class="cd red"><h3>Storage growth</h3><p>~20 PB a year. Tier old history, compress, keep months on fast disks.</p></div>
+</div>
+<div class="foot"><span>Chat · cost</span><span>stage 9</span></div>
+</div>
+
+<!-- v-38 phases -->
+<div class="slide dia">
+<div class="k">The manager layer · how you'd build it</div>
+<h1>The invariant first, then scale</h1>
+<figure class="grow"><!--SVG:em-phases--></figure>
+<div class="foot"><span>Chat · delivery</span><span>stage 10</span></div>
+</div>
+
+<!-- v-39 teams -->
+<div class="slide">
+<div class="k">The manager layer · team seams</div>
+<h1>Four teams</h1>
+<div class="cards c4">
+<div class="cd"><h3>Connections</h3><p>Gateways, registry, capacity.</p></div>
+<div class="cd red"><h3>Messaging core</h3><p>Sequencer, storage, the invariant. Delivery-latency on-call.</p></div>
+<div class="cd grn"><h3>Sync and clients</h3><p>The protocol and its versions.</p></div>
+<div class="cd amb"><h3>Search</h3><p>Off the send path.</p></div>
+</div>
+<div class="foot"><span>Chat · teams</span><span>stage 10</span></div>
+</div>
+
+<!-- v-40 close -->
+<div class="slide th">
+  <div class="lbl">Key line · the close</div>
+  <div class="s">Store first, with a sequence. <em>Deliver second.</em></div>
+  <div class="sub">One order, no loss, no duplicates; offline and multi-device on the same path. Next: harden reconnect storms, tier twenty petabytes a year.</div>
+  <div class="foot"><span>Chat · the close</span><span>stage 11</span></div>
+</div>
+
+<!-- v-41 FU1 Q -->
+<div class="slide qs">
+<div class="who">Follow-up 1 · stakeholder pressure</div>
+<div class="qq">"The CEO announced end-to-end encryption on stage. Product wants a date by Friday."</div>
+<div class="hint">What breaks, what it costs, who decides.</div>
+</div>
+
+<!-- v-42 FU1 dia -->
+<div class="slide dia">
+<div class="k">Follow-up 1 · price the decision</div>
+<h1>A one-page options paper, not a date</h1>
+<figure class="grow"><!--SVG:fu-e2e--></figure>
+<div class="foot"><span>Chat · follow-up 1</span><span>stakeholder</span></div>
+</div>
+
+<!-- v-43 FU2 Q -->
+<div class="slide qs">
+<div class="who">Follow-up 2 · an incident</div>
+<div class="qq">"A gateway deploy restarts a whole zone at once. Delivery latency goes from half a second to forty seconds."</div>
+<div class="hint">Detect, contain, recover, learn.</div>
+</div>
+
+<!-- v-44 FU2 dia -->
+<div class="slide dia">
+<div class="k">Follow-up 2 · the first hour</div>
+<h1>Stop the rollout before you fix the storm</h1>
+<figure class="grow"><!--SVG:fu-incident--></figure>
+<div class="foot"><span>Chat · follow-up 2</span><span>incident</span></div>
+</div>
+
+<!-- v-45 FU3 Q -->
+<div class="slide qs">
+<div class="who">Follow-up 3 · the team</div>
+<div class="qq">"The messaging-core team was paged forty times last month. Two engineers have asked to move teams."</div>
+<div class="hint">Measure, cut noise, fix, protect people.</div>
+</div>
+
+<!-- v-46 FU3 dia -->
+<div class="slide dia">
+<div class="k">Follow-up 3 · a burning on-call</div>
+<h1>Paging load is a team health metric</h1>
+<figure class="grow"><!--SVG:fu-oncall--></figure>
+<div class="foot"><span>Chat · follow-up 3</span><span>people</span></div>
+</div>
+
+<!-- v-47 FU4 Q -->
+<div class="slide qs">
+<div class="who">Follow-up 4 · a cost target</div>
+<div class="qq">"Finance wants message storage cost down forty percent next year, with no product change."</div>
+<div class="hint">Slice before you cut.</div>
+</div>
+
+<!-- v-48 FU4 dia -->
+<div class="slide dia">
+<div class="k">Follow-up 4 · the levers</div>
+<h1>Tier history first</h1>
+<figure class="grow"><!--SVG:fu-cost--></figure>
+<div class="foot"><span>Chat · follow-up 4</span><span>cost</span></div>
+</div>
+
+<!-- v-49 scorecard -->
+<div class="slide">
+<div class="k">Debrief</div>
+<h1>Where the round lands</h1>
+<table class="bt"><tr><th>Signal</th><th>Strong</th><th>Exceptional</th></tr>
+<tr><td>Framing</td><td>WebSockets and a database</td><td>"mailbox first, socket second"</td></tr>
+<tr><td>Order</td><td>timestamps</td><td>one sequencer per conversation</td></tr>
+<tr><td>Dedup</td><td>retries</td><td>clientMsgId, the lost-ACK walk</td></tr>
+<tr><td>Groups</td><td>fan-out</td><td>shared log; receipts aggregated, sized</td></tr>
+<tr><td>EM layer</td><td>SLOs</td><td>probe conversations, reconnect plan, storage tiering</td></tr>
+</table>
+<div class="foot"><span>Chat · scorecard</span><span>debrief</span></div>
+</div>
+
+<!-- v-50 checks -->
+<div class="slide th">
+  <div class="lbl">Debrief</div>
+  <div class="s" style="font-size:38pt">Five checks before the real round.</div>
+  <ol class="check" style="padding-left:30pt">
+    <li>Store before deliver, said out loud.</li>
+    <li>A server sequence per conversation, not timestamps.</li>
+    <li>clientMsgId and the lost ACK.</li>
+    <li>Per-device cursors and the offline walk.</li>
+    <li>The receipt trap, found with a number.</li>
+  </ol>
+  <div class="foot"><span>Chat · mock round</span><span>end</span></div>
+</div>
+</body></html>

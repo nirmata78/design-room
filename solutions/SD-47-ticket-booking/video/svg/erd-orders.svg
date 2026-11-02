@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 820" width="1600" height="820">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<rect x="20" y="30" width="500" height="448" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
+<path d="M20,38 a8,8 0 0 1 8,-8 h484 a8,8 0 0 1 8,8 v40 h-500 z" fill="#c8341f"/>
+<text x="34" y="62.64" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="24.2" font-weight="700" fill="#fff">orders</text>
+<rect x="34" y="86.0" width="35.6" height="24.0" rx="3" fill="#fdecea" stroke="#c8341f" stroke-width="0.8"/>
+<text x="51.8" y="104.4" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.8" font-weight="700" fill="#c8341f">PK</text>
+<text x="76.7" y="105.2" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19.8" fill="#1f2328" font-weight="700">order_id</text>
+<text x="506" y="105.2" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.9" fill="#57606a">uuid</text>
+<rect x="21" y="118" width="498" height="40" fill="#f6f8fa"/>
+<text x="76.7" y="145.2" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19.8" fill="#1f2328">user_id</text>
+<text x="506" y="145.2" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.9" fill="#57606a">bigint</text>
+<text x="76.7" y="185.2" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19.8" fill="#1f2328">event_id</text>
+<text x="506" y="185.2" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.9" fill="#57606a">bigint</text>
+<rect x="21" y="198" width="498" height="40" fill="#f6f8fa"/>
+<rect x="34" y="206.0" width="35.6" height="24.0" rx="3" fill="#e7f4ec" stroke="#2d8a4e" stroke-width="0.8"/>
+<text x="51.8" y="224.4" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.8" font-weight="700" fill="#2d8a4e">UK</text>
+<text x="76.7" y="225.2" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19.8" fill="#1f2328">hold_id</text>
+<text x="506" y="225.2" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.9" fill="#57606a">uuid</text>
+<text x="76.7" y="265.2" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19.8" fill="#1f2328">amount</text>
+<text x="506" y="265.2" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.9" fill="#57606a">numeric(12,2)</text>
+<rect x="21" y="278" width="498" height="40" fill="#f6f8fa"/>
+<text x="76.7" y="305.2" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19.8" fill="#1f2328">currency</text>
+<text x="506" y="305.2" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.9" fill="#57606a">char(3)</text>
+<text x="76.7" y="345.2" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19.8" fill="#1f2328">status</text>
+<text x="506" y="345.2" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.9" fill="#57606a">text</text>
+<rect x="21" y="358" width="498" height="40" fill="#f6f8fa"/>
+<text x="76.7" y="385.2" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19.8" fill="#1f2328">psp_ref</text>
+<text x="506" y="385.2" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.9" fill="#57606a">text</text>
+<rect x="34" y="406.0" width="35.6" height="24.0" rx="3" fill="#e7f4ec" stroke="#2d8a4e" stroke-width="0.8"/>
+<text x="51.8" y="424.4" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.8" font-weight="700" fill="#2d8a4e">UK</text>
+<text x="76.7" y="425.2" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19.8" fill="#1f2328">idem_key</text>
+<text x="506" y="425.2" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.9" fill="#57606a">text</text>
+<text x="34" y="462.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17.9" font-style="italic" fill="#57606a">UNIQUE hold_id: one order per hold</text>
+<rect x="640" y="30" width="450" height="288" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
+<path d="M640,38 a8,8 0 0 1 8,-8 h434 a8,8 0 0 1 8,8 v40 h-450 z" fill="#1168bd"/>
+<text x="654" y="62.64" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="24.2" font-weight="700" fill="#fff">payment_attempt</text>
+<rect x="654" y="86.0" width="35.6" height="24.0" rx="3" fill="#fdecea" stroke="#c8341f" stroke-width="0.8"/>
+<text x="671.8" y="104.4" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.8" font-weight="700" fill="#c8341f">PK</text>
+<rect x="694.65" y="86.0" width="35.6" height="24.0" rx="3" fill="#e8f0fa" stroke="#2f6fb5" stroke-width="0.8"/>
+<text x="712.5" y="104.4" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.8" font-weight="700" fill="#2f6fb5">FK</text>
+<text x="737.3" y="105.2" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19.8" fill="#1f2328" font-weight="700">order_id</text>
+<text x="1076" y="105.2" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.9" fill="#57606a">uuid</text>
+<rect x="641" y="118" width="448" height="40" fill="#f6f8fa"/>
+<rect x="654" y="126.0" width="35.6" height="24.0" rx="3" fill="#fdecea" stroke="#c8341f" stroke-width="0.8"/>
+<text x="671.8" y="144.4" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.8" font-weight="700" fill="#c8341f">PK</text>
+<text x="696.6" y="145.2" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19.8" fill="#1f2328" font-weight="700">attempt</text>
+<text x="1076" y="145.2" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.9" fill="#57606a">int</text>
+<rect x="654" y="166.0" width="35.6" height="24.0" rx="3" fill="#e7f4ec" stroke="#2d8a4e" stroke-width="0.8"/>
+<text x="671.8" y="184.4" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.8" font-weight="700" fill="#2d8a4e">UK</text>
+<text x="696.6" y="185.2" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19.8" fill="#1f2328">psp_idem_key</text>
+<text x="1076" y="185.2" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.9" fill="#57606a">text</text>
+<rect x="641" y="198" width="448" height="40" fill="#f6f8fa"/>
+<text x="696.6" y="225.2" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19.8" fill="#1f2328">status</text>
+<text x="1076" y="225.2" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.9" fill="#57606a">text</text>
+<text x="696.6" y="265.2" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19.8" fill="#1f2328">last_checked</text>
+<text x="1076" y="265.2" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.9" fill="#57606a">timestamptz</text>
+<text x="654" y="302.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17.9" font-style="italic" fill="#57606a">SENT · AUTHORIZED · UNKNOWN · VOIDED</text>
+<rect x="1180" y="30" width="410" height="288" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
+<path d="M1180,38 a8,8 0 0 1 8,-8 h394 a8,8 0 0 1 8,8 v40 h-410 z" fill="#1168bd"/>
+<text x="1194" y="62.64" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="24.2" font-weight="700" fill="#fff">ticket</text>
+<rect x="1194" y="86.0" width="35.6" height="24.0" rx="3" fill="#fdecea" stroke="#c8341f" stroke-width="0.8"/>
+<text x="1211.8" y="104.4" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.8" font-weight="700" fill="#c8341f">PK</text>
+<text x="1236.7" y="105.2" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19.8" fill="#1f2328" font-weight="700">ticket_id</text>
+<text x="1576" y="105.2" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.9" fill="#57606a">uuid</text>
+<rect x="1181" y="118" width="408" height="40" fill="#f6f8fa"/>
+<rect x="1194" y="126.0" width="35.6" height="24.0" rx="3" fill="#e7f4ec" stroke="#2d8a4e" stroke-width="0.8"/>
+<text x="1211.8" y="144.4" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.8" font-weight="700" fill="#2d8a4e">UK</text>
+<text x="1236.7" y="145.2" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19.8" fill="#1f2328">event_id</text>
+<text x="1576" y="145.2" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.9" fill="#57606a">bigint</text>
+<rect x="1194" y="166.0" width="35.6" height="24.0" rx="3" fill="#e7f4ec" stroke="#2d8a4e" stroke-width="0.8"/>
+<text x="1211.8" y="184.4" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.8" font-weight="700" fill="#2d8a4e">UK</text>
+<text x="1236.7" y="185.2" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19.8" fill="#1f2328">seat_id</text>
+<text x="1576" y="185.2" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.9" fill="#57606a">int</text>
+<rect x="1181" y="198" width="408" height="40" fill="#f6f8fa"/>
+<rect x="1194" y="206.0" width="35.6" height="24.0" rx="3" fill="#e8f0fa" stroke="#2f6fb5" stroke-width="0.8"/>
+<text x="1211.8" y="224.4" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.8" font-weight="700" fill="#2f6fb5">FK</text>
+<text x="1236.7" y="225.2" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19.8" fill="#1f2328">order_id</text>
+<text x="1576" y="225.2" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.9" fill="#57606a">uuid</text>
+<text x="1236.7" y="265.2" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="19.8" fill="#1f2328">barcode</text>
+<text x="1576" y="265.2" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.9" fill="#57606a">bytea</text>
+<text x="1194" y="302.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17.9" font-style="italic" fill="#57606a">UNIQUE (event_id, seat_id)</text>
+<path d="M520.0,119.6 L640.0,116.4" fill="none" stroke="#5b6672" stroke-width="1.8"/>
+<circle cx="520.0" cy="119.6" r="4" fill="#5b6672"/>
+<text x="536.3" y="140.2" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="20.7" font-weight="700" fill="#c8341f">1</text>
+<circle cx="640.0" cy="116.4" r="4" fill="#5b6672"/>
+<text x="623.7" y="111.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="20.7" font-weight="700" fill="#c8341f">N</text>
+<rect x="518.6" y="51.6" width="122.7" height="33.4" rx="4" fill="#ffffff"/>
+<text x="580.0" y="76.9" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">order_id</text>
+<path d="M520.0,366.0 L1385.0,395.0 L1385.0,318.0" fill="none" stroke="#5b6672" stroke-width="1.8"/>
+<circle cx="520.0" cy="366.0" r="4" fill="#5b6672"/>
+<text x="535.6" y="387.6" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="20.7" font-weight="700" fill="#c8341f">1</text>
+<circle cx="1385.0" cy="318.0" r="4" fill="#5b6672"/>
+<text x="1372.0" y="342.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="20.7" font-weight="700" fill="#c8341f">N</text>
+<rect x="838.6" y="376.6" width="122.7" height="33.4" rx="4" fill="#ffffff"/>
+<text x="900.0" y="401.9" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">order_id</text>
+<rect x="20" y="560" width="1570" height="75.6" rx="6" fill="#fdf3e1" stroke="#a86a12" stroke-width="1.2"/>
+<text x="34" y="586.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="21.0" fill="#1f2328">Money is numeric(12,2), never a float. psp_idem_key is what the PSP deduplicates on, so a retried authorisation is never a second charge. The</text>
+<text x="34" y="614.6" font-family="Inter, Helvetica, Arial, sans-serif" font-size="21.0" fill="#1f2328">ticket&#x27;s UNIQUE (event_id, seat_id) is the last line against oversell, independent of our code.</text>
+</svg>

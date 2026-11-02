@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>SD-25 rate limiter video slides</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="deck.css">
+<link rel="stylesheet" href="video.css">
+</head><body>
+<!-- One idea per slide, ≤ ~25 words of body, one figure max. Content follows ../../SD-25-rate-limiter.md;
+     the four follow-ups are new for this video. -->
+
+<!-- v-01 title -->
+<div class="slide th">
+  <div class="lbl">Mock system design round · L6 Engineering Manager</div>
+  <div class="s">A distributed rate limiter:<br>how the round could go.</div>
+  <div class="sub">Every customer has a quota, enforced across five hundred servers. The design, then four manager follow-ups.</div>
+  <div class="foot"><span>design-room · SD-25</span><span>interviewer · candidate · coach</span></div>
+</div>
+
+<!-- v-02 weighed -->
+<div class="slide">
+<div class="k">Before you start</div>
+<h1>What an L6 EM panel weighs most</h1>
+<div class="cards c3">
+<div class="cd red"><h3>Operations and cost</h3><p>Fail open, the false-limit SLI, safe policy rollout, the decision log bill.</p></div>
+<div class="cd"><h3>Leadership</h3><p>Exceptions with owners, who owns billing, the week-one plan.</p></div>
+<div class="cd grn"><h3>Depth, once</h3><p>Demand-weighted shares and the size of the error.</p></div>
+</div>
+<div class="line a">The curveball: an unlimited customer, a bad policy push, billing on approximate counts, a log bill.</div>
+<div class="foot"><span>Rate limiter · mock round</span><span>levels: em = L6 / M1</span></div>
+</div>
+
+<!-- v-03 prompt -->
+<div class="slide qs">
+<div class="who">Interviewer · the prompt</div>
+<div class="qq">"Design a rate limiter for our API. Every customer has a quota, and we need to enforce it across a fleet of servers."</div>
+<div class="hint">Ask what exact costs.</div>
+</div>
+
+<!-- v-04 clarify 1 -->
+<div class="slide">
+<div class="k">Clarify · minutes 0–6</div>
+<h1>Traffic and limits</h1>
+<table class="bt"><tr><th>I ask</th><th>They answer</th><th>Why it matters</th></tr>
+<tr><td>Traffic?</td><td>1 M req/s, 500 servers, 3 regions</td><td>a shared store per request is 1 M ops/s</td></tr>
+<tr><td>What's limited?</td><td>per customer and endpoint; some 100× others</td><td>hot keys</td></tr>
+<tr><td>Latency budget?</td><td>under 1 ms p99 added</td><td>no cross-region call</td></tr>
+<tr><td>Bursts?</td><td>legitimate; don't break them</td><td>the algorithm must allow bursts</td></tr>
+</table>
+<div class="foot"><span>Rate limiter · clarify</span><span>stage 1</span></div>
+</div>
+
+<!-- v-05 clarify 2 -->
+<div class="slide">
+<div class="k">Clarify · the trade-off questions</div>
+<h1>How accurate, and what happens when it breaks?</h1>
+<table class="bt"><tr><th>I ask</th><th>They answer</th><th>Why it matters</th></tr>
+<tr><td>Accuracy?</td><td>"what does exact cost?"</td><td>the trade-off of the round</td></tr>
+<tr><td>At the limit?</td><td>429; "what else should it carry?"</td><td>the client contract</td></tr>
+<tr><td>Fail open or closed?</td><td>"your call; defend it"</td><td>availability vs protection</td></tr>
+<tr><td>Global or per region?</td><td>(ask it)</td><td>exact global needs coordination</td></tr>
+</table>
+<div class="foot"><span>Rate limiter · clarify</span><span>stage 1</span></div>
+</div>
+
+<!-- v-06 scope -->
+<div class="slide">
+<div class="k">Clarify · scope</div>
+<h1>A protection mechanism, not a billing meter</h1>
+<div class="cards c2">
+<div class="cd grn"><h3>In scope</h3><p>Limits per customer and endpoint, policies, enforcement, headers, decision observability.</p></div>
+<div class="cd amb"><h3>Out, said aloud</h3><p>DDoS at the edge, billing accuracy, abuse detection, the gateway itself.</p></div>
+</div>
+<div class="line">If billing needs exact counts, that's a separate asynchronous pipeline.</div>
+<div class="foot"><span>Rate limiter · scope</span><span>stage 1</span></div>
+</div>
+
+<!-- v-07 THESIS -->
+<div class="slide th">
+  <div class="lbl">Key line · land it by minute ten</div>
+  <div class="s">The limiter's latency and availability matter <em>more than its accuracy</em>.</div>
+  <div class="sub">Decide locally from a token bucket, reconcile asynchronously, and know the size of the error.</div>
+  <div class="foot"><span>Rate limiter · the thesis</span><span>key line</span></div>
+</div>
+
+<!-- v-08 NFRs -->
+<div class="slide">
+<div class="k">Non-functional targets</div>
+<h1>Four numbers to design against</h1>
+<div class="tiles">
+<div class="tile"><b>≤ 1 ms</b><span>added at p99</span></div>
+<div class="tile blue"><b>never</b><span>a limiter outage as an API outage</span></div>
+<div class="tile blue"><b>few %</b><span>accuracy against the configured limit</span></div>
+<div class="tile blue"><b>seconds</b><span>for a policy change to take effect</span></div>
+</div>
+<div class="foot"><span>Rate limiter · targets</span><span>stage 1</span></div>
+</div>
+
+<!-- v-09 number 1 -->
+<div class="slide th">
+  <div class="lbl">Estimation · the number that shapes the design</div>
+  <div class="s">1,000 a minute ÷ 500 servers = <em>2 per server</em>.</div>
+  <div class="sub">A customer hitting three servers unevenly is throttled at a fraction of their quota. The limit can't be divided statically.</div>
+  <div class="foot"><span>Rate limiter · estimation</span><span>key number</span></div>
+</div>
+
+<!-- v-10 number 2 -->
+<div class="slide">
+<div class="k">Estimation · the shared-store option</div>
+<h1>Feasible, and the wrong place for a dependency</h1>
+<div class="tiles" style="--n:3">
+<div class="tile blue"><b>1 M/s</b><span>checks, one per request</span></div>
+<div class="tile blue"><b>~0.5 ms</b><span>round trip each, in-region</span></div>
+<div class="tile"><b>every request</b><span>gets a network hop and a dependency</span></div>
+</div>
+<div class="foot"><span>Rate limiter · estimation</span><span>stage 2</span></div>
+</div>
+
+<!-- v-11 number 3 -->
+<div class="slide">
+<div class="k">Estimation · state and the hot key</div>
+<h1>State is tiny; hot paths are the problem</h1>
+<div class="tiles" style="--n:3">
+<div class="tile blue"><b>2 M</b><span>keys: 100 k customers × 20 endpoints</span></div>
+<div class="tile blue"><b>~128 MB</b><span>of state</span></div>
+<div class="tile"><b>100 k/s</b><span>on one key, for the heaviest customer</span></div>
+</div>
+<div class="foot"><span>Rate limiter · estimation</span><span>stage 2</span></div>
+</div>
+
+<!-- v-12 API -->
+<div class="slide">
+<div class="k">API · minutes 11–16</div>
+<h1>A decision call and a header contract</h1>
+<pre class="big">allow(customerId, endpoint, cost=1) → {allowed, remaining, resetAt, retryAfter}
+
+RateLimit-Limit: 1000        RateLimit-Remaining: 37
+RateLimit-Reset: 23          Retry-After: 2        (only on 429)
+
+PUT /v1/policies/{customer}/{endpoint}
+  {rate, per, burst, scope: global | region, mode: enforce | shadow}</pre>
+<div class="foot"><span>Rate limiter · API</span><span>stage 3</span></div>
+</div>
+
+<!-- v-13 state -->
+<div class="slide">
+<div class="k">Data model</div>
+<h1>Four places state lives</h1>
+<table class="bt"><tr><th>Store</th><th>Holds</th></tr>
+<tr><td><b>Policy store</b></td><td>rate, burst, scope, mode, version; cached in every server</td></tr>
+<tr><td><b>Local bucket</b></td><td>tokens, last refill, local share: in memory</td></tr>
+<tr><td><b>Regional coordinator</b></td><td>consumed counts and share grants: Redis per region</td></tr>
+<tr><td><b>Decision log</b></td><td>sampled decisions, for "why was I limited?"</td></tr>
+</table>
+<div class="foot"><span>Rate limiter · data</span><span>stage 3</span></div>
+</div>
+
+<!-- v-14 C4 context -->
+<div class="slide dia">
+<div class="k">Architecture · C4 level 1 · system context</div>
+<h1>Customers call; billing and monitoring sit beside</h1>
+<figure class="grow"><!--SVG:c4-context--></figure>
+<div class="foot"><span>Rate limiter · C4 context</span><span>stage 4</span></div>
+</div>
+
+<!-- v-15 C4 containers -->
+<div class="slide dia">
+<div class="k">Architecture · C4 level 2 · one region</div>
+<h1>The decision is in-process; the coordinator is off the path</h1>
+<figure class="grow"><!--SVG:c4-containers--></figure>
+<div class="foot"><span>Rate limiter · containers</span><span>stage 4</span></div>
+</div>
+
+<!-- v-16 seq request -->
+<div class="slide dia">
+<div class="k">Sequence · one request</div>
+<h1>A token from the local bucket, in microseconds</h1>
+<figure class="grow"><!--SVG:seq-request--></figure>
+<div class="foot"><span>Rate limiter · hot path</span><span>stage 4</span></div>
+</div>
+
+<!-- v-17 seq share -->
+<div class="slide dia">
+<div class="k">Sequence · the share sync</div>
+<h1>Every 100 ms: report usage, receive a share</h1>
+<figure class="grow"><!--SVG:seq-share--></figure>
+<div class="foot"><span>Rate limiter · sync</span><span>stage 4</span></div>
+</div>
+
+<!-- v-18 why not INCR -->
+<div class="slide">
+<div class="k">Why not a Redis increment per request?</div>
+<h1>It works at small scale. At a million a second:</h1>
+<div class="cards c3">
+<div class="cd"><h3>Latency</h3><p>About half a millisecond on every call: half the budget.</p></div>
+<div class="cd amb"><h3>Hot shards</h3><p>Heavy customers concentrate on single shards.</p></div>
+<div class="cd red"><h3>Coupled outage</h3><p>A Redis incident becomes an API outage.</p></div>
+</div>
+<div class="foot"><span>Rate limiter · design</span><span>stage 4</span></div>
+</div>
+
+<!-- v-19 tech -->
+<div class="slide">
+<div class="k">Technology choices</div>
+<h1>Mechanism and reason</h1>
+<table class="bt"><tr><th>Component</th><th>Choice and reason</th></tr>
+<tr><td><b>Decision point</b></td><td>in-process library or sidecar: zero hops</td></tr>
+<tr><td><b>Algorithm</b></td><td>token bucket: rate plus burst, O(1) state</td></tr>
+<tr><td><b>Coordinator</b></td><td>Redis per region, Lua: atomic shares; servers × keys / 100 ms, not 1 M/s</td></tr>
+<tr><td><b>Policies</b></td><td>pushed and cached: keep working if the service is down</td></tr>
+<tr><td><b>Decision log</b></td><td>sampled events to a columnar store</td></tr>
+</table>
+<div class="foot"><span>Rate limiter · technology</span><span>stage 5</span></div>
+</div>
+
+<!-- v-20 component -->
+<div class="slide dia">
+<div class="k">C4 level 3 · the limiter library</div>
+<h1>Decide, buckets, share manager, fallback, sampler</h1>
+<figure class="grow"><!--SVG:c4-component-limiter--></figure>
+<div class="foot"><span>Rate limiter · component</span><span>stage 5</span></div>
+</div>
+
+<!-- v-21 Q algorithms -->
+<div class="slide qs">
+<div class="who">Interviewer · deep dive one</div>
+<div class="qq">"Which algorithm, and why not the others?"</div>
+<div class="hint">Compare them; don't list them.</div>
+</div>
+
+<!-- v-22 algorithms -->
+<div class="slide">
+<div class="k">Deep dive one · algorithms, compared</div>
+<h1>Token bucket expresses "rate plus burst" directly</h1>
+<table class="bt"><tr><th>Algorithm</th><th>The catch</th></tr>
+<tr><td><b>Fixed window</b></td><td>2× burst at the boundary: 1,000 at 11:59:59, 1,000 at 12:00</td></tr>
+<tr><td><b>Sliding log</b></td><td>exact, but a timestamp per request: unusable at scale</td></tr>
+<tr><td><b>Sliding counter</b></td><td>a cheap, weighted approximation: a fair compromise</td></tr>
+<tr><td><b>Token bucket</b></td><td><b>chosen</b>: bursts up to a cap, a long-run rate, O(1)</td></tr>
+<tr><td><b>Leaky bucket</b></td><td>shapes output; for outbound traffic, not quotas</td></tr>
+</table>
+<div class="foot"><span>Rate limiter · algorithms</span><span>stage 6</span></div>
+</div>
+
+<!-- v-23 atomic key line -->
+<div class="slide th">
+  <div class="lbl">Key line · the production bug</div>
+  <div class="s">Check-and-decrement must be <em>atomic</em>.</div>
+  <div class="sub">Read, compare, then write races under concurrency and lets traffic through. A Lua script, an atomic counter, or a single-threaded local bucket.</div>
+  <div class="foot"><span>Rate limiter · algorithms</span><span>key line</span></div>
+</div>
+
+<!-- v-24 Q share -->
+<div class="slide qs">
+<div class="who">Interviewer · deep dive two</div>
+<div class="qq">"So each server decides locally. How wrong can it be?"</div>
+<div class="hint">Give the error a size.</div>
+</div>
+
+<!-- v-25 shares dia -->
+<div class="slide dia">
+<div class="k">Deep dive two · demand-weighted shares</div>
+<h1>The share moves to where the traffic is</h1>
+<figure class="grow"><!--SVG:shares--></figure>
+<div class="foot"><span>Rate limiter · shares</span><span>stage 6</span></div>
+</div>
+
+<!-- v-26 error key line -->
+<div class="slide th">
+  <div class="lbl">Key line · the trade, sized</div>
+  <div class="s">Up to <em>a couple of percent</em> over, for no hop on the hot path.</div>
+  <div class="sub">A contractual hard cap switches that policy to synchronous mode, and pays the hop for that customer only.</div>
+  <div class="foot"><span>Rate limiter · shares</span><span>key line</span></div>
+</div>
+
+<!-- v-27 seq cold -->
+<div class="slide dia">
+<div class="k">Sequence · a cold key</div>
+<h1>One synchronous ask, then local</h1>
+<figure class="grow"><!--SVG:seq-cold--></figure>
+<div class="foot"><span>Rate limiter · cold keys</span><span>stage 6</span></div>
+</div>
+
+<!-- v-28 hot key -->
+<div class="slide">
+<div class="k">Deep dive · the hot key</div>
+<h1>Aggregated locally, by the same mechanism</h1>
+<div class="cards c2">
+<div class="cd grn"><h3>This design</h3><p>100 k req/s spread over every server's share. The coordinator sees 500 reports per 100 ms.</p></div>
+<div class="cd amb"><h3>A shared-store design</h3><p>Would need sub-counters, key#0 to key#15, summed on read.</p></div>
+</div>
+<div class="foot"><span>Rate limiter · hot keys</span><span>stage 6</span></div>
+</div>
+
+<!-- v-29 Q coordinator down -->
+<div class="slide qs">
+<div class="who">Interviewer · deep dive three</div>
+<div class="qq">"The coordinator is down. Fail open, or fail closed?"</div>
+<div class="hint">Defend it, and name the exception.</div>
+</div>
+
+<!-- v-30 seq coord down -->
+<div class="slide dia">
+<div class="k">Sequence · the coordinator is down</div>
+<h1>Fail open, locally, on the last shares</h1>
+<figure class="grow"><!--SVG:seq-coord-down--></figure>
+<div class="foot"><span>Rate limiter · failure</span><span>stage 6</span></div>
+</div>
+
+<!-- v-31 fail-closed key line -->
+<div class="slide th">
+  <div class="lbl">Key line · fail open by default</div>
+  <div class="s">Fail-closed by default makes the limiter a <em>single point of failure</em> for the whole API.</div>
+  <div class="sub">If one endpoint fails closed, an expensive export say, say why it's different.</div>
+  <div class="foot"><span>Rate limiter · failure</span><span>key line</span></div>
+</div>
+
+<!-- v-32 deployment -->
+<div class="slide dia">
+<div class="k">Deployment · three regions</div>
+<h1>Regional by default, global by choice</h1>
+<figure class="grow"><!--SVG:c4-deployment--></figure>
+<div class="foot"><span>Rate limiter · multi-region</span><span>stage 6</span></div>
+</div>
+
+<!-- v-33 scopes -->
+<div class="slide dia">
+<div class="k">Deep dive four · multi-region</div>
+<h1>Exact global doesn't fit a 1 ms budget</h1>
+<figure class="grow"><!--SVG:scopes--></figure>
+<div class="foot"><span>Rate limiter · multi-region</span><span>stage 6</span></div>
+</div>
+
+<!-- v-34 Q midround -->
+<div class="slide qs">
+<div class="who">Interviewer · a requirement added mid-round</div>
+<div class="qq">"A customer needs ten times the burst for the first thirty seconds of each hour."</div>
+<div class="hint">Yes to the customer; careful with the exception.</div>
+</div>
+
+<!-- v-35 midround dia -->
+<div class="slide dia">
+<div class="k">Mid-round · the delta</div>
+<h1>A scheduled policy, then a product tier</h1>
+<figure class="grow"><!--SVG:midround-burst--></figure>
+<div class="foot"><span>Rate limiter · mid-round</span><span>stage 7</span></div>
+</div>
+
+<!-- v-36 failures -->
+<div class="slide">
+<div class="k">Failure modes · minutes 45–50</div>
+<h1>What breaks, and the response</h1>
+<table class="bt"><tr><th>Failure</th><th>Response</th></tr>
+<tr><td><b>Coordinator down</b></td><td>last shares, decaying; alert</td></tr>
+<tr><td><b>Policy service down</b></td><td>cached policies keep working</td></tr>
+<tr><td><b>Bad policy: limit = 0</b></td><td>shadow mode, canary, instant rollback</td></tr>
+<tr><td><b>Clock skew</b></td><td>local monotonic clocks for refill</td></tr>
+<tr><td><b>Server restart</b></td><td>start small, converge in one interval</td></tr>
+</table>
+<div class="foot"><span>Rate limiter · failures</span><span>stage 8</span></div>
+</div>
+
+<!-- v-37 seq policy -->
+<div class="slide dia">
+<div class="k">Sequence · rolling out a policy</div>
+<h1>Shadow, canary, everyone, rollback in seconds</h1>
+<figure class="grow"><!--SVG:seq-policy--></figure>
+<div class="foot"><span>Rate limiter · rollout</span><span>stage 8</span></div>
+</div>
+
+<!-- v-38 SLOs -->
+<div class="slide">
+<div class="k">SLOs and observability</div>
+<h1>The SLI customers feel is the false limit</h1>
+<div class="cards c3">
+<div class="cd"><h3>Decision latency</h3><p>p99 under 1 ms.</p></div>
+<div class="cd red"><h3>False-limit rate</h3><p>429s to customers who were below their limit, from the decision log.</p></div>
+<div class="cd amb"><h3>"Why was I limited?"</h3><p>Policy version, node, bucket state: answered in minutes.</p></div>
+</div>
+<div class="foot"><span>Rate limiter · SLOs</span><span>stage 9</span></div>
+</div>
+
+<!-- v-39 phases -->
+<div class="slide dia">
+<div class="k">The manager layer · how you'd build it</div>
+<h1>Week one, week four, later</h1>
+<figure class="grow"><!--SVG:em-phases--></figure>
+<div class="foot"><span>Rate limiter · delivery</span><span>stage 10</span></div>
+</div>
+
+<!-- v-40 ownership -->
+<div class="slide">
+<div class="k">The manager layer · ownership</div>
+<h1>Who owns what</h1>
+<div class="cards c3">
+<div class="cd red"><h3>Platform team</h3><p>The library, the coordinator, the false-limit SLI, on-call.</p></div>
+<div class="cd"><h3>Policy governance</h3><p>Exceptions with an owner and an expiry date.</p></div>
+<div class="cd grn"><h3>Support</h3><p>The "why was I limited?" tool and runbook.</p></div>
+</div>
+<div class="foot"><span>Rate limiter · ownership</span><span>stage 10</span></div>
+</div>
+
+<!-- v-41 close -->
+<div class="slide th">
+  <div class="lbl">Key line · the close</div>
+  <div class="s">It fails open on its own dependencies, so it can <em>never take the API down</em>.</div>
+  <div class="sub">In-process token buckets, demand-following shares, a bounded overshoot. Next: the decision log and the false-limit SLI.</div>
+  <div class="foot"><span>Rate limiter · the close</span><span>stage 11</span></div>
+</div>
+
+<!-- v-42 FU1 Q -->
+<div class="slide qs">
+<div class="who">Follow-up 1 · stakeholder pressure</div>
+<div class="qq">"Sales just signed our biggest customer. They want them exempt from rate limits. Entirely."</div>
+<div class="hint">Find the real need; keep the protection.</div>
+</div>
+
+<!-- v-43 FU1 dia -->
+<div class="slide dia">
+<div class="k">Follow-up 1 · the answer</div>
+<h1>A higher limit, not no limit</h1>
+<figure class="grow"><!--SVG:fu-exempt--></figure>
+<div class="foot"><span>Rate limiter · follow-up 1</span><span>stakeholder</span></div>
+</div>
+
+<!-- v-44 FU2 Q -->
+<div class="slide qs">
+<div class="who">Follow-up 2 · an incident</div>
+<div class="qq">"Someone pushed a policy with a limit of zero for a popular endpoint. Eight minutes of 429s for everyone."</div>
+<div class="hint">Roll back first. Then fix the process, not the person.</div>
+</div>
+
+<!-- v-45 FU2 dia -->
+<div class="slide dia">
+<div class="k">Follow-up 2 · the timeline</div>
+<h1>Config is code</h1>
+<figure class="grow"><!--SVG:fu-incident--></figure>
+<div class="foot"><span>Rate limiter · follow-up 2</span><span>incident</span></div>
+</div>
+
+<!-- v-46 FU3 Q -->
+<div class="slide qs">
+<div class="who">Follow-up 3 · scope creep</div>
+<div class="qq">"Finance wants to bill customers from the limiter's counts. It already counts every request, right?"</div>
+<div class="hint">Two jobs, two guarantees.</div>
+</div>
+
+<!-- v-47 FU3 dia -->
+<div class="slide dia">
+<div class="k">Follow-up 3 · protect versus charge</div>
+<h1>One event stream, two consumers</h1>
+<figure class="grow"><!--SVG:fu-billing--></figure>
+<div class="foot"><span>Rate limiter · follow-up 3</span><span>scope</span></div>
+</div>
+
+<!-- v-48 FU4 Q -->
+<div class="slide qs">
+<div class="who">Follow-up 4 · a cost spike</div>
+<div class="qq">"The decision log now costs more than the rest of the limiter put together."</div>
+<div class="hint">Cut it without losing the ability to explain a 429.</div>
+</div>
+
+<!-- v-49 FU4 dia -->
+<div class="slide dia">
+<div class="k">Follow-up 4 · the levers</div>
+<h1>Sample the allows, keep every rejection</h1>
+<figure class="grow"><!--SVG:fu-cost--></figure>
+<div class="foot"><span>Rate limiter · follow-up 4</span><span>cost</span></div>
+</div>
+
+<!-- v-50 scorecard -->
+<div class="slide">
+<div class="k">Debrief</div>
+<h1>Where the round lands</h1>
+<table class="bt"><tr><th>Signal</th><th>Strong</th><th>Exceptional</th></tr>
+<tr><td>Framing</td><td>Redis INCR</td><td>"availability over accuracy", said early</td></tr>
+<tr><td>Numbers</td><td>QPS</td><td>1,000 ÷ 500 = 2, and the static split dies</td></tr>
+<tr><td>Algorithm</td><td>names token bucket</td><td>compares five; atomic check-and-decrement</td></tr>
+<tr><td>Accuracy</td><td>"approximate"</td><td>error bound: one interval of demand shift</td></tr>
+<tr><td>EM layer</td><td>monitoring</td><td>false-limit SLI, shadow mode, exception governance</td></tr>
+</table>
+<div class="foot"><span>Rate limiter · scorecard</span><span>debrief</span></div>
+</div>
+
+<!-- v-51 checks -->
+<div class="slide th">
+  <div class="lbl">Debrief</div>
+  <div class="s" style="font-size:38pt">Five checks before the real round.</div>
+  <ol class="check" style="padding-left:30pt">
+    <li>1,000 ÷ 500, and the static split is dead.</li>
+    <li>Algorithms compared, the boundary burst named.</li>
+    <li>Atomic check-and-decrement.</li>
+    <li>Fail open, and why.</li>
+    <li>The error, sized; "why was I limited?" designed in.</li>
+  </ol>
+  <div class="foot"><span>Rate limiter · mock round</span><span>end</span></div>
+</div>
+</body></html>

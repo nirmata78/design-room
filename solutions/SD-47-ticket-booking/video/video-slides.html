@@ -1,0 +1,854 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Ticket booking mock video slides</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="deck.css">
+<link rel="stylesheet" href="video.css">
+</head><body>
+<!-- v2 (2026-10-29): Staff L6/L7 depth. Every frame carries its slide number (top right, from video.css).
+     Slides marked class="aux" are the EM layer: useful, explicitly optional in a Staff / IC round.
+     Content follows ../SD-47_Ticket_Booking_Reference_Design.md. v1 (EM framing) is in .v1-em-2026-10-28/. -->
+
+<!-- 1 title -->
+<div class="slide th">
+  <div class="lbl">Mock system design round · Staff engineer, L6 / L7 · FAANG and top-tier bar</div>
+  <div class="s">Ticket booking under contention:<br>how the round could go.</div>
+  <div class="sub">Fifty thousand seats, a million people, the minute sales open. Maximum technical depth; the EM layer is marked AUX and can be skipped in an IC round.</div>
+  <div class="foot"><span>design-room · SD-47 · v2</span><span>interviewer · candidate · coach</span></div>
+</div>
+
+<!-- 2 weighed -->
+<div class="slide">
+<div class="k">Before you start</div>
+<h1>What a Staff panel weighs most</h1>
+<div class="cards c3">
+<div class="cd red"><h3>Depth, more than once</h3><p>The claim, the waiting room, the seat map, the payment: two to three levels down, with the code.</p></div>
+<div class="cd"><h3>Trade-offs, justified</h3><p>Every store and every protocol against its rejected alternatives, with numbers.</p></div>
+<div class="cd grn"><h3>Ambiguity and pushback</h3><p>Take a position on the hard probe and defend it.</p></div>
+</div>
+<div class="line a">Slides marked AUX are the EM layer: phasing, teams, roadmap. Say them in a manager loop; skip them in a Staff round.</div>
+<div class="foot"><span>Ticket booking · mock round</span><span>levels: staff = L6 · principal = L7</span></div>
+</div>
+
+<!-- 3 prompt -->
+<div class="slide qs">
+<div class="who">Interviewer · the prompt</div>
+<div class="qq">"Design ticket booking for a stadium: fifty thousand seats, and a million people trying to buy them the moment sales open."</div>
+<div class="hint">Five or six questions. Each one should move a box.</div>
+</div>
+
+<!-- 4 oversell / pick -->
+<div class="slide">
+<div class="k">Requirements · minutes 3–8</div>
+<h1>Two answers that fix the core</h1>
+<div class="cards c2">
+<div class="cd red"><h3>"Can we ever oversell?"</h3><p><b>Never.</b> One place where each seat's state lives, changed atomically.</p></div>
+<div class="cd"><h3>"Pick a seat, or best available?"</h3><p><b>Pick from a map.</b> Contention is per seat, not on one counter.</p></div>
+</div>
+<div class="foot"><span>Ticket booking · requirements</span><span>stage 1</span></div>
+</div>
+
+<!-- 5 checkout / payment -->
+<div class="slide">
+<div class="k">Requirements · time and money</div>
+<h1>Checkout takes minutes; payment can go silent</h1>
+<div class="cards c2">
+<div class="cd amb"><h3>Checkout: ~3 minutes</h3><p>You can't hold a transaction open that long. The reservation is <b>data</b>: a hold with an expiry.</p></div>
+<div class="cd red"><h3>Payment: 2–10 s, can time out</h3><p>"Didn't answer" is not "declined". Seats must not be released while the outcome is unknown.</p></div>
+</div>
+<div class="foot"><span>Ticket booking · requirements</span><span>stage 1</span></div>
+</div>
+
+<!-- 6 fairness / freshness -->
+<div class="slide">
+<div class="k">Requirements · fairness and freshness</div>
+<h1>Fairness is a product decision</h1>
+<div class="cards c2">
+<div class="cd grn"><h3>"What does fair mean, and who decides?"</h3><p>First-come is expected; a queue or a lottery is fine if argued. The promoter owns it.</p></div>
+<div class="cd"><h3>"How fresh must the map be?"</h3><p>A couple of seconds. So the seat map can be a cached snapshot.</p></div>
+</div>
+<div class="line">Out of scope, said aloud: search, pricing, resale, the refunds UI, the app itself.</div>
+<div class="foot"><span>Ticket booking · requirements</span><span>stage 1</span></div>
+</div>
+
+<!-- 7 THESIS -->
+<div class="slide th">
+  <div class="lbl">Key line · by minute twelve</div>
+  <div class="s">Turn a <em>stampede</em> into a <em>metered stream</em>.</div>
+  <div class="sub">And be honest, fast and fair with the 98% who won't get a ticket. Selling to the 2% is the easy part once the stampede is gone.</div>
+  <div class="foot"><span>Ticket booking · thesis</span><span>framing</span></div>
+</div>
+
+<!-- 8 NFRs -->
+<div class="slide">
+<div class="k">Requirements · targets</div>
+<h1>Five targets to design against</h1>
+<table class="bt"><tr><th>Requirement</th><th>Target</th></tr>
+<tr><td>Oversell</td><td><b>zero</b>, a hard invariant</td></tr>
+<tr><td>The opening minute</td><td>must not fall over</td></tr>
+<tr><td>Hold API</td><td>p99 under 300 ms</td></tr>
+<tr><td>Seat map</td><td>at most ~2 s stale</td></tr>
+<tr><td>Seats in limbo</td><td>never; fair and bot-resistant</td></tr>
+</table>
+<div class="foot"><span>Ticket booking · requirements</span><span>stage 1</span></div>
+</div>
+
+<!-- 9 estimation 1 -->
+<div class="slide">
+<div class="k">Estimation · minutes 8–12 · show the arithmetic</div>
+<h1>Winners, and what happens without a queue</h1>
+<table class="bt sm"><tr><th>Quantity</th><th>Arithmetic</th><th>Result</th><th>Consequence</th></tr>
+<tr><td>Orders</td><td class="calc">50,000 seats ÷ 2.5 per order</td><td><b>20,000</b></td><td rowspan="2">a rejection system: tell the 98% early</td></tr>
+<tr><td>Success rate</td><td class="calc">20,000 ÷ 1,000,000</td><td><b>2%</b></td></tr>
+<tr><td>No queue</td><td class="calc">1 M fans × 2 attempts ÷ 60 s</td><td><b>33,000 writes/s</b></td><td>on 50,000 rows: lock queues, empty pool</td></tr>
+<tr><td>Joins at T0</td><td class="calc">1 M ÷ 60 s = 17k/s; × 3 in the first seconds</td><td><b>~50,000/s</b></td><td>a join must be one in-memory op</td></tr>
+</table>
+<div class="foot"><span>Ticket booking · estimation</span><span>stage 2</span></div>
+</div>
+
+<!-- 10 estimation 2 -->
+<div class="slide">
+<div class="k">Estimation · the shop and the waiting · Little's law: L = λ × W</div>
+<h1>The rate is set by capacity, not demand</h1>
+<table class="bt sm"><tr><th>Quantity</th><th>Arithmetic</th><th>Result</th></tr>
+<tr><td>Admission rate R</td><td class="calc">10,000 shoppers ÷ 300 s each</td><td><b>~33/s = 2,000/min</b></td></tr>
+<tr><td>Time to sell out</td><td class="calc">20,000 orders ÷ 70% = 29,000 admits ÷ 2,000/min</td><td><b>~15 min</b></td></tr>
+<tr><td>Queue polls</td><td class="calc">1,000,000 fans ÷ 10 s</td><td><b>100,000 req/s</b></td></tr>
+<tr><td>At the origin</td><td class="calc">~200 CDN edges × 1 miss ÷ 1 s TTL</td><td><b>~200 req/s</b> (shield: ~1)</td></tr>
+<tr><td>Adaptive polling</td><td class="calc">950k ÷ 30 s + 45k ÷ 10 s + 5k ÷ 3 s</td><td><b>~37,000 req/s</b></td></tr>
+</table>
+<div class="foot"><span>Ticket booking · estimation</span><span>stage 2</span></div>
+</div>
+
+<!-- 11 estimation 3 -->
+<div class="slide">
+<div class="k">Estimation · the core</div>
+<h1>After the queue, it's a few hundred transactions a second</h1>
+<table class="bt sm"><tr><th>Quantity</th><th>Arithmetic</th><th>Result</th></tr>
+<tr><td>Seat-map reads</td><td class="calc">10,000 shoppers ÷ 2 s; 50,000 bits ÷ 8</td><td><b>5,000/s × 6.25 KB</b></td></tr>
+<tr><td>Hold writes</td><td class="calc">33/s × 1.5 attempts; × 10 bursts</td><td><b>50–500/s</b></td></tr>
+<tr><td>Payments</td><td class="calc">20,000 ÷ 900 s; × 10 s each in flight</td><td><b>~25/s, ~250 open</b></td></tr>
+<tr><td>Seat rows / year</td><td class="calc">500k events × 2k seats × 120 B</td><td><b>~120 GB</b></td></tr>
+<tr><td>Orders / year</td><td class="calc">300 M orders × 1 KB</td><td><b>~300 GB</b>: not the problem</td></tr>
+</table>
+<div class="foot"><span>Ticket booking · estimation</span><span>stage 2</span></div>
+</div>
+
+<!-- 12 load funnel -->
+<div class="slide dia">
+<div class="k">Estimation · where the load lands</div>
+<h1>Each layer shrinks the number below it, and here's why</h1>
+<figure class="grow"><!--SVG:load-funnel--></figure>
+<div class="foot"><span>Ticket booking · load funnel</span><span>stage 2</span></div>
+</div>
+
+<!-- 13 API overview -->
+<div class="slide">
+<div class="k">API · minutes 12–18 · the endpoints</div>
+<h1>Queue, admit, read, hold, order</h1>
+<pre class="wire">POST   /events/{e}/queue                     → 201 queue token + serverTime
+GET    /events/{e}/queue/me                  → {seq}             lobby fans, once, after T0
+GET    /events/{e}/queue/state               → shared JSON       CDN, max-age=1
+POST   /events/{e}/admit    {queueToken}     → admission JWT, 10 min
+GET    /events/{e}/layout?v=3                → SVG + seat list   CDN, immutable
+GET    /events/{e}/availability?v=811        → bitmap | 304
+POST   /events/{e}/holds    {seatIds}        → 201 hold | 409 fresh bitmap
+POST   /orders              {holdId, token}  → 202 PENDING;  GET /orders/{id} to poll
+POST   /psp/webhooks                         → outcome, HMAC-signed by the PSP</pre>
+<div class="line">Every mutating call carries an Idempotency-Key. Everything after /admit needs the admission JWT.</div>
+<div class="foot"><span>Ticket booking · API</span><span>stage 3</span></div>
+</div>
+
+<!-- 14 API join -->
+<div class="slide">
+<div class="k">API · joining the queue · request and response</div>
+<h1>The position travels in a signed token, not a session</h1>
+<div class="cols2">
+<pre class="wire">POST /events/evt-7731/queue
+Idempotency-Key: 5d0e…
+Authorization: Bearer &lt;user session&gt;
+{ "client": "web-4.12" }
+
+201 Created
+{
+  "queueToken": "eyJr…",      // Ed25519-signed
+  "kind": "LOBBY",            // or QUEUE after T0
+  "seq": null,                // known after the draw
+  "serverTime": 1792130380,   // countdown sync
+  "opensAt": 1792130400
+}</pre>
+<pre class="wire">queue token, decoded
+{
+  "evt":  "evt-7731",
+  "sub":  "user-48213",
+  "kind": "QUEUE",
+  "seq":  380577,             // 1-based place
+  "iat":  1792130412,
+  "kid":  "wr-2026-10"        // signing key id
+}</pre>
+</div>
+<div class="line">Signed, so a position can't be forged or traded; any waiting-room node verifies it without a lookup.</div>
+<div class="foot"><span>Ticket booking · API · join</span><span>stage 3</span></div>
+</div>
+
+<!-- 15 CDN state -->
+<div class="slide dia">
+<div class="k">API · what a waiting fan sees from the CDN</div>
+<h1>One cached object for a million people</h1>
+<figure class="grow"><!--SVG:cdn-state--></figure>
+<div class="foot"><span>Ticket booking · API · queue state</span><span>stage 3</span></div>
+</div>
+
+<!-- 16 API admit -->
+<div class="slide">
+<div class="k">API · admission · request and response</div>
+<h1>The admission token: checked on every shop call, no network hop</h1>
+<div class="cols2">
+<pre class="wire">POST /events/evt-7731/admit
+{ "queueToken": "eyJr…" }
+
+200 OK
+{ "admissionToken": "eyJh…",
+  "expiresAt": 1792131000 }
+
+425 Too Early
+{ "ahead": 1240 }      // seq > admittedUpTo
+
+410 Gone                // window already used
+{ "reason": "SHOPPING_WINDOW_ENDED" }</pre>
+<pre class="wire">admission JWT, decoded (EdDSA)
+{
+  "iss":   "waiting-room",
+  "sub":   "user-48213",
+  "evt":   "evt-7731",
+  "scope": "shop",
+  "iat":   1792130400,
+  "exp":   1792131000,     // 10 minutes
+  "jti":   "adm-5f1c2b"    // revocable
+}</pre>
+</div>
+<div class="line">Private key only in the waiting room; gateways hold the public key, so a compromised gateway can't mint tokens.</div>
+<div class="foot"><span>Ticket booking · API · admit</span><span>stage 3</span></div>
+</div>
+
+<!-- 17 bitmap -->
+<div class="slide dia">
+<div class="k">API · the availability bitmap, byte by byte</div>
+<h1>6,250 bytes describe 50,000 seats</h1>
+<figure class="grow"><!--SVG:bitmap--></figure>
+<div class="foot"><span>Ticket booking · API · availability</span><span>stage 3</span></div>
+</div>
+
+<!-- 18 API holds -->
+<div class="slide">
+<div class="k">API · the only contended write · request and responses</div>
+<h1>201 means all your seats; 409 carries a fresh map</h1>
+<div class="cols2">
+<pre class="wire">POST /events/evt-7731/holds
+Authorization: Bearer &lt;admission JWT&gt;
+Idempotency-Key: k-77
+{ "seatIds": [101, 102] }
+
+201 Created
+{ "holdId": "h-5521",
+  "seatIds": [101, 102],
+  "expiresAt": "2026-10-29T10:07:00Z" }</pre>
+<pre class="wire">409 Conflict
+X-Map-Version: 812
+{ "taken": [102],
+  "bitmap": "base64 · 6,250 bytes" }
+
+429 Too Many Requests
+{ "reason": "MAX_4_PER_ACCOUNT" }
+
+401 / 403  no admission token,
+           or a token for another event</pre>
+</div>
+<div class="line">Same Idempotency-Key, same answer: a retried click never holds twice.</div>
+<div class="foot"><span>Ticket booking · API · holds</span><span>stage 3</span></div>
+</div>
+
+<!-- 19 API orders -->
+<div class="slide">
+<div class="k">API · checkout · asynchronous because payment takes seconds</div>
+<h1>202 now, poll for the outcome</h1>
+<div class="cols2">
+<pre class="wire">POST /orders
+Idempotency-Key: k-78
+{ "holdId": "h-5521",
+  "paymentToken": "tok_visa_…" }  // PSP card-form token
+
+
+202 Accepted
+{ "orderId": "o-9031",
+  "status": "PENDING" }</pre>
+<pre class="wire">GET /orders/o-9031
+
+200 OK
+{ "orderId": "o-9031",
+  "status": "CONFIRMED",   // PENDING · AUTHORIZING
+                           // UNKNOWN · CONFIRMED
+                           // FAILED · REFUNDED
+  "tickets": [
+    {"seat": 101, "ticketId": "t-1"},
+    {"seat": 102, "ticketId": "t-2"} ] }</pre>
+</div>
+<div class="line a">Holding the HTTP request open for 10 s would pin ~250 connections at the peak; 202 + poll pins none.</div>
+<div class="foot"><span>Ticket booking · API · orders</span><span>stage 3</span></div>
+</div>
+
+<!-- 20 ERD inventory -->
+<div class="slide dia">
+<div class="k">Data model · ERD · the inventory database (the hot one)</div>
+<h1>The hold is data with an expiry, not a lock</h1>
+<figure class="grow"><!--SVG:erd-inventory--></figure>
+<div class="foot"><span>Ticket booking · data · inventory</span><span>stage 3</span></div>
+</div>
+
+<!-- 21 ERD orders -->
+<div class="slide dia">
+<div class="k">Data model · ERD · the order database (separate, owned by orders)</div>
+<h1>Two independent guards against oversell</h1>
+<figure class="grow"><!--SVG:erd-orders--></figure>
+<div class="foot"><span>Ticket booking · data · orders</span><span>stage 3</span></div>
+</div>
+
+<!-- 22 Redis keys -->
+<div class="slide dia">
+<div class="k">Data model · the waiting room in Redis</div>
+<h1>Seven keys per event, one hash slot</h1>
+<figure class="grow"><!--SVG:redis-keys--></figure>
+<div class="foot"><span>Ticket booking · data · Redis</span><span>stage 3</span></div>
+</div>
+
+<!-- 23 tech postgres -->
+<div class="slide">
+<div class="k">Technology · seats · selected against the alternatives</div>
+<h1>PostgreSQL for the seats</h1>
+<table class="bt sm"><tr><th>Option</th><th>Verdict</th><th>Why</th></tr>
+<tr><td><b>PostgreSQL</b>, sync replica</td><td><b>chosen</b></td><td>multi-row all-or-nothing claim with row locks; CHECK and UNIQUE in the DB; RPO 0 on failover</td></tr>
+<tr><td>Redis + Lua</td><td>rejected</td><td>async replication: a hold acked, primary dies, replica promoted, seat free again = oversell</td></tr>
+<tr><td>DynamoDB / Cassandra</td><td>rejected</td><td>multi-item conditional writes are limited or costly; LWT is slow under contention; no relational guard</td></tr>
+<tr><td>Spanner / CockroachDB</td><td>not needed</td><td>global serializability we don't need: one event lives in one region; 500 writes/s fit one primary</td></tr>
+</table>
+<div class="line">Speed isn't the bottleneck after the queue; correctness is.</div>
+<div class="foot"><span>Ticket booking · technology</span><span>stage 5</span></div>
+</div>
+
+<!-- 24 tech redis -->
+<div class="slide">
+<div class="k">Technology · waiting room · selected against the alternatives</div>
+<h1>Redis for the queue</h1>
+<table class="bt sm"><tr><th>Option</th><th>Verdict</th><th>Why</th></tr>
+<tr><td><b>Redis Cluster</b> + Lua</td><td><b>chosen</b></td><td>50k trivial ops/s at T0; single-threaded, so INCR and Lua are atomic; hash tags keep an event on one node</td></tr>
+<tr><td>PostgreSQL rows</td><td>rejected</td><td>50,000 INSERTs a second for data that may lose a second: wrong cost for the durability</td></tr>
+<tr><td>Kafka as the queue</td><td>rejected</td><td>we ask "what's my position?" and "advance by 33", not "consume next"</td></tr>
+<tr><td>In-process memory</td><td>rejected</td><td>no shared pointer across nodes; a restart loses the line</td></tr>
+</table>
+<div class="line a">What Redis can lose (≈1 s with AOF everysec) is survivable: the seq lives in the fan's signed token.</div>
+<div class="foot"><span>Ticket booking · technology</span><span>stage 5</span></div>
+</div>
+
+<!-- 25 tech kafka -->
+<div class="slide">
+<div class="k">Technology · fan-out · selected against the alternatives</div>
+<h1>Kafka, fed by a transactional outbox</h1>
+<table class="bt sm"><tr><th>Option</th><th>Verdict</th><th>Why</th></tr>
+<tr><td><b>Outbox → Debezium → Kafka</b></td><td><b>chosen</b></td><td>seat change and its event commit together; replayable; per-event order via key = event_id</td></tr>
+<tr><td>Dual write from the app</td><td>rejected</td><td>a crash between commit and publish loses the event; the map shows a sold seat as free</td></tr>
+<tr><td>Polling the seat table</td><td>rejected</td><td>5,000 reads/s back on the hot database: the mixed-paths failure</td></tr>
+<tr><td>SQS / RabbitMQ</td><td>rejected</td><td>no replay to rebuild a snapshot; ordering per key is weaker</td></tr>
+</table>
+<div class="foot"><span>Ticket booking · technology</span><span>stage 5</span></div>
+</div>
+
+<!-- 26 tech cdn -->
+<div class="slide">
+<div class="k">Technology · telling a million people · selected against the alternatives</div>
+<h1>Polling a cached file at the CDN</h1>
+<table class="bt sm"><tr><th>Option</th><th>Verdict</th><th>Why</th></tr>
+<tr><td><b>CDN, max-age=1, collapsing</b></td><td><b>chosen</b></td><td>100k req/s → ~200 at origin; degrades to a paused line, never an error</td></tr>
+<tr><td>WebSockets to 1 M clients</td><td>rejected</td><td>a stateful fleet of a million sockets to push one number a second; if it dies, fans see nothing</td></tr>
+<tr><td>Long polling</td><td>rejected</td><td>a million open requests at the origin: the same cost, harder to cache</td></tr>
+<tr><td>SSE, for the 10k admitted</td><td>phase 2</td><td>a fine upgrade for map deltas; not needed for the waiting line</td></tr>
+</table>
+<div class="foot"><span>Ticket booking · technology</span><span>stage 5</span></div>
+</div>
+
+<!-- 27 magic store -->
+<div class="slide th">
+  <div class="lbl">Key line · why not one magic store</div>
+  <div class="s">One store would be <em>too weak</em> for the seats or <em>too expensive</em> for the queue.</div>
+  <div class="sub">Redis: fast, can lose a second. PostgreSQL: strict and transactional. Kafka: durable and replayable. CDN: a million identical reads at the edge.</div>
+  <div class="foot"><span>Ticket booking · technology</span><span>key line</span></div>
+</div>
+
+<!-- 28 C4 context -->
+<div class="slide dia">
+<div class="k">High-level design · C4 level 1 · system context</div>
+<h1>A million at the edge; the payment provider is slow and sometimes silent</h1>
+<figure class="grow"><!--SVG:c4-context--></figure>
+<div class="foot"><span>Ticket booking · C4 context</span><span>stage 4</span></div>
+</div>
+
+<!-- 29 C4 wait -->
+<div class="slide dia">
+<div class="k">High-level design · C4 level 2 · the waiting path and the read path</div>
+<h1>Where people wait, and what they read while waiting</h1>
+<figure class="grow"><!--SVG:c4-containers-wait--></figure>
+<div class="foot"><span>Ticket booking · C4 containers</span><span>stage 4</span></div>
+</div>
+
+<!-- 30 C4 write -->
+<div class="slide dia">
+<div class="k">High-level design · C4 level 2 · the write path</div>
+<h1>Small, boring and correct</h1>
+<figure class="grow"><!--SVG:c4-containers-write--></figure>
+<div class="foot"><span>Ticket booking · C4 containers</span><span>stage 4</span></div>
+</div>
+
+<!-- 31 THESIS 2 -->
+<div class="slide th">
+  <div class="lbl">Key line · three paths</div>
+  <div class="s">The queue path is <em>huge</em>.<br>The read path can be <em>stale</em>.<br>The write path must be <em>correct</em>.</div>
+  <div class="sub">Mixing any two of them is how ticket sites fall over.</div>
+  <div class="foot"><span>Ticket booking · three paths</span><span>key line</span></div>
+</div>
+
+<!-- 32 Q race -->
+<div class="slide qs">
+<div class="who">Interviewer · deep dive 1</div>
+<div class="qq">"Two fans click the same seat in the same millisecond."</div>
+<div class="hint">The risk, the mechanism, the failure case. In that order.</div>
+</div>
+
+<!-- 33 seq race -->
+<div class="slide dia">
+<div class="k r">Deep dive 1 · sequence · two fans, one seat</div>
+<h1>The loser fails in milliseconds, with a fresh map</h1>
+<figure class="grow"><!--SVG:seq-hold-race--></figure>
+<div class="foot"><span>Ticket booking · hold race</span><span>deep dive 1</span></div>
+</div>
+
+<!-- 34 claim SQL -->
+<div class="slide">
+<div class="k r">Deep dive 1 · the claim, in one transaction</div>
+<h1>The WHERE clause is the availability check</h1>
+<pre class="wire">BEGIN;
+SELECT seat_id FROM event_seat WHERE event_id = :e AND seat_id = ANY(:seats)
+ ORDER BY seat_id FOR UPDATE NOWAIT;               -- sorted: no deadlock cycle; NOWAIT: fail fast
+UPDATE event_seat SET state = 'HELD', hold_id = :h, version = version + 1,
+       hold_expires_at = now() + interval '5 minutes'
+ WHERE event_id = :e AND seat_id = ANY(:seats)
+   AND (state = 'AVAILABLE' OR (state = 'HELD' AND hold_expires_at &lt; now()))  -- lazy expiry
+RETURNING seat_id;                                 -- fewer rows than asked → ROLLBACK → 409
+INSERT INTO hold   (hold_id, event_id, user_id, seat_ids, status, expires_at, idem_key) …;
+INSERT INTO outbox (event_id, event_type, payload) VALUES (:e, 'SeatsHeld', …);
+COMMIT;</pre>
+<div class="foot"><span>Ticket booking · claim</span><span>deep dive 1</span></div>
+</div>
+
+<!-- 35 alternatives -->
+<div class="slide">
+<div class="k r">Deep dive 1 · why this, and not the usual answers</div>
+<h1>Five weak answers, and what's wrong with each</h1>
+<table class="bt sm"><tr><th>Alternative</th><th>What goes wrong</th></tr>
+<tr><td><b>Distributed lock</b>, Redis SETNX per seat</td><td>a second system's failure modes; a lease can expire mid-transaction</td></tr>
+<tr><td><b>SERIALIZABLE</b> isolation</td><td>correct, but under contention it aborts many transactions; retries for nothing</td></tr>
+<tr><td><b>Optimistic</b> version per seat</td><td>multi-seat all-or-nothing still ends in a conditional update; write that</td></tr>
+<tr><td><b>Lock without NOWAIT</b></td><td>losers queue holding connections; on the front row the pool empties</td></tr>
+<tr><td><b>Lock in request order</b></td><td>[102,101] vs [101,102] deadlock; 1 s deadlock_timeout on the hottest rows</td></tr>
+</table>
+<div class="line">Read Committed is enough: a waiting writer re-checks its WHERE against the new row version.</div>
+<div class="foot"><span>Ticket booking · claim</span><span>deep dive 1</span></div>
+</div>
+
+<!-- 36 component -->
+<div class="slide dia">
+<div class="k r">Deep dive 1 · C4 level 3 · inside the inventory service</div>
+<h1>The claim engine and the outbox share one transaction</h1>
+<figure class="grow"><!--SVG:c4-component-inventory--></figure>
+<div class="foot"><span>Ticket booking · component view</span><span>deep dive 1</span></div>
+</div>
+
+<!-- 37 Q waiting room -->
+<div class="slide qs">
+<div class="who">Interviewer · deep dive 2</div>
+<div class="qq">"A million people arrive at ten o'clock. Where do they wait, and how do they get in?"</div>
+<div class="hint">This is the deep dive that decides the round.</div>
+</div>
+
+<!-- 38 seq lobby -->
+<div class="slide dia">
+<div class="k r">Deep dive 2 · sequence · the lobby and T0</div>
+<h1>Everyone in the lobby at T0 gets a random place in line</h1>
+<figure class="grow"><!--SVG:seq-lobby--></figure>
+<div class="foot"><span>Ticket booking · lobby</span><span>deep dive 2</span></div>
+</div>
+
+<!-- 39 join lua -->
+<div class="slide">
+<div class="k r">Deep dive 2 · the join, atomic in one Lua script</div>
+<h1>A join racing the T0 flip lands cleanly on one side</h1>
+<pre class="wire">-- join.lua   KEYS: phase:{e} lobby:{e} next:{e} seqOf:{e}   ARGV: userId, secretScore
+if redis.call('GET', KEYS[1]) == 'LOBBY' then
+  redis.call('ZADD', KEYS[2], 'NX', ARGV[2], ARGV[1])  -- NX: re-joining keeps the first draw
+  return {'LOBBY', 0}
+end
+if redis.call('ZSCORE', KEYS[2], ARGV[1]) then return {'LOBBY', 0} end   -- ask /queue/me
+local s = redis.call('HGET', KEYS[4], ARGV[1])
+if s then return {'QUEUE', tonumber(s)} end              -- idempotent re-join after T0
+local seq = redis.call('INCR', KEYS[3])                  -- late arrivals: plain FIFO
+redis.call('HSET', KEYS[4], ARGV[1], seq); return {'QUEUE', seq}</pre>
+<div class="line">At T0, a million /queue/me calls over 20 s of client jitter: 50k ZRANK/s, O(log n) ≈ 20 steps each.</div>
+<div class="foot"><span>Ticket booking · join</span><span>deep dive 2</span></div>
+</div>
+
+<!-- 40 seq admit -->
+<div class="slide dia">
+<div class="k r">Deep dive 2 · sequence · polling and admission</div>
+<h1>One cached number for everyone; the position is computed locally</h1>
+<figure class="grow"><!--SVG:seq-admit--></figure>
+<div class="foot"><span>Ticket booking · admission</span><span>deep dive 2</span></div>
+</div>
+
+<!-- 41 controller -->
+<div class="slide dia">
+<div class="k r">Deep dive 2 · the admission controller</div>
+<h1>A dial turned every second: AIMD, like TCP</h1>
+<figure class="grow"><!--SVG:controller--></figure>
+<div class="foot"><span>Ticket booking · controller</span><span>deep dive 2</span></div>
+</div>
+
+<!-- 42 sold out -->
+<div class="slide">
+<div class="k r">Deep dive 2 · telling the 98%</div>
+<h1>Sold out, in two stages</h1>
+<div class="cards c2">
+<div class="cd amb"><h3>admissionPaused: likely sold out</h3><p>Seats left ÷ 2.5 &lt; fans still shopping. Stop admitting; say so.</p></div>
+<div class="cd red"><h3>soldOut: final</h3><p>Nothing AVAILABLE or HELD for a few minutes. If seats come back, resume from the pointer.</p></div>
+</div>
+<div class="line">Both flags travel in the same cached JSON, so 970,000 people know within one poll.</div>
+<div class="foot"><span>Ticket booking · sold out</span><span>deep dive 2</span></div>
+</div>
+
+<!-- 43 THESIS 3 -->
+<div class="slide th">
+  <div class="lbl">Key line · the waiting room</div>
+  <div class="s">A waiting fan costs us <em>almost nothing</em>.</div>
+  <div class="sub">A signed number in their token, and one cached pointer for everyone. The core only ever sees what it chose to admit.</div>
+  <div class="foot"><span>Ticket booking · waiting room</span><span>key line</span></div>
+</div>
+
+<!-- 44 Q seat map -->
+<div class="slide qs">
+<div class="who">Interviewer · deep dive 3</div>
+<div class="qq">"Ten thousand shoppers refresh a fifty-thousand-seat map every two seconds. Where does that read come from?"</div>
+<div class="hint">Not from the inventory database.</div>
+</div>
+
+<!-- 45 seq seat map -->
+<div class="slide dia">
+<div class="k r">Deep dive 3 · sequence · from a committed hold to a fan's map</div>
+<h1>Outbox, WAL, Kafka, a builder, a versioned bitmap</h1>
+<figure class="grow"><!--SVG:seq-seatmap--></figure>
+<div class="foot"><span>Ticket booking · seat map</span><span>deep dive 3</span></div>
+</div>
+
+<!-- 46 seat map decisions -->
+<div class="slide">
+<div class="k r">Deep dive 3 · the decisions inside the snapshot builder</div>
+<h1>Why each choice</h1>
+<table class="bt sm"><tr><th>Choice</th><th>Why</th></tr>
+<tr><td><b>Publish ≤ once a second</b></td><td>~50 seat changes/s; one version a second keeps most 2-second polls at 304</td></tr>
+<tr><td><b>Version = Kafka offset</b></td><td>only grows, survives a restart, two builders agree on it</td></tr>
+<tr><td><b>Flip the pointer last</b></td><td>a reader never sees a version whose bytes aren't written yet</td></tr>
+<tr><td><b>Not CDN-cached</b></td><td>admitted users only; 5,000 req/s is Redis's easy case</td></tr>
+<tr><td><b>Stale by ~1–2 s</b></td><td>acceptable: the claim is authoritative, a stale click fails fast</td></tr>
+</table>
+<div class="foot"><span>Ticket booking · seat map</span><span>deep dive 3</span></div>
+</div>
+
+<!-- 47 Q expiry -->
+<div class="slide qs">
+<div class="who">Interviewer · deep dive 4</div>
+<div class="qq">"A fan holds two seats and closes the laptop."</div>
+<div class="hint">Release too late and seats are lost. Too early and you sell them twice.</div>
+</div>
+
+<!-- 48 seq expiry -->
+<div class="slide dia">
+<div class="k r">Deep dive 4 · sequence · two expiry paths</div>
+<h1>Correctness never depends on the sweeper</h1>
+<figure class="grow"><!--SVG:seq-expiry--></figure>
+<div class="foot"><span>Ticket booking · expiry</span><span>deep dive 4</span></div>
+</div>
+
+<!-- 49 sweeper SQL -->
+<div class="slide">
+<div class="k r">Deep dive 4 · the sweeper</div>
+<h1>SKIP LOCKED for "any", NOWAIT for "these"</h1>
+<pre class="wire">WITH expired AS (
+  SELECT event_id, seat_id FROM event_seat
+   WHERE event_id = :e AND state = 'HELD' AND hold_expires_at &lt; now()
+   ORDER BY hold_expires_at LIMIT 500
+   FOR UPDATE SKIP LOCKED                  -- skip rows a buyer is claiming right now
+)
+UPDATE event_seat s SET state = 'AVAILABLE', hold_id = NULL, hold_expires_at = NULL,
+       version = s.version + 1
+  FROM expired x WHERE s.event_id = x.event_id AND s.seat_id = x.seat_id
+RETURNING s.seat_id;                       -- + outbox 'SeatsReleased', same commit</pre>
+<div class="line">Every 5 s, 500 a batch: up to 100 releases a second, short locks, parallel-safe. PAYMENT_PENDING is never touched.</div>
+<div class="foot"><span>Ticket booking · sweeper</span><span>deep dive 4</span></div>
+</div>
+
+<!-- 50 seat states -->
+<div class="slide dia">
+<div class="k r">Deep dive 4 · the seat state machine</div>
+<h1>PAYMENT_PENDING is the state weak designs miss</h1>
+<figure class="grow"><!--SVG:seat-states--></figure>
+<div class="line a">If the sweeper dies: staleness, not oversell. Alert on the age of the oldest expired hold.</div>
+<div class="foot"><span>Ticket booking · seat states</span><span>deep dive 4</span></div>
+</div>
+
+<!-- 51 Q hardest -->
+<div class="slide qs">
+<div class="who">Interviewer · the hardest probe</div>
+<div class="qq">"The hold expires at 4:50, the payment provider takes fifteen seconds, and then says approved."</div>
+<div class="hint">There's no perfectly clean answer. Take a position and defend it.</div>
+</div>
+
+<!-- 52 seq checkout -->
+<div class="slide dia">
+<div class="k r">Deep dive 5 · sequence · checkout</div>
+<h1>Freeze the seats before calling the provider</h1>
+<figure class="grow"><!--SVG:seq-checkout--></figure>
+<div class="foot"><span>Ticket booking · checkout</span><span>deep dive 5</span></div>
+</div>
+
+<!-- 53 freeze SQL -->
+<div class="slide">
+<div class="k r">Deep dive 5 · the freeze, and the order of money</div>
+<h1>Reserve the money, secure the seats, then take the money</h1>
+<pre class="wire">UPDATE event_seat
+   SET state = 'PAYMENT_PENDING', hold_expires_at = now() + interval '10 minutes',
+       order_id = :o, version = version + 1
+ WHERE event_id = :e AND hold_id = :h
+   AND state = 'HELD' AND hold_expires_at > now()   -- still mine, not expired
+RETURNING seat_id;                                    -- fewer rows → "your hold expired"</pre>
+<div class="cards c3">
+<div class="cd"><h3>Authorize</h3><p>Reserve the money, key order-{id}-1. Undo = a void, invisible to the fan.</p></div>
+<div class="cd red"><h3>Sell</h3><p>PAYMENT_PENDING → SOLD; tickets with UNIQUE (event, seat).</p></div>
+<div class="cd grn"><h3>Capture</h3><p>Only now take the money. Undo here = a refund.</p></div>
+</div>
+<div class="foot"><span>Ticket booking · freeze</span><span>deep dive 5</span></div>
+</div>
+
+<!-- 54 seq unknown -->
+<div class="slide dia">
+<div class="k r">Deep dive 5 · sequence · the provider goes silent</div>
+<h1>Unknown is not failure</h1>
+<figure class="grow"><!--SVG:seq-unknown--></figure>
+<div class="foot"><span>Ticket booking · unknown outcome</span><span>deep dive 5</span></div>
+</div>
+
+<!-- 55 THESIS 4 -->
+<div class="slide th">
+  <div class="lbl">Key line · the payment</div>
+  <div class="s">I'd rather hold a seat <em>ten extra minutes</em> than sell it twice.</div>
+  <div class="sub">The cost is slightly slower sell-through at the very end. That's a trade-off I'd show the product owner, explicitly.</div>
+  <div class="foot"><span>Ticket booking · payments</span><span>key line</span></div>
+</div>
+
+<!-- 56 degrade -->
+<div class="slide">
+<div class="k">Under load · what breaks first</div>
+<h1>Every layer sheds before the next one hurts</h1>
+<table class="bt"><tr><th>Overloaded</th><th>What it does</th><th>What the fan sees</th></tr>
+<tr><td>CDN can't reach us</td><td>serves the last state for 30 s</td><td>the line pauses</td></tr>
+<tr><td>Gateway</td><td>sheds untokened traffic first</td><td>polls slow; shoppers fine</td></tr>
+<tr><td>Inventory DB</td><td>controller cuts R by 30%</td><td>the line moves slower</td></tr>
+<tr><td>Payment provider</td><td>breaker opens; seats stay frozen</td><td>"processing…" longer</td></tr>
+</table>
+<div class="line">Double the fans and the database doesn't notice: R is set by shop health, not demand.</div>
+<div class="foot"><span>Ticket booking · degradation</span><span>stage 6.7</span></div>
+</div>
+
+<!-- 57 mid-round -->
+<div class="slide">
+<div class="k">Any time · requirements added mid-round</div>
+<h1>New consumers and read models, not a redesign</h1>
+<table class="bt"><tr><th>New requirement</th><th>What changes</th></tr>
+<tr><td>"The promoter adds 5,000 seats"</td><td>insert AVAILABLE rows, bump layout version, resume</td></tr>
+<tr><td>"A waitlist when sold out"</td><td>a consumer of SeatsReleased makes targeted holds</td></tr>
+<tr><td>"Best available"</td><td>a server-side allocator; contention drops</td></tr>
+<tr><td>"Multi-region"</td><td>each event's inventory homed in one region</td></tr>
+</table>
+<div class="foot"><span>Ticket booking · extensions</span><span>stage 7</span></div>
+</div>
+
+<!-- 58 failures -->
+<div class="slide">
+<div class="k">Failure modes · minutes 48–52</div>
+<h1>The queue absorbs the outage</h1>
+<table class="bt"><tr><th>Failure</th><th>Mitigation</th></tr>
+<tr><td>Inventory primary fails</td><td>sync replica, ~30 s failover; the controller pauses R</td></tr>
+<tr><td>Redis queue node fails</td><td>admitted fans unaffected; re-seed from tokens</td></tr>
+<tr><td>Payment provider outage</td><td>breaker; PAYMENT_PENDING keeps seats safe</td></tr>
+<tr><td>Admission controller dies</td><td>lease expires, another takes over; the line pauses</td></tr>
+<tr><td>Clock skew</td><td>every expiry uses the database's clock</td></tr>
+</table>
+<div class="foot"><span>Ticket booking · failures</span><span>stage 8</span></div>
+</div>
+
+<!-- 59 SLOs -->
+<div class="slide">
+<div class="k">Operations · SLOs</div>
+<h1>Oversell has an SLO of zero</h1>
+<div class="tiles" style="--n:4">
+<div class="tile"><b>0</b><span>oversell: tickets = SOLD seats, checked every minute</span></div>
+<div class="tile blue"><b>300 ms</b><span>hold p99</span></div>
+<div class="tile blue"><b>30 s</b><span>approved to tickets, p99</span></div>
+<div class="tile"><b>15 min</b><span>max PAYMENT_PENDING age</span></div>
+</div>
+<div class="line r">Before the biggest sale: a 1-million-fan load test and a game day.</div>
+<div class="foot"><span>Ticket booking · SLOs</span><span>stage 9</span></div>
+</div>
+
+<!-- 60 AUX MVP -->
+<div class="slide aux">
+<div class="k">The EM layer · phasing</div>
+<h1>The correctness core first</h1>
+<div class="cards c2">
+<div class="cd red"><h3>MVP · 6–8 weeks</h3><p>Holds, checkout, the claim path, a simple FIFO queue, a polled seat map.</p></div>
+<div class="cd"><h3>Then</h3><p>Lobby and lottery, bot defence, adaptive polling, waitlist, best available, cells for mega events.</p></div>
+</div>
+<div class="line">Half the time and half the team? Never cut the invariant monitor.</div>
+<div class="foot"><span>Ticket booking · EM layer</span><span>AUX</span></div>
+</div>
+
+<!-- 61 AUX teams -->
+<div class="slide aux">
+<div class="k">The EM layer · team seams</div>
+<h1>Teams along the three paths</h1>
+<div class="cards c3">
+<div class="cd"><h3>Edge &amp; waiting room</h3><p>Queue, admission, bot defence.</p></div>
+<div class="cd red"><h3>Inventory &amp; orders</h3><p>The correctness core. Owns the invariant.</p></div>
+<div class="cd grn"><h3>Payments</h3><p>Provider adapters, reconciliation.</p></div>
+</div>
+<div class="line">Contracts between them: the event stream and the admission token. They ship in parallel. The runbook names who may change R.</div>
+<div class="foot"><span>Ticket booking · EM layer</span><span>AUX</span></div>
+</div>
+
+<!-- 62 close -->
+<div class="slide th">
+  <div class="lbl">Key line · the close</div>
+  <div class="s" style="font-size:36pt">I chose <em>correctness</em> and <em>graceful rejection</em> over raw throughput.</div>
+  <div class="sub">A waiting room that meters a million people into a few hundred transactions a second, a 6 KB versioned bitmap, a relational claim path. Biggest risk: the unknown payment outcome. Next: bot defence and best available.</div>
+  <div class="foot"><span>Ticket booking · the close</span><span>what · trade-off · risk · next</span></div>
+</div>
+
+<!-- 63 FU1 Q multi-event -->
+<div class="slide qs">
+<div class="who">Follow-up 1 · scale-out, technical</div>
+<div class="qq">"A twenty-date stadium tour goes on sale at ten, for every date at once, and three other big shows open the same morning."</div>
+<div class="hint">What's shared, what isn't, and what you'd budget.</div>
+</div>
+
+<!-- 64 FU1 dia -->
+<div class="slide dia">
+<div class="k r">Follow-up 1 · the answer</div>
+<h1>An isolation problem, not a coordination problem</h1>
+<figure class="grow"><!--SVG:fu-multi-event--></figure>
+<div class="foot"><span>Ticket booking · follow-up 1</span><span>multi-event</span></div>
+</div>
+
+<!-- 65 FU2 Q -->
+<div class="slide qs">
+<div class="who">Follow-up 2 · failure, mid-sale</div>
+<div class="qq">"Ten minutes into the biggest on-sale of the year, the inventory primary fails over."</div>
+<div class="hint">The first seconds, then the week after.</div>
+</div>
+
+<!-- 66 FU2 dia -->
+<div class="slide dia">
+<div class="k r">Follow-up 2 · the timeline</div>
+<h1>The queue absorbs the outage</h1>
+<figure class="grow"><!--SVG:fu-failover--></figure>
+<div class="foot"><span>Ticket booking · follow-up 2</span><span>failover</span></div>
+</div>
+
+<!-- 67 FU3 Q -->
+<div class="slide qs">
+<div class="who">Follow-up 3 · a policy with an engineering cost</div>
+<div class="qq">"The promoter says a lottery looks rigged. They want strict first-come, first-served at ten o'clock."</div>
+<div class="hint">What strict first-come means at the millisecond, and who decides.</div>
+</div>
+
+<!-- 68 FU3 dia -->
+<div class="slide dia">
+<div class="k r">Follow-up 3 · the answer</div>
+<h1>Options with consequences; the promoter decides</h1>
+<figure class="grow"><!--SVG:fu-fairness--></figure>
+<div class="foot"><span>Ticket booking · follow-up 3</span><span>fairness</span></div>
+</div>
+
+<!-- 69 FU4 Q -->
+<div class="slide qs">
+<div class="who">Follow-up 4 · cost</div>
+<div class="qq">"Finance says the CDN bill for last month's on-sale was three times the forecast."</div>
+<div class="hint">Slice before you guess: rate × size × audience.</div>
+</div>
+
+<!-- 70 FU4 dia -->
+<div class="slide dia">
+<div class="k r">Follow-up 4 · the diagnosis</div>
+<h1>One of three factors moved</h1>
+<figure class="grow"><!--SVG:fu-cdn-cost--></figure>
+<div class="foot"><span>Ticket booking · follow-up 4</span><span>cost</span></div>
+</div>
+
+<!-- 71 FU5 Q AUX -->
+<div class="slide qs aux">
+<div class="who">Follow-up 5 · delivery · EM loops only</div>
+<div class="qq">"Three teams. Twelve weeks until the biggest tour of the year. What ships, and what doesn't?"</div>
+<div class="hint">Sequenced by risk, with a named never-cut.</div>
+</div>
+
+<!-- 72 FU5 dia AUX -->
+<div class="slide dia aux">
+<div class="k r">Follow-up 5 · the plan</div>
+<h1>Correctness first, scale second</h1>
+<figure class="grow"><!--SVG:fu-roadmap--></figure>
+<div class="foot"><span>Ticket booking · follow-up 5</span><span>AUX</span></div>
+</div>
+
+<!-- 73 scorecard -->
+<div class="slide">
+<div class="k">Debrief</div>
+<h1>Where the round lands at Staff</h1>
+<table class="bt sm"><tr><th>Signal</th><th>Senior</th><th>Staff / L6–L7</th></tr>
+<tr><td>Framing</td><td>asks about oversell and holds</td><td>"98% will be rejected", designed for, with arithmetic</td></tr>
+<tr><td>Contention</td><td>conditional update</td><td>sorted locks, NOWAIT, 409 + fresh map; why not SERIALIZABLE</td></tr>
+<tr><td>Queue</td><td>a waiting room</td><td>cached pointer, Lua join, lottery, AIMD controller</td></tr>
+<tr><td>Data</td><td>tables</td><td>ERDs, wire formats, a 6 KB versioned bitmap, Redis hash tags</td></tr>
+<tr><td>Payments</td><td>idempotency key</td><td>freeze → authorize → sell → capture; unknown ≠ failed</td></tr>
+</table>
+<div class="foot"><span>Ticket booking · scorecard</span><span>debrief</span></div>
+</div>
+
+<!-- 74 checks -->
+<div class="slide th">
+  <div class="lbl">Debrief</div>
+  <div class="s" style="font-size:38pt">Six checks before the real round.</div>
+  <ol class="check" style="padding-left:30pt">
+    <li>"Mostly a system for saying no", with the arithmetic.</li>
+    <li>Every number shown as a calculation, with its consequence.</li>
+    <li>Wire formats: what the CDN, the bitmap and the 409 actually contain.</li>
+    <li>Every store against its rejected alternatives.</li>
+    <li>PAYMENT_PENDING, and unknown is not failure.</li>
+    <li>The EM layer only when the loop asks for it.</li>
+  </ol>
+  <div class="foot"><span>Ticket booking · mock round</span><span>end</span></div>
+</div>
+</body></html>
