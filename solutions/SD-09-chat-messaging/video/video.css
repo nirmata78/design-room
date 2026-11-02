@@ -62,3 +62,8 @@ pre.wire { font-size: 13pt; line-height: 1.38; padding: 10pt 14pt; margin: 0 0 1
 table.bt.sm { font-size: 14.5pt; } table.bt.sm th, table.bt.sm td { padding: 6pt 10pt; }
 table.bt td.calc { font-family: "DejaVu Sans Mono", monospace; font-size: 13pt; color: #0b3d6e; }
 .cols2 pre.wire { font-size: 11.5pt; white-space: pre; overflow: hidden; }
+
+/* readable code slides (2026-10-29 review): 16pt, comments on their own line, ≤ 16 lines */
+pre.code { font-size: 16pt; line-height: 1.5; padding: 12pt 18pt; white-space: pre; }
+pre.code .cm, pre.wire .cm { color: #6e7781; font-style: italic; }
+pre.code .kw { color: #c8341f; font-weight: 700; }

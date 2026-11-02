@@ -1,0 +1,39 @@
+@startuml
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam rectangle {
+  BackgroundColor #E8F0FA
+  BorderColor #2F6FB5
+}
+skinparam database {
+  BackgroundColor #E8F0FA
+  BorderColor #2F6FB5
+}
+actor "100 M connected devices" as D
+rectangle "Gateways\n250-300 hosts" as G
+rectangle "Message service\n~1,000 Raft leaders" as M #FDECEA
+database "Messages\n60 TB/day replicated" as S #FDECEA
+rectangle "Message log\n200 MB/s" as L
+rectangle "Delivery workers" as W
+database "Session registry\n~10 GB, in memory" as R
+rectangle "Inbox consumer" as I
+database "Inbox index\n~1 TB, in memory" as X
+rectangle "Sync service" as Y
+rectangle "Receipt service" as C
+database "Device cursors" as K
+D --> G : 3.3 M heartbeats/s\n(stop here)
+G --> M : 1 M SEND/s (peak)
+M --> S : 1 M commits/s
+S --> L : 1 M events/s
+L --> W : 1 M events/s
+W --> R : about 5 M lookups/s
+W --> G : about 3 M pushes/s
+G --> R : about 330 k refreshes/s
+L --> I : 1 M events/s
+I --> X : about 5 M upserts/s,\ncoalesced per conversation
+G --> Y : about 28 k syncs/s normally\n+55 k/s in a zone drain
+Y --> S : about 280 k reads/s normally\n+550 k/s in a zone drain
+G --> C : about 3 M cursor frames/s,\nbatched by the device
+C --> K : write-behind
+@enduml

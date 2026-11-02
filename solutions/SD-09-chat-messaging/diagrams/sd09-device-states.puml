@@ -1,0 +1,25 @@
+@startuml
+hide empty description
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam noteBackgroundColor #FFF8DC
+skinparam noteBorderColor #C9A227
+skinparam state {
+  BackgroundColor #E8F0FA
+  BorderColor #2F6FB5
+}
+[*] --> OFFLINE
+OFFLINE --> BACKOFF : network back, or\nsocket dropped
+BACKOFF --> CONNECTING : random delay\n(jitter, up to 60 s)
+CONNECTING --> REGISTERED : TLS resumed, auth ok;\nsession written first
+CONNECTING --> BACKOFF : failed: longer delay
+REGISTERED --> SYNCING : SYNC {cursors}
+SYNCING --> SYNCING : pages of missed messages;\nlive pushes held by seq
+SYNCING --> BACKOFF_SYNC : RETRY_LATER\n(admission control)
+BACKOFF_SYNC --> SYNCING : after the delay;\nthe socket stays open
+SYNCING --> LIVE : LIVE frame
+LIVE --> REPAIR : seq jumps past cursor + 1,\nor the periodic head check differs
+REPAIR --> LIVE : gap filled by SYNC
+LIVE --> OFFLINE : socket lost or app killed
+@enduml

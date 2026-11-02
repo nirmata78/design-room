@@ -1,0 +1,26 @@
+@startuml
+hide empty description
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam noteBackgroundColor #FFF8DC
+skinparam noteBorderColor #C9A227
+skinparam state {
+  BackgroundColor #E8F0FA
+  BorderColor #2F6FB5
+}
+[*] --> PENDING : user taps send;\nstored locally with clientMsgId
+PENDING --> SENT : ACK {seq}\none tick
+PENDING --> PENDING : no ACK: retry\nsame clientMsgId
+PENDING --> FAILED : 7 days without an ACK
+FAILED --> PENDING : manual resend\n(a new clientMsgId)
+SENT --> DELIVERED : a recipient device's\nDELIVERED cursor passes seq\ntwo ticks
+DELIVERED --> READ : a recipient's READ cursor\npasses seq
+READ --> [*]
+note right of SENT
+  The tick is a promise: a majority of
+  replicas held the message before the
+  ACK left. Every later state is a cursor
+  comparison, not a per-message record.
+end note
+@enduml

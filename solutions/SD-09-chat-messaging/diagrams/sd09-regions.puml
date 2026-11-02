@@ -1,0 +1,36 @@
+@startuml
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam rectangle {
+  BackgroundColor #E8F0FA
+  BorderColor #2F6FB5
+}
+skinparam noteBackgroundColor #FFF8DC
+skinparam noteBorderColor #C9A227
+actor "Alice (EU)" as A
+actor "Bob (US)" as B
+rectangle "Region EU" as EU {
+  rectangle "Gateway EU" as GE
+  rectangle "Leader of conv 9001\n(home_region = EU)\n3 zones, sync quorum" as LE #FDECEA
+}
+rectangle "Region US" as US {
+  rectangle "Gateway US" as GU
+  rectangle "Read replica of conv 9001\n(async, ~seconds behind)" as RU
+  rectangle "Delivery workers US" as WU
+}
+A --> GE : SEND
+GE --> LE : commit in-region\nabout 25 ms
+B --> GU : SEND
+GU --> LE : cross-region forward\n+about 100 ms round trip
+LE --> RU : async replication
+RU --> WU : MessageStored
+WU --> GU : push
+GU --> B : MSG
+note bottom of RU
+  A region loss can lose the last seconds of
+  acknowledged messages. Stated in the room,
+  and closed only by a cross-region quorum,
+  which costs that round trip on every send.
+end note
+@enduml

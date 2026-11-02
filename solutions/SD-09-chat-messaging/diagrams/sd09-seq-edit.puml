@@ -1,0 +1,28 @@
+@startuml
+hide footbox
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 230
+skinparam noteBackgroundColor #FFF8DC
+skinparam noteBorderColor #C9A227
+participant "Sender" as A
+participant "Partition leader" as L
+participant "Messages" as S
+participant "Log" as K
+participant "New app" as N
+participant "Old app" as O
+participant "Search" as Q
+A -> L : SEND {kind: EDIT, target: 1234, body}
+L -> L : check: the sender wrote 1234,\nand it's inside the edit window
+L -> S : one Raft entry: row at seq 1250 (EDIT)\n+ update row 1234 (body, edited_at)
+L --> A : ACK {seq: 1250}
+S -> K : MessageStored {seq 1250, kind EDIT}
+K -> N : MSG 1250: replace the text of 1234
+K -> O : MSG 1250: unknown kind, skip
+O -> O : cursor = 1250, not stuck;\nstill shows the original
+K -> Q : reindex 1234
+note over N, O : A device that syncs later reads row 1234 already edited, then 1250.\nApplying 1250 again changes nothing, so the order of the two doesn't matter.
+@enduml
