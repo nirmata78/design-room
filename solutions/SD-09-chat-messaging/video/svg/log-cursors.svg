@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 620" width="1600" height="620">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="40" y="50" text-anchor="start" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24" fill="#1f2328" font-weight="700">One conversation&#x27;s log: numbers assigned by the server, with no gaps</text>
+<rect x="60" y="90" width="142" height="90" rx="8" fill="#ffffff" stroke="#1168bd" stroke-width="2.4"/>
+<text x="131.0" y="145" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="26" fill="#1168bd" font-weight="700">1230</text>
+<rect x="208" y="90" width="142" height="90" rx="8" fill="#ffffff" stroke="#1168bd" stroke-width="2.4"/>
+<text x="279.0" y="145" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="26" fill="#1168bd" font-weight="700">1231</text>
+<rect x="356" y="90" width="142" height="90" rx="8" fill="#ffffff" stroke="#1168bd" stroke-width="2.4"/>
+<text x="427.0" y="145" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="26" fill="#1168bd" font-weight="700">1232</text>
+<rect x="504" y="90" width="142" height="90" rx="8" fill="#ffffff" stroke="#1168bd" stroke-width="2.4"/>
+<text x="575.0" y="145" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="26" fill="#1168bd" font-weight="700">1233</text>
+<rect x="652" y="90" width="142" height="90" rx="8" fill="#ffffff" stroke="#1168bd" stroke-width="2.4"/>
+<text x="723.0" y="145" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="26" fill="#1168bd" font-weight="700">1234</text>
+<rect x="800" y="90" width="142" height="90" rx="8" fill="#ffffff" stroke="#1168bd" stroke-width="2.4"/>
+<text x="871.0" y="145" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="26" fill="#1168bd" font-weight="700">1235</text>
+<rect x="948" y="90" width="142" height="90" rx="8" fill="#ffffff" stroke="#1168bd" stroke-width="2.4"/>
+<text x="1019.0" y="145" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="26" fill="#1168bd" font-weight="700">1236</text>
+<rect x="1096" y="90" width="142" height="90" rx="8" fill="#ffffff" stroke="#1168bd" stroke-width="2.4"/>
+<text x="1167.0" y="145" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="26" fill="#1168bd" font-weight="700">1237</text>
+<rect x="1244" y="90" width="142" height="90" rx="8" fill="#ffffff" stroke="#1168bd" stroke-width="2.4"/>
+<text x="1315.0" y="145" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="26" fill="#1168bd" font-weight="700">1238</text>
+<rect x="1392" y="90" width="142" height="90" rx="8" fill="#ffffff" stroke="#c8341f" stroke-width="2.4"/>
+<text x="1463.0" y="145" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="26" fill="#c8341f" font-weight="700">1239</text>
+<line x1="1463" y1="182" x2="1463" y2="266" stroke="#2d8a4e" stroke-width="2.6" stroke-dasharray="6 5"/>
+<circle cx="1463" cy="272" r="8" fill="#2d8a4e"/>
+<text x="1447.0" y="282" text-anchor="end" font-family="Inter, Helvetica, Arial, sans-serif" font-size="23" fill="#2d8a4e" font-weight="700">Phone, cursor 1239: up to date</text>
+<line x1="1019" y1="182" x2="1019" y2="356" stroke="#a86a12" stroke-width="2.6" stroke-dasharray="6 5"/>
+<circle cx="1019" cy="362" r="8" fill="#a86a12"/>
+<text x="1003.0" y="372" text-anchor="end" font-family="Inter, Helvetica, Arial, sans-serif" font-size="23" fill="#a86a12" font-weight="700">Laptop, cursor 1236: asks for 1237 onward</text>
+<line x1="279" y1="182" x2="279" y2="446" stroke="#c8341f" stroke-width="2.6" stroke-dasharray="6 5"/>
+<circle cx="279" cy="452" r="8" fill="#c8341f"/>
+<text x="295.0" y="462" text-anchor="start" font-family="Inter, Helvetica, Arial, sans-serif" font-size="23" fill="#c8341f" font-weight="700">Tablet, cursor 1231: offline; asks for 1232 onward</text>
+<rect x="40" y="530" width="1520" height="47.2" rx="6" fill="#e8f0fa" stroke="#2f6fb5" stroke-width="1.2"/>
+<text x="54" y="556.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="21.0" fill="#1f2328">A cursor is one number per device, per conversation: &quot;I have everything up to here.&quot; Offline is simply a cursor that is further behind.</text>
+</svg>

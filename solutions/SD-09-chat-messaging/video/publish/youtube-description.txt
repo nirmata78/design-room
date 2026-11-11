@@ -1,0 +1,53 @@
+A chat system that never loses a message and never shows one twice, for a billion users. A full mock system design round at the Staff bar (L6/L7): interviewer, candidate and coach, 44 minutes, 85 numbered slides, then 5 follow-ups.
+
+The thesis: start from the mailbox, not the socket. A message is durably stored in its conversation log, with a server-assigned sequence number, before anything is acknowledged. Every device then catches up by cursor. The WebSocket only delivers early.
+
+IN THIS ROUND
+• Estimates as arithmetic: 100 M sockets, 20 PB a year, the million-receipt trap
+• Wire formats for send, deliver and sync
+• Data model: Chen ERD, physical tables, wide-column, hot keys and who writes them
+• C4 context, container and component diagrams; a sequence and code for each path
+• Ordering: one authority per conversation, and leader failover without reordering
+• The lost ACK: every crash point, and why dedup comes before numbering
+• Groups: shared log vs inbox copies, coalesced inbox writes, receipts as cursors
+• A gateway dies with 500 k connections: jitter, resumption, admission control
+• Edit and delete as a mid-round requirement; versioning a protocol for slow-updating phones
+
+HOW TO USE IT
+Watch once straight through. On the second pass, pause after each question and answer first. Slides badged AUX are the manager layer: skip them in a Staff round.
+
+CHAPTERS
+0:00 Before you start
+0:47 Requirements
+2:56 Terms, defined once
+4:35 The thesis
+5:19 Back of the envelope
+7:12 The API
+9:47 Data model
+14:34 Technology, against the alternatives
+16:35 The send path
+22:40 The sync path
+26:13 Deep dive one: ordering
+29:15 Deep dive two: the lost ACK
+30:54 Deep dive three: groups and receipts
+33:06 Deep dive four: reconnects
+35:07 A requirement added mid-round
+36:20 Failures and operations
+37:41 The EM layer, auxiliary
+38:20 The close
+38:58 Follow-up 1: encryption by Friday
+39:53 Follow-up 2: the deploy
+40:36 Follow-up 3: the broadcast channel
+41:21 Follow-up 4: the storage bill
+41:58 Follow-up 5: the on-call, auxiliary
+42:35 Debrief
+
+LINKS
+Reference solution: https://nirmata78.github.io/design-room/solutions/SD-09-chat-messaging.html
+Run this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room
+All mock rounds: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md
+
+ABOUT THIS VIDEO
+This is a scripted mock, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script and diagrams were produced with Claude Code from the repository's reference solution. Numbers are back-of-the-envelope estimates for the exercise, not any company's real figures, and this is not any company's actual design.
+
+#SystemDesign #SoftwareEngineering #DistributedSystems

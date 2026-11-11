@@ -1,0 +1,27 @@
+@startuml
+hide footbox
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 230
+skinparam noteBackgroundColor #FFF8DC
+skinparam noteBorderColor #C9A227
+participant "Admin device" as A
+participant "Partition leader" as L
+participant "Members table\n(same Raft group)" as M
+participant "Log" as K
+participant "Delivery worker" as W
+participant "New member's phone" as N
+A -> L : POST /members {user N}
+L -> L : next seq = 5000
+L -> M : one Raft entry: member row with\njoin_seq = 5000 + event MEMBER_ADDED at 5000
+L --> A : 200 {joinSeq: 5000}
+M -> K : MemberChanged, seq 5000
+K -> W : invalidate members:{conv}
+W -> N : MSG seq 5000 (you were added)
+N -> L : history read before seq 5000
+L --> N : 403: below join_seq
+note over L, W : A removal is the same entry with left_seq. Until the cached members set\nexpires a removed member may get a few more pushes, so sync and history\nalways check the table, and for a sensitive group the push waits for the change.
+@enduml

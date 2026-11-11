@@ -1,0 +1,55 @@
+{
+  "mp4": "chat-mock.mp4",
+  "teaser_chapter": "Deep dive two: the lost ACK",
+  "thumbnail": {
+    "kicker": "Staff mock system design round",
+    "title": "Chat for<br>a <em>billion</em> users",
+    "sub": "Never lose a message. Never show one twice.",
+    "id": "design-room · SD-09"
+  },
+  "youtube": {
+    "title": "Chat System Design: Staff-Level Mock Interview (1B users, groups, offline, receipts)",
+    "playlist": "System design mock rounds · design-room (create it once, reuse it)",
+    "tags": [
+      "system design",
+      "system design interview",
+      "chat system design",
+      "messaging system design",
+      "staff engineer",
+      "mock interview",
+      "distributed systems",
+      "websocket",
+      "raft",
+      "software architecture"
+    ],
+    "description_top": [
+      "A chat system that never loses a message and never shows one twice, for a billion users. A full mock system design round at the Staff bar (L6/L7): interviewer, candidate and coach, {DURATION} minutes, {SLIDES} numbered slides, then {FOLLOWUPS} follow-ups.",
+      "The thesis: start from the mailbox, not the socket. A message is durably stored in its conversation log, with a server-assigned sequence number, before anything is acknowledged. Every device then catches up by cursor. The WebSocket only delivers early.",
+      "IN THIS ROUND\n• Estimates as arithmetic: 100 M sockets, 20 PB a year, the million-receipt trap\n• Wire formats for send, deliver and sync\n• Data model: Chen ERD, physical tables, wide-column, hot keys and who writes them\n• C4 context, container and component diagrams; a sequence and code for each path\n• Ordering: one authority per conversation, and leader failover without reordering\n• The lost ACK: every crash point, and why dedup comes before numbering\n• Groups: shared log vs inbox copies, coalesced inbox writes, receipts as cursors\n• A gateway dies with 500 k connections: jitter, resumption, admission control\n• Edit and delete as a mid-round requirement; versioning a protocol for slow-updating phones",
+      "HOW TO USE IT\nWatch once straight through. On the second pass, pause after each question and answer first. Slides badged AUX are the manager layer: skip them in a Staff round."
+    ],
+    "description_bottom": [
+      "LINKS\nReference solution: https://nirmata78.github.io/design-room/solutions/SD-09-chat-messaging.html\nRun this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room\nAll mock rounds: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md",
+      "ABOUT THIS VIDEO\nThis is a scripted mock, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script and diagrams were produced with Claude Code from the repository's reference solution. Numbers are back-of-the-envelope estimates for the exercise, not any company's real figures, and this is not any company's actual design.",
+      "#SystemDesign #SoftwareEngineering #DistributedSystems"
+    ]
+  },
+  "linkedin": {
+    "post": [
+      "A chat system that never loses a message and never shows one twice. How would you design it for a billion users?",
+      "I've published a {DURATION}-minute mock system design round at the Staff bar: interviewer, candidate and coach, on {SLIDES} numbered slides.",
+      "The idea that unlocks it: start from the mailbox, not the socket. Store the message durably, with a server-assigned sequence number, before anything is acknowledged. Every device then catches up by cursor. Online, offline and multi-device become one code path. The WebSocket only delivers early.",
+      "What the round goes into:\n→ Who decides the order when two people send at once, and what happens when that leader dies mid-write\n→ The lost ACK: every crash point, and why dedup has to come before numbering\n→ The million-receipt trap in a group of 1,000, found with arithmetic\n→ Half a million sockets reconnecting at once\n→ Wire formats, C4 and sequence diagrams, the data model and code for each path\n→ {FOLLOWUPS} follow-ups, from end-to-end encryption to a channel with a million subscribers",
+      "Attached: the full written design, 53 pages. Every decision with its alternatives, the arithmetic, the failure cases, and the internals of each tool.",
+      "▶ The video: {YOUTUBE_URL}\n\nBest on a second pass: pause after each question and answer it first.",
+      "It's a scripted mock with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator. More rounds are coming, one problem at a time.",
+      "Where would you push harder if you were the interviewer?",
+      "#SystemDesign #SoftwareEngineering #DistributedSystems"
+    ],
+    "first_comment": "Reference solution, stage by stage: https://nirmata78.github.io/design-room/solutions/SD-09-chat-messaging.html\n\nRun this round yourself, with an AI interviewer that won't help you: https://github.com/nirmata78/design-room",
+    "document": {
+      "pdf": "../../SD-09_Chat_Messaging_Reference_Design.pdf",
+      "title": "Chat for a billion users: a Staff-level system design, explained"
+    }
+  }
+}

@@ -1,0 +1,27 @@
+@startuml
+hide footbox
+skinparam defaultFontName "Helvetica"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 230
+skinparam noteBackgroundColor #FFF8DC
+skinparam noteBorderColor #C9A227
+participant "Delivery worker" as W
+participant "Gateway" as G
+participant "Laptop (cursor 1240)" as D
+participant "Sync service" as Y
+W -> G : push seq 1241
+G -x D : frame lost (half-open socket)
+note over W : The worker commits its offset:\ndelivery is best-effort
+note over D : Nothing follows 1241, so there is no\ngap to see. The laptop looks up to date
+... up to 5 minutes later ...
+D -> G : HEAD_CHECK {lastSyncTs} (with a heartbeat)
+G -> Y : which conversations changed?
+Y --> D : 9001: head = 1241
+D -> Y : SYNC {9001: 1240}
+Y --> D : MSG 1241
+D --> Y : DELIVERED up to 1241
+note over D, Y : Gap detection repairs a hole with a later message after it.\nThe periodic head check repairs the last message, which has none.
+@enduml

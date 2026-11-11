@@ -26,6 +26,8 @@ curveball, failure modes, SLOs and cost, what changes by level, and the four-sen
 **correctness under failure** (SD-44) and **hot-path protection** (SD-25). Master these and most other
 questions are recombinations.
 
+**Mock-round videos:** [VIDEOS.md](VIDEOS.md) lists each problem published so far.
+
 ## How every solution is laid out
 
 | Stage | Clock (60 min) | Section |
@@ -71,12 +73,14 @@ internals appendix for the "how does that tool actually work?" probe.
 | ID | Problem | Source | What's in it |
 |---|---|---|---|
 | [SD-47](SD-47-ticket-booking/SD-47_Ticket_Booking_Reference_Design.md) | Ticket booking under contention | `SD-47-ticket-booking/` | 60-minute script (pace `hour`), 21 PlantUML diagrams, seven deep dives (the same-millisecond click, the lottery waiting room, hold expiry, the expired-hold-paid case, the seat map at 10k shoppers, concurrent on-sales, degradation), three worked requirement drips, PostgreSQL / Redis / Kafka / CDN / card-payment internals, a one-page cheat card |
+| [SD-09](SD-09-chat-messaging/SD-09_Chat_Messaging_Reference_Design.md) | Chat and messaging, Staff bar | `SD-09-chat-messaging/` | The written companion to the video: 34 figures shared with it where possible, ten deep dives (ordering and leader failover, the lost ACK, groups, receipts, reconnect storms, a month offline, the sync races, storage and buckets, degradation, regions), four worked deltas, WebSocket / Raft / wide-column / log and CDC / Redis / push-service / E2E internals, a one-page cheat card |
 
 Build the PDF (needs `pandoc`, `xelatex`, `plantuml`, `rsvg-convert`; the PDF is gitignored):
 
 ```bash
 solutions/SD-47-ticket-booking/build-sd-booklet.sh SD-47_Ticket_Booking_Reference_Design             # diagrams + PDF
 solutions/SD-47-ticket-booking/build-sd-booklet.sh SD-47_Ticket_Booking_Reference_Design --no-diagrams
+solutions/SD-09-chat-messaging/build-sd-booklet.sh SD-09_Chat_Messaging_Reference_Design
 ```
 
 For a guide in the *style* of the URL-shortener and notification-platform reference interviews (cover
