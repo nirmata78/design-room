@@ -7,13 +7,17 @@ local boxes = {
   warn = {"warnbg", "warnrule", "Trap"},
   load = {"loadbg", "loadrule", "Under load"},
 }
+local order = {"key", "why", "say", "warn", "load"}  -- fixed order: pairs() is unspecified
+-- one pass, so replacement text is never re-escaped
+local esc = {["\\"]="\\textbackslash{}", ["%"]="\\%", ["&"]="\\&", ["#"]="\\#", ["_"]="\\_",
+             ["$"]="\\$", ["{"]="\\{", ["}"]="\\}", ["~"]="\\textasciitilde{}", ["^"]="\\textasciicircum{}"}
 function Div(el)
-  for cls, spec in pairs(boxes) do
+  for _, cls in ipairs(order) do
+    local spec = boxes[cls]
     if el.classes:includes(cls) then
       local label = el.attributes["title"] or spec[3]
       -- titles are plain text: escape LaTeX specials (%, ~, & … would break or vanish)
-      label = label:gsub("([%%&#_%$%{%}])", "\\%1")
-                   :gsub("~", "\\textasciitilde{}"):gsub("%^", "\\textasciicircum{}")
+      label = label:gsub("[\\%%&#_%$%{%}~%^]", esc)
       table.insert(el.content, 1, pandoc.RawBlock("latex",
         "\\begin{sdbox}{" .. spec[1] .. "}{" .. spec[2] .. "}{" .. label .. "}"))
       table.insert(el.content, pandoc.RawBlock("latex", "\\end{sdbox}"))
