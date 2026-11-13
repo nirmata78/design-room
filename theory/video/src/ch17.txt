@@ -1,0 +1,302 @@
+#! title: The building blocks
+#! short: Building blocks
+
+= th | System design at Staff depth · Part 17 of 17 | The building blocks | Twenty-two boxes you will draw, what each is for and not for, and the part of this course that opens each one up.
+N: Part seventeen, the building blocks. Every design is drawn from about twenty boxes. This part is a field guide to them: one card per block, saying when to draw it, when not to, and which part of this course teaches what is inside. Then three facts worth having exact, a map from design problems to parts, and three small assemblies.
+
+## 17.0 Why this part decides rounds
+
+= panel trap | The opening story | "Open that up."
+The candidate draws a box labelled **Kafka** and moves on. The interviewer points at it: "Open that up. What decides ordering, and what happens to a consumer when the group rebalances?"
+A name without a mechanism is a Depth miss. A mechanism without a name is fine.
+N: The candidate draws a box labelled Kafka and moves on. The interviewer points at it and says: open that up. What decides ordering, and what happens to a consumer when the group rebalances? A name without the mechanism behind it is a miss on depth. A mechanism without a product name is perfectly fine. So each card in this part points to where the mechanism was taught, and the product names come last.
+
+= panel note | Assumed reading | What this part does not repeat
+*Site Reliability Engineering*, chapter 2, *The Production Environment at Google, from the Viewpoint of an SRE*.
+Each block's mechanism is in the part named on its card. This part only says when to draw it.
+N: One reading is assumed: chapter two of the S-R-E book, which tours Google's production environment, Borg, Chubby, Bigtable, Spanner and the rest, as a working whole. Each block's mechanism is in the part named on its card, so this part only says when to draw it, and when not.
+
+= list | Map of the part | Five groups of blocks, then three assemblies
+- **The front door**: DNS and anycast, L4 balancer, L7 proxy, real-time gateway
+- **Databases and stores**: relational, distributed SQL, wide-column, leaderless key-value, embedded engine, object store
+- **Memory and coordination**: in-memory cache, coordination service
+- **Messaging and processing**: partitioned log, queue or pub-sub, stream processor, batch processor, columnar warehouse
+- **Platforms and backends**: time-series database, workflow engine, cluster manager, config and flags, tracing and logging
+N: Five groups. The front door. Databases and stores. Memory and coordination. Messaging and processing. And platforms and backends. Then three facts, the map from problems to parts, and three assemblies.
+
+## 17.1 The front door
+
+= dia | The front door | What is inside: packets, then requests
+p11-l4-l7
+N: The front door in one picture, from part eleven. A layer four balancer places connections, fast and blind to the protocol. A layer seven proxy terminates them and places each request, and can route, retry and limit. Behind them sits everything else. The four cards in this group are the four layers a request crosses before it reaches your code.
+
+= cards | BLK-01 · Block | DNS and anycast front door · Cloud DNS, Google's anycast edge ↔ Route 53, NS1
+@ BLK-01
+grn Draw it for :: global entry; steering users to a region; failover in seconds with anycast
+red Not for :: fast failover by changing DNS records: bound by the TTL and clients that ignore it
+amb Open up :: TTL, geo DNS by resolver, route withdrawal: part 11, section 11.1
+N: The DNS and anycast front door. Draw it for global entry and steering users to a region, and with anycast, failover in seconds. Not for fast failover by editing DNS records, which is bound by the time to live and by clients that ignore it. To open it up: part eleven, section one.
+
+= cards | BLK-02 · Block | L4 load balancer · Maglev ↔ IPVS, Katran, AWS NLB
+@ BLK-02
+grn Draw it for :: spreading connections across a fleet; absorbing floods; a stable virtual address
+red Not for :: per-request routing, or balancing long-lived multiplexed connections
+amb Open up :: consistent hashing of connections, the long-connection imbalance: part 11, section 11.2; part 6, section 6.2
+N: The layer four load balancer, Maglev at Google. Draw it to spread connections over a fleet, absorb floods and hold a stable virtual address. Not for routing individual requests, or balancing a few long multiplexed connections. Open it up with part eleven, section two, and the consistent hashing of part six.
+
+= cards | BLK-03 · Block | L7 proxy or API gateway · Google Front End, Apigee ↔ Envoy, NGINX
+@ BLK-03
+grn Draw it for :: TLS, authentication, per-client limits, routing, retries of idempotent calls, deadlines
+red Not for :: business logic or orchestration of several services
+amb Open up :: what stays out of the gateway, fail static: part 11, section 11.4; limits: part 12
+N: The layer seven proxy or API gateway, the Google Front End internally. Draw it for TLS, authentication, per-client limits, routing, retries and deadlines. Not for business logic or orchestrating services. Open it up with part eleven, section four, and the limits of part twelve.
+
+= cards | BLK-05 · Block | Real-time gateway · a WebSocket or SSE tier you build
+@ BLK-05
+grn Draw it for :: server push, presence, chat, streamed model output
+red Not for :: plain request and response, which a normal API serves more cheaply
+amb Open up :: transports, the connection tier, the routing table, reconnect storms: part 11, sections 11.6 and 11.7
+N: The real-time gateway, a tier of persistent connections you usually build yourself. Draw it for server push, presence, chat and streamed model output. Not for plain request and response. Open it up with part eleven, sections six and seven: the transports, the routing table and the reconnect storm.
+
+## 17.2 Databases and stores
+
+= dia | Databases and stores | What is inside: a log, a memory table, sorted files
+p7-lsm-write
+N: Inside most stores, from part seven: a write-ahead log for durability, an in-memory sorted table, and immutable sorted files merged in the background. A B-tree engine updates pages in place instead. Around that engine, each store in this group adds a different answer to replication, partitioning and transactions, and that answer is what decides when to draw it.
+
+= cards | BLK-06 · Block | Relational database · Cloud SQL, AlloyDB ↔ PostgreSQL, MySQL
+@ BLK-06
+grn Draw it for :: transactions, joins, constraints; up to tens of thousands of writes a second and a few TB per primary
+red Not for :: unbounded write scale-out on one primary
+amb Open up :: B-trees and indexes: part 7; isolation levels and locks: part 8; single-leader failover: part 5
+N: The relational database. Draw it for transactions, joins and constraints, up to tens of thousands of writes a second and a few terabytes per primary, which covers more systems than people expect. Not for unbounded write scale-out on one primary. Open it up with B-trees and indexes in part seven, isolation and locks in part eight, and failover in part five.
+
+= cards | BLK-07 · Block | Distributed SQL · Spanner, with F1 ↔ CockroachDB, YugabyteDB, TiDB
+@ BLK-07
+grn Draw it for :: strong consistency with horizontal scale and placement across regions
+red Not for :: the lowest-latency single-region key-value access
+amb Open up :: a consensus group per range: part 3; two-phase commit over groups: part 8; bounded clocks: part 2
+N: Distributed SQL, Spanner at Google. Draw it when you need strong consistency, transactions, horizontal scale and placement across regions together. Not for the lowest-latency key-value access in one region. Open it up with part three's consensus group per range, part eight's two-phase commit over groups, and part two's bounded clocks.
+
+= cards | BLK-08 · Block | Wide-column store · Bigtable ↔ HBase; Cassandra, with a different replication model
+@ BLK-08
+grn Draw it for :: huge sparse tables, high write rates, scans by row-key range
+red Not for :: multi-row transactions, ad hoc queries
+amb Open up :: LSM write and read paths: part 7; range partitioning and splits: part 6
+N: The wide-column store, Bigtable at Google. Draw it for huge sparse tables, high write rates and scans by row-key range. Not for multi-row transactions or ad hoc queries. Open it up with the LSM tree of part seven and the range partitioning and splits of part six.
+
+= cards | BLK-09 · Block | Leaderless key-value store · DynamoDB, Cassandra, Riak
+@ BLK-09
+grn Draw it for :: always-writable, multi-region, simple access by key
+red Not for :: invariants across keys
+amb Open up :: quorums, sloppy quorums, read repair, Merkle trees, tombstones: part 5; quorum maths: part 2
+N: The leaderless key-value store, in the Dynamo style. Draw it for always-writable, multi-region access by key. Not for invariants that span keys. Open it up with part five's quorums, repair, Merkle trees and tombstones, and part two's quorum arithmetic.
+
+= cards | BLK-10 · Block | Embedded storage engine · LevelDB ↔ RocksDB, Pebble
+@ BLK-10
+grn Draw it for :: the single-node layer inside a store you are designing
+red Not for :: anything distributed by itself: it is one node's library
+amb Open up :: write-ahead log, LSM paths, Bloom filters, compaction: part 7
+N: The embedded storage engine, LevelDB, RocksDB or Pebble. Draw it as the single-node layer inside a store you are designing yourself. It is a library on one node, and does nothing distributed. Open it up with all of part seven's engine half.
+
+= cards | BLK-11 · Block | Object or blob store · Colossus, Cloud Storage ↔ S3, HDFS, Ceph
+@ BLK-11
+grn Draw it for :: large immutable objects, backups, data lakes
+red Not for :: small hot records, or in-place updates
+amb Open up :: layout, erasure coding, integrity, repair, orphans: part 7; resumable upload: part 11
+N: The object store, Cloud Storage on Colossus. Draw it for large immutable objects, backups and data lakes. Not for small hot records or in-place updates. Open it up with part seven's blob half and part eleven's resumable upload.
+
+## 17.3 Memory and coordination
+
+= dia | Memory and coordination | What is inside: register under a lease, watch, check on every request
+p4-registry
+N: From part four: servers register under a lease, clients watch for changes, and every request carries the owner and epoch it expects. That pattern, and the cache tiers of part nine, are what the two blocks in this group provide.
+
+= cards | BLK-12 · Block | In-memory cache · Memorystore ↔ Memcached, Redis, Valkey
+@ BLK-12
+grn Draw it for :: read offload, sessions, ephemeral state
+red Not for :: the source of truth
+amb Open up :: patterns, eviction, invalidation, leases, stampedes, hit-ratio maths: part 9; hashing: part 6
+N: The in-memory cache, Memorystore on Google Cloud. Draw it for read offload, sessions and ephemeral state. Never as the source of truth. Open it up with all of part nine, and the hashing of part six.
+
+= cards | BLK-13 · Block | Coordination service · Chubby ↔ ZooKeeper, etcd, Consul
+@ BLK-13
+grn Draw it for :: leader election, locks, membership, small configuration
+red Not for :: bulk data or high write rates: one consensus group, about ten thousand writes a second
+amb Open up :: sessions, primitives, election with epochs, correctness locks: part 4; consensus: part 3
+N: The coordination service, Chubby at Google. Draw it for election, locks, membership and small configuration. Not for bulk data or high write rates, since it is one consensus group. Open it up with parts three and four.
+
+## 17.4 Messaging and processing
+
+= dia | Messaging and processing | What is inside: segments, offsets, retention
+p10-segments
+N: From part ten: a partition is a sequence of segment files with offsets and a sparse index, retained by whole files. Queues, stream processors, batch processors and warehouses are all built around moving and transforming data from structures like this one.
+
+= cards | BLK-14 · Block | Partitioned log · Managed Service for Apache Kafka ↔ Kafka, Pulsar, Kinesis
+@ BLK-14
+grn Draw it for :: replayable event streams, order per key, decoupling producers from consumers
+red Not for :: per-message routing, delays or priorities
+amb Open up :: segments, in-sync replicas, consumer groups, delivery, ordering: part 10
+N: The partitioned log, Kafka or its managed versions. Draw it for replayable event streams, order per key, and decoupling producers from consumers. Not for per-message routing, delays or priorities. Open it up with part ten.
+
+= cards | BLK-15 · Block | Message queue or pub-sub · Pub/Sub, Cloud Tasks ↔ SQS and SNS, RabbitMQ
+@ BLK-15
+grn Draw it for :: task distribution, fan-out, acknowledgement per message
+red Not for :: strict global order
+amb Open up :: queue versus log, ack deadlines, dead letters, fan-out: part 10
+N: The message queue or publish-subscribe service, Pub Sub and Cloud Tasks on Google Cloud. Draw it for task distribution, fan-out and per-message acknowledgement. Not for strict global order. Open it up with part ten.
+
+= cards | BLK-16 · Block | Stream processor · MillWheel then Dataflow ↔ Flink, Kafka Streams, Spark Structured Streaming
+@ BLK-16
+grn Draw it for :: windowed aggregation, joins, enrichment over streams
+red Not for :: serving request and response traffic
+amb Open up :: event time, watermarks, checkpointed state, the sink: part 10
+N: The stream processor, MillWheel and then Dataflow at Google. Draw it for windowed aggregation, joins and enrichment. Not for serving requests. Open it up with part ten's windows, watermarks and checkpoints.
+
+= cards | BLK-17 · Block | Batch processor · MapReduce then Flume ↔ Spark, Beam
+@ BLK-17
+grn Draw it for :: large recomputation, backfills, index builds
+red Not for :: low latency
+amb Open up :: Lambda versus Kappa: part 10; backfills under a throttle: part 16
+N: The batch processor, MapReduce and then Flume at Google. Draw it for large recomputations, backfills and index builds. Not for low latency. Open it up with part ten's Lambda and Kappa, and part sixteen's throttled backfills.
+
+= cards | BLK-18 · Block | Columnar warehouse or OLAP store · Dremel and BigQuery, Mesa, Procella ↔ ClickHouse, Druid, Pinot, Snowflake
+@ BLK-18
+grn Draw it for :: ad hoc analytics over huge tables
+red Not for :: point lookups or transactional workloads
+amb Open up :: columnar storage and encodings: part 14; roll-ups: part 14
+N: The columnar warehouse, BigQuery on Dremel. Draw it for ad hoc analytics over huge tables. Not for point lookups or transactions. Open it up with part fourteen's columnar storage and roll-ups.
+
+## 17.5 Platforms and backends
+
+= dia | Platforms and backends | What is inside: a control plane that decides, a data plane that serves
+p15-planes
+N: From part fifteen: a control plane that decides and pushes versioned state, and a data plane that serves from local state. Every block in this last group is either a control plane, like the cluster manager and the config service, or a backend for observing one, like the metrics and tracing stores.
+
+= cards | BLK-20 · Block | Time-series database · Monarch ↔ Prometheus with Thanos or Mimir, M3, InfluxDB
+@ BLK-20
+grn Draw it for :: metrics
+red Not for :: events that need joins, or per-user labels
+amb Open up :: cardinality, histograms, compression, the label index, roll-ups: part 14
+N: The time-series database, Monarch at Google. Draw it for metrics. Not for events that need joins, or labels with unbounded values. Open it up with part fourteen.
+
+= cards | BLK-21 · Block | Workflow engine · Cloud Workflows ↔ Temporal, Airflow, Step Functions
+@ BLK-21
+grn Draw it for :: long-running multi-step processes with retries and timers
+red Not for :: sub-millisecond scheduling
+amb Open up :: durable workflows by replay, task leasing: part 15; sagas: part 8
+N: The workflow engine. Draw it for long-running multi-step processes with retries and timers. Not for sub-millisecond scheduling. Open it up with part fifteen's durable workflows and part eight's sagas.
+
+= cards | BLK-22 · Block | Cluster manager · Borg ↔ Kubernetes, Nomad
+@ BLK-22
+grn Draw it for :: running and healing services and batch jobs on shared machines
+red Not for :: being on your request path: it is a control plane
+amb Open up :: reconcile loops, placement, preemption, eviction: part 15
+N: The cluster manager, Borg at Google. Draw it to run and heal services and batch jobs on shared machines. It is a control plane, so never on your request path. Open it up with part fifteen.
+
+= cards | BLK-24 · Block | Config or feature-flag service · etcd- or Consul-backed services, LaunchDarkly
+@ BLK-24
+grn Draw it for :: dynamic configuration and flags with staged rollout and kill switches
+red Not for :: large payloads, or anything read synchronously per request
+amb Open up :: versions, deltas, push with pull, last known good: part 4; rollout and kill switches: part 16
+N: The configuration and feature-flag service. Draw it for dynamic configuration and flags, rolled out in stages, with kill switches. Not for large payloads, and never read synchronously on every request. Open it up with part four and part sixteen.
+
+= cards | BLK-26 · Block | Tracing and logging backends · Dapper, Cloud Logging ↔ OpenTelemetry with Jaeger; Elasticsearch, Loki
+@ BLK-26
+grn Draw it for :: debugging across services, audit trails
+red Not for :: aggregate metrics, which belong in the time-series store
+amb Open up :: the logging pipeline and drop order: part 14; exemplars linking metrics to traces: part 14
+N: The tracing and logging backends, Dapper at Google. Draw them for debugging across services and for audit. Not for aggregate metrics, which belong in the time-series store. Open them up with part fourteen's pipeline and exemplars.
+
+## 17.6 Three facts worth having exact
+
+= list | Three facts | Easy to get wrong, checked November 2026
+- **Pub/Sub**: ack deadline 10 s by default, at most 600 s; retention 7 days by default, at most 31; dead-lettering after 5 to 100 attempts; ordering keys give order within a region
+- **Kafka** removed ZooKeeper in version 4.0, March 2025: its controller quorum now runs on Raft
+- **Colossus** keeps file-system metadata in Bigtable behind a metadata service; data flows directly between clients and file servers; separate services rebalance and reconstruct
+N: Three facts worth having exact, checked in November twenty twenty-six. Pub Sub's acknowledgement deadline is ten seconds by default and at most six hundred, retention seven days by default and at most thirty-one, and dead-lettering after five to one hundred attempts, with ordering keys giving order within a region. Kafka removed ZooKeeper in version four point oh, in March twenty twenty-five, and its controllers now agree through Raft. And Colossus keeps its file-system metadata in Bigtable behind a metadata service, while data flows directly between clients and file servers.
+
+## 17.7 Which parts each design problem leans on
+
+= table | The map, 1 of 2 | The parts each design problem turns on
+Problem | Turns on parts
+Denylist or blocklist service | 1, 3 to 4, 7 (filters), 9, 11, 12, 13, 16
+Distributed cache | 1, 6, 9, 13, 16
+Rate limiter | 1, 2, 6, 8, 11, 12, 13
+Metrics and monitoring system | 1, 6, 7, 10, 13, 14, 16
+Ad-click or event aggregation | 1, 2, 6, 10
+N: The map from design problems to the parts they turn on, part one of two. A denylist service turns on estimation, consensus and coordination, filters from part seven, caching, the edge, limits, reliability and operations. A distributed cache on partitioning, caching and reliability. A rate limiter on consistency, partitioning, transactions, the API contract and part twelve. A metrics system on storage, streams and observability. And event aggregation on streams, partitioning and time.
+
+= table | The map, 2 of 2 | The parts each design problem turns on
+Problem | Turns on parts
+Job scheduler | 1, 2, 3 to 4, 8, 10, 13, 15, 16
+Ticket or seat booking | 1, 2, 8, 9, 11, 12, 13
+Key-value store | 1, 2, 3 to 4, 5, 6, 7, 8, 16
+File or blob storage | 1, 2, 3 to 4, 5, 6, 7, 13, 16
+Data migration | 1, 2, 5, 8, 10, 13, 16
+N: Part two of the map. A job scheduler turns on consensus, transactions, streams, reliability and part fifteen. Booking on transactions, caching, the API contract and limits. A key-value store on consensus, replication, partitioning, storage and transactions. Blob storage on the same core plus reliability. And a migration on replication, transactions, streams, reliability and part sixteen. Estimation and the manager layer of part sixteen apply to every one of them.
+
+## 17.8 Three assemblies
+
+= table | Assembly · a cache tier | Which blocks, what each owns, the managed replacement
+Box | Owns | On Google Cloud
+L4 balancer, or client-side hashing | Spreading keys over nodes | Built into the client library
+In-memory cache nodes | Hot items; eviction; leases against stampedes | Memorystore
+Coordination service | Membership and the hash ring's version | Built into the managed service
+Database behind it | The source of truth; an admission limit in front | Cloud SQL, Spanner or Bigtable
+Change stream consumer | Invalidation within the stream's lag | Datastream into a small consumer
+N: Three assemblies. First, a cache tier. Clients hash keys over cache nodes, with virtual nodes. The cache nodes own hot items, eviction and leases against stampedes. A coordination service owns membership and the ring's version. The database behind it owns the truth, with an admission limit in front of it. And a change-stream consumer owns invalidation. On Google Cloud, Memorystore replaces the nodes and the membership. The interviewer who says do not use the managed product is asking you to open parts six and nine.
+
+= table | Assembly · a job scheduler | Which blocks, what each owns, the managed replacement
+Box | Owns | On Google Cloud
+Consistent store, on consensus | Job definitions; launch records; leader election | Spanner, or a coordination service
+Scheduler shards | Timer buckets, an in-memory wheel, the misfire policy | Cloud Scheduler
+Task queue with leases | Delivery to workers; deadlines; dead letters | Cloud Tasks or Pub/Sub
+Workers | The work, tagged with the attempt ID | Cloud Run jobs, or GKE
+Workflow engine, for multi-step jobs | Steps, retries and timers by replay | Cloud Workflows
+N: Second, a job scheduler. A consistent store on consensus owns job definitions, launch records and leader election. Scheduler shards own timer buckets, an in-memory wheel and the misfire policy. A task queue with leases owns delivery, deadlines and dead letters. Workers do the work, tagged with the attempt identifier. And a workflow engine runs multi-step jobs. On Google Cloud, Cloud Scheduler, Cloud Tasks and Workflows cover most of it. Building it yourself means parts three, four and fifteen.
+
+= table | Assembly · a blob store | Which blocks, what each owns, the managed replacement
+Box | Owns | On Google Cloud
+Front end and API | Resumable uploads; conditional requests; auth | Cloud Storage's API
+Metadata service on a consistent store | Names, versions, chunk lists; the commit point | Inside Cloud Storage; Colossus keeps it in Bigtable
+Chunk or file servers | Immutable chunks, erasure-coded across racks | Colossus file servers
+Background services | Scrubbing, repair by risk, rebalancing, orphan collection | Inside the managed service
+N: Third, a blob store. The front end owns resumable uploads, conditional requests and authentication. A metadata service on a consistent store owns names, versions, chunk lists and the moment an object becomes visible. Chunk servers own immutable, erasure-coded chunks across racks. And background services own scrubbing, repair by risk, rebalancing and orphan collection. On Google Cloud all of that is Cloud Storage, on Colossus. Building it yourself means part seven, with parts five and six.
+
+## 17.9 Probe drills
+
+= probe | Why a wide-column store and not a relational database here?
+- The **write rate** exceeds one primary, and access is by **row-key range**
+- No multi-row transactions or ad hoc joins are needed
+- If they were, distributed SQL, at a latency price
+C: Because the write rate is beyond what one relational primary can take, and every query is a scan by row-key range, which the wide-column store serves directly from its sorted tablets. We do not need multi-row transactions or ad hoc joins. If we did, I would choose distributed SQL instead, and pay a consensus round trip per write.
+
+= probe | Why a log and not a queue?
+- **Several consumers** need the same events, and replay after a bug
+- **Order per key** matters
+- Tasks of varying cost done once each would favour a queue
+C: Because several consumers need the same events independently, and we must be able to replay a week after a bug, which a queue cannot do once messages are acknowledged. And we need order per key. If the messages were tasks of varying cost, each done once, with redelivery and dead letters, I would choose a queue.
+
+= probe | Why a coordination service and not the cache for this lock?
+- It is a **correctness** lock: overlap corrupts data
+- Needs consensus and a **fencing token** the resource checks
+- A cache lock is fine only for **efficiency**
+C: Because this lock protects correctness: two holders would corrupt the ledger file. That needs a consensus-backed lock that survives a node failure and issues a fencing token, which the storage checks on every write. A lock in a cache is fine when two holders only means repeated work, which is not the case here.
+
+= probe | "Do not use the managed product. Build it." Which part do you open?
+- Name the **mechanisms** the product provides, then the part for each
+- A cache: parts 6 and 9; a scheduler: 3, 4 and 15; a blob store: 5, 6 and 7
+- Build the differentiating mechanism in depth; keep the rest as boxes
+C: I would name the mechanisms the product provides and open the part for each. For a cache, partitioning and caching, parts six and nine. For a scheduler, consensus, coordination and part fifteen. For a blob store, replication, partitioning and storage, parts five to seven. And I would go deep on the mechanism the question is really about, keeping the rest as clearly labelled boxes.
+
+## 17.10 Where this shows up
+
+= panel note | Where this shows up | Every design, as its vocabulary
+This part is the index of the course. The task videos cite these cards when they draw a box, and the part named on each card when they open it.
+N: This part is the index of the whole course. The task videos draw these boxes, cite these cards, and point to the part named on each card when the interviewer asks them to open one up.
+
+= panel note | Read next | Where to go deeper
+The Google Cloud Architecture Center: reference architectures that assemble these blocks.
+Each system's own paper: Chubby, Bigtable, Spanner, GFS and Colossus, Dremel, MillWheel, Dataflow, Monarch, Borg, Maglev, Dapper.
+N: To go deeper: the Google Cloud Architecture Center, for reference architectures that assemble these blocks, and each system's own paper: Chubby, Bigtable, Spanner, the Google File System and Colossus, Dremel, MillWheel, Dataflow, Monarch, Borg, Maglev and Dapper. That is the end of the course. The task series puts these parts to work, one design at a time.

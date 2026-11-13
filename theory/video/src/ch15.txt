@@ -1,0 +1,292 @@
+#! title: Scheduling and control planes
+#! short: Control planes
+
+= th | System design at Staff depth · Part 15 of 17 | Scheduling and control planes | Control plane and data plane, reconcile loops, placement, priority and preemption, node liveness, timers at scale, task leasing, durable workflows.
+N: Part fifteen, scheduling and control planes. A job scheduler, a cron service, a cluster manager, a workflow engine: all are control planes, systems that decide what should run and make it so. The interviewer's favourite question about any of them is about a crash at an awkward moment: the scheduler started a job and died before recording it. This part builds the answer.
+
+## 15.0 Why this part decides rounds
+
+= panel trap | The opening story | The control plane goes down. Does anything else notice?
+A cluster manager's control plane is unavailable for an hour: no new scheduling, no rescheduling, no config pushes.
+In a well-built system, **every running service keeps serving**. Users notice nothing.
+In a badly built one, nodes that cannot reach it **kill their workloads**, and the whole fleet goes dark within minutes.
+N: A cluster manager's control plane is unavailable for an hour: nothing new can be scheduled or moved. In a well-built system, every running service keeps serving, and users notice nothing. In a badly built one, nodes that cannot reach the control plane decide they are orphaned and kill their workloads, and the whole fleet goes dark within minutes. The difference is one design decision about what the data plane does when its control plane is silent.
+
+= panel note | Assumed reading | What this part does not repeat
+*Site Reliability Engineering*, chapter 24, *Distributed Periodic Scheduling with Cron*.
+The chapter's design history of the cron service and its handling of large installations stay there.
+Part 3 (consensus), part 2 (fencing), part 13 (static stability).
+N: Chapter twenty-four of the S-R-E book, on distributed periodic scheduling with cron, is assumed. Its design history and its treatment of large installations stay there. So do three earlier parts: consensus, fencing tokens, and static stability.
+
+= list | Map of the part | Three groups
+- **The shape**: control plane versus data plane; desired state and reconcile loops
+- **Deciding where**: placement, priority, quota and preemption, node liveness
+- **Deciding when, and making it happen once**: timers at scale, task leasing, durable workflows
+N: Three groups. The shape of a control plane: how it separates from the data plane, and the reconcile loop at its heart. Deciding where work runs: placement, priority and preemption, and liveness. And deciding when, and making it happen exactly once: timers, task leasing and durable workflows.
+
+## 15.1 Control plane versus data plane
+
+= table | OPS-04 · Tier A · The failure | A data plane that asks the control plane on every request
+@ OPS-04
+Design | Control plane down for an hour
+Proxies fetch routes from the control plane **per request** | Every request fails: the outage is total
+Proxies refresh routes every minute, and **drop** them on failure | Total outage after one minute
+Proxies refresh routes, and **keep the last known good** on failure | Nothing changes for users; no new routes for an hour
+N: Three designs, one outage. If proxies fetch routes from the control plane on every request, its outage is a total outage. If they refresh every minute and discard routes they could not refresh, the outage is total after a minute. If they refresh and keep the last known good routes when a refresh fails, users notice nothing, and the only loss is that no route can change for an hour. The first two made the control plane part of the request path.
+
+= dia | OPS-04 · Tier A · The mechanism | Decide slowly and centrally; serve fast and locally
+p15-planes
+N: The picture separates the two. The control plane, at the top, holds desired state in a consistent store, runs controllers that decide, and pushes decisions down: routes, placements, limits. It handles a few hundred changes a second and may be unavailable for minutes. The data plane, at the bottom, is the proxies, servers and storage nodes that handle every request, from local state, at millions a second. The arrow between them is one-way for decisions and asynchronous. Nothing on the request path waits for the control plane.
+
+= panel key | OPS-04 · Tier A · One level down | The properties each plane needs
+**Data plane**: highest availability, local state, statically stable (part 13), simple, changes rarely.
+**Control plane**: correctness, consistency, auditability; can be **less available**, because the data plane rides through its outages.
+**The interface** is versioned state, delivered as configuration (part 4), never a synchronous call.
+So the availability target of the product is set by the **data plane**; the control plane's sets only how long changes can wait.
+N: One level down: the properties each needs. The data plane needs the highest availability, local state, static stability and simplicity, and changes rarely. The control plane needs correctness and consistency and an audit trail, and can be less available, because the data plane rides through its outages. Between them is versioned state delivered as configuration, never a synchronous call. So the product's availability is set by the data plane, and the control plane's availability sets only how long a change can wait.
+
+= panel watch | OPS-04 · Tier A · The alternative and the price | What separation costs
+**Staleness**: the data plane acts on decisions up to a refresh interval old, or longer during an outage.
+**Two systems** to build and to test, including the case where they disagree.
+The alternative, one combined system, is simpler and fails all at once.
+N: The price. The data plane acts on decisions that can be a refresh interval old, or much older during an outage. And there are two systems to build and test, including the case where they disagree. The alternative, one combined system, is simpler, and fails all at once.
+
+= th | OPS-04 · the line to say | The control plane decides and pushes versioned state; the data plane serves from local state and rides through control-plane outages.
+V: I separate the control plane, which decides and pushes versioned state, from the data plane, which serves every request from local state. Nothing on the request path calls the control plane, so the product's availability is the data plane's, and a control-plane outage only delays changes.
+[pause: 0.8]
+
+## 15.2 Desired state and reconciliation
+
+= dia | SCH-01 · Tier A · The failure | An edge-triggered controller misses one event
+@ SCH-01
+p15-edge
+N: A controller keeps three replicas of a service running. It is edge-triggered: it reacts to events. Replica died: start one. In the picture, a replica dies while the controller is restarting, and the event is lost. The controller comes back, waits for events, and none arrive. Two replicas run for ever, and nothing will ever correct it, because the system only acts on changes it happened to see.
+
+= code | SCH-01 · Tier A · The mechanism | A level-triggered reconcile loop
+desired:   service "api": replicas 3, image v42        (in the consistent store)
+observed:  2 replicas running v42                      (from the nodes)
+
+loop, on any event AND every 30 s regardless:
+    diff = desired - observed
+    for each difference: one idempotent action
+        missing replica -> place and start one
+        wrong image     -> replace one at a time
+    write status: observed generation, conditions
+N: The fix is a level-triggered reconcile loop. Desired state lives in a consistent store: three replicas of image v forty-two. Observed state comes from the nodes: two replicas running. The controller repeatedly compares the two and takes one idempotent action per difference. A replica is missing, so it places and starts one. It runs on every event, as a speed-up, and also every thirty seconds regardless. A missed event no longer matters, because the next pass sees the difference, not the event.
+
+= panel key | SCH-01 · Tier A · One level down | Why level-triggered wins, and what each action must be
+**Level-triggered** reacts to the **state**, not the change: any missed, duplicated or reordered event is harmless, because the next pass recomputes the diff.
+Each action must be **idempotent**: start replica "api-7" twice and there is one api-7. Name things deterministically.
+A controller must be safe to **restart at any moment** and to run as a new leader after failover (part 4): it holds no state that is not in the store or observable.
+Record the **generation** of desired state each pass acted on, so "has my change been applied?" has an answer.
+N: One level down. Level-triggered means reacting to state, not change, so a missed, duplicated or reordered event is harmless. Each action must be idempotent: starting replica api seven twice still leaves one api seven, so names are deterministic. A controller must be safe to restart at any moment and to run as a new leader after a failover, so it keeps no state that is not in the store or observable. And it records which generation of desired state it has acted on, so has my change been applied has an answer.
+
+= panel watch | SCH-01 · Tier A · The alternative and the price | What the loop costs
+Every pass lists desired and observed state: at 100,000 objects, use **watches plus a periodic full resync** rather than a full list every second.
+A loop can **fight** another controller, or a human, that changes the same field: give each field one owner.
+N: The price. Every pass reads desired and observed state, so at a hundred thousand objects, use watches for speed plus a periodic full resynchronisation, not a full list every second. And two controllers, or a controller and a human, that both set the same field will fight for ever. Give each field one owner.
+
+= th | SCH-01 · the line to say | Store desired state, observe actual state, and reconcile the difference in a level-triggered loop of idempotent actions.
+V: My control plane keeps desired state in a consistent store and runs level-triggered reconcile loops: compare desired with observed, take one idempotent action per difference, on every event and periodically. A missed event, a restart or a failover is then harmless, because the next pass sees the difference.
+[pause: 0.8]
+
+## 15.3 Placement
+
+= table | SCH-02 · Tier B · The mechanism | Filter, then score
+@ SCH-02
+Step | Does | Example
+Filter | Remove nodes that **cannot** run the task | Not enough free memory; wrong zone; missing GPU; anti-affinity with a replica already there
+Score | Rank the rest | Bin-packing: prefer the fullest node that fits. Spreading: prefer the emptiest, or another zone
+Bind | Record the decision in the store, then the node starts it | A conditional write, so two schedulers cannot double-book a node
+N: Placement is filter, then score. Filter removes nodes that cannot run the task: not enough free memory, the wrong zone, no GPU, or a replica of the same service already there. Score ranks the rest. Then bind: record the decision in the store with a conditional write, so two schedulers cannot book the same capacity, and the node starts the task.
+
+= panel watch | SCH-02 · Tier B · The price | Bin-packing against spreading
+**Bin-packing** uses fewer machines and frees whole nodes for big tasks, and puts many replicas in one failure domain unless spread is a filter.
+**Spreading** survives failures and leaves capacity fragmented: a task needing 64 GB finds no node with 64 GB free.
+Usual answer: **spread replicas** of one service as a hard rule, **pack** different services by score.
+N: The price is the old tension. Bin-packing uses fewer machines and keeps whole nodes free for big tasks, and puts replicas together unless spreading is enforced. Spreading survives failures and fragments capacity, so a large task finds no node with enough free. The usual answer: spread replicas of one service as a hard filter, and pack different services together by score.
+
+= th | SCH-02 · the line to say | Placement filters impossible nodes, scores the rest, and binds with a conditional write: spread replicas, pack services.
+V: The scheduler filters out nodes that cannot run the task, scores the rest, and binds with a conditional write in the store. I spread replicas of one service across failure domains as a hard rule, and pack different services by score to save machines.
+[pause: 0.8]
+
+## 15.4 Priority, quota and preemption
+
+= dia | SCH-03 · Tier B · The mechanism | A high-priority task arrives on a full cluster
+@ SCH-03
+p15-preempt
+N: The cluster is full, and a production task arrives that must run. Priority says it outranks batch work. Quota says the production team is entitled to this much. So the scheduler finds the cheapest set of lower-priority tasks to evict on one node, in the picture, two batch tasks. It sends them a termination signal, waits a grace period, thirty seconds, for them to checkpoint and exit, then starts the production task. The evicted batch tasks go back into the queue to run elsewhere, later.
+
+= panel key | SCH-03 · Tier B · One level down | Who is evicted, and how cleanly
+Choose victims by **lowest priority first**, then the **least work lost**, then fewest victims.
+Never preempt **within** the same priority band, or two services evict each other for ever.
+**Quota** bounds what priority can take: a team at its quota cannot preempt anyone, so priority cannot grow without a budget.
+Victims get a **graceful termination**: a signal, a grace period, then a kill. Batch jobs checkpoint so a restart costs minutes, not hours.
+N: One level down: who is evicted, and how cleanly. Choose victims of the lowest priority first, then those with the least work to lose, then the fewest. Never preempt within the same priority band, or two services evict each other for ever. Quota bounds priority: a team at its quota cannot preempt anyone, so priority does not grow without a budget. And victims get a graceful termination, a signal, a grace period, then a kill, with batch jobs checkpointing so a restart costs minutes.
+
+= th | SCH-03 · the line to say | Priority decides who may evict whom, quota bounds it, and preemption picks the cheapest victims and terminates them gracefully.
+V: Priority decides who may evict whom, quota caps how much any team can claim, and preemption picks the lowest-priority victims with the least work lost, giving them a grace period to checkpoint. Batch work is designed to be evicted.
+[pause: 0.8]
+
+## 15.5 Node liveness and eviction
+
+= dia | SCH-05 · Tier B · The mechanism | A partition makes healthy nodes look dead
+@ SCH-05
+p15-partition
+N: Nodes heartbeat to the control plane. A node silent for forty seconds is presumed dead, and its tasks are rescheduled elsewhere. Now the picture: a network partition cuts the control plane off from a whole zone, two hundred nodes. They are all healthy, and serving. The control plane sees two hundred silent nodes. If it evicts them all, it starts two hundred nodes' worth of tasks elsewhere, which the other zones may not have room for, and when the partition heals there are two copies of everything.
+
+= panel key | SCH-05 · Tier B · One level down | Rate-limited eviction, and what the node does
+**Rate-limit eviction**: evict at most, say, 1% of nodes a minute; if more than a threshold of a zone goes silent at once, **stop evicting**: it is the network, not the nodes.
+**The node, cut off, keeps its tasks running** (static stability). It does not kill workloads because the control plane is silent.
+**Fencing**: rescheduled tasks run with a new epoch, so the old copies cannot write (part 2).
+N: One level down. Rate-limit evictions, say at most one percent of nodes a minute, and if more than a threshold of a zone goes silent at once, stop evicting entirely, because that is a network problem, not two hundred failures. The node, cut off, keeps its tasks running, as static stability requires, and never kills workloads because the control plane went quiet. And any task that is rescheduled runs with a new epoch, so the old copy, if it still lives, cannot write.
+
+= th | SCH-05 · the line to say | Presume a silent node dead slowly, evict at a limited rate, stop when a whole zone goes quiet, and fence the replacements.
+V: A silent node is presumed dead only after a timeout, evictions are rate-limited, and if a large share of a zone goes silent at once eviction stops, because it is a partition. Cut-off nodes keep running their tasks, and replacements run with a new epoch so the old copies cannot write.
+[pause: 0.8]
+
+## 15.6 Timers at scale
+
+= tiles | SCH-06 · Tier B · The failure | A million jobs at midnight
+@ SCH-06
+1,000,000 | jobs scheduled for 00:00:00
+1 | scheduler scanning a table "WHERE due <= now"
+minutes | to find and dispatch them, while the table is locked by the scan
+every night | the same herd against every downstream (part 13)
+N: A million jobs are scheduled for exactly midnight. One scheduler finds due jobs by scanning a table for everything due before now. At midnight that scan returns a million rows, takes minutes, and holds locks while it does, and then dispatches a million jobs at once into every downstream service. It happens every night. Timers at scale need two things: a way to find due work without scanning, and a way not to release it all at once.
+
+= dia | SCH-06 · Tier B · The mechanism | Due-time buckets, sharded, loaded into an in-memory wheel
+p15-timers
+N: The mechanism, in the picture. Store each timer under a key made of its due-time bucket, one minute wide, and a shard number. At eleven fifty-nine, each of sixteen scheduler shards reads only its own shard of the midnight bucket, a sixteenth of the timers, in one range read. It loads them into an in-memory timing wheel: an array of slots, one per second, each holding the timers due in that second. A pointer advances one slot a second and fires what it finds. For the next due time across slots, a small heap.
+
+= panel key | SCH-06 · Tier B · One level down | Misfires, and spreading the midnight herd
+**Misfire policy**, per job, decided in advance: if the scheduler was down at the due time, **fire once late**, **skip**, or **fire every missed run**.
+**Spread**: most "midnight" jobs do not need midnight. Accept a window, say 00:00 to 00:30, and assign each job a fixed random offset within it.
+Each fire is a **task lease** (next section), so a scheduler crash after firing does not lose or double the run.
+N: One level down. Every job has a misfire policy, decided in advance: if the scheduler was down at the due time, fire once late, skip it, or fire every missed run. A billing job and a cache warm-up want different answers. And spread the herd: most midnight jobs do not need midnight. Accept a window, midnight to half past, and give each job a fixed random offset in it. Then a million jobs arrive at about five hundred and fifty a second.
+
+= th | SCH-06 · the line to say | Store timers by due-time bucket and shard, load each bucket into an in-memory timing wheel, set a misfire policy, and spread fixed times over a window.
+V: For timers at scale I key them by due-time bucket and shard, so each scheduler shard reads one small range ahead of time into an in-memory timing wheel. Each job has a misfire policy, and fixed times like midnight are spread over a window with a stable random offset.
+[pause: 0.8]
+
+## 15.7 Heaps and timing wheels
+
+= table | DS-08 · Tier B · The mechanism | Two structures for "what is due next"
+@ DS-08
+Structure | Insert | Next due | Cancel | Best for
+Binary heap | log n | Constant to peek, log n to pop | log n with an index | Thousands of timers with arbitrary times
+Timing wheel, one slot per tick | Constant | Advance one slot per tick | Constant | Millions of timers within a short horizon
+Hierarchical wheel: seconds, minutes, hours | Constant | Timers cascade down a level as their time nears | Constant | Millions of timers over long horizons
+N: Two structures. A binary heap keeps the earliest timer at the top: insert and pop cost log n, which is fine for thousands of timers at arbitrary times. A timing wheel is an array of slots, one per tick. Inserting puts a timer in the slot for its due tick, constant time, and a pointer advances one slot per tick, firing that slot's list. For long horizons, a hierarchical wheel: a seconds wheel, a minutes wheel and an hours wheel, with timers cascading down a level as their time nears.
+
+= panel watch | DS-08 · Tier B · The price | Resolution and memory
+A wheel fires at **tick resolution**: one-second ticks mean up to a second late.
+A wheel of 3,600 one-second slots holds an hour; anything later belongs in an outer wheel, or in the durable store until its bucket loads.
+N: The price of the wheel is resolution: with one-second ticks a timer can fire up to a second late. And an hour of one-second slots is three thousand six hundred slots, so anything later belongs in an outer wheel, or stays in the durable store until its bucket is loaded.
+
+= th | DS-08 · the line to say | A heap for thousands of arbitrary timers; a hierarchical timing wheel for millions, at constant cost per timer.
+V: For a few thousand timers a heap is enough. For millions, a hierarchical timing wheel gives constant-time insert and cancel, fires at tick resolution, and cascades long timers down as they approach.
+[pause: 0.8]
+
+## 15.8 Task leasing
+
+= dia | SCH-07 · Tier A · The failure | The scheduler starts a job and dies before recording it
+@ SCH-07
+p15-launch-gap
+N: The interviewer's question, as a sequence. One: the scheduler's leader decides that the nightly billing job should run. Two: it tells a worker to start it. Three: the worker starts billing. Four: before the leader records that the job was launched, it crashes. Five: a new leader takes over, reads the store, sees no launch recorded, and launches billing again. Every customer is billed twice. Or, with the opposite ordering, record first, crash before launching, and the new leader thinks it ran when it never did.
+
+= dia | SCH-07 · Tier A · The mechanism | Record the intent, lease the task, record the outcome, tag results with the attempt
+p15-lease
+N: The fix has four parts. One: before any side effect, the leader writes a launch record through consensus: billing, run for the twelfth, attempt one, state starting. Two: workers pull tasks and take a lease on each, with a time limit, renewed by heartbeat while working. Three: when finished, the worker writes the result tagged with its attempt identifier, and the record moves to done. Four: if the lease expires without a heartbeat, the task returns to the queue as attempt two, and attempt one's late results are refused.
+
+= panel key | SCH-07 · Tier A · One level down | What a new leader does with "starting, never finished"
+It finds a record in state **starting** with no result. It cannot know whether the side effect happened.
+So the job declares its policy in advance:
+**At most once**, for anything that must not repeat without a check: mark it **unknown**, and ask the job's own idempotency mechanism, or a human.
+**At least once**, for jobs that are idempotent: launch again as the next attempt.
+The **attempt ID is a fencing token** (part 2): the downstream system records the highest attempt it has seen and refuses lower ones.
+N: One level down: what does a new leader do with a record that says starting and never finished? It cannot know whether the side effect happened, so the job declares its policy in advance. At most once, for anything that must not repeat: mark the run unknown, and resolve it through the job's own idempotency, such as a billing run key, or a human. At least once, for idempotent jobs: launch it again as the next attempt. And the attempt identifier is a fencing token. The downstream system keeps the highest attempt it has seen and refuses anything lower.
+
+= table | SCH-07 · Tier A · The alternative and the price | Push to a worker, or let workers pull with leases
+ | Push: leader assigns to a worker | Pull: workers lease from a queue
+Who tracks liveness | The leader, per worker | The lease, per task
+Worker dies | Leader must notice and reassign | Lease expires; task returns by itself
+Load balance | Leader must know capacity | Workers take only what they can run
+Cost | A smarter leader | A queue, heartbeats per task
+N: Push or pull? If the leader pushes tasks to workers, it must track every worker's liveness and capacity, and notice a death to reassign. If workers pull tasks under leases, a worker takes only what it can run, and a dead worker's tasks come back by themselves when their leases expire. The cost of pulling is a queue and a heartbeat per task. For a scheduler, pull with leases is usually the simpler and safer shape.
+
+= th | SCH-07 · the line to say | Write the launch record through consensus before the side effect, lease tasks to workers, tag results with the attempt, and declare skip or repeat per job.
+V: The scheduler writes a launch record through consensus before any side effect and the outcome after. Workers pull tasks under leases renewed by heartbeat, results are tagged with the attempt identifier, which downstream uses as a fencing token, and each job declares whether a run that started and never finished is retried or held for a check.
+[pause: 0.8]
+
+## 15.9 Durable workflows
+
+= dia | SCH-08 · Tier B · The mechanism | The workflow's code is replayed from an event history
+@ SCH-08
+p15-workflow
+N: A durable workflow engine runs multi-step business processes that last minutes or months, and survive any crash. In the picture, the workflow function says: charge the card, wait two days, ship, email. Every step's result is appended to an event history in the engine's store. When a worker crashes after the charge, another worker picks the workflow up and replays the function from the start. Step one is in the history, so it is not executed again: its recorded result is returned. Execution resumes exactly where it stopped, at the two-day timer.
+
+= panel watch | SCH-08 · Tier B · The price | Determinism, versioning and history size
+Workflow code must be **deterministic**: no local clock, randomness or direct I/O; those go through recorded steps.
+Changing workflow code while old instances are running needs **versioning**, or replay diverges.
+History grows with steps: very long workflows **continue as new** with a fresh history.
+N: The price is the same as state-machine replication in part three. Workflow code must be deterministic: no local clock, no random numbers, no direct input or output, all of which must go through recorded steps. Changing the code while old instances are running needs explicit versioning, or replay diverges from the history. And the history grows with every step, so very long workflows periodically continue as a new instance with a fresh history.
+
+= th | SCH-08 · the line to say | A durable workflow records each step's result in a history and resumes after a crash by deterministic replay.
+V: For long multi-step processes I use a durable workflow engine: each step's result is recorded in a history, and after a crash the code replays deterministically, skipping completed steps, and resumes. The rules are determinism, explicit versioning and bounded history.
+[pause: 0.8]
+
+## 15.10 Recap
+
+= list | Recap | What to be able to explain without notes
+- **Control plane and data plane**, and why the data plane rides through
+- The **level-triggered reconcile loop**, and why it beats edge-triggered
+- **Filter, score, bind**; spread replicas, pack services
+- **Preemption** with quota and a grace period
+- **Rate-limited eviction**, stopped when a zone goes quiet
+- **Timers**: buckets, shards, a timing wheel, misfire policy, spreading midnight
+- **Launch records, leases and attempt IDs**: the crash after start
+- **Durable workflows** by replay
+N: Without notes: the two planes and why the data plane rides through. The level-triggered loop. Filter, score and bind. Preemption under quota. Rate-limited eviction. Timers at scale. The launch record, the lease and the attempt identifier that answer the crash after start. And durable workflows by replay.
+
+## 15.11 Probe drills
+
+= probe | The scheduler dies after starting a job and before recording it.
+- Prevent it: write a **launch record through consensus first**, state starting
+- New leader finds **starting, no result**: apply the job's declared policy
+- Idempotent: retry as **attempt 2**; otherwise mark **unknown** and check
+C: I would not let that state exist silently. The leader writes a launch record through consensus before starting anything. A new leader that finds a record in starting with no result applies the job's declared policy. If the job is idempotent, it launches attempt two, and attempt one's late results are refused by attempt number. If not, like billing, it marks the run unknown and resolves it through the job's own idempotency key, or a person.
+
+= probe | A million jobs at midnight.
+- Timers keyed by **due bucket and shard**, read ahead into **in-memory wheels**
+- **Spread** over a window with a stable random offset per job
+- Downstream sees about **550 a second**, not a million at once
+C: Timers are stored under their due-time bucket and a shard, so at a minute to midnight each scheduler shard reads its own small range into an in-memory timing wheel, with no table scan. And I ask whether they need exactly midnight. Most do not, so each job gets a fixed random offset in a half-hour window, and downstream services see about five hundred and fifty launches a second instead of a million at once.
+
+= probe | A high-priority job arrives. Who is evicted, and how cleanly?
+- Only **lower** priority, never the same band; the team must be within **quota**
+- Cheapest victims: least work lost, fewest tasks
+- Signal, **grace period**, then kill; batch checkpoints and requeues
+C: Only tasks of lower priority, never the same band, and only if the arriving job's team is within its quota. Among candidates, I choose those that lose the least work, and the fewest of them, on one node. They get a termination signal and a grace period, say thirty seconds, to checkpoint and exit, then a kill, and they go back in the queue to run elsewhere.
+
+= probe | The control plane is down for an hour. What happens?
+- The data plane **keeps serving** on last known good
+- No new placements, no rescheduling, no config changes
+- Nodes **do not** kill workloads because the control plane is silent
+C: Everything that is running keeps running, from last known good state, so users notice nothing. What stops is change: no new placements, no rescheduling after failures, no config pushes. Crucially, nodes do not kill their workloads because they cannot reach the control plane. That would turn a control-plane outage into a total one.
+
+## 15.12 Where this shows up
+
+= table | Where this shows up | What each design problem takes from this part
+Problem | Takes
+Job scheduler and cron | Launch records, leases, attempt IDs, timers, misfire policy
+Cluster manager | Reconcile loops, placement, preemption, eviction limits
+Workflow or order processing | Durable workflows; sagas (part 8)
+Every platform service | Control plane versus data plane; static stability
+N: The job scheduler takes launch records, leases, timers and misfire policies. A cluster manager takes reconcile loops, placement, preemption and eviction limits. Order processing takes durable workflows, with part eight's sagas. And every platform service takes the split between control and data planes.
+
+= panel note | Read next | Where to go deeper
+Verma et al., *Large-scale cluster management at Google with Borg*.
+Burns et al., *Borg, Omega, and Kubernetes*.
+*Site Reliability Engineering*, chapter 2, *The Production Environment at Google*. *Designing Data-Intensive Applications*, chapter 8 (fencing).
+N: To go deeper: the Borg paper, and Borg, Omega, and Kubernetes, for the lessons across three generations. Chapter two of the S-R-E book, on Google's production environment. And chapter eight of Designing Data-Intensive Applications, for fencing. Part sixteen turns to security, operations and the manager layer.

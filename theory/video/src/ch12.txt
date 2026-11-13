@@ -1,0 +1,349 @@
+#! title: Rate limiting and overload control
+#! short: Overload
+
+= th | System design at Staff depth · Part 12 of 17 | Rate limiting and overload control | Token buckets, window counters, enforcement across nodes, concurrency limits, shedding by criticality, client-side throttling, fairness, fail-open or closed, admission and queues.
+N: Part twelve, rate limiting and overload. A rate limiter is one of the most asked design questions on its own, and overload control appears in every other one: what does your system do when it receives three times the traffic it can serve? The weak answer is autoscaling. The strong answer says what is rejected, where, at what cost, and who decided.
+
+## 12.0 Why this part decides rounds
+
+= panel trap | The opening story | A limiter that failed closed and took the product down
+Every request checks a central rate-limit store. One afternoon the store's primary fails over, and is unreachable for forty seconds.
+The limiter's code treats "no answer" as "over the limit". **Every request is rejected**.
+For forty seconds the product was down, protected perfectly from traffic it could easily have served.
+N: Every request checks a central rate-limit store. One afternoon the store fails over and is unreachable for forty seconds. The limiter treats no answer as over the limit, so every request is rejected. For forty seconds the product is completely down, perfectly protected from traffic it could easily have served. Nobody had decided that. It was the default in a library. Whether a limiter fails open or closed is a product decision, and it has to be made on purpose.
+
+= panel note | Assumed reading | What this part does not repeat
+*Site Reliability Engineering*, chapter 21, *Handling Overload*.
+The chapter's criticality classes, per-customer limits, the derivation of client-side throttling and its utilisation signals stay there.
+Part 8 of this course: reservations and escrow, for quotas that are money.
+N: Chapter twenty-one of the S-R-E book, Handling Overload, is assumed. Its criticality classes, per-customer limits, and the derivation of client-side throttling stay there. And quotas that are money, reserved and committed, are part eight's reservations and escrow, not repeated here.
+
+= list | Map of the part | Three groups
+- **Counting**: the token bucket, window counters, enforcement across many nodes
+- **Protecting a server**: concurrency limits, shedding by criticality, client-side throttling, admission and queues
+- **Deciding**: fairness between tenants, and fail-open versus fail-closed
+N: Three groups. Counting: the token bucket, the window counters, and how to enforce one limit across many nodes. Protecting a server under overload: concurrency limits, shedding, client-side throttling and queue discipline. And two decisions: fairness between tenants, and what the limiter does when it cannot decide.
+
+## 12.1 The token bucket
+
+= table | RL-01 · Tier A · The failure | A fixed per-second counter, and a legitimate burst
+@ RL-01
+Second | Requests | Fixed limit 10 a second | Client experience
+1 | 0 | — | Idle
+2 | 0 | — | Idle
+3 | 25 (page load: one HTML, 24 images) | 10 accepted, **15 rejected** | Broken page
+N: Start with the failure. A client is allowed ten requests a second, enforced as a counter per second. It is idle for two seconds, then loads a page that needs twenty-five requests at once. Ten are accepted, fifteen rejected, and the page is broken, although over three seconds the client used less than its allowance. A limit should allow bursts that the average permits, up to a bound you choose. That needs a memory of unused allowance.
+
+= code | RL-01 · Tier A · The mechanism | Two numbers of state, refilled lazily on read
+state per key:  tokens, last_refill_time
+config:         rate r = 10 a second, capacity b = 30
+
+allow(key):
+    now     = clock()
+    tokens  = min(b, tokens + (now - last_refill_time) x r)
+    last_refill_time = now
+    if tokens >= 1:  tokens -= 1;  return ALLOW
+    else:            return DENY,  retry_after = (1 - tokens) / r
+N: The token bucket keeps two numbers per key: how many tokens it has, and when it was last refilled. Configuration is a rate, ten a second, and a capacity, thirty. Nothing runs in the background. On each request, compute how many tokens accrued since the last refill, add them, capped at the capacity, and record the time. If at least one token is there, spend it and allow. Otherwise deny, and the retry-after is the time until one token accrues. The idle client had banked thirty tokens, so its page of twenty-five loads.
+
+= panel key | RL-01 · Tier A · One level down | Atomic, and the clock comes from one place
+The read, refill and decrement must be **one atomic step**: two gateways that read 1 token and both decrement admit twice. In a shared store, run it as a single script or a conditional update.
+**Time comes from the store**, not from each caller: callers' clocks differ, and a caller with a fast clock would refill everyone's bucket early.
+Memory: about 16 to 32 bytes per key; ten million keys is a few hundred megabytes, with an expiry on idle keys.
+N: One level down. The read, the refill and the decrement must be one atomic step. Two gateways that each read one remaining token and then each decrement will admit two requests. In a shared store, run the whole thing as one script, or as a conditional update. And time comes from the store, not from each caller. Callers' clocks differ, and one with a fast clock would refill buckets early. Memory is small: a few dozen bytes per key, so ten million keys is a few hundred megabytes, with idle keys expired.
+
+= panel watch | RL-01 · Tier A · The alternative and the price | Token bucket or leaky bucket
+**Token bucket** allows bursts up to b, then the rate r. Two knobs: the average and the burst.
+**Leaky bucket** as a queue: requests drain at a constant rate. Smooths output perfectly, and **adds latency** to bursts; suits shaping traffic to a fragile downstream.
+N: The alternative is the leaky bucket used as a queue, where requests drain at a constant rate. It smooths the output perfectly, and it adds queueing delay to every burst, which suits shaping traffic into a fragile downstream. The token bucket admits a burst immediately and limits the average. Two knobs, rate and burst, chosen separately.
+
+= th | RL-01 · the line to say | A token bucket is two numbers per key refilled lazily on read; rate sets the average, capacity the burst; atomic, with the store's clock.
+V: A token bucket keeps tokens and a last refill time per key and refills lazily on each request, so the rate sets the average and the capacity sets the burst. The check and decrement are one atomic operation, and time comes from the store, not from the callers.
+[pause: 0.8]
+
+## 12.2 Window counters
+
+= dia | RL-03 · Tier A · The failure | Twice the limit across a window boundary
+@ RL-03
+p12-boundary
+N: Window counters count requests per time window. The fixed window is the simplest: one counter per key per minute, reset at the top of the minute. The picture shows its failure. The limit is a hundred a minute. A client sends a hundred requests in the last second of one minute, and a hundred more in the first second of the next. Each window saw a hundred, so all two hundred are allowed, within two seconds. The fixed window allows up to twice the limit across a boundary.
+
+= table | RL-03 · Tier A · The mechanism | Three window counters
+Method | State per key | Accuracy
+Fixed window | One counter | Up to **2x** at a boundary
+Sliding log | A timestamp per request in the window | Exact; memory grows with the limit
+Sliding-window counter | Two counters: this window and the previous | Close to exact, at fixed cost
+N: Three ways to count. A fixed window keeps one counter, and allows up to twice the limit at a boundary. A sliding log keeps a timestamp for every request in the last window, and counts them exactly, at a memory cost that grows with the limit: a limit of ten thousand a minute is ten thousand timestamps per key. And the sliding-window counter keeps just two counters, this window's and the previous one's, and estimates the rest.
+
+= code | RL-03 · Tier A · One level down | The sliding-window estimate, worked
+limit 100 a minute; now is 15 s into the current minute (25% through)
+
+previous minute's count   80
+current minute's count    30
+
+estimate = previous x (1 - 0.25) + current
+         = 80 x 0.75 + 30  = 90       ->  allow; 10 left
+
+assumes the previous minute's requests were spread evenly
+N: One level down, the estimate worked. The limit is a hundred a minute, and we are fifteen seconds, a quarter, into the current minute. The previous minute had eighty requests, this one has thirty so far. Assume the previous minute's requests were evenly spread, so three quarters of them are still inside the sliding window. Eighty times three quarters is sixty, plus thirty, gives ninety. Allow, with ten left. The error comes only from that evenness assumption, and in practice it is small.
+
+= panel watch | RL-03 · Tier A · The alternative and the price | Windows or buckets
+**Windows** state a limit the way contracts do: "1,000 requests per hour". Easy to explain, easy to bill.
+**Buckets** state a rate and a burst, and are better at protecting a server.
+Many systems use both: a bucket per second for protection, a window per day for the commercial quota.
+N: Windows or buckets? Windows state a limit the way contracts are written, a thousand requests per hour, easy to explain and to bill. Buckets state a rate and a burst, and protect a server better. Many systems use both: a bucket per second for protection, and a daily window for the commercial quota.
+
+= th | RL-03 · the line to say | A fixed window allows twice the limit at a boundary; a sliding-window counter weights the previous window and fixes it with two counters.
+V: A fixed window counter allows up to twice the limit across a boundary. A sliding log is exact and costs a timestamp per request. The sliding-window counter weights the previous window by how much of it still overlaps, and is nearly exact with two counters per key.
+[pause: 0.8]
+
+## 12.3 Distributed enforcement
+
+= dia | RL-04 · Tier A · The failure | Fifty gateways, each enforcing the limit locally
+@ RL-04
+p12-local-limit
+N: One limit, many enforcers. A customer may send a thousand requests a second, and requests are spread over fifty gateways. If each gateway enforces a thousand a second locally, the customer can send fifty thousand. If each enforces twenty, one fiftieth, then a customer whose traffic happens to land unevenly, on three gateways, is throttled at sixty although they sent far under their limit. Local counting is either too loose or unfair. The limit is global, so some part of the state must be shared.
+
+= table | RL-04 · Tier A · The mechanism | Three ways to enforce one limit across nodes
+Way | How | Over-admission | Cost
+Central atomic counter | Every request decrements a counter in a shared store | None | A round trip per request, about 0.5 to 1 ms; the store is on the hot path
+Local buckets with leased capacity | Each node leases a batch of tokens, or a rate share, from the central store, and spends locally | Bounded by what is **leased and outstanding** | One trip per lease, not per request
+Gossip | Nodes count locally and exchange counts every interval | About the global rate times the interval | No central store; approximate
+N: Three ways. A central atomic counter: every request decrements it in a shared store. Exact, and it costs a round trip per request, and puts the store on the hot path. Local buckets with leased capacity: each node leases a batch of tokens, or a share of the rate, from the central store, and spends them locally. One trip per lease instead of per request, and over-admission bounded by what is leased. And gossip: each node counts locally and exchanges counts every interval. No central store, approximate, and over by about the rate times the interval.
+
+= code | RL-04 · Tier A · One level down | The worst-case over-admission with leased capacity
+N nodes, each holding a lease of L tokens, renewed when used up
+worst case: every node has just received a full lease
+            and the remaining global budget is zero
+over-admission  <=  N x L
+
+N = 50 gateways, L = 20 tokens   ->  up to 1,000 extra requests
+                                     on a limit of 1,000 a second
+
+halve it: L = 10   ->  500 extra, and twice the lease traffic
+                       to the central store
+N: One level down: the worst-case over-admission with leases. N nodes each hold a lease of L tokens. In the worst case, every node has just received a full lease at the moment the global budget runs out. So the system can over-admit by up to N times L. Fifty gateways with leases of twenty tokens can admit up to a thousand extra requests, on a limit of a thousand a second, which is one extra second's worth in the worst moment. Halve the lease, and the bound halves to five hundred, at the price of twice as many trips to the central store.
+
+= panel key | RL-04 · Tier A · One level down | A limit is lowered: when does it bite?
+Leases already granted are **spent at the old terms**. The new limit bites as each lease **expires or is used up**.
+So the delay is at most the **lease duration**, and the overshoot at most the outstanding **N x L**.
+For an emergency cut, the store can **revoke**: nodes check a version on each local decision and drop leases older than it.
+N: The probe: a limit is lowered, when does it bite? Leases already granted are spent on the old terms, so the new limit takes effect as each lease is used up or expires. The delay is at most the lease duration, and the overshoot at most the outstanding N times L. For an emergency cut, add revocation: nodes check a limit version on each local decision, and drop any lease older than it.
+
+= panel watch | RL-04 · Tier A · The alternative and the price | Exact and slow, or bounded and fast
+**Central counter** when the limit is small and money-like, and a millisecond per request is affordable.
+**Leases** for high-volume protection limits: a few percent over, almost no added latency. Google's **Doorman** works this way, with rate shares and leases.
+**Gossip** where any central store is unacceptable and rough is fine.
+N: Choose by what the limit protects. A central counter when the limit is small and close to money, and a millisecond per request is affordable. Leases for high-volume protection limits: a bounded few percent over, and almost no added latency. Google's Doorman works this way, with rate shares granted under leases. Gossip where no central store is acceptable and rough is good enough.
+
+= th | RL-04 · the line to say | Enforce a global limit with leased local capacity: over-admission at most N times L, a lowered limit bites within one lease.
+V: For a global limit across many nodes I lease capacity from a central store and spend it locally. Over-admission is bounded by nodes times lease size, a lowered limit takes effect within one lease duration, and I pick the lease size to trade that bound against traffic to the store.
+[pause: 0.8]
+
+= panel trap | RL-04 · Tier A · The probe | "Two gateways race for the last token."
+With a **central counter**: the decrement is atomic, so exactly one wins.
+With **leases**: they cannot race for the same token, because tokens are partitioned among nodes in advance. The cost is that the last few tokens may sit unused on another node.
+N: The probe: two gateways race for the last token. With a central counter, the decrement is atomic, so exactly one wins. With leases they cannot race at all, because tokens were divided among the nodes in advance. The cost is the mirror image: near the end, the last few tokens may sit unused on a node that does not need them, the same stranding as escrow in part eight.
+
+## 12.4 Concurrency limits
+
+= panel key | RL-05 · Tier B · The mechanism | Limit what is in flight, not what arrives
+@ RL-05
+A server can run at most so many requests at once before latency climbs. By Little's law, **in flight = throughput x latency**: 2,000 a second at 50 ms is **100** in flight.
+A **concurrency limit** rejects new work when in-flight requests reach the limit. It needs no clock, and it responds instantly when latency rises.
+**Adaptive** limits find the value themselves: raise it while latency stays flat, cut it sharply when latency rises, as TCP does with its window.
+N: A rate limit counts arrivals. A concurrency limit counts what is in flight. By Little's law, in flight equals throughput times latency: two thousand a second at fifty milliseconds is a hundred in flight. Reject new work when a hundred are already running. It needs no clock, and it responds the instant latency rises, because slower requests stay in flight longer. And an adaptive limit finds the number itself: raise it slowly while latency stays flat, and cut it sharply when latency rises, the way TCP adjusts its window.
+
+= panel watch | RL-05 · Tier B · The price | What it protects, and what it does not
+It protects **this server** from its own slowness. It says nothing about fairness between clients.
+An adaptive limit needs a clean latency signal: if latency is dominated by a slow dependency, the limit shrinks to protect the dependency, which may be exactly right.
+N: The price. A concurrency limit protects this server from its own slowness, and says nothing about fairness between clients, which needs the quotas later in this part. And an adaptive limit reacts to latency, so if a slow dependency dominates latency, the limit shrinks to protect that dependency, which is often exactly what you want.
+
+= th | RL-05 · the line to say | A concurrency limit caps in-flight work at throughput times latency, and an adaptive one raises slowly and cuts fast as latency moves.
+V: Besides rate limits, each server has a concurrency limit, sized by Little's law as throughput times latency, and ideally adaptive: increase while latency is flat, cut sharply when it rises. It reacts to slowness instantly, with no clock.
+[pause: 0.8]
+
+## 12.5 Load shedding and criticality
+
+= code | RL-06 · Tier A · Assumes SRE book ch. 21 | The cost of a reject decides whether shedding can save you
+@ RL-06
+capacity C = 10,000 requests a second of full work
+a reject costs r of a full request
+
+offered load L, served s:  s + r x (L - s) <= C
+    s = (C - r x L) / (1 - r)
+
+r = 1%:   still serves at 10x overload; collapses only near 100x
+r = 10%:  serves 5,556 at 5x overload; serves nothing at 10x
+r = 50%:  serves nothing at 2x
+N: Assumes chapter twenty-one of the S-R-E book. The one formula worth carrying: the cost of a reject decides whether shedding can save you. A server can do ten thousand requests a second of full work. Rejecting one costs some fraction r of a full request. Under offered load L, it serves s, where serving plus rejecting fits in capacity. If a reject costs one percent, it still serves at ten times overload. At ten percent, it serves five and a half thousand at five times, and nothing at ten times: it spends all its capacity saying no. So rejects must be cheap and early.
+
+= panel trap | RL-06 · Tier A · The probe the chapter leaves | "Where exactly do you reject, and what do you drop first?"
+**Where**: as early and as cheaply as possible: before parsing the body, before authentication if you can, ideally at the client (12.6).
+**What first**: by criticality carried on the request: batch and prefetch before user-facing, user-facing before the critical few, such as checkout.
+And **propagate** criticality to downstream calls, so a backend sheds the same way.
+N: The probe the chapter leaves open: where do you reject, and what goes first? Where: as early and cheaply as possible, before parsing the body, before authentication if you can, and ideally at the client, as the next section shows. What first: by a criticality carried on each request. Batch work and prefetches before user-facing requests, and user-facing before the critical few, such as checkout. And pass the criticality down to backends, so they shed the same way.
+
+= th | RL-06 · the line to say | Shed by criticality, as early as possible, because a reject that costs a tenth of a request collapses the server at ten times overload.
+V: Under overload I shed by a criticality carried on every request and propagated downstream, batch first, checkout last. I reject as early and cheaply as possible, because if a rejection costs a tenth of the work, the server serves nothing at ten times overload.
+[pause: 0.8]
+
+## 12.6 Client-side adaptive throttling
+
+= code | RL-07 · Tier B · Assumes SRE book ch. 21 | The client rejects locally, before sending
+@ RL-07
+over the last two minutes, the client counts:
+    requests   attempted
+    accepts    accepted by the backend
+
+reject locally with probability
+    max(0, (requests - K x accepts) / (requests + 1))
+
+K = 2: the client sends at most about twice what the backend is accepting
+backend accepting 30% of requests: local rejection about 40%
+N: Assumes chapter twenty-one. The cheapest reject is one never sent. Each client counts, over the last two minutes, the requests it attempted and how many the backend accepted. It then rejects requests itself, without sending them, with a probability of requests minus K times accepts, over requests plus one. With K equal to two, a client sends at most about twice what the backend is currently accepting. If the backend accepts thirty percent, the client drops about forty percent locally. The backend's reject cost falls away, and recovery is fast because the window is short.
+
+= panel watch | RL-07 · Tier B · The price | Why K is 2 and not 1
+With K = 1 the client would send only what was accepted, and could never **discover** that the backend has recovered.
+K above 1 keeps sending some excess, which probes for capacity, at the cost of some wasted rejections at the backend.
+N: Why is K two and not one? With K equal to one, the client would send only what was accepted, and could never discover that the backend had recovered. K above one keeps sending a little excess, which probes for capacity, at the cost of some rejections still reaching the backend.
+
+= th | RL-07 · the line to say | Clients drop requests locally with probability requests minus K accepts over requests plus one, with K about 2.
+V: Clients throttle themselves: each tracks recent requests and accepts and drops locally with probability requests minus K times accepts, over requests plus one, with K about two. Rejected work never reaches the overloaded backend.
+[pause: 0.8]
+
+## 12.7 Fairness
+
+= code | RL-08 · Tier B · The mechanism | Max–min fairness, worked
+@ RL-08
+capacity 100; three tenants want 10, 30 and 80
+
+equal split: 33.3 each        -> tenant A wastes 23.3, tenant C starved
+max-min:
+    give everyone an equal share of what is left: 33.3
+    A needs only 10 -> give 10; 90 left for two tenants -> 45 each
+    B needs only 30 -> give 30; 60 left for one tenant  -> 60
+    result: 10, 30, 60     nobody can gain without taking from someone smaller
+
+weighted: shares in proportion to weights, by plan or by payment
+N: Fairness decides who gets capacity when everyone wants more than there is. Capacity is a hundred, and three tenants want ten, thirty and eighty. An equal split gives each thirty-three, wasting twenty-three on the first tenant while the third is starved. Max-min fairness fills the smallest demands first. Everyone gets an equal share of what is left. Tenant A needs only ten, so give it ten. Ninety is left for two, forty-five each. Tenant B needs only thirty, so the last tenant gets sixty. Ten, thirty and sixty. Weighted fair queuing applies the same idea with weights, by plan or payment.
+
+= panel key | RL-08 · Tier B · One level down | Where fairness is enforced
+**Quotas per tenant** at the gateway: a ceiling for each, so no tenant can take everything.
+**Per-tenant queues** inside a server, drained round robin or by weight, so one tenant's burst waits behind its own queue, not in front of everyone.
+The combination matters: quotas bound the **average**, queues bound the **interference** during a burst.
+N: Where is it enforced? Quotas per tenant at the gateway set a ceiling, so no tenant can take everything. Per-tenant queues inside a server, drained round robin or by weight, make one tenant's burst wait behind itself, not in front of everyone. Quotas bound the average, and queues bound the interference during a burst. You usually need both.
+
+= th | RL-08 · the line to say | Max–min fairness fills the smallest demands first; quotas bound each tenant's average and per-tenant queues bound interference.
+V: For fairness I use max-min allocation, with weights where plans differ, enforced by per-tenant quotas at the gateway and per-tenant queues inside servers, so a noisy tenant waits behind its own burst.
+[pause: 0.8]
+
+## 12.8 Fail-open versus fail-closed
+
+= table | RL-09 · Tier A · The failure | One default, two very different consequences
+@ RL-09
+Limiter store unreachable, limiter fails | Protecting | Consequence
+Closed | A product API's per-user limits | **Outage**: the opening story
+Open | A product API's per-user limits | A few minutes without abuse protection; usually fine
+Open | Login attempts, against password guessing | **Security hole** for as long as the store is down
+Closed | A free-tier API, against cost abuse | Free users blocked for minutes; paying users must not be
+N: One default, very different consequences. Fail closed on a product's per-user limits, and the opening story happens: an outage. Fail open on the same limits, and you run a few minutes without abuse protection, usually fine. But fail open on login attempts, and password guessing is unlimited for as long as the store is down. And for a free tier protecting cost, failing closed may be right for free users and wrong for paying ones. There is no correct default. There is a correct decision per limit.
+
+= panel key | RL-09 · Tier A · The mechanism | Decide per limit, and fail to a local fallback
+For each limit, write down: **what it protects** (the server, the business, security) and **what failing each way costs**.
+Implement the failure mode **explicitly**, with a timeout on the store call of a few milliseconds.
+Best of both: fail to a **local fallback limit**, a per-node bucket at the global limit divided by node count, generous but bounded.
+N: The mechanism. For each limit, write down what it protects, the server, the business or security, and what failing each way would cost. Implement the failure mode explicitly, with a timeout of a few milliseconds on the store call, not whatever the library does. And the best answer is usually neither open nor closed: fail to a local fallback, a per-node bucket at the global limit divided by the number of nodes. Generous, and still bounded.
+
+= panel key | RL-09 · Tier A · One level down | Who owns the decision
+Not the limiter library and not the on-call engineer at 3 a.m.
+**Product** decides for business limits; **security** decides for abuse and authentication limits; the decision is recorded in the design and in the runbook.
+And it is **tested**: block the store in a staging game day and watch what the limiter does.
+N: Who owns the decision? Not the library, and not the on-call engineer at three in the morning. Product decides for business limits, security decides for abuse and authentication limits, and the decision is written in the design and in the runbook. And it is tested. Block the store in a staging exercise and watch what the limiter actually does.
+
+= panel watch | RL-09 · Tier A · The alternative and the price | Removing the dependency instead
+If the limiter must never be a single point of failure, keep the store **off the request path**: leased capacity (12.3) keeps working for one lease duration when the store dies.
+The price is the bounded overshoot, which you already accepted.
+N: The alternative is to remove the dependency. With leased capacity from section twelve point three, each node keeps working on its current lease for one lease duration after the store dies, and then on its local fallback. The store is no longer on the request path. The price is the bounded overshoot, which you already accepted.
+
+= th | RL-09 · the line to say | Fail-open or closed is decided per limit by its owner, implemented explicitly, and usually falls back to a bounded local limit.
+V: For every limit I decide, with its owner, whether it fails open or closed when the store is unreachable. Product limits usually fail open to a bounded local fallback, security limits fail closed. The behaviour is explicit, with a short timeout, and tested by blocking the store.
+[pause: 0.8]
+
+## 12.9 Admission control and queue discipline
+
+= dia | RL-10 · Tier B · The mechanism | A bounded queue, deadlines checked at dequeue, newest first under overload
+@ RL-10
+p12-queue
+N: When requests wait in a queue, three rules keep the waiting useful. First, bound the queue: a queue that can grow without limit turns overload into unlimited latency. Second, check the deadline when a request leaves the queue, not only when it enters. In the picture, request seven has waited past its deadline, so it is dropped unserved, rather than served for a client that already gave up. Third, under overload, serve newest first. The newest requests are the ones whose clients are most likely still waiting.
+
+= panel key | RL-10 · Tier B · One level down | CoDel, and the waiting room
+**CoDel** watches the **minimum** queueing delay over an interval, 100 ms. If even the minimum exceeds a target, 5 ms, the queue is standing, not absorbing a burst, and it starts dropping.
+A **virtual waiting room** for a ticket sale: admit users to the real system at the rate it can serve, and hold the rest in a cheap queue page with a position.
+N: One level down. CoDel, controlled delay, watches the minimum queueing delay over an interval of a hundred milliseconds. If even the minimum is above a target of five milliseconds, the queue is standing rather than absorbing a burst, and it starts dropping. And at the product level, a virtual waiting room for a ticket sale admits users at the rate the real system can serve, and holds the rest on a cheap page that shows their place in line.
+
+= th | RL-10 · the line to say | Bound every queue, drop requests whose deadline has passed at dequeue, and serve newest first or use CoDel under overload.
+V: Every queue is bounded, a request whose deadline has passed is dropped when it reaches the front, and under overload I serve newest first or let CoDel drop when the minimum delay stays above target. For a known spike, a waiting room in front.
+[pause: 0.8]
+
+## 12.10 Recap
+
+= list | Recap | What to be able to explain without notes
+- The **token bucket**: two numbers, refilled on read, atomic, the store's clock
+- The **boundary burst**, and the sliding-window estimate
+- Three ways to **enforce across nodes**, and the **N x L** bound
+- When a **lowered limit** bites
+- The **reject-cost** arithmetic, and shedding by criticality
+- **Client-side throttling**, with K about 2
+- **Max–min fairness**, worked
+- **Fail-open or closed**, decided per limit
+N: Without notes: the token bucket. The boundary burst and the sliding-window estimate. Three ways to enforce across nodes, and the N times L bound. When a lowered limit bites. The reject-cost arithmetic. Client-side throttling. Max-min fairness. And fail-open or closed, decided per limit by its owner.
+
+## 12.11 Probe drills
+
+= probe | State the worst-case over-admission.
+- With leased capacity: **N x L**
+- 50 gateways, leases of 20: up to **1,000** extra in the worst moment
+- With a central counter: zero, for a round trip per request
+C: With leased capacity it is the number of nodes times the lease size, because in the worst moment every node has just received a full lease as the global budget runs out. Fifty gateways with leases of twenty tokens can over-admit by up to a thousand requests. With a central atomic counter it would be zero, at the cost of a round trip to the store on every request.
+
+= probe | Halve it. What does it cost?
+- Halve **L**: 500 extra
+- **Twice** the lease requests to the central store
+- Or fewer nodes per limit: route a tenant to a **subset** of gateways
+C: Halving the lease size halves the bound to five hundred, and doubles the traffic to the central store, since each node renews twice as often. Alternatively, reduce N for a given limit: route each tenant to a subset of gateways, so only those hold leases for it. That also improves locality, at the cost of a routing rule.
+
+= probe | The limiter's store is down.
+- Each limit **fails as decided**: product limits open to a **local fallback**, security limits closed
+- Leases keep working for **one lease duration**
+- Alert, and the runbook names the owner of each choice
+C: Each limit does what we decided in advance. Nodes keep spending their current leases for one lease duration, then fall back. Product limits fail open to a local per-node bucket, the global limit divided by the node count, so we are generous but bounded. Login and other security limits fail closed. We alert at once, and the runbook says who owns each of those choices.
+
+= probe | Two gateways race for the last token.
+- **Central counter**: an atomic decrement; exactly one wins
+- **Leases**: no race; tokens are partitioned in advance
+- The price of leases: a few tokens stranded on another node
+C: With a central counter, the decrement is atomic, so exactly one of them gets it and the other is told to retry after. With leases there is no race at all, because the tokens were split among nodes in advance. The price is the opposite problem: near the end, a few tokens can sit unused on a node that does not need them.
+
+= probe | A limit is lowered. When does it bite?
+- At the next **lease renewal**: within one **lease duration**
+- Overshoot meanwhile at most **N x L**
+- For an emergency cut: **revoke** by version
+C: Leases already granted are spent at the old terms, so the new limit bites as each node renews, within one lease duration, with an overshoot of at most N times L in the meantime. If that is too slow, for an emergency, nodes check a limit version on each decision and drop leases older than the new version, so the cut is immediate.
+
+## 12.12 Where this shows up
+
+= table | Where this shows up | What each design problem takes from this part
+Problem | Takes
+Rate limiter | All of it: the bucket, windows, enforcement across nodes, failure modes
+API gateway | Per-client quotas, the 429 contract (part 11), fail static
+Ticket sale | The waiting room, admission control, shedding by criticality
+Multi-tenant platforms | Max–min fairness, per-tenant queues
+Every backend | Concurrency limits, deadlines at dequeue, cheap rejects
+N: The rate limiter task takes all of it. An API gateway takes per-client quotas and the throttling contract. A ticket sale takes the waiting room and admission control. Multi-tenant platforms take fairness and per-tenant queues. And every backend takes concurrency limits, deadlines at dequeue and cheap rejects.
+
+= panel note | Read next | Where to go deeper
+*The Site Reliability Workbook*, chapter 11, *Managing Load*, and chapter 17, *Identifying and Recovering from Overload*.
+The Doorman design (Google's global distributed client-side rate limiter): rate shares and leases.
+*Designing Data-Intensive Applications*, chapter 7: preventing lost updates, the atomic check-and-decrement.
+N: To go deeper: chapters eleven and seventeen of the Site Reliability Workbook, on managing load and recovering from overload. The Doorman design, Google's global rate limiter with rate shares and leases. And chapter seven of Designing Data-Intensive Applications, for the atomic check and decrement. Part thirteen turns to reliability patterns.

@@ -1,0 +1,64 @@
+#! title: Sample part
+#! short: Sample
+
+= th | Test course · Part 99 | Sample part | One slide of every type, for the builder's own tests.
+N: This is the sample part. It exists so the builder can be tested.
+
+## 99.1 Every slide type
+
+= panel note | Assumed reading | What this part does not repeat
+A short note about reading.
+N: One reading is assumed. It is a short note.
+
+= table | TST-01 · Tier A · The mechanism | A small table
+@ TST-01
+| Thing | Value |
+| one | 1 |
+| two | 2 |
+N: A table with two rows. One is one. Two is two.
+
+= cards | TST-02 · Tier B · The choice | Two cards
+@ TST-02
+grn Use it for :: the easy case
+red Not for :: the hard case
+N: Two cards. Use it for the easy case, not for the hard one.
+
+= tiles | Tiles | Three numbers
+10 | ten
+20 | twenty
+30 | thirty
+N: Three tiles. Ten, twenty and thirty.
+
+= list | A list | Three items
+- first item
+- second item
+- third item
+> The takeaway bar.
+N: Three items. The first. The second. And the third. Then the takeaway.
+[pause: 0.8]
+
+= dia | A figure | One box
+sample-box
+N: One box in a figure, drawn for this test.
+
+= code | Code | Two lines
+x = 1
+y = x + 1
+N: Two lines of code. Y is one more than X.
+
+= panel trap | A trap | The thing people get wrong
+They forget the second step.
+N: The trap is forgetting the second step.
+
+= th | TST-02 · the line to say | Say the line slowly.
+V: Say the line slowly, and mean it.
+
+= panel note | Read next | Where to go deeper
+Read the sample chapter.
+N: To go deeper, read the sample chapter.
+
+= probe | What happens when the box fails?
+- The request fails over to the **second** box
+- Nobody notices
+I: Okay. And then?
+C: It fails over to the second box, and nobody notices.

@@ -1,0 +1,434 @@
+#! title: Replication
+#! short: Replication
+
+= th | System design at Staff depth · Part 5 of 17 | Replication | One leader, many leaders, no leader; lag; failover step by step; change data capture and the outbox; conflicts; regions; RPO and RTO.
+N: Part five, replication. Part three gave us one way to keep copies identical, a consensus log. Most data in the world is not replicated that way. It is copied from a leader to followers, asynchronously, or between several leaders, or with no leader at all. Every one of those choices decides what you lose on failover, and that is the question this part teaches you to answer with a number.
+
+## 5.0 Why this part decides rounds
+
+= panel trap | The opening story | The follower that was one second behind
+A database primary fails at peak. Automation promotes a follower within thirty seconds. Everyone is pleased.
+The follower was **one second** behind. At five thousand writes a second, five thousand acknowledged writes are gone.
+Worse: some of them had already been copied into a cache and a search index, which now hold data the database never had.
+N: A database primary fails at peak. Automation promotes a follower within thirty seconds, and everyone is pleased. But the follower was one second behind. At five thousand writes a second, five thousand writes that users were told had succeeded are gone. Worse, some had already been copied into a cache and a search index, which now hold data the database has never heard of. Failover was fast, and it lost data, and it made the copies disagree. This part is about deciding, in advance, which of those you accept.
+
+= panel note | Assumed reading | What this part does not repeat
+*Designing Data-Intensive Applications*, chapter 5, **whole**.
+Part 2 of this course: session guarantees on the consistency ladder, quorums, last-writer-wins and version vectors. Part 3: consensus.
+The chapter's survey of topologies and the history of conflict resolution stay in the chapter. This part goes to failover, the outbox, repair and the numbers.
+N: Chapter five of Designing Data-Intensive Applications is assumed, the whole chapter. So are three sections of part two: the session guarantees on the consistency ladder, quorums, and last writer wins with version vectors. The chapter's survey of topologies stays in the chapter. Here we go to the things an interviewer pushes on: failover step by step, the outbox, repair, and the numbers.
+
+= list | Map of the part | Five groups of ideas
+- **One leader**: sync and async, failover, primary–backup leases, log shipping
+- **Lag**: measured in time, and the guarantee that fixes each anomaly
+- **Getting changes out**: change data capture and the outbox
+- **Many leaders and none**: conflicts and their resolution, quorums, repair, Merkle trees, tombstones
+- **Across regions and disasters**: topologies, seeding a replica, RPO and RTO
+N: Five groups. One leader, with failover, leases and log shipping. Lag, measured in time. Getting changes out of a database safely, with change data capture and the outbox. Many leaders, and no leader, with conflicts, repair, Merkle trees and tombstones. And finally regions and disasters.
+
+## 5.1 Single-leader replication
+
+= dia | REP-01 · Tier A · The failure | Asynchronous replication loses the tail on failover
+@ REP-01
+p5-async-tail
+N: Start with the failure. The leader accepts writes one to one hundred and acknowledges each one as soon as it is on its own disk. It ships them to the follower as fast as it can, and the follower has applied up to ninety-five. The leader dies. Writes ninety-six to one hundred were acknowledged to clients and exist only on the dead machine. Promote the follower, and they are gone. That gap, the replication lag at the moment of failure, is your recovery point. Here it is five writes. At peak it is a second of writes, or more.
+
+= table | REP-01 · Tier A · The mechanism | Three acknowledgement modes, and what each loses
+Mode | Leader answers the client after | Lost on leader failure | Write latency
+Asynchronous | Its own disk | Everything not yet shipped: the lag | Local disk
+Semi-synchronous | Its disk **and one** follower's receipt | Nothing, if that follower is promoted | Plus one round trip to the nearest follower
+Synchronous to all | Every follower | Nothing | The slowest follower; one down blocks writes
+N: There are three acknowledgement modes. Asynchronous: the leader answers after its own disk, and failover loses whatever has not shipped. Semi-synchronous: the leader waits for its own disk and one follower's receipt, so at least one follower has every acknowledged write, and failover loses nothing, provided that is the follower you promote. It adds one round trip to the nearest follower. Synchronous to all followers loses nothing and is held hostage by the slowest one. If any follower is down, writes stop. That is why almost no one runs it.
+
+= panel key | REP-01 · Tier A · One level down | Failover, step by step
+**1. Detect.** Missed heartbeats: 3 × 10 s = 30 s, set against false failovers.
+**2. Choose.** The follower with the **highest applied log position**; with semi-sync, the one that holds every acknowledged write.
+**3. Fence the old leader.** Revoke its lease, raise the epoch the storage checks, or cut its power. It must not accept one more write.
+**4. Repoint clients.** Through the registry, a proxy or a virtual IP. Caches of the old address are the slow part.
+**5. Reconcile.** The old leader's unshipped tail is **saved, not discarded**: compared, replayed where safe, reported where not.
+N: Failover, step by step. Detect: missed heartbeats, perhaps three times ten seconds, chosen to avoid false alarms. Choose: the follower with the highest applied log position. Fence the old leader: revoke its lease, raise the epoch that storage checks, or cut its power, so it cannot accept one more write. Repoint clients, through the registry, a proxy or a virtual address. And reconcile. The old leader's unshipped tail is saved, not thrown away. It is compared with the new leader, replayed where that is safe, and reported to a human where it is not.
+
+= panel trap | REP-01 · Tier A · Split brain | The old leader comes back and accepts writes
+Without step 3, a leader that was only partitioned keeps serving clients that can still reach it. Now two leaders take writes, and the histories diverge.
+Detection by timeout **cannot** tell dead from partitioned. Only fencing makes the difference harmless.
+This is the same lesson as part 2's fencing token, applied to a whole database.
+N: Leave out the fencing step and you get split brain. A leader that was only partitioned, not dead, keeps serving clients that can still reach it. Now two leaders take writes and their histories diverge, and no merge will be clean. Remember that a timeout cannot tell a dead leader from a partitioned one. Only fencing makes the difference harmless. It is part two's fencing token, applied to an entire database.
+
+= table | REP-01 · Tier A · The alternative and the price | Async leader, semi-sync leader, or a consensus log
+ | Async leader | Semi-sync leader | Consensus log (part 3)
+Writes lost on failover | The lag, often a second | None, if promotion is right | None
+Failover | External; can pick wrong | External; must pick the acknowledged follower | Built in
+Write latency | Local | Plus nearest follower | Plus nearest majority
+Split brain | Needs fencing | Needs fencing | Impossible to commit twice
+N: Compare the three. An asynchronous leader loses the lag, often a second, and depends on an external failover that can pick the wrong follower. A semi-synchronous leader loses nothing, if the failover tool promotes the follower that acknowledged, and costs one round trip. A consensus log loses nothing and does failover itself, for a round trip to the nearest majority. The step from semi-sync to consensus mostly buys you correct failover without writing it yourself.
+
+= th | REP-01 · the line to say | Asynchronous replication loses the lag on failover. Semi-sync loses nothing if you promote the right follower. Either way, fence the old leader.
+V: With asynchronous replication, failover loses whatever was not yet shipped, so my recovery point is the lag. Semi-synchronous loses nothing if the follower that acknowledged is the one promoted. And in every case, failover means detect, choose the most advanced follower, fence the old leader, repoint clients, and reconcile the tail it left behind.
+[pause: 0.8]
+
+## 5.2 Primary–backup with leases
+
+= panel key | REP-06 · Tier B · The mechanism | A lease names the primary; a version number exposes stale copies
+@ REP-06
+The GFS shape: a master grants one replica of a chunk a **60-second lease** to be primary. The primary orders all writes; backups apply them in that order.
+Each new lease raises the chunk's **version number**. A replica that was down during a write still has the old number, and is detected as stale and never served.
+The lease makes ownership time-bounded; the version number makes a missed write visible.
+N: A lighter shape than a full database failover is primary and backup with a lease, as in the Google File System. A master grants one replica of each chunk a sixty second lease to be primary. The primary picks the order of writes, and the backups apply them in that order. Each new lease also raises the chunk's version number. A replica that was down during a write is left with an older number, so it is detected as stale and never served. The lease bounds ownership in time. The version number makes a missed write visible.
+
+= panel watch | REP-06 · Tier B · The price | What the lease costs, and what it relies on
+After a primary disappears, the master **waits out the lease** before granting a new one: up to 60 seconds without writes to that chunk.
+It relies on bounded clock drift, like every lease. Writes from a former primary are rejected by the version check.
+N: The price. After a primary disappears, the master must wait out the lease before naming another, so a chunk can be without writes for up to a minute. That is fine for a file system that retries, and wrong for a payment path. And like every lease, it relies on bounded clock drift, with the version number as the fence against a former primary.
+
+= th | REP-06 · the line to say | A time-bounded lease names one primary; a version number raised per lease makes stale replicas visible.
+V: Primary and backup with leases: the master grants one replica a time-bounded lease to order writes, and raises a version number with each lease, so a replica that missed writes is detected as stale. Failover waits out the lease.
+[pause: 0.8]
+
+## 5.3 Log shipping
+
+= table | REP-07 · Tier B · The mechanism | What is shipped decides what the follower can be
+@ REP-07
+Shipped | Example | Follower must be | Breaks on
+Statements | "UPDATE … SET at = now()" | The same engine | Non-determinism: time, random numbers, triggers
+Physical log | Page and byte changes from the write-ahead log | The **same version**, byte-identical | Version upgrades; cannot feed other systems
+Logical log | Row changes: before and after values, by key | Any version, any schema-compatible consumer | Larger; must be designed for consumers
+N: What you ship decides what the follower can be. Shipping statements is compact and breaks on anything non-deterministic: the current time, random numbers, triggers. Shipping the physical write-ahead log is fast and gives a byte-identical copy, so the follower must run the same version, and nothing else can read it. Shipping a logical log, the row changes by key with before and after values, lets the follower run a different version, and lets other systems consume it. That last property is what makes zero-downtime upgrades and change data capture possible.
+
+= panel key | REP-07 · Tier B · One level down | Why logical decoding enables an upgrade without downtime
+Run the new version as a **logical follower** of the old. Let it catch up. Stop writes for seconds, wait for zero lag, repoint clients.
+With physical shipping you cannot: the new version cannot read the old version's pages.
+N: One level down. To upgrade a database without downtime, run the new version as a logical follower of the old one. Let it catch up, stop writes for a few seconds, wait for the lag to reach zero, and repoint clients. With physical shipping that is impossible, because the new version cannot read the old version's pages.
+
+= th | REP-07 · the line to say | Physical log shipping gives an identical copy of the same version; a logical log of row changes feeds other versions and other systems.
+V: Physical log shipping gives a byte-identical follower on the same version. A logical log of row changes by key can feed a different version, or a different system entirely, which is how I upgrade without downtime and how change data capture works.
+[pause: 0.8]
+
+## 5.4 Replication lag
+
+= dia | REP-10 · Tier A · The failure | Lag is usually milliseconds, and sometimes minutes
+@ REP-10
+p5-lag-curve
+N: Replication lag is the time between a write committing on the leader and becoming visible on a follower. The picture shows it over a day. Most of the time it is a few milliseconds, the flat line at the bottom. Then three spikes. At two in the morning, a batch job runs one long transaction, and the follower cannot apply anything behind it: lag climbs to four minutes. At noon, a schema change rewrites a table. At six, the follower's disk is slow during a backup. An interviewer asks: what is your replication lag? The honest answer is a distribution, with its causes.
+
+= table | REP-10 · Tier A · The mechanism | The anomaly lag causes, and the guarantee that fixes it
+Anomaly (part 2, section 2.3) | Fix
+Read your own writes | After a write, read from the leader for a while, or carry the write's **log position** and read only from a replica that has applied it
+Monotonic reads | Pin a user to one replica, or carry the **highest position seen** and never read below it
+Consistent prefix | Keep causally related writes in **one partition**, so they replicate in order
+N: Part two named the anomalies. Here are the fixes, as mechanisms. For reading your own writes: either read from the leader for a short while after writing, or carry the write's log position and read only from a replica that has applied it. For monotonic reads: pin the user to one replica, or carry the highest position seen and never read below it. For consistent prefix, where an answer appears before its question: keep causally related writes in one partition, so they replicate in order.
+
+= panel key | REP-10 · Tier A · One level down | Measure lag in time, from a heartbeat row
+Lag in **bytes** or log positions says nothing to a user. Measure it in **seconds**.
+The leader writes a heartbeat row every second: `(id = 1, written_at = now)`. Each replica reports **now minus the written_at it has applied**.
+This is correct even when there are no other writes, and it includes apply delay, not only transfer.
+Single-threaded apply is the usual cause of a growing lag: the leader writes in parallel, the follower replays in one stream.
+N: Measure lag in time, not bytes. Bytes behind means nothing to a user. The reliable way is a heartbeat row. The leader writes the current time into one row every second, and each replica reports the current time minus the time in the newest heartbeat it has applied. That works even when nothing else is being written, and it includes the time to apply, not only to transfer. And when lag keeps growing, the usual cause is that the leader writes in parallel while the follower replays in a single stream.
+
+= panel watch | REP-10 · Tier A · The alternative and the price | Read from the leader, or carry a position
+Reading from the leader is simple, and sends your read load back to one machine. Fine for a few seconds after a write; not for every read.
+Carrying a position costs a token in the session, and a wait or a redirect when the replica is behind.
+A **bound** is the product decision: "stale by at most 5 seconds, or served by the leader".
+N: The alternatives each have a price. Reading from the leader is simple, and moves read load back onto one machine. Acceptable for a few seconds after a user's own write, not for every read. Carrying a log position costs a token in the session, and a wait or a redirect when the replica is behind. And the bound itself is a product decision. Stale by at most five seconds, or served by the leader. Say it as a number.
+
+= th | REP-10 · the line to say | Lag is a distribution measured in seconds from a heartbeat row. Read-your-writes and monotonic reads are fixed by carrying a log position.
+V: I measure replication lag in seconds, with a heartbeat row, and I treat it as a distribution with causes, not one number. For read your writes and monotonic reads, the session carries a log position, and a replica serves the read only if it has applied that far.
+[pause: 0.8]
+
+## 5.5 Change data capture and the outbox
+
+= dia | REP-08 · Tier A · The failure | Two writes, two systems, no atomicity
+@ REP-08
+p5-dual-write
+N: Here is the most common bug in event-driven designs: the dual write. The service updates the order in the database, then publishes an order paid event to the log. Follow the two failures in the picture. On the left, the database commit succeeds and the process crashes before publishing. The order is paid, and nobody downstream ever hears of it. On the right, two requests race. Request one writes A, request two writes B, but their publishes arrive in the other order. The database says B, the search index says A, for ever.
+
+= dia | REP-08 · Tier A · The mechanism | Write the event in the same transaction; ship it from the database
+p5-outbox
+N: The fix is to stop writing to two systems. Step one: in the same database transaction as the business change, insert a row into an outbox table: the event's identifier, the entity key, and the payload. Either both commit, or neither does. Step two: a relay reads the outbox, either by polling it or by tailing the database's own log, which is change data capture. Step three: it publishes each event to the log, keyed by entity, so events for one order stay in order. Step four: it marks the event as sent, or simply advances its position.
+
+= panel key | REP-08 · Tier A · One level down | Draining the outbox correctly
+**Polling by ID can skip a row.** IDs are assigned at insert, but transactions commit in a different order: row 41 can become visible after the poller has moved past 42. Poll with a small lag window, or by commit position.
+**Log tailing** reads changes in **commit order** from the write-ahead log, and adds no query load.
+**The relay can publish twice**: it publishes, then crashes before recording progress. So it is at least once, and **the consumer must deduplicate** by event ID.
+Delete sent rows in batches, or the outbox becomes the biggest table.
+N: One level down, three details. Polling by identifier can skip a row. Identifiers are assigned at insert, but transactions commit in another order, so row forty-one can become visible after the poller has already passed forty-two. Poll with a short lag window, or by commit position. Tailing the log reads changes in commit order, and adds no query load. And either way the relay can publish and then crash before recording its progress, so it will publish twice. Delivery is at least once, and the consumer must deduplicate by event identifier.
+
+= table | REP-08 · Tier A · The alternative and the price | Outbox, raw change data capture, or the log as the source
+Approach | What consumers see | Cost
+Outbox table | Designed events: "order paid", with a stable schema | An extra insert per transaction; a relay to run
+Raw change data capture on business tables | Row changes, in the table's own shape | No extra write; consumers couple to your schema
+Write the log first, derive the database from it | The log is the truth | Read-your-writes on the database becomes a lag problem
+N: Three ways to do it. An outbox table publishes designed events, with a schema you control, for one extra insert per transaction. Raw change data capture on the business tables needs no extra write, and couples every consumer to the shape of your tables, so a column rename becomes a cross-team incident. Or write the log first and derive the database from it, which makes the log the truth and turns reading your own write into a lag problem. For most services, the outbox is the boring right answer.
+
+= th | REP-08 · the line to say | Never dual-write. Put the event in the same transaction, ship it from the database, and let consumers deduplicate.
+V: I never write to the database and the log as two separate steps. The event goes into an outbox table in the same transaction, a relay ships it from the database in commit order, and because the relay can publish twice, every consumer deduplicates by event identifier.
+[pause: 0.8]
+
+## 5.6 Multi-leader replication
+
+= dia | REP-02 · Tier B · The mechanism | Each region accepts writes; conflicts appear after the fact
+@ REP-02
+p5-multi-leader
+N: With several leaders, each region accepts writes locally and replicates to the others asynchronously. Writes are fast everywhere, and a region can work while cut off. The price is in the picture. A user in Europe sets a document's title to A. Eighty milliseconds later, before that change arrives, a user in America sets it to B. Each leader accepted its write. When the changes cross, each leader sees a conflict, and must resolve it the same way, or the regions disagree for ever. Conflicts are detected after both users were told they succeeded.
+
+= panel key | REP-02 · Tier B · One level down | The best conflict is the one that cannot happen: home each entity
+Give each entity a **home region**: a user's data is written only in the region that owns that user. Other regions forward writes, or read local copies.
+Within one entity there is now one leader: no conflicts. Across entities, regions are still independent.
+The price: a user travelling, or a region failing over, needs a **controlled change of home**.
+N: The best way to handle conflicts is to make them impossible. Give each entity a home region. A user's data is only written in the region that owns that user, and other regions forward the write or serve a local copy for reads. Within one entity there is now a single leader, so no conflicts. Across entities, regions remain independent. The price is that moving the home, for a traveller or during a regional failover, must be a controlled step.
+
+= th | REP-02 · the line to say | Multi-leader buys local writes and partition tolerance, and pays with conflicts. Homing each entity to one region removes them.
+V: Multi-leader replication gives local writes in every region and keeps working through a partition, and it pays with conflicts found after both writers were told they succeeded. Where I can, I home each entity to one region, so each entity has one leader.
+[pause: 0.8]
+
+## 5.7 Conflict resolution
+
+= table | REP-09 · Tier B · The mechanism | Three ways to resolve, by what they lose
+@ REP-09
+Approach | How | Loses
+Last writer wins | Keep the highest timestamp (part 2, section 2.6) | Concurrent writes, silently; and correct later writes on clock skew
+Version vectors plus a merge | Detect concurrency (part 2, section 2.7); keep both; merge in code or ask the user | Nothing, if the merge is right; costs application logic
+CRDTs | Data types whose merge is commutative, associative and idempotent: counters, sets, sequences | Nothing; limited to those types, with metadata overhead
+N: Three ways to resolve a conflict, by what each loses. Last writer wins keeps the highest timestamp, and silently loses concurrent writes, and even a later write when clocks are skewed, as part two showed. Version vectors detect that two writes were concurrent, keep both, and hand them to a merge in code or to the user. And conflict-free replicated data types, CRDTs, are data types whose merge gives the same result in any order, applied any number of times. A counter, a set, a text sequence.
+
+= panel key | REP-09 · Tier B · One level down | A grow-only counter, as the smallest CRDT
+Each replica keeps **one slot per replica**: A = (3, 0, 0), B = (0, 5, 0), C = (0, 0, 2).
+Merge takes the **maximum per slot**; the value is the **sum**. Merge in any order, any number of times: (3, 5, 2), value 10.
+A plain "add one" counter would double count on a repeated merge. Per-slot maximum cannot.
+Decrements need a second such counter; sets need tags per add. The metadata grows with replicas.
+N: The smallest example is a counter that only grows. Each replica keeps one slot per replica, and only increments its own slot. To merge, take the maximum of each slot. The value is the sum. Merge in any order, as many times as you like, and you get the same answer: ten. A plain counter that adds increments would double count on a repeated merge. The maximum per slot cannot. Decrements need a second counter, and sets need tags, and the metadata grows with the number of replicas.
+
+= th | REP-09 · the line to say | Last writer wins loses concurrent writes; version vectors keep both for a merge; CRDTs merge by construction.
+V: For conflicts I choose by what I can afford to lose. Last writer wins is acceptable only where losing a concurrent write is harmless. Otherwise version vectors detect concurrency and keep both for a merge, or I use a CRDT, whose merge is correct by construction.
+[pause: 0.8]
+
+## 5.8 Leaderless replication
+
+= dia | REP-03 · Tier B · The mechanism | Write to N, wait for W; read from N, wait for R
+@ REP-03
+p5-sloppy
+N: In a leaderless, Dynamo-style store, there is no leader. The client, or a coordinator node, sends each write to all N replicas of a key and waits for W of them. A read asks all N and waits for R. Part two showed why R plus W greater than N is not by itself a guarantee. Now the picture adds a sloppy quorum. Replica three is down. Instead of failing the write, the coordinator writes to node four, outside the key's home set, with a hint: this belongs to replica three. When three returns, node four hands the write over. That is hinted handoff.
+
+= panel key | REP-03 · Tier B · One level down | What the client gets back
+If replicas return **different versions** that are concurrent by their version vectors, the read returns **all of them** to the client, which merges and writes back the merged value with the combined vector.
+A sloppy quorum keeps writes available during failures, and means a read quorum **may not overlap** the write quorum. Reads can miss a write until handoff completes.
+N: One level down. If the replicas return versions that are concurrent by their version vectors, the read returns all of them, and the client merges them and writes the result back. And notice what the sloppy quorum costs. It keeps writes available when home replicas are down, but the nodes that took the write may not be the ones a read asks, so a read can miss an acknowledged write until handoff completes.
+
+= th | REP-03 · the line to say | Leaderless: write to N, wait for W, read R; sloppy quorums and hinted handoff trade read freshness for write availability.
+V: In a leaderless store every replica takes writes. I wait for W of N on writes and R on reads, concurrent versions come back to the client to merge, and a sloppy quorum with hinted handoff keeps writes available at the cost of reads that can miss them for a while.
+[pause: 0.8]
+
+## 5.9 Read repair and anti-entropy
+
+= table | REP-04 · Tier B · The mechanism | Two ways replicas converge after missing a write
+@ REP-04
+Mechanism | When it runs | Repairs | Misses
+Read repair | On a read that sees a stale replica | That key, on those replicas | Keys that are never read
+Anti-entropy | In the background, replica against replica | Everything that differs | Nothing, given time; costs network and disk
+N: Hinted handoff is not enough on its own, because hints are lost when the node holding them dies. Two mechanisms close the gap. Read repair: when a read sees that one replica returned an older version, it writes the newer one back to it. Cheap, and it never fixes keys that are not read. Anti-entropy: a background process compares replicas pairwise and copies whatever differs. It catches everything, given time, at a cost in network and disk. Comparing everything cheaply needs the next idea.
+
+= panel watch | REP-04 · Tier B · The price | Repair must finish inside the tombstone grace period
+A replica that misses a delete must be repaired before tombstones are discarded, or the deleted data returns (section 5.11).
+So the repair schedule is a **correctness** requirement, not a tuning knob.
+N: There is a deadline on repair. A replica that missed a delete must be repaired before the tombstone that records the delete is thrown away. Otherwise the deleted value comes back, as section five point eleven shows. So the repair schedule is a correctness requirement, not a tuning knob.
+
+= th | REP-04 · the line to say | Read repair fixes what is read; anti-entropy fixes everything, and must complete inside the tombstone grace period.
+V: Replicas converge two ways: read repair fixes keys as they are read, and background anti-entropy compares replicas and fixes everything else. Anti-entropy has a deadline: it must finish within the tombstone grace period.
+[pause: 0.8]
+
+## 5.10 Merkle trees
+
+= dia | DS-04 · Tier B · The mechanism | Compare two replicas by comparing hashes, and descend only where they differ
+@ DS-04
+p5-merkle
+N: A Merkle tree makes anti-entropy cheap. Split the key range into buckets. Each leaf holds the hash of the keys and versions in its bucket. Each parent holds the hash of its children's hashes, up to one root hash. Two replicas compare roots. Equal roots mean identical data, with one message. If the roots differ, compare the children, and descend only into the child that differs. In the picture, the replicas differ in one key. The comparison walks down one path, and only that one bucket's keys are exchanged.
+
+= code | DS-04 · Tier B · One level down | The numbers for a billion keys
+keys                        10^9
+tree with fan-out 16, depth 5:   16^5  = 1,048,576 leaves
+keys per leaf               about 950
+
+one differing key, one comparison:
+    5 levels x 16 hashes x 32 bytes     = 2.5 KB of hashes
+    + one leaf's key list: 950 x 40 B  = 38 KB
+compare by full scan instead:  10^9 x 40 B  = 40 GB
+N: The numbers, for a billion keys. A tree with a fan-out of sixteen and a depth of five has about a million leaves, so about nine hundred and fifty keys in each. To find one differing key, exchange sixteen hashes of thirty-two bytes at each of five levels, two and a half kilobytes, then one leaf's key list, about thirty-eight kilobytes. A full comparison would move forty gigabytes. The catch is keeping the tree current: every write changes one leaf and the hashes above it, so many stores rebuild the tree in the background before a repair instead.
+
+= th | DS-04 · the line to say | A Merkle tree compares replicas root first and descends only into differing ranges: kilobytes instead of a full scan.
+V: For anti-entropy I keep a Merkle tree per key range: hashes of buckets, then hashes of hashes. Two replicas compare roots, descend only where they differ, and exchange a few kilobytes to find a difference that a full scan would need gigabytes for.
+[pause: 0.8]
+
+## 5.11 Tombstones
+
+= dia | REP-14 · Tier B · The mechanism | A deleted value comes back from a replica that was away
+@ REP-14
+p5-tombstone
+N: In a store where replicas converge by copying what others lack, a delete cannot simply remove the value. A replica that missed the delete would still have it, and repair would copy it back. So a delete writes a tombstone: a marker with a timestamp that says this key was deleted. The picture shows the failure anyway. Replica C is down for twelve days. The tombstone is kept for a grace period of ten days, then discarded. When C returns it still holds the value. The others have no tombstone left to contradict it, and repair copies the deleted value back everywhere.
+
+= panel key | REP-14 · Tier B · One level down | The rule, and the queue that tombstones build
+**Rule:** the grace period must exceed the longest time a replica can be away **and** be repaired. A replica away longer is **rebuilt from scratch**, never rejoined.
+**Cost:** tombstones are still read. A queue built as "insert, then delete" on such a store leaves a long run of tombstones that every read must skip, and reads slow down.
+N: The rule follows. The grace period must be longer than the longest time a replica can be away and then be repaired. A replica that was away longer is rebuilt from scratch, never simply rejoined. And tombstones have a cost of their own. They are still read. Build a queue on such a store, insert then delete, and every read skips over a long run of tombstones, and gets slower and slower.
+
+= th | REP-14 · the line to say | A delete is a tombstone kept longer than any outage plus repair. A replica away longer is rebuilt, not rejoined.
+V: A delete is a tombstone, kept for a grace period longer than the longest outage plus repair. A replica that was away longer than that is rebuilt from scratch, or it will resurrect deleted data.
+[pause: 0.8]
+
+## 5.12 Geo topologies
+
+= table | REP-11 · Tier A · The failure | One design, three regions, and the question nobody asked
+@ REP-11
+Question | If nobody decided
+Where do writes go? | Wherever the nearest server is: conflicts
+What does a user in the far region read? | A follower: their own write, missing
+What happens when a region is lost? | Someone decides, during the incident
+N: Replication across regions fails at the decisions nobody made. Draw three regions with the same boxes in each, and an interviewer asks three questions. Where do writes go? If nobody decided, wherever the nearest server is, and now there are conflicts. What does a user in the far region read? A follower, which does not yet have their own write. And what happens when a region is lost? Someone decides, at three in the morning, during the incident. The topology is the set of answers to those three questions, given in advance.
+
+= table | REP-11 · Tier A · The mechanism | Four topologies, by where writes go
+Topology | Writes go to | Far reads | Region loss
+One leader region, followers elsewhere | The leader region | Local, stale by the lag | Promote a follower region; lose the lag
+Each entity homed to a region | The entity's home | Local copy, stale; or forward to home | That region's entities move home; lose their lag
+Multi-leader, all active | Any region | Local, fresh for local writes | Others carry on; conflicts to resolve
+Consensus across regions (part 3) | The leader, committed on a majority of regions | Leader, or a safe follower read | Nothing lost; writes pay a cross-region round trip
+N: Four topologies, by where writes go. One leader region with followers elsewhere: writes travel to the leader, far reads are local and stale by the lag, and losing the leader's region loses the lag. Each entity homed to a region: the same, per entity, so a regional loss only affects the entities it owned. Multi-leader, all active: writes anywhere, conflicts to resolve. And consensus across regions, from part three: nothing lost on a regional failure, and every write pays a cross-region round trip.
+
+= panel key | REP-11 · Tier A · One level down | The write latency each one costs, in numbers
+Regions 30, 70 and 80 ms apart, as in part 3.
+**One leader region**: far clients pay up to **80 ms** round trip, plus local commit.
+**Homed**: a user writes at home, about **1 ms** to commit, and pays 30 to 80 ms only when away from home.
+**Consensus**: about **30 ms** to the nearest majority, for every write, plus the client's distance to the leader.
+**Multi-leader**: local commit, and an unbounded window in which another region may conflict.
+N: Put numbers on it, with regions thirty, seventy and eighty milliseconds apart as in part three. With one leader region, a far client pays up to eighty milliseconds per write. With homing, a user writes at home in about a millisecond and pays the cross-region trip only when away. Consensus costs about thirty milliseconds on every write, to the nearest majority. Multi-leader commits locally and leaves a window in which another region may write the same thing.
+
+= panel watch | REP-11 · Tier A · The alternative and the price | Choose per data type, not per system
+Most systems mix them: **account balance** on consensus, **user profile** homed, **counters and likes** multi-leader with a CRDT, **catalogue** one leader with followers everywhere.
+The price of mixing is that a single request may touch data with different guarantees. Say which data each screen shows.
+N: The real answer is to choose per type of data, not per system. An account balance on consensus. A user profile homed to the user's region. Counters and likes multi-leader, with a CRDT. A product catalogue with one leader and followers everywhere. The price of mixing is that one screen may show data with different guarantees, so say, for each screen, which data it shows and how stale it can be.
+
+= th | REP-11 · the line to say | The topology answers three questions in advance: where writes go, what far readers see, and what is lost with a region.
+V: For multiple regions I decide three things in advance: where each type of data is written, what a reader in another region sees, and what is lost when a region goes. Usually that means consensus for money, entities homed to a region for user data, and followers for read-mostly data.
+[pause: 0.8]
+
+## 5.13 Snapshot plus log catch-up
+
+= dia | REP-12 · Tier B · The mechanism | A new replica copies a snapshot, then replays the log from the snapshot's position
+@ REP-12
+p5-seed
+N: How does a new replica start? It cannot replay the log from the beginning of time. The leader takes a consistent snapshot, and records the log position the snapshot corresponds to, here position nine hundred. The new replica copies the snapshot, loads it, and then asks for the log from position nine hundred and one onwards, and replays until it has caught up. The one requirement is that the leader still retains the log back to nine hundred. If it has discarded it, the snapshot is useless, and you start again.
+
+= code | REP-12 · Tier B · One level down | A replica two days behind: catch up, or rebuild?
+backlog: 2 days x 5,000 writes a second    = 864 million writes
+replay at 20,000 a second, while 5,000 a second still arrive
+    net progress 15,000 a second  ->  57,600 s  = about 16 hours
+
+rebuild: a 2 TB snapshot at 200 MB a second  = 10,000 s  = about 2.8 hours
+    then replay only what arrived during the copy
+
+and catch-up only works if the log is still retained back 2 days
+N: The probe: a replica is two days behind, catch up or rebuild? Two days at five thousand writes a second is eight hundred and sixty-four million writes. Replaying at twenty thousand a second, while five thousand a second keep arriving, the replica gains fifteen thousand a second, so it needs about sixteen hours. A fresh snapshot of two terabytes at two hundred megabytes a second takes under three hours, plus a short replay. Rebuild. And catching up was only possible at all if the leader had kept two days of log.
+
+= th | REP-12 · the line to say | Seed from a snapshot at a log position, replay from there. Past a point, rebuild is faster than catch-up.
+V: A new or lagging replica loads a snapshot taken at a known log position and replays from there, which needs the log retained back that far. I compare replay time, which is backlog over replay rate minus arrival rate, with rebuild time, and past a point the rebuild wins.
+[pause: 0.8]
+
+## 5.14 RPO, RTO and failover orchestration
+
+= panel trap | REP-13 · Tier A · The failure | A regional failover nobody had the authority to start
+@ REP-13
+The primary region is degraded, not down. Writes succeed slowly, some fail.
+Failing over would lose the replication lag, about 4 seconds of payments. Not failing over keeps a third of requests failing.
+Two teams argue for forty minutes about whose decision it is.
+N: The failure is not technical. The primary region is degraded, not down. Writes succeed slowly and some fail. Failing over would lose the replication lag, about four seconds of payments. Not failing over keeps a third of requests failing. Two teams argue for forty minutes about whose call it is. The outage was forty minutes long because nobody had written down, in advance, how much data the business would trade for how much time.
+
+= tiles | REP-13 · Tier A · The mechanism | Two numbers, decided before the incident
+RPO | recovery point: how much data, in time, may be lost
+RTO | recovery time: how long until service is back
+lag | async RPO is at least the replication lag at failure
+who | names the person, or the automation, allowed to decide
+N: Two numbers. The recovery point objective, RPO, is how much data, measured in time, you may lose. The recovery time objective, RTO, is how long until service is back. With asynchronous replication, the RPO can never be better than the replication lag at the moment of failure. And the fourth tile is what was missing in the story: who is allowed to decide, a named role or an automation, with the condition under which they decide.
+
+= table | REP-13 · Tier A · One level down | Who decides, at each level of failure
+Failure | Decided by | Why
+A node | Automation, in seconds | Frequent, well understood, no data loss with consensus or semi-sync
+A zone | Automation, with a rate limit | Rare; must not cascade into moving everything
+A region, data loss possible | **A named human**, with a runbook and a threshold | Trades data for time; a false failover is itself an outage
+N: Who decides depends on the level. A node failure: automation, in seconds, because it happens often and loses nothing with consensus or semi-sync. A zone: automation with a rate limit, so it cannot cascade into moving everything at once. A region, where failing over may lose data: a named human, with a runbook and a threshold written in advance, such as fail over if errors exceed ten percent for five minutes. A false regional failover is itself an outage, and automation cannot weigh lost payments.
+
+= table | REP-13 · Tier A · The alternative and the price | Each RPO and RTO has a cost
+Target | Needs | Costs
+RPO hours, RTO a day | Backups, restored by hand | Cheap; the restore must be tested
+RPO seconds, RTO minutes | Async replica in another region, warm | A second copy; the lag is the loss
+RPO zero, RTO minutes | Synchronous or consensus across regions | A cross-region round trip on every write
+RPO zero, RTO seconds | Active in several regions on consensus, clients already spread | All of the above, plus capacity for a region's load in the others
+N: Every target has a price. RPO in hours and RTO in a day needs backups, cheap, and a tested restore. Seconds and minutes need a warm asynchronous replica in another region, and the lag is your loss. Zero data loss needs synchronous or consensus writes across regions, so a round trip on every write. And zero loss with recovery in seconds needs all of that, plus spare capacity in the remaining regions for the lost region's load. Ask the business which row it is paying for.
+
+= th | REP-13 · the line to say | RPO and RTO are decided before the incident, with who may fail over and on what threshold. Async RPO is at least the lag.
+V: I agree the recovery point and recovery time with the business before the incident, each with its price. Node and zone failover is automated. A regional failover that may lose data is a named person's decision, against a threshold written in the runbook. And with asynchronous replication, my recovery point is at least the lag.
+[pause: 0.8]
+
+## 5.15 Recap
+
+= list | Recap | What to be able to explain without notes
+- What **async, semi-sync and sync** each lose on failover
+- **Failover in five steps**, and why fencing is one of them
+- Lag **in seconds**, and the **log position** that fixes read-your-writes
+- The **dual-write race**, the **outbox**, and why consumers still deduplicate
+- **Homing** an entity, and three ways to **resolve** a conflict
+- **Merkle-tree** repair in numbers, and **tombstones** against resurrection
+- **Topology** per data type; **RPO, RTO** and who decides
+N: Without notes: what each acknowledgement mode loses. Failover in five steps, including fencing. Lag in seconds, and the log position that fixes reading your own writes. The dual write race, the outbox, and why consumers still deduplicate. Homing an entity, and the three ways to resolve a conflict. Merkle tree repair in numbers, and tombstones. And the topology chosen per type of data, with RPO, RTO and who decides.
+
+## 5.16 Probe drills
+
+= probe | The same key is updated in two regions within 100 ms. Which write survives?
+- With **last writer wins**: the higher timestamp; the other is lost **silently**
+- With **version vectors**: both, as concurrent versions, until a merge
+- Better: **home** the entity, so the second region forwards its write
+C: It depends on the resolution rule, and I would rather not need one. With last writer wins, the higher timestamp survives and the other is silently lost, even if it was really later, under clock skew. With version vectors both survive as concurrent versions until something merges them. My preferred answer is to home the entity to one region, so the second region forwards the write and there is no conflict.
+
+= probe | And who is told?
+- Last writer wins: **nobody**; both users saw success
+- With a merge: the application, or the user, sees both and resolves
+- If someone must be told, the write needed **one leader**; say so in the design
+C: With last writer wins, nobody. Both users were told their write succeeded, and one of them was lost. With version vectors, the application or the user sees both and resolves them, like a conflicting edit dialog. And if the business needs someone to be told before success is reported, then this data needed a single leader, or consensus, and the design should say that.
+
+= probe | A replica is two days behind. Catch up or rebuild?
+- Catch-up time is **backlog over replay rate minus arrival rate**
+- Two days at 5k a second, replay at 20k: **about 16 hours**
+- A 2 TB snapshot at 200 MB a second: **under 3 hours**. Rebuild
+C: I compare the two. Catch-up time is the backlog divided by the replay rate minus the arrival rate. Two days at five thousand writes a second, replayed at twenty thousand, is about sixteen hours. Copying a fresh two terabyte snapshot at two hundred megabytes a second takes under three hours, plus a short replay. So I rebuild. And if the log was not retained for two days, catch-up was never an option.
+
+= probe | A deleted item comes back. What happened?
+- A replica **missed the delete** and returned after the tombstone was purged
+- Or a stale copy elsewhere, a cache or an index, was written back
+- Fix: grace period longer than outage plus repair; rebuild long-absent replicas
+C: Most likely a replica missed the delete, was away longer than the tombstone grace period, and on return repair treated its old value as data the others were missing. The other common cause is a stale copy outside the store, a cache or a search index, being written back. The fixes: a grace period longer than any outage plus repair, rebuilding replicas that were away longer, and never writing derived copies back to the source.
+
+= probe | A user writes, then reads from another region. What do they see?
+- From a follower: possibly **not their write**, for the lag
+- Fix: carry the write's **log position**; the far replica waits, or forwards to the home region
+- Or route the user's reads home for a few seconds after a write
+C: If the far region serves the read from a follower, they may not see their own write until the lag passes. To fix it, the session carries the log position of the user's last write. The far replica serves the read only once it has applied that position, and otherwise waits briefly or forwards the read to the home region. A simpler version routes the user's reads home for a few seconds after any write.
+
+= probe | The primary fails at peak. What did you lose, exactly?
+- Async: **the lag at that moment**, in writes: lag times write rate
+- Plus anything copied to caches or indexes but not to the new leader
+- Saved from the old leader's tail and reconciled, not discarded
+C: With asynchronous replication, I lost the lag at that moment, times the write rate. One second at five thousand writes a second is five thousand acknowledged writes. Plus a subtler loss: anything that reached a cache or an index from the old leader but never reached the new one. I save the old leader's unshipped tail, compare it with the new leader, replay what is safe, and report the rest.
+
+## 5.17 Where this shows up
+
+= table | Where this shows up | What each design problem takes from this part
+Problem | Takes
+Key-value store | Leaderless quorums, hinted handoff, Merkle repair, tombstones
+Payments and ledgers | Semi-sync or consensus; RPO zero; the outbox for every event
+Notification and feed systems | The outbox; consumers that deduplicate
+Multi-region user data | Homing; read-your-writes with a log position
+Data migration | Logical log shipping; snapshot plus catch-up
+N: A key-value store takes the leaderless half: quorums, hinted handoff, Merkle repair and tombstones. Payments take semi-sync or consensus, a recovery point of zero, and the outbox for every event. Notifications and feeds take the outbox and deduplicating consumers. Multi-region user data takes homing and the log position for reading your own writes. And a data migration takes logical log shipping and seeding by snapshot.
+
+= panel note | Read next | Where to go deeper
+DeCandia et al., *Dynamo*: sloppy quorums, hinted handoff, Merkle trees, vector clocks, in one paper.
+Ghemawat et al., *The Google File System*: leases, primaries and chunk version numbers.
+*Designing Data-Intensive Applications*, chapter 11: change data capture and event sourcing.
+*Site Reliability Engineering*, chapter 26, *Data Integrity*. The Google Cloud disaster-recovery planning guide for RPO and RTO.
+N: To go deeper: the Dynamo paper, which puts most of the leaderless half into one design. The Google File System paper, for leases and version numbers. Chapter eleven of Designing Data-Intensive Applications, on change data capture. Chapter twenty-six of the S-R-E book, on data integrity. And the Google Cloud disaster recovery planning guide, for the RPO and RTO vocabulary. Part six partitions the data.

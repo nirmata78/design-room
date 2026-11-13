@@ -1,0 +1,301 @@
+#! title: Coordination services
+#! short: Coordination
+
+= th | System design at Staff depth · Part 4 of 17 | Coordination services | The Chubby model, etcd primitives, leader election with an epoch, locks for efficiency and for correctness, membership, and configuration push.
+N: Part four, coordination services. Part three built a consensus log. This part is about the small, strongly consistent service that almost every large system puts on top of one: the place where leaders are elected, locks are held, members are listed and configuration is published. Interviewers love it, because a shallow answer says lock, and a deep answer says what happens when the holder stops for twenty seconds.
+
+## 4.0 Why this part decides rounds
+
+= panel trap | The opening story | A lock that works until the holder pauses
+A batch job takes a lock so that only one copy rewrites a report. It has worked for a year.
+One night the holder stalls in garbage collection for twenty seconds. Its lock expires. A second copy starts.
+The first wakes up, still certain it holds the lock, and both write the same file.
+N: A batch job takes a lock, so that only one copy rewrites a report. It has worked for a year. One night the holder stalls in a garbage collection pause for twenty seconds. Its lock expires, and a second copy starts, correctly. The first one wakes up, still certain it holds the lock. Both write the same file. Nothing was broken in the lock service. The design asked a lock to provide something a lock alone cannot provide. This part is about the gap between the two.
+
+= panel note | Assumed reading | What this part does not repeat
+Burrows, *The Chubby Lock Service for Loosely-Coupled Distributed Systems*: read it whole, it is short.
+Part 2 of this course: leases and fencing tokens. Part 3: the consensus log underneath.
+This part leaves the paper's design rationale and usage statistics to the paper, and goes to the timeline, the primitives and the patterns.
+N: One reading is assumed: the Chubby paper, which is short enough to read whole. And two earlier parts of this course: leases and fencing tokens from part two, and the consensus log from part three. The paper's design rationale and its usage numbers stay in the paper. Here we walk the session timeline, the primitives, and the four patterns built from them.
+
+= list | Map of the part | Six ideas, in dependency order
+- **The Chubby model**: sessions, KeepAlives, the grace period, sequencers, caches
+- **etcd primitives**: revisions, leases, compare-and-swap, watch
+- **Leader election** as a pattern, with an epoch on every side effect
+- **Locks**: for efficiency, or for correctness
+- **Membership and discovery**, and stale client caches
+- **Configuration distribution**: snapshots, deltas, push with a pull backstop
+N: Six ideas, in order. The Chubby model, as the reference design. Then etcd, as the open counterpart, through its four primitives. Then three patterns built on them: leader election, locks, and membership. And last, configuration distribution, which uses the same machinery for a different job.
+
+## 4.1 The Chubby model
+
+= dia | CON-07 · Tier B · The mechanism | A session is a lease, renewed by KeepAlives, with a grace period on top
+@ CON-07
+p4-chubby-session
+N: Chubby is a cell of five replicas running Paxos, with one elected master. Every client holds a session, and the session is a lease. Read the picture from the left. The client sends a KeepAlive. The master holds the call open and answers shortly before the lease runs out, granting a new lease, twelve seconds by default. The client keeps its own copy of the lease, set a little shorter, to allow for clock drift and the round trip.
+N: If that local copy expires, the client enters jeopardy. It empties its cache and waits, for a grace period of forty-five seconds by default. If the master answers within the grace period, the session is saved. If not, the session is gone, and with it every lock.
+
+= panel key | CON-07 · Tier B · One level down | Four details an interviewer reaches on the second "why?"
+**The client's lease is shorter than the master's.** The client starts its clock when it sends; the master when it receives. So the client always believes it has lost the lease before the master does.
+**Master failover keeps sessions alive.** A new master cannot know old lease times, so it extends every session conservatively, and clients in their grace period reconnect to it.
+N: Four details. First, the client's lease is shorter than the master's, because the client starts counting when it sends and the master when it receives. So the client always gives up first. Second, when the master fails over, the new one cannot know the old lease times, so it extends every session generously, and clients in their grace period simply reconnect.
+
+= panel key | CON-07 · Tier B · One level down | Four details an interviewer reaches on the second "why?"
+**Sequencers**: a lock holder can ask for an opaque string holding the lock name, the mode and a **generation number**, and pass it to the server it writes to. That is a fencing token.
+**Cache invalidation**: before a write completes, the master sends invalidations on the KeepAlive replies and waits until every cache has dropped the entry, or its lease has expired.
+N: Third, sequencers. A holder can ask for a string with the lock name, the mode and a generation number, and hand it to the server it writes to. That is a fencing token. Fourth, caches. A write does not complete until every client cache holding that file has been told to drop it.
+
+= th | CON-07 · the line to say | A session is a lease kept alive by KeepAlives. Jeopardy, then a grace period, then every lock is lost.
+V: In the Chubby model a session is a lease renewed by KeepAlives. When the client's own, shorter copy of the lease expires, it stops trusting its cache and waits through a grace period. If the master does not answer by then, the session and all its locks are gone. And for correctness, the holder passes a sequencer to whatever it writes to.
+[pause: 0.8]
+
+## 4.2 etcd primitives
+
+= code | CON-09 · Tier B · The mechanism | Four primitives, on one revision counter
+@ CON-09
+every write raises one global counter: the revision
+    key "/svc/leader"   create_revision 812   mod_revision 950   version 3   lease 7f2a
+
+lease grant ttl=10s          ->  lease id 7f2a; keys attached to it die with it
+lease keepalive 7f2a         ->  ttl reset; one renewal covers every attached key
+
+txn  if   mod_revision("/svc/leader") == 950
+     then put "/svc/leader" "node-b"
+     else get "/svc/leader"            # compare-and-swap, atomic
+
+watch "/svc/" from revision 951       # every change after 951, in order, none missed
+N: etcd is the open counterpart, and it gives you four primitives on one counter. Every write raises a global revision. Each key records the revision that created it, the revision that last changed it, and how many times it has changed. A lease has a time to live, and keys attached to it are deleted when it expires. One keepalive renews every key on that lease. A transaction compares, then puts or gets, atomically: that is compare and swap. And a watch streams every change after a given revision, in order, with none missed.
+
+= panel key | CON-09 · Tier B · One level down | Watch from a revision is what makes it safe
+A client reads the current state **at revision R**, then watches **from R plus one**. No change can fall between the read and the watch.
+If the client was away so long that history was **compacted** past R, the watch fails, and the client must read the full state again.
+Limits worth knowing: a default storage quota of about **2 GB**, requests of about **1.5 MB**. It is built for metadata, not data.
+N: The detail that matters is how read and watch fit together. A client reads the current state at revision R, then watches from R plus one. No change can fall into the gap between them. If the client was away so long that old history has been compacted, the watch fails, and the client must read the whole state again. Two limits are worth knowing: a default storage quota of about two gigabytes, and requests of about one and a half megabytes. It is a store for metadata.
+
+= th | CON-09 · the line to say | Revisions, leases with a time to live, compare-and-swap transactions, and watches from a revision.
+V: etcd gives me four primitives on one revision counter: leases with a time to live that delete their keys, compare and swap transactions, and watches that resume from a revision so I never miss a change. Everything else, election, locks, membership, is built from those.
+[pause: 0.8]
+
+## 4.3 Leader election as a pattern
+
+= dia | CON-10 · Tier A · The failure | Two nodes both act as leader for a few seconds
+@ CON-10
+p2-pause
+N: Start with the failure, and it is the same picture as in part two. Node A is elected, with a ten second lease. It stalls. The lease expires, and node B is elected, correctly. B starts sending orders to the workers. Then A wakes up. Until it next checks its lease, it believes it is the leader, and it sends orders too. For a few seconds the workers receive instructions from two leaders. Election is easy to get right inside the coordination service. It goes wrong at the edges, in the side effects the leader causes elsewhere.
+
+= dia | CON-10 · Tier A · The mechanism | Win with a compare-and-swap; carry the epoch on everything you do
+p4-election-epoch
+N: The pattern has four steps. Step one: each candidate tries to create the leader key, with its lease attached, only if the key does not exist. One of them succeeds. Step two: the winner reads the key's create revision, here eight hundred and twelve, and uses it as its epoch. Step three: every command it sends, to workers or to storage, carries that epoch. Step four: every receiver remembers the highest epoch it has seen and refuses anything lower. When B wins later, its epoch is higher. A's late commands are refused, however long A was asleep.
+
+= panel key | CON-10 · Tier A · One level down | The leader's own clock, and the order of operations
+**Stop before the lease does.** The leader ends its leadership at grant time plus the lease, minus a margin for drift, counted from when it **sent** the request.
+**Epoch from the coordination service, never from the node.** A revision or a term is ordered by the consensus log, so a new leader can never hold a smaller number.
+**Losers watch, they do not poll.** Each candidate watches the leader key and tries again on its deletion.
+**Step down is a state change, not a log line.** On losing the lease, stop issuing work, finish nothing, and rejoin as a candidate.
+N: One level down, four rules. Stop before the lease does: the leader ends its own leadership at grant time plus the lease, minus a margin for drift, counting from when it sent the request, not when the answer arrived. Take the epoch from the coordination service, never from the node itself, because only the consensus log can promise that a newer leader holds a bigger number. Losers watch the key rather than polling it. And stepping down must actually stop work, not just write a log line.
+
+= table | CON-10 · Tier A · The alternative and the price | Three ways to have one leader, and what each costs
+Approach | Leader is | Safe against a paused leader | Costs
+Lease in a coordination service | Whoever holds the key | Only with an **epoch checked downstream** | A dependency; failover is the lease length, often 10 to 15 s
+Built into the data's own consensus group | The group's Raft leader | Yes, the term fences it | Only works where the work is the log
+Static assignment, with a human to change it | A configured node | Yes, no automatic change | Minutes of downtime on failure
+N: Three ways to get one leader. A lease in a coordination service: general, but it is only safe if the epoch is checked downstream, and failover takes about one lease length, ten to fifteen seconds. Second, if the work is writing to a replicated log, use that log's own leader. Its term already fences it, and no extra service is needed. Third, static assignment with a human to change it. Perfectly safe, and it costs minutes of downtime on failure. Choose by how fast failover must be, and by whether the side effects can check an epoch.
+
+= th | CON-10 · the line to say | Election is a compare-and-swap on a leased key. The epoch from the store goes on every side effect, and receivers reject lower ones.
+V: I elect with a compare and swap on a key that carries a lease. The winner's epoch comes from the store's revision, every side effect carries it, and every receiver rejects a lower one. So a paused former leader can wake up, and do no harm.
+[pause: 0.8]
+
+= panel trap | CON-10 · Tier A · The probe | "Failover takes fifteen seconds. Make it one."
+Shorten the lease, and every garbage-collection pause or slow disk now causes a **false failover**, each one an outage of its own.
+Better: keep the lease, and make the **leaderless interval cheap**. Workers continue the work they already have; only new decisions wait.
+If decisions truly cannot wait, move them into a consensus group whose leader change is already sub-second, and fence with its term.
+N: The probe: failover takes fifteen seconds, make it one. The shallow answer shortens the lease to one second. Then every garbage collection pause and slow disk triggers a false failover, and each one is a small outage. The better answer keeps the lease and makes the interval without a leader cheap. Workers carry on with the work they already hold, and only new decisions wait. If decisions truly cannot wait, put them into a consensus group whose leader change is already fast, and fence with its term.
+
+## 4.4 Locks: for efficiency, or for correctness
+
+= table | CON-11 · Tier A · The failure | Two kinds of lock that look the same in code
+@ CON-11
+Lock taken to | If two holders ever overlap | Example
+Save work | Some work is done twice; the result is still right | Only one worker rebuilds a cache entry
+Protect correctness | Data is corrupted or money moves twice | Only one writer appends to a ledger file
+N: There are two kinds of lock, and they look the same in code. One is taken to save work. If two holders ever overlap, some work is done twice, and the result is still correct. Only one worker rebuilds a cache entry, and on a bad day two do. The other is taken to protect correctness. If two holders overlap, data is corrupted, or money moves twice. The failure in the opening story is a correctness lock built like an efficiency lock. The first question to ask about any lock is which of the two it is.
+
+= dia | CON-11 · Tier A · The mechanism | A majority of independent nodes, and a clock that jumps
+p4-redlock-clock
+N: Here is why the difference matters, using a lock spread over five independent cache nodes, taken by writing a key with an expiry on a majority. Client one writes to nodes one, two and three, and holds the lock. Then node three's clock jumps forward, and its key expires early. Client two writes to nodes three, four and five. It too has a majority. Two clients hold the lock at once.
+N: The same happens with no clock jump at all, if client one pauses for longer than the expiry, as in the opening story. The scheme assumes bounded pauses, bounded drift and bounded network delay, and it gives no fencing token.
+
+= panel key | CON-11 · Tier A · One level down | What a correctness lock is made of
+**A consensus-backed store**, so a grant survives the loss of any minority, and no clock jump on one node can create a second holder.
+**A fencing token** from that store's ordered log, passed with every write.
+**A resource that checks the token** atomically with the write, as a conditional update.
+Without the third, the first two only make the overlap rarer, never impossible.
+N: So what is a correctness lock made of? Three parts. A consensus-backed store, so a grant survives the loss of a minority, and no clock jump on one node can produce a second holder. A fencing token from that store's ordered log, passed with every write. And a resource that checks the token in the same atomic step as the write. The third part is the one people leave out. Without it, the first two only make the overlap rarer. They never make it impossible.
+
+= table | CON-11 · Tier A · The alternative and the price | Pick the cheapest lock that matches the harm
+Need | Use | Price
+Efficiency, rare double work is fine | One cache node, set-if-absent with an expiry | One round trip; lost on node failure, and that is acceptable
+Correctness, the resource can check a token | Consensus store plus fencing token | A few ms per acquire; a dependency that must be highly available
+Correctness, the resource cannot check a token | **Avoid the lock**: a conditional write on the data itself, or a single writer per partition | Redesign; nothing protects you otherwise
+N: Pick the cheapest lock that matches the harm. For efficiency, a single cache node with set if absent and an expiry is enough. If that node dies, you lose the lock and some work is repeated, which you already accepted. For correctness, where the resource can check a token, use a consensus store and a fencing token, at a few milliseconds per acquire. And where the resource cannot check a token, do not use a lock at all. Make the write itself conditional, on a version, or give each partition one writer.
+
+= th | CON-11 · the line to say | Say first whether the lock is for efficiency or for correctness. A correctness lock needs consensus, a fencing token, and a resource that checks it.
+V: First I say whether this lock is for efficiency or for correctness. For efficiency, a single cache node with an expiry is fine. For correctness I need a consensus-backed lock, a fencing token, and a resource that checks the token on every write. Without the check, no lock is safe against a pause.
+[pause: 0.8]
+
+= dia | CON-11 · Tier A · The probe | A thousand clients wait on one lock
+p4-herd
+N: The probe. A thousand clients wait for one lock. On the left, the naive way. Every waiter watches the lock key. When it is released, all thousand wake up and try at once. One wins, nine hundred and ninety-nine fail and watch again. Over a thousand releases that is about half a million wasted attempts. On the right, the fix. Each waiter creates its own key in a queue, ordered by revision, and watches only the key just before its own. A release wakes exactly one waiter.
+N: The better answer adds a question: why do a thousand clients wait on one lock at all? That is usually a work queue, misnamed.
+
+## 4.5 Membership and service discovery
+
+= dia | CON-12 · Tier A · The failure | A client sends traffic to an address that now belongs to someone else
+@ CON-12
+p4-stale-discovery
+N: Membership is the list of who is alive and where. Discovery is how a client finds them. The failure is in the picture. Step one: the client asks the registry for the shard owner and caches the answer, server seven at one address. Step two: server seven dies, and its address is reused by a new server for a different shard. Step three: the registry is updated within seconds. Step four: the client, still trusting its cache, sends a write to the old address. The new server accepts it, because nothing told it the request was meant for someone else.
+
+= dia | CON-12 · Tier A · The mechanism | Register with a lease, publish by watch, verify on connect
+p4-registry
+N: The mechanism has three parts. First, each server registers itself under a key attached to a lease, and renews it. If it dies, the lease expires and the key disappears on its own, with no one cleaning up. Second, clients do not poll. They read the member list at a revision and watch from there, so a change reaches them in about a second. Third, and this is the part that fixes the failure, every request carries what the client believes it is talking to: the shard and the owner's epoch. The server checks it, and refuses a request meant for someone else.
+
+= panel key | CON-12 · Tier A · One level down | How long a dead member stays listed
+**Time to remove** is about the lease length plus the watch delivery delay: with a 10 s lease, about 10 to 12 seconds.
+In that window clients send traffic to a dead member. So clients also keep **their own failure signal**: a connection error or a timeout removes the member from that client's list at once.
+**Many keys, one lease.** A server attaches all its keys to one lease and renews only that, so a hundred thousand servers renew a hundred thousand leases, not millions of keys.
+N: How long does a dead member stay listed? About one lease length plus the time to deliver the watch event. With a ten second lease, ten to twelve seconds. During that window clients will send traffic to a dead member, so each client keeps its own failure signal as well. A connection error or a timeout removes the member from that client's view at once, without waiting for the registry. And for cost, a server attaches all its keys to one lease and renews only that.
+
+= table | CON-12 · Tier A · The alternative and the price | A central registry, or gossip
+ | Central registry on consensus | Gossip membership (part 2)
+View | One agreed list at a revision | Each node's own view; converges in seconds
+Scales to | Tens of thousands of members, watched by many clients | Very large clusters, no central service
+Fails how | Registry down: no changes, clients keep last view | Can disagree for a while; false suspicion under load
+Use when | Ownership must be unique, as for shards | Rough liveness is enough, as for load spreading
+N: The alternative is gossip, from part two. A central registry gives one agreed list at a revision, and scales to tens of thousands of members. If it goes down, nothing changes and clients keep their last view. Gossip has no central service, scales further, and converges within seconds, but different nodes can disagree for a while. So use a registry when ownership must be unique, as when one server owns one shard. Use gossip when rough liveness is enough, as for spreading load.
+
+= th | CON-12 · the line to say | Members register under a lease; clients watch; every request carries the owner and epoch it expects, and the server checks it.
+V: Members register under a lease, so a dead member disappears on its own. Clients watch for changes and also drop a member on their own errors. And because any client cache can be stale, every request carries the shard and epoch it expects, and the server refuses a request meant for someone else.
+[pause: 0.8]
+
+= panel trap | CON-12 · Tier A · The probe | "The registry is down. What breaks?"
+Nothing that is already running should break. Clients keep serving from their **last known member list**.
+What stops: joins, leaves and ownership changes. A new server cannot take traffic; a dead one is removed only by client-side errors.
+Design so the registry is **not on the request path**. If every request reads the registry, its outage is your outage.
+N: The probe: the registry is down, what breaks? The right answer is that nothing already running should break. Clients keep serving from their last known list. What stops is change: a new server cannot be added, and a dead one is removed only by each client's own errors. That holds only if the registry is off the request path. If every request reads the registry, then the registry's outage is your outage. This is static stability, which part thirteen develops.
+
+## 4.6 Configuration distribution
+
+= dia | CON-13 · Tier A · The failure | One bad config value, everywhere, within a minute
+@ CON-13
+p4-config-push
+N: Configuration looks harmless, and it is one of the most common causes of large outages, because it is fast. The picture shows the path. Someone edits a value in the config source. The config service stores it as version forty-two. A push stream delivers it to every server within seconds. If the value is wrong, a timeout set to zero, a feature turned on for everyone, every server is now wrong at the same time. A binary deploy goes out in stages over hours. A config change often goes everywhere in a minute. The mechanism has to put the stages back.
+
+= dia | CON-13 · Tier A · The mechanism | Versioned snapshots, deltas, push with a pull backstop, staged rollout
+p4-config-flow
+N: Follow the mechanism. One: every change produces a new version, and the service keeps a full snapshot plus the deltas between recent versions. Two: servers keep a stream open, and receive each new version as a delta. Three: every few minutes each server also polls, with its current version, as a backstop in case the stream silently broke. Four: each payload carries a checksum, and the server validates it before applying it. Five: the change is applied in stages, a canary group first, then a zone, then the rest, with a health check between stages. Six: if validation or health fails, the server keeps its last known good version.
+
+= panel key | CON-13 · Tier A · One level down | A server that was offline for two hours
+On return it sends **its version**, 31. The service holds deltas back to version 35.
+31 is older than the oldest delta, so the service sends a **full snapshot** at the current version, 42, and the stream resumes from there.
+**How you know it caught up**: each server reports the version it **applied** and a hash of the config it is running. A dashboard of version spread, and an alert when any server is more than a few minutes behind.
+The hash catches a server that says 42 but parsed it differently.
+N: The probe from the brief. A server was offline for two hours. On return it sends its version, thirty-one. The service only holds deltas back to thirty-five. So it sends a full snapshot at the current version, forty-two, and the stream resumes from there. And how do you know it caught up? Each server reports the version it applied, and a hash of the configuration it is actually running. You watch the spread of versions, and alert when any server is more than a few minutes behind. The hash catches a server that claims forty-two but parsed it differently.
+
+= table | CON-13 · Tier A · The alternative and the price | Push, pull, or bake into the release
+Delivery | Freshness | Fails how | Use for
+Push stream, pull backstop | Seconds | Too fast; needs staging | Flags, limits, routing
+Pull every N minutes | N minutes | A thundering herd on the config service; add jitter | Large fleets, slow-moving values
+Baked into the binary | Hours, per release | Slow, but staged by the deploy | Values that must never change in a hurry
+N: Three ways to deliver configuration. Push with a pull backstop gives seconds, and is too fast unless you stage it. Pull every few minutes is simpler, and a large fleet pulling at once is a thundering herd on the config service, so add jitter. And baking values into the binary gives hours, with the deploy's own staging for free. The judgment is to sort values by how fast they must change. Limits and flags go on the stream. A value that must never change in a hurry goes into the release.
+
+= th | CON-13 · the line to say | Config is versioned, pushed with a pull backstop, checksummed, applied in stages, and falls back to last known good.
+V: I treat configuration like code. Every change is a version, delivered by push with a periodic pull as a backstop, checked by checksum before it applies, rolled out in stages with health checks, with last known good as the fallback. And each server reports the version it is running, so I can see who has not caught up.
+[pause: 0.8]
+
+= panel trap | CON-13 · Tier A · The trap | The config service must not be needed to start
+If a server cannot start without reaching the config service, then a config-service outage plus a restart wave is a full outage.
+Each server **persists its last known good config locally** and starts from it, then catches up.
+The same holds for the coordination service: a cold start of everything at once must not need it in the critical path.
+N: The trap. If a server cannot start without reaching the config service, then a config outage combined with a wave of restarts is a full outage. So every server persists its last known good configuration on local disk, starts from it, and catches up afterwards. The same is true of the coordination service in general. A system that cannot start while its coordination service is down has hidden a single point of failure in the boot sequence.
+
+## 4.7 What a coordination service is not
+
+= code | CON-07 · Tier B · Why it is a bad database | The write arithmetic
+one consensus group, one leader: every write is
+    a leader fsync, plus a round trip and fsync on a majority
+    order of 10,000 small writes a second, with batching
+
+a fleet of 50,000 servers, each writing its status once a second
+    = 50,000 writes a second             -> beyond one group
+and 50,000 keys x 20 KB of status        = 1 GB, half the default quota
+
+instead: one lease per server, renewed     -> cheap, not a log write
+         status goes to a metrics or storage system
+N: A coordination service is used for coarse locks and small metadata, and the arithmetic says why. It is one consensus group with one leader, so every write costs a disk sync on the leader and a round trip and sync on a majority. With batching that is on the order of ten thousand small writes a second, as an order of magnitude. Now let fifty thousand servers write their status once a second. That is fifty thousand writes a second, beyond one group, and a gigabyte of state, half the default quota. So keep one lease per server, which is cheap to renew, and send status somewhere built for it.
+
+## 4.8 Recap
+
+= list | Recap | What to be able to explain without notes
+- The **session timeline**: lease, the shorter local lease, jeopardy, grace period, locks lost
+- **Read at a revision, watch from the next one**
+- **Election** with an epoch that every side effect carries
+- **Efficiency** locks versus **correctness** locks, and why a multi-node cache lock is not the second
+- Waiting **without a herd**
+- **Membership** with leases, watches and a check on every request
+- **Config**: versions, deltas, a pull backstop, stages, last known good
+N: Without notes, you should be able to explain the session timeline: the lease, the client's shorter copy, jeopardy, the grace period, and the moment every lock is lost. Reading at a revision and watching from the next. Election with an epoch on every side effect. The two kinds of lock, and why a lock over several cache nodes is not a correctness lock. Waiting without a herd. Membership with leases and a check on every request. And configuration delivered in versions and stages.
+
+## 4.9 Probe drills
+
+= probe | Why is a lock on a cache cluster not enough here?
+- It assumes **bounded pauses, drift and delay**; any one violated gives two holders
+- It hands out **no fencing token**, so the resource cannot reject a late holder
+- For correctness: a consensus store, a token, and a check at the resource
+C: Because it rests on timing assumptions: that a client never pauses longer than the expiry, that clocks do not jump, and that messages arrive in bounded time. Break any one, and two clients hold the lock. And it gives no fencing token, so the resource has no way to reject the late holder. For a correctness lock I want a consensus-backed store, a fencing token, and the check done by the resource on every write.
+
+= probe | Then when is it enough?
+- When the lock is for **efficiency**: a double holder only repeats work
+- When every write is **idempotent or conditional** anyway, so the lock is an optimisation
+- Then even **one node** is enough; five buys little
+C: It is enough when the lock is for efficiency. If two holders only means some work is done twice, a cheap lock is the right choice. It is also enough when the writes are already safe on their own, idempotent or conditional on a version, so the lock just reduces wasted work. And in that case even a single node is fine. Five independent nodes buy very little, because the cost of failure was already acceptable.
+
+= probe | A thousand clients wait on one lock. What happens on release?
+- Naive: all wake, one wins, the rest retry: a **herd** on every release
+- Fix: a queue of keys ordered by revision; each waiter **watches only its predecessor**
+- And ask why: a thousand waiters is usually a **work queue** in disguise
+C: Done naively, every waiter watches the lock key, so each release wakes all of them, one wins and the rest fail and watch again. That is a herd on every release. Instead, each waiter creates its own key in a queue, ordered by revision, and watches only the key just before it. A release wakes exactly one client. And I would ask why a thousand clients wait on one lock. That is usually a work queue that should be a queue.
+
+= probe | A node was offline for two hours. How does its config catch up?
+- It reconnects with **its version**; the service sends deltas, or a **full snapshot** if they no longer reach back
+- It validates the checksum, applies, and resumes the stream
+- Until then it serves from **last known good**, persisted on its disk
+C: It reconnects and sends the version it has. If the service still holds deltas back that far, it sends them. If not, it sends a full snapshot at the current version. The node checks the checksum, applies it, and resumes the stream. Until then it runs on its last known good configuration, which it kept on local disk, so it could start even while the config service was unreachable.
+
+= probe | And how do you know it did?
+- Each node reports the **version applied** and a **hash** of the running config
+- A dashboard of **version spread**; an alert on any node behind by more than a few minutes
+- The hash catches a node that claims the version but parsed it differently
+C: Each node reports the version it has applied, and a hash of the configuration it is actually running. I watch the spread of versions across the fleet and alert when any node has been behind for more than a few minutes. The hash matters because a node can claim the right version and still be running something different, for example after a parse error it silently ignored.
+
+= probe | Your leader election fails over in fifteen seconds. Is that acceptable?
+- Ask what stops during it: **new decisions**, or the **data path**?
+- Keep the lease long enough to ride out pauses; make the leaderless interval **cheap**
+- If the data path stops, move it out from behind the leader
+C: It depends on what stops in those fifteen seconds. If only new decisions wait, scheduling or rebalancing, it is usually fine, and a shorter lease would bring false failovers on every long pause. If the data path stops, the problem is not the lease length, it is that the data path depends on the leader. I would move it out from behind the leader, so workers keep serving what they already own.
+
+## 4.10 Where this shows up
+
+= table | Where this shows up | What each design problem takes from this part
+Problem | Takes
+Lock and election service | All of it, built as the service itself
+Job scheduler | Leader election with an epoch on every launch
+Key-value store | Shard ownership in a registry; the epoch check on every request
+Configuration or feature-flag service | Versions, deltas, staged push, last known good
+Rate limiter | Limits delivered as configuration; nothing on the request path
+N: The lock and election service takes all of it, because it is this service. A job scheduler takes leader election, with the epoch on every launch. A key-value store keeps shard ownership in a registry and checks the epoch on every request. A feature flag service is configuration distribution with a product around it. And a rate limiter receives its limits as configuration, and keeps the coordination service off the request path.
+
+= panel note | Read next | Where to go deeper
+Kleppmann, *How to do distributed locking*: the timing argument and fencing, in full.
+*Designing Data-Intensive Applications*, chapter 9: membership and coordination services.
+*The Site Reliability Workbook*, chapter 14, *Configuration Design and Best Practices*.
+N: To go deeper: Kleppmann's essay How to do distributed locking, for the timing argument in full. Chapter nine of Designing Data-Intensive Applications, on membership and coordination services. And chapter fourteen of the Site Reliability Workbook, on configuration design. Part five turns to replication of the data itself.

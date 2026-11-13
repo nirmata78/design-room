@@ -1,0 +1,423 @@
+#! title: Estimation that changes the design
+#! short: Estimation
+
+= th | System design at Staff depth · Part 1 of 17 | Estimation that changes the design | Constants, load shape, storage, the machine envelope, latency, availability, queueing, fan-out, transfer time, durability, cost.
+N: Part one, estimation. This part is short on theory and long on arithmetic, because that is what the first ten minutes of a design round are. You will be handed a vague problem, and the interviewer will watch one thing: whether a number you produce changes what you draw.
+
+## 1.0 Why estimates decide rounds
+
+= cards c2 | The opening story | Two candidates, the same numbers
+red Candidate one :: "Ten thousand writes a second, two hundred bytes each, about a hundred and seventy gigabytes a day." Then moves on to the diagram.
+grn Candidate two :: The same numbers, then: "**so** a year fits on one machine's disks three times over, the whole key set fits in memory, and the hot path needs no network call."
+> Every estimate ends in the word **so**.
+N: Here is the story this part is built on. Two candidates work out the same numbers. Ten thousand writes a second, two hundred bytes each, about a hundred and seventy gigabytes a day. The first one writes that in a table and starts drawing. The second one adds one sentence. So a year of it fits on one machine's disks, the key set fits in memory, and the hot path needs no network call. Same arithmetic, a different score. An estimate that is never used again is decoration. Every estimate in this part ends in the word so.
+
+= panel note | Assumed reading | What this part does not repeat
+The SRE workbook, chapter 12, *Introducing Non-Abstract Large System Design*, walks one design from a single machine to a planet-wide system with numbers at every step. Read it twice.
+The SRE book, chapter 3, *Embracing Risk*, is where the availability targets in this part come from.
+N: Two chapters are assumed. Chapter twelve of the S-R-E workbook walks one complete design from one machine to a global system, with the arithmetic at every step. This part teaches the individual moves, and that chapter shows them joined together. And chapter three of the S-R-E book explains why an availability target is a product decision and not a point of pride.
+
+= list | Map of the part | Eleven moves, in the order you use them
+- **Size the work**: constants, load shape, storage
+- **Size the machines**: the machine envelope, the latency ladder
+- **Size the risk**: availability, queueing, fan-out, durability
+- **Size the bill**: transfer time, cost
+N: The part has four blocks. First, size the work: the constants you need by heart, the shape of the load, and storage. Second, size the machines: what one server does, and what each kind of operation costs in time. Third, size the risk: availability, queues, fan-out and durability. Last, size the bill: moving data, and paying for it.
+
+## 1.1 Time and size constants
+
+= tiles | EST-01 · Tier A · The failure | Without constants, every estimate needs a calculator you do not have
+@ EST-01
+86,400 | seconds in a day. Use **10⁵**
+12 /s | is 1 million a day
+3 × 10⁷ | seconds in a year
+2¹⁰ ≈ 10³ | so 2³⁰ ≈ 10⁹, a gigabyte
+N: Start with what goes wrong. A candidate is told one hundred million events a day and reaches for long division at the whiteboard. Thirty seconds pass and the result is wrong by a factor of ten. Four constants prevent that. A day is eighty-six thousand four hundred seconds. Call it ten to the fifth. So one million a day is about twelve a second. A year is about thirty million seconds. And two to the tenth is about a thousand, so two to the thirtieth is about a billion.
+
+= table | EST-01 · Tier A · The mechanism | Per-day figures become per-second figures by dropping five zeros
+Per day | Exact per second | With 10⁵ | Error
+1 million | 11.6 | 10 | 14% low
+100 million | 1,157 | 1,000 | 14% low
+1 billion | 11,574 | 10,000 | 14% low
+50 billion | 578,704 | 500,000 | 14% low
+> The rounded figure is always about one seventh low. Say so once, then use it.
+N: The mechanism is one move. To turn a daily figure into a per-second figure, drop five zeros. One hundred million a day becomes one thousand a second. The exact answer is eleven hundred and fifty-seven, so the shortcut is about fourteen percent low, every time, in the same direction. That is fine. An interview estimate needs the right power of ten. Say once that you are rounding down, and carry on.
+
+= table | EST-01 · Tier A · One level down | The sizes of the things you will count
+Thing | Bytes | Why it matters
+A 64-bit integer or timestamp | 8 | Counters, offsets, times
+A UUID | 16 | Random keys; 36 as text
+An IPv4 address | 4 | 16 for IPv6
+A small record with overhead | 100–200 | The default guess for a row
+A log line | 200–500 | Text, repeated fields
+A photo, a minute of video | 2 MB, 50 MB | Blob problems start here
+N: One level down. Counts become bytes only if you know the size of one thing. A timestamp or a counter is eight bytes. A unique identifier of the U-U-I-D kind is sixteen bytes in binary and thirty-six as text, which more than doubles an index if you store it carelessly. A small record is one to two hundred bytes with overhead. A log line is a few hundred. When an interviewer asks why your index is that big, the answer is in this table.
+
+= panel watch | EST-01 · Tier A · The alternative and the price | Precision is not rigour
+Working to three significant figures costs time and adds no information: the inputs are guesses.
+Rounding to a power of ten is fast, but hides a factor of three. When a result lands near a boundary, such as "fits in memory, just", redo that one number carefully.
+N: The alternative is to be precise, and it has a price. Three significant figures take time and mean nothing, because the inputs are guesses. But pure powers of ten can hide a factor of three. So here is the rule. Round freely, until a result lands near a boundary that changes the design. Just fits in memory. Just fits on one machine. Then redo that single number with care, and say that you are doing it.
+
+= th | EST-01 · the line to say | A day is ten to the fifth seconds, so a million a day is about ten a second.
+V: A day is about ten to the fifth seconds, so a million a day is roughly ten a second. I am rounding down by about a seventh, which is fine for sizing.
+[pause: 0.8]
+
+## 1.2 Load shape
+
+= dia | EST-02 · Tier A · The failure | A system sized for the average falls over every evening
+@ EST-02
+p1-load-curve
+N: The failure first. The picture shows one day of traffic. The flat dashed line is the daily average, about twelve hundred requests a second. The curve is what actually arrives. At four in the morning it is a third of the average. At nine in the evening it is three times the average. A system sized for the dashed line is overloaded for six hours of every day. And on the right there is a spike, a product launch or a retry storm, at ten times the average. The average is a number that never happens.
+
+= table | EST-02 · Tier A · The mechanism | Four questions turn one number into a load shape
+Question | Example answer | What it sizes
+Average rate? | 100 M a day, about 1,200 /s | Storage growth, the bill
+Peak to average? | 3× daily, so 3,500 /s | Serving capacity
+Burst? | 10× for minutes, 12,000 /s | Queues, limits, shedding
+Reads to writes? | 100 to 1 | Cache and replica strategy
+> **Design for the peak. Pay for the average. Survive the burst.**
+N: The mechanism is four questions. What is the average rate? That sizes storage growth and the bill. What is the ratio of peak to average? If the interviewer has no number, say three and move on. That sizes serving capacity. How big is a burst, and for how long? That sizes queues, limits and load shedding. And what is the ratio of reads to writes? That decides whether the design is about caches and replicas or about the write path.
+
+= panel key | EST-02 · Tier A · One level down | Why the peak factor is not a constant
+A single-country product follows the sun: peak is 2–3× the average. A global product is flatter: 1.5×.
+An event-driven product, such as ticket sales or a match final, is not a curve at all: 100× for five minutes.
+Internal traffic has its own peaks: batch jobs on the hour, cron at midnight, a cache that restarts cold.
+N: One level down, the peak factor depends on who the users are. A product used in one country follows the sun, and peaks at two or three times the average. A global product is flatter, about one and a half. An event-driven product, a ticket sale or a match final, has no curve at all, only a wall of a hundred times for five minutes. And machines make their own peaks: batch jobs on the hour, scheduled jobs at midnight, a cache that has just restarted cold.
+
+= cards c2 | EST-02 · Tier A · The alternative and the price | Two ways to meet a peak
+Provision for it :: Capacity for 3× sits idle most of the day. Simple, predictable, and you pay about twice what the average needs.
+Absorb and defer it :: Queue what can wait, shed what matters least, scale out when the signal is early enough. Cheaper, and now the queue and the scaler are things that fail.
+> Synchronous user requests are provisioned. Background work is deferred.
+N: There are two ways to meet a peak, and each has a price. You can provision for it. That is simple and predictable, and you pay for capacity that sits idle most of the day. Or you can absorb it: queue what can wait, shed what matters least, and scale out. That is cheaper, and you now own a queue and an autoscaler that can both fail at the worst moment. The usual split is that user-facing requests are provisioned for peak, and background work is deferred.
+
+= th | EST-02 · the line to say | I size serving for the peak, storage for the average, and I say what happens in a burst.
+V: The average is about a thousand a second. I will assume a peak of three times that and size serving for it. Storage follows the average. And for a ten times burst, I will say what queues and what is shed.
+[pause: 0.8]
+
+## 1.3 Storage sizing
+
+= code | EST-03 · Tier A · The mechanism | One chain, from records to machines
+@ EST-03
+events per day        500,000,000
+bytes per event       × 200            = 100 GB a day
+retention             × 730 days       = 73 TB logical
+replication           × 3              = 219 TB raw
+index and metadata    × 1.1            = 241 TB
+keep disks 70% full   ÷ 0.7            = 344 TB provisioned
+8 TB usable per node  ÷ 8              = 43 nodes
+N: Storage sizing is one chain of multiplications, and the failure is skipping links. Follow it down. Five hundred million events a day, at two hundred bytes each, is one hundred gigabytes a day. Keep two years, and that is seventy-three terabytes of logical data. Three replicas make it two hundred and nineteen. Indexes and metadata add a tenth. Disks should not run above seventy percent full, so divide by zero point seven. Three hundred and forty-four terabytes provisioned. At eight terabytes a node, forty-three nodes.
+
+= panel trap | EST-03 · Tier A · The failure | The number most candidates stop at is five times too small
+Logical data: **73 TB**. Provisioned: **344 TB**. The factor between them is 4.7.
+Stopping at the logical figure gives nine machines instead of forty-three.
+N: Here is why the chain matters. The logical figure was seventy-three terabytes. The provisioned figure is three hundred and forty-four. The factor between them is almost five. A candidate who stops at the logical number asks for nine machines and needs forty-three. Replication, index overhead and free space are not details. Together they are most of the answer.
+
+= table | EST-03 · Tier A · One level down | What each multiplier really is
+Multiplier | Typical | It moves when
+Replication | 3× | Erasure coding brings it to about 1.5×
+Index and metadata | 1.1–1.5× | Every secondary index adds a copy of its columns
+Free space | ÷ 0.7 | Compaction and rebuilds need room to work
+Compression | ÷ 2 to ÷ 10 | Text and time series compress; media does not
+Growth | × 2 over the horizon | Size for the end of the period, not the start
+N: One level down, each multiplier has a cause. Replication is three, unless you erasure-code, which part seven covers. Index overhead grows with every secondary index. Free space exists because compaction and replica rebuilds need room to work. Without it, a full disk cannot repair itself. Compression divides, by two for mixed data and up to ten for time series, and by nothing for media. And growth: size for the end of the planning period.
+
+= cards c2 | EST-03 · Tier A · The alternative and the price | Keep it all, or tier it
+Keep everything hot :: One system, one query path. At two years of retention, nine tenths of the bytes are never read and still sit on the expensive tier.
+Tier by age :: Recent data on fast storage, old data compressed or rolled up on cheap storage. A fraction of the cost, and reads of old data are slower and take a second code path.
+N: The alternative to one flat store is tiering by age. Keep everything hot, and you have one system and one query path, but most of the bytes are never read and still sit on fast storage. Tier by age, and old data moves to cheap storage, compressed or rolled up. The bill drops to a fraction. The price is a second read path, slower, for anything old. Ask what the read pattern by age looks like before you choose.
+
+= th | EST-03 · the line to say | Records times bytes times retention, then replication, index, free space. In terabytes and in machines.
+V: Records times bytes times retention gives the logical size. Then I multiply by replication and index overhead and divide by a fill factor, and I state the result twice: in terabytes, and in machines.
+[pause: 0.8]
+
+## 1.4 The machine envelope
+
+= tiles | EST-04 · Tier A · The mechanism | One server, to the nearest power of ten
+@ EST-04
+32–128 | cores
+256 GB–1 TB | memory
+10⁵+ | random reads a second, one flash drive
+100–200 | random reads a second, one spinning disk
+10–100 Gb/s | network
+N: To turn load into a number of machines you need the envelope of one machine. Tens of cores, up to about a hundred. A quarter to one terabyte of memory. A flash drive does more than a hundred thousand random reads a second. A spinning disk does one or two hundred, because a head has to move, though it streams two hundred megabytes a second sequentially. And the network card carries ten to a hundred gigabits a second.
+
+= table | EST-04 · Tier A · The failure | The same load, three answers, depending on what binds
+Workload | Binding limit | One node handles | Nodes for 50,000 /s
+In-memory lookups | CPU | about 100,000 /s | 1, so 3 for redundancy
+Random reads from flash | Drive | about 100,000 /s | 1, so 3 for redundancy
+Random reads from spinning disks | Seeks | about 150 /s a disk | 330 disks
+Requests of 1 MB | Network, 10 Gb/s | about 1,200 /s | 42
+N: The failure is to divide load by a single magic number. Take fifty thousand requests a second. If each is an in-memory lookup, one node does it, and you run three for redundancy. If each is a random read from flash, the same. If each is a random read from spinning disks, at a hundred and fifty seeks a disk you need three hundred and thirty disks. And if each request carries a megabyte, the network binds first: a ten gigabit card moves about twelve hundred of them a second.
+
+= panel key | EST-04 · Tier A · One level down | Find the resource that runs out first
+Compute four numbers per node: requests by CPU, by memory, by disk operations, by network. The smallest one is the node's capacity.
+Then ask which the cluster is sized by: **data** (bytes ÷ disk per node) or **load** (rate ÷ capacity per node). Take the larger count.
+N: One level down. For any node, work out four capacities: by processor, by memory, by disk operations, and by network. The smallest is the real one. Then size the cluster twice. Once by data: total bytes divided by disk per node. Once by load: peak rate divided by capacity per node. Take the larger count, and say which one won, because that tells you what kind of system you are building. A cluster sized by data has idle processors. A cluster sized by load has empty disks.
+
+= cards c2 | EST-04 · Tier A · The alternative and the price | Few big nodes or many small ones
+Few large nodes :: Fewer things to operate, better packing. Losing one of ten removes a tenth of capacity and takes hours to rebuild.
+Many small nodes :: A failure costs one percent and rebuilds in minutes. More coordination, more connections, more per-node overhead.
+N: The alternative is a choice of node size. Few large nodes are easier to run and pack data well. But when one of ten fails you lose a tenth of capacity, and rebuilding eight terabytes takes hours. Many small nodes make each failure cheap and each rebuild quick, and you pay in coordination, connection counts and per-node overhead. A good answer names the rebuild time, because that is the window in which a second failure hurts.
+
+= th | EST-04 · the line to say | One node does about a hundred thousand simple operations a second. I size by data and by load and take the larger.
+V: One node handles on the order of a hundred thousand simple operations a second, and holds a few terabytes. I size the cluster by data and by load, take the larger, and say which resource is the binding one.
+[pause: 0.8]
+
+## 1.5 The latency ladder
+
+= dia | EST-05 · Tier A · The mechanism | Six rungs, each about ten times the one below
+@ EST-05
+p1-latency-ladder
+N: This is the latency ladder, drawn on a scale where each step is a factor of ten. At the bottom, a memory access: about a hundred nanoseconds. A read from a flash drive: about a hundred microseconds, a thousand times slower. A round trip inside one datacentre: about half a millisecond. A seek on a spinning disk: ten milliseconds. A round trip between regions on one continent: tens of milliseconds. And across an ocean: a hundred to a hundred and fifty. Every design is a budget spent on these rungs.
+
+= table | EST-05 · Tier A · The failure | A 200 ms budget spent without counting
+Step | Cost | Running total
+Client to the nearest edge | 20 ms | 20
+Edge to the home region, across an ocean | 120 ms | 140
+Ten service calls in sequence, in one datacentre | 10 × 0.5 ms | 145
+Three lookups on spinning disks | 3 × 10 ms | 175
+One more cross-region call for a consistency check | 120 ms | **295**
+> One arrow on the diagram cost more than everything else combined.
+N: The failure is a budget spent without counting. Say the target is two hundred milliseconds. The client reaches the edge in twenty. The edge reaches the home region across an ocean in a hundred and twenty. Ten service calls in sequence inside the datacentre cost five milliseconds in total, almost nothing. Three disk seeks cost thirty. We are at a hundred and seventy-five, inside the budget. Then someone adds one more cross-region call, and the total is two hundred and ninety-five. One arrow cost more than everything else.
+
+= panel key | EST-05 · Tier A · One level down | Three rules the ladder gives you
+**Wide-area round trips dominate.** Count them first. A design is fast when the common path has zero or one.
+**Sequential calls add; parallel calls take the slowest.** Ten calls in series at 0.5 ms is 5 ms. In parallel it is the worst of ten.
+**Disk seeks are the only local cost that matters.** One seek is twenty datacentre round trips.
+N: The ladder gives three rules. First, wide-area round trips dominate, so count them before anything else. A design is fast when its common path has none, or one. Second, sequential calls add up, and parallel calls cost as much as the slowest one, which matters again when we reach fan-out. Third, inside a datacentre, a seek on a spinning disk is the only cost worth worrying about. One seek is twenty network round trips.
+
+= cards c2 | EST-05 · Tier A · The alternative and the price | Remove the round trip or hide it
+Move the data to the user :: Replicas or caches in each region take the ocean out of the read path. Now the copies can disagree, and writes still travel.
+Hide it :: Answer from local state and reconcile in the background. Fast, and the user can see something that is later corrected.
+N: When a round trip does not fit the budget, there are two alternatives. Move the data to the user: put a replica or a cache in each region, and the read path loses the ocean. The price is that copies can disagree, and writes still travel. Or hide the trip: answer from local state and reconcile in the background. That is fast, and the user may see something that is corrected later. Part two is about exactly what that costs.
+
+= th | EST-05 · the line to say | Memory is nanoseconds, flash microseconds, the datacentre half a millisecond, an ocean a hundred.
+V: Memory is nanoseconds, flash is microseconds, a datacentre round trip is half a millisecond, and an ocean is over a hundred. So I count wide-area round trips on the common path first.
+[pause: 0.8]
+
+## 1.6 Availability
+
+= table | EST-06 · Tier A · The mechanism | Nines as downtime
+@ EST-06
+Availability | Down per year | Down per month
+99% | 3.7 days | 7.3 hours
+99.9% | 8.8 hours | 44 minutes
+99.99% | 53 minutes | 4.4 minutes
+99.999% | 5.3 minutes | 26 seconds
+> Each nine divides the downtime by ten, and costs more than the one before.
+N: Availability is spoken in nines, and each nine is a downtime. Three nines is eight point eight hours a year, or forty-four minutes a month. Four nines is fifty-three minutes a year. Five nines is five minutes a year, twenty-six seconds a month, which is less time than a human needs to read an alert. So five nines means no human is in the recovery path. That single consequence is worth more than the table.
+
+= dia | EST-06 · Tier A · The failure | Three good dependencies make one mediocre service
+p1-series-parallel
+N: Here is the failure. On the left, a request passes through three services in a row, each available ninety-nine point nine percent of the time. The request succeeds only if all three do, so the availabilities multiply. The result is ninety-nine point seven. Twenty-six hours of downtime a year, built from parts that each promised under nine. On the right, the repair: two replicas side by side, each only ninety-nine percent. The request fails only if both fail, so the unavailabilities multiply. One percent of one percent. Ninety-nine point nine nine.
+
+= code | EST-06 · Tier A · One level down | The arithmetic, and the assumption hiding in it
+serial:    0.999 × 0.999 × 0.999        = 0.9970   → 26 hours a year
+five deep: 0.999 ^ 5                    = 0.9950   → 44 hours a year
+parallel:  1 − (0.01 × 0.01)            = 0.9999   → 53 minutes a year
+
+both formulas assume the failures are independent.
+two replicas behind one shared database at 99.9%:
+           0.9999 × 0.999               = 0.9989   → the database is the ceiling
+N: One level down, look at the assumption. Both formulas assume that failures are independent. In practice they rarely are. Put those two replicas behind one shared database that is available ninety-nine point nine percent, and the pair is capped just below that, however many replicas you add. The shared dependency is the ceiling. The same holds for a shared configuration push, a shared network, or one bad release rolled out to both replicas at once.
+
+= cards c2 | EST-06 · Tier A · The alternative and the price | Two ways to raise the number
+Add redundancy :: Works only across independent failure domains: zones, releases, power. Costs capacity, and costs consistency if the copies hold state.
+Remove dependencies :: Make a hard dependency soft: serve stale data, a default, a degraded page. Costs product behaviour, which someone must agree to.
+> A service cannot be more available than its hard dependencies. So have fewer.
+N: There are two ways to raise availability. Add redundancy, which helps only across domains that fail independently: zones, releases, power feeds. It costs capacity, and if the copies hold state it costs consistency. Or remove dependencies. Turn a hard dependency into a soft one by serving stale data, a default, or a degraded page. That costs product behaviour, and someone has to agree to it. A service cannot be more available than its hard dependencies, so the cheapest nine is often a dependency you no longer need.
+
+= th | EST-06 · the line to say | Serial dependencies multiply availability. Redundant ones multiply unavailability, if they fail independently.
+V: Dependencies in series multiply their availabilities, so five at three nines give me two and a half. Redundant copies multiply their unavailabilities, but only if they fail independently. So I look for what they share.
+[pause: 0.8]
+
+## 1.7 Queueing
+
+= dia | EST-08 · Tier A · The failure | Latency does not rise in a straight line
+@ EST-08
+p1-utilisation-curve
+N: This curve is the reason systems that looked fine at lunchtime fall over in the evening. Along the bottom is utilisation, the fraction of time a server is busy. Up the side is the time a request spends in the system, as a multiple of its bare service time. At fifty percent busy, a request takes twice its service time. At eighty percent, five times. At ninety, ten times. At ninety-five, twenty. The line is nearly flat, and then it is nearly vertical. A system at ninety percent has no room for a small surprise.
+
+= code | EST-08 · Tier A · The mechanism | Two formulas, both short enough to remember
+time in system   W = S ÷ (1 − ρ)
+                 S = service time, ρ = utilisation
+   ρ = 0.50   →   2 × S
+   ρ = 0.80   →   5 × S
+   ρ = 0.90   →  10 × S
+   ρ = 0.95   →  20 × S
+
+Little's law     L = λ × W
+                 requests in the system = rate × time each spends
+   1,000 /s × 0.2 s   =   200 in flight
+N: Two formulas. For a single server with random arrivals, the time in the system is the service time divided by one minus the utilisation. That is where the curve comes from: as utilisation approaches one, you divide by something approaching zero. The second is Little's law. The number of requests in the system equals the arrival rate times the time each one spends there. A thousand a second, each taking two hundred milliseconds, means two hundred in flight. That is your thread pool, your connection count and your memory.
+
+= panel key | EST-08 · Tier A · One level down | What the simple formula leaves out, and which way it errs
+Real service times vary more than the model assumes: the curve bends **earlier**.
+Many servers behind one queue bend **later**: at 80% busy, ten servers wait far less than one does.
+A queue per server, with random assignment, behaves like the single-server case. That is why load-balancing policy matters.
+N: One level down. The formula is for the simplest case, so know which way reality differs. Real service times vary more than the model assumes, with occasional slow requests, and that bends the curve earlier. Many servers sharing one queue bend it later: at eighty percent busy, ten servers behind one queue wait far less than a single server does. But a separate queue per server, fed at random, behaves like the bad case again. That is why the choice of load-balancing policy, in part eleven, is a latency decision.
+
+= cards c2 | EST-08 · Tier A · The alternative and the price | Headroom or a bounded queue
+Run at 50–70% :: Latency stays flat and a burst is absorbed. You pay for capacity that looks idle on every dashboard.
+Run hot, bound the queue :: Cheap. Past the bound, requests are rejected fast instead of waiting slowly. Now you need a rejection the caller can handle.
+> An unbounded queue turns overload into latency, then into timeouts, then into retries.
+N: The alternatives. Run at fifty to seventy percent, and latency stays flat and bursts are absorbed. You pay for capacity that looks idle on every dashboard, and you will be asked to justify it. Or run hot and bound the queue. That is cheap, and beyond the bound a request is rejected quickly instead of waiting slowly. Then the caller needs a rejection it can handle. What you must not have is an unbounded queue. It turns overload into latency, latency into timeouts, and timeouts into retries.
+
+= th | EST-08 · the line to say | Past seventy to eighty percent utilisation, latency grows without limit, so I size for headroom.
+V: Time in the system is service time over one minus utilisation, so at ninety percent a request takes ten times longer. I size for about seventy percent at peak, and I bound every queue.
+[pause: 0.8]
+
+## 1.8 Fan-out and tail latency
+
+= dia | EST-09 · Tier B · The mechanism | One request, a hundred leaves, and the slowest one sets the time
+@ EST-09
+p1-fanout
+N: A request arrives at a root server, which asks a hundred leaf servers in parallel and waits for all of them. Each leaf is fast ninety-nine times in a hundred, and slow once. The root is as slow as its slowest leaf. So the question is: what is the chance that at least one of a hundred is slow? It is one minus the chance that all are fast. Ninety-nine percent, to the power of a hundred, is thirty-seven percent. So sixty-three percent of user requests are slow.
+
+= table | EST-09 · Tier B · One level down | The leaf latency you need for the user latency you promised
+Leaves per request | Leaf percentile needed for a user p99
+1 | p99
+10 | p99.9
+100 | p99.99
+1,000 | p99.999
+> With fan-out, the user's tail is the leaves' extreme tail. Average leaf latency tells you nothing.
+N: One level down, turn the formula around. If you promise the user a ninety-ninth percentile, and each request touches a hundred leaves, each leaf must meet that time at its ninety-nine point nine nine percentile. One in ten thousand. With a thousand leaves, one in a hundred thousand. So a service with fan-out has to measure and manage the extreme tail of its leaves. The average tells you nothing. The cures are in part thirteen: hedged requests, and answering without the slowest few.
+
+= th | EST-09 · the line to say | With a hundred parallel calls, a one percent slow leaf makes sixty-three percent of requests slow.
+V: The chance that any of N parallel calls is slow is one minus the chance that all are fast. For a hundred leaves at one percent, that is sixty-three percent. So I care about the leaves' extreme tail, and I will hedge or drop the slowest.
+[pause: 0.8]
+
+## 1.9 Bandwidth and transfer time
+
+= code | EST-10 · Tier B · The mechanism | Bytes times eight, divided by the link
+@ EST-10
+100 PB  =  10^17 bytes  =  8 × 10^17 bits
+link       100 Gb/s     =  10^11 bits a second
+time    =  8 × 10^17 ÷ 10^11   =  8 × 10^6 seconds   =  93 days
+
+1 PB at a sustained 1 GB/s (8 Gb/s)   =  10^6 seconds   =  11.6 days
+re-replicating one lost 8 TB node at 200 MB/s          =  11 hours
+N: Moving data takes time that people forget to compute. Bytes times eight, divided by the link rate. One hundred petabytes is eight times ten to the seventeenth bits. A hundred gigabit link carries ten to the eleventh bits a second. That is eight million seconds. Ninety-three days, with the link saturated and nothing else using it. One petabyte at a gigabyte a second takes eleven and a half days. And rebuilding one lost eight terabyte node at two hundred megabytes a second takes eleven hours.
+
+= panel key | EST-10 · Tier B · One level down | What the transfer time decides
+**Migrations**: the change stream must be retained for at least as long as the bulk copy runs. A twelve-day copy needs a twelve-day log.
+**Repair**: the rebuild time is the window in which another failure causes loss. It feeds the durability sum directly.
+**Cross-region replication**: the write rate times the record size must fit the link, with room to catch up after an outage.
+N: The transfer time decides three things. In a migration, the stream of changes has to be kept at least as long as the bulk copy runs, so a twelve day copy needs a twelve day log. In repair, the rebuild time is the window in which a second failure loses data, and it goes straight into the durability sum. And for replication between regions, the write rate times the record size has to fit the link, with room left to catch up after an outage.
+
+= th | EST-10 · the line to say | A hundred petabytes over a hundred gigabits is three months. So I keep the change log at least that long.
+V: Transfer time is bytes times eight over the link rate. A hundred petabytes over a hundred gigabits a second is about three months. So the copy is a project, and the change log has to outlive it.
+[pause: 0.8]
+
+## 1.10 Durability
+
+= code | EST-07 · Tier B · The mechanism | Failures are a daily rate, and loss needs several inside one repair window
+@ EST-07
+fleet                         75,000 disks
+annual failure rate           × 1.5%            = 1,125 a year  ≈ 3 a day
+
+one disk failing inside a 6-hour repair window:
+           0.015 × 6 ÷ 8,760                    ≈ 0.00001      (one in 100,000)
+
+3 copies:    data is lost if 2 more specific disks fail in the window
+RS(6,3):     data is lost if 3 more of the 8 other fragments fail in the window
+N: Durability starts from a rate. Seventy-five thousand disks, at one and a half percent failing a year, is eleven hundred failures a year. About three a day, every day. So disk failure is the steady state. Data is lost only when enough further failures land on the same data before the first is repaired. The chance that one given disk fails inside a six hour repair window is about one in a hundred thousand. Loss needs two or three of those at once, on the right disks.
+
+= panel key | EST-07 · Tier B · One level down | The two levers, and the assumption that breaks both
+**Repair time**: with a scheme that survives *k* further losses, halving the repair window cuts the loss probability by about 2ᵏ.
+**Tolerated losses**: each extra one multiplies the probability by about one in 100,000.
+Both assume independent failures. A rack losing power takes every disk in it at once, so copies must sit in different racks and zones, or the sum is fiction.
+N: There are two levers. Repair time: if the scheme survives several further losses, halving the repair window cuts the chance of loss many times over. And the number of losses tolerated: each extra one multiplies the chance by roughly one in a hundred thousand. But both rest on independent failures. A rack that loses power takes every disk in it together. If two copies sit in one rack, the sum is fiction. So durability numbers are only as good as the placement behind them, which is part six.
+
+= th | EST-07 · the line to say | Failure rate times fleet size is failures per day. Loss depends on repair time and on how many losses the encoding survives.
+V: At one to two percent a year, a fleet of seventy-five thousand disks loses about three a day. Whether that loses data depends on how fast I repair, how many simultaneous losses the encoding survives, and whether the copies can fail together.
+[pause: 0.8]
+
+## 1.11 Cost
+
+= table | EST-12 · Tier B · The mechanism | The overhead factor is the first cost decision
+@ EST-12
+For 1 PB of logical data | Raw storage | Monthly cost, at an assumed $20 per raw TB
+3 copies | 3 PB | $60,000
+Reed–Solomon 6 + 3 | 1.5 PB | $30,000
+The same, on a cold tier at a quarter of the price | 1.5 PB | $7,500
+> The prices are assumptions for the arithmetic. The ratios are the point.
+N: Cost is the estimate a manager will be asked about, so do it once. Take one petabyte of logical data, and assume twenty dollars a month for a raw terabyte. The price is an assumption, and the ratios are what matter. Three copies need three petabytes raw: sixty thousand dollars a month. An erasure code with six data and three parity fragments needs one and a half: thirty thousand. Move it to a cold tier at a quarter of the price: seven and a half thousand.
+
+= panel key | EST-12 · Tier B · One level down | Name the largest line, and the lever that moves it
+Every design has one dominant cost: **storage** for logs and blobs, **memory** for caches, **compute** for processing, **network egress** for anything that serves media or replicates across regions.
+Name it, then name the lever: encoding and tiering, hit ratio, batching, keeping traffic in the region.
+N: One level down. Every design has one cost that dominates the rest. For logs and blobs it is storage. For a cache it is memory. For a pipeline it is compute. For anything that serves media, or replicates between regions, it is network traffic leaving the region. A Staff answer names the largest line, and then the lever that moves it. Encoding and tiering. Hit ratio. Batching. Keeping traffic inside the region.
+
+= th | EST-12 · the line to say | The biggest cost here is storage, and the lever is the overhead factor: three times, or one and a half.
+V: The biggest line in this design is storage. Three copies cost three times the logical size, an erasure code about one and a half. So for cold data I would encode, and I would tier by age.
+[pause: 0.8]
+
+## 1.12 Recap
+
+= list | Recap | What to be able to do without notes
+- Turn **per day into per second** by dropping five zeros
+- Ask for **average, peak, burst, read to write**, and size serving for the peak
+- Run the **storage chain** to machines, not to terabytes
+- Find the **binding resource** of a node; size by data and by load
+- Count **wide-area round trips** before anything else
+- **Multiply** availabilities in series; look for what redundant copies **share**
+- Keep utilisation near **70%**, and bound every queue
+N: Before the drills, here is what you should be able to do with no notes. Turn a daily figure into a per-second one. Ask the four load questions and size for the peak. Run the storage chain all the way to a number of machines. Find the resource that binds on one node. Count wide-area round trips first. Multiply availabilities in series, and look for what redundant copies share. And keep utilisation near seventy percent with every queue bounded.
+
+## 1.13 Probe drills
+
+= probe | Your cache hit ratio falls from 99 percent to 95. What happens to the database?
+- Misses go from **1% to 5%** of reads: database load is **five times** higher
+- At 1 M reads a second: 10,000 /s becomes 50,000 /s
+- If the database was at 30% utilisation, it is now past saturation
+> A four-point drop in hit ratio is a fivefold rise in backend load.
+C: The database sees the misses, so I look at the miss ratio. It goes from one percent to five percent, which is five times the load. At a million reads a second, that is ten thousand a second becoming fifty thousand. If the database was running at thirty percent, it is now beyond saturation, and from the queueing curve, latency there is no longer bounded.
+
+= probe | Which number would you alarm on?
+- The **miss rate in requests per second** reaching the database, against its known capacity
+- Not the hit ratio: 99% and 98% look alike on a chart and differ by 2×
+C: I would alarm on the absolute miss rate reaching the database, in requests a second, compared with the capacity I measured for it. I would not alarm on the hit ratio itself. Ninety-nine and ninety-eight look the same on a chart, and they are a factor of two apart in backend load.
+
+= probe | This service calls five others on every request. What is its availability?
+- If all five are hard dependencies at 99.9%: 0.999⁵ ≈ **99.5%**, about 44 hours a year
+- Its own failures come on top
+- To promise 99.9%, each dependency needs about 99.98%, or some must become soft
+C: If all five are hard dependencies at three nines each, they multiply. That is ninety-nine point five percent before my own failures, about forty-four hours a year. So I cannot promise three nines on top of five three-nine dependencies. Either each one has to be nearer ninety-nine point nine eight, or I make some of them soft, with a default or a stale answer when they fail.
+
+= probe | And if two of those five share one database?
+- Their failures are no longer independent: when the database is down, both are
+- That **helps** the serial sum slightly, since it is one failure instead of two
+- It **breaks** any redundancy between them: a fallback from one to the other is worth nothing
+C: Then those two fail together. For the serial sum that is slightly better, since it is one failure instead of two. But it breaks any redundancy I was counting on. If my plan was to fall back from one to the other, the fallback is worth nothing, because the event that takes the first away takes the second with it. So I would ask what else is shared: the database, the configuration, the release train.
+
+= probe | You may ask me for one number. Which one?
+- The **peak rate of the dominant operation**, with its size
+- It sets the machine count, shows whether memory or disk binds, and whether one node is enough
+- Second choice: the latency target, because it decides how many wide-area round trips are allowed
+C: The peak rate of the dominant operation, with the size of one item. From that I get the machine count, I see which resource binds, and I learn whether this is a one machine problem that I am over-thinking. If I am allowed a second number, it is the latency target, because that tells me how many wide-area round trips the common path may contain.
+
+= probe | You sized forty-three nodes. I give you a budget for twenty. What changes?
+- Find the largest multiplier in the chain: **replication at 3×**
+- Erasure-code data older than a month: about 1.5× on most of the bytes
+- Or cut retention on the hot tier and roll old data up
+- Say what is given up: slower reads and repairs of old data
+C: I go back to the chain and find the largest multiplier, which is replication at three times. Most of the bytes are old and rarely read, so I would erasure-code everything older than about a month, which brings that data down to one and a half times. If that is not enough, I shorten retention on the hot tier and keep roll-ups. And I would say what we give up: reads and repairs of old data get slower.
+
+## 1.14 Where this shows up
+
+= table | Where this shows up | Every design problem starts in this part
+Problem | The estimate that steers it
+Distributed cache | Hit ratio against backend capacity; memory per node
+Blob storage | The storage chain; failures a day; repair time
+Monitoring | Samples a second times bytes; series in memory
+Job scheduler | Jobs a day against the burst on the hour
+Data migration | Transfer time against log retention
+Key-value store | Nodes by data against nodes by load
+N: Every design problem opens with this part, and each has one estimate that steers it. For a cache, the hit ratio against what the backend can take. For blob storage, the storage chain, failures a day and repair time. For monitoring, samples a second times bytes. For a scheduler, the burst on the hour. For a migration, transfer time against log retention. For a key-value store, whether data or load sets the node count.
+
+= panel note | Read next | Where to go deeper
+*Designing Data-Intensive Applications*, chapter 1: describing load and describing performance, including why percentiles and not averages.
+Dean and Barroso, *The Tail at Scale*: where the fan-out arithmetic comes from, and what to do about it.
+The SRE workbook, chapter 12, again, now with a pencil: redo its numbers before reading its answers.
+N: To go deeper, read chapter one of Designing Data-Intensive Applications for load and percentiles, and the paper The Tail at Scale for fan-out. Then go back to chapter twelve of the S-R-E workbook with a pencil, and work out each number before you read the answer. Part two is next: consistency, time and failure.

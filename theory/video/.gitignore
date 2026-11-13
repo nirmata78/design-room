@@ -1,0 +1,3 @@
+# Companion build products (course.py companion → build-sd-booklet.sh); the PDF is ignored by the root *.pdf rule
+companion/diagrams/
+companion/video/

@@ -1,0 +1,498 @@
+#! title: Logs, queues, streams and sketches
+#! short: Streams
+
+= th | System design at Staff depth · Part 10 of 17 | Logs, queues, streams and sketches | Queue versus log, inside a partitioned log, replication, consumer groups, delivery semantics, ordering, redelivery, lag, fan-out, windows and watermarks, state, schemas, and three sketches.
+N: Part ten, logs, queues and streams. Almost every large design moves work through some kind of message channel, and the interviewer's favourite question about it is three words long: exactly once, really? This part answers it by showing where the duplicate is created and where it dies. Then it goes on to ordering, lag, time, and the small probabilistic structures that count things in streams.
+
+## 10.0 Why this part decides rounds
+
+= panel trap | The opening story | The consumer crashed between two lines of code
+A consumer reads a batch of payments from the log, writes each one into the ledger, then commits its position.
+It crashes after the ledger write and before the commit.
+On restart it reads from the last committed position, and writes the same payments **again**. The broker did exactly what it promised.
+N: A consumer reads a batch of payments from the log, writes each one into the ledger, and then commits its position in the log. It crashes after the ledger write, and before the commit. When it restarts, it reads from the last committed position, which is before that batch, and writes the same payments into the ledger again. The broker did exactly what it promised. It delivered at least once. The duplicate was created by the gap between two lines of the consumer's code, and only the consumer can close it.
+
+= panel note | Assumed reading | What this part does not repeat
+*Designing Data-Intensive Applications*, chapter 11.
+Part 2 of this course: idempotency and exactly-once, ordering guarantees. Part 5: change data capture and the outbox.
+The chapter's stream joins and its survey of brokers stay there.
+N: Chapter eleven of Designing Data-Intensive Applications is assumed, and three earlier sections of this course: idempotency and ordering from part two, and change data capture from part five. Stream joins and the survey of brokers stay in the book.
+
+= list | Map of the part | Four groups
+- **The channel**: queue versus log, inside a partition, replication, consumer groups
+- **The guarantees**: delivery semantics, ordering, acknowledgements and dead letters, lag
+- **Shapes of work**: delayed and priority delivery, fan-out
+- **Streams**: event time and watermarks, state, Lambda and Kappa, schemas, and three sketches
+N: Four groups. The channel itself: queue or log, what a partition is inside, how it is replicated, how consumers share it. The guarantees: delivery, ordering, redelivery and lag. Two shapes of work: delayed delivery and fan-out. And stream processing: time, state, architecture, schemas, and three sketches that count in a stream.
+
+## 10.1 Queue versus log
+
+= table | MSG-01 · Tier A · The failure | A queue, and the second consumer that arrived later
+@ MSG-01
+Month | Need | With a queue
+1 | Send each order to fulfilment | Works: each message consumed, then deleted
+4 | Analytics wants the same orders | A second queue, and every producer must publish twice
+6 | A bug corrupted a week of fulfilment | **Cannot replay**: the messages were deleted on acknowledgement
+N: A team sends each order to fulfilment through a queue. It works: each message is consumed and deleted. In month four, analytics wants the same orders. Now every producer publishes twice, to two queues. In month six a bug corrupts a week of fulfilment, and the fix needs the week's orders again. They are gone, because a queue deletes a message when it is acknowledged. Nothing was wrong with the queue. The need had changed from distributing work to recording events.
+
+= dia | MSG-01 · Tier A · The mechanism | Delete on acknowledgement, or keep and track a position
+p10-queue-log
+N: The picture shows the two models. On the left, a queue. Messages wait, any free worker takes the next one, and acknowledges it, and the queue deletes it. Workers compete, each message is handled by one of them, and the queue tracks each message's state. On the right, a log. Messages are appended and kept for a retention period. Nothing is deleted on read. Each consumer group keeps its own position, an offset, and two groups read the same messages independently. Rewind a group's offset, and it replays.
+
+= panel key | MSG-01 · Tier A · One level down | What each tracks, and so what each can do
+**A queue tracks every message**: delivered, acknowledged, deadline. So it can redeliver one message, delay one, dead-letter one, and scale workers freely, with no ordering.
+**A log tracks one number per partition per group**. So it is cheap, ordered within a partition, and replayable, and one slow message **blocks** the partition behind it.
+N: One level down: what each tracks. A queue tracks every message: delivered, acknowledged, its deadline. So it can redeliver, delay or dead-letter one message, and scale workers freely, with no ordering. A log tracks one number per partition per consumer group. So it is cheap, ordered within a partition, and replayable, and one slow or poisonous message blocks everything behind it in its partition.
+
+= table | MSG-01 · Tier A · The alternative and the price | Choose by what the messages are
+Messages are | Use | Because
+Tasks to be done once each, of varying cost | Queue | Per-message acks, redelivery, dead letters, free scaling
+Events that several consumers need, in order | Log | Independent positions, replay, order per key
+Both | Log as the record; a queue per task-like consumer, fed from it | Each gets the semantics it needs
+N: So choose by what the messages are. Tasks to be done once each, of varying cost: a queue, for per-message acknowledgement and dead letters. Events that several consumers need, in order: a log, for independent positions and replay. And often both. The log is the record of what happened, and a task-like consumer feeds a queue from it.
+
+= th | MSG-01 · the line to say | A queue tracks each message and deletes it on acknowledgement; a log keeps everything and each consumer tracks a position.
+V: A queue tracks each message and deletes it once acknowledged, which suits tasks done once each. A log keeps messages for a retention period and each consumer group tracks its own offset, which suits events that several consumers need in order, and allows replay.
+[pause: 0.8]
+
+## 10.2 Inside a partitioned log
+
+= dia | MSG-02 · Tier B · The mechanism | Segments, offsets, a sparse index, and retention by whole files
+@ MSG-02
+p10-segments
+N: A topic is split into partitions, and each partition is one ordered log on disk. In the picture, a partition is a sequence of segment files, each about a gigabyte. Messages are appended to the active segment, and each gets the next offset. Beside each segment sits a sparse index: every four kilobytes or so, an offset and its byte position. To read from offset five million and forty, find the segment, binary-search its index, and scan forward a few kilobytes. Retention deletes whole old segments, which is one file deletion, not millions of record deletions.
+
+= panel key | MSG-02 · Tier B · One level down | Compaction by key: the log as a table
+A **compacted** topic keeps, for each key, only the **latest** value. Older records with the same key are removed in the background; a record with an empty value is a **tombstone** that deletes the key.
+So a new consumer reading from the start rebuilds the **current state** of every key, without the full history.
+Use it for state: user settings, a configuration table, a changelog of a stream processor's state.
+N: One level down: compaction by key. A compacted topic keeps, for each key, only the latest value. Older records with the same key are removed in the background, and a record with an empty value is a tombstone that deletes the key. So a new consumer reading from the beginning rebuilds the current state of every key without reading the whole history. That makes the log usable as a table: user settings, configuration, or the changelog of a stream processor's state.
+
+= th | MSG-02 · the line to say | A partition is segment files with a sparse offset index; retention deletes whole segments; compaction keeps the latest value per key.
+V: Each partition is an append-only sequence of segment files with a sparse index from offset to file position. Retention deletes whole segments by age or size, and a compacted topic keeps only the latest value per key, so it doubles as a table.
+[pause: 0.8]
+
+## 10.3 Log replication
+
+= dia | MSG-03 · Tier B · The mechanism | Followers fetch; the high watermark is what all in-sync replicas hold
+@ MSG-03
+p10-isr
+N: Each partition has a leader and followers, which fetch from the leader. The in-sync replicas are the leader plus the followers that have caught up recently, within a time limit. The high watermark is the highest offset that every in-sync replica holds. In the picture the leader has up to offset one hundred and twelve, follower one up to one hundred and ten, follower two up to one hundred and eight. The high watermark is one hundred and eight. Consumers only see messages up to the high watermark, so they never read a message that could still be lost.
+
+= table | MSG-03 · Tier B · One level down | What "acknowledged" means under each setting
+Producer waits for | Survives | Lost when
+The leader only | Nothing beyond the leader's disk | The leader dies before followers fetch
+All in-sync replicas, minimum 2 of 3 | Any one broker | Two brokers die together; or the in-sync set shrinks to one and it dies
+All in-sync, and **unclean election** allowed | — | An out-of-date replica becomes leader: **acknowledged messages gone**
+N: What does acknowledged mean? If the producer waits only for the leader, a message is lost if the leader dies before any follower fetched it. If it waits for all in-sync replicas, with a minimum of two out of three, any one broker can die. And here is the data-loss case. If the in-sync set has shrunk to just the leader, and the leader dies, the system must choose: wait for it, unavailable, or elect an out-of-date replica, and lose acknowledged messages. Allowing that unclean election trades durability for availability. Say which you chose.
+
+= th | MSG-03 · the line to say | Acknowledge after all in-sync replicas, with a minimum of two, and never allow an out-of-date replica to lead.
+V: For durability, the producer waits for all in-sync replicas with a minimum of two in sync, and consumers read only up to the high watermark. If the last in-sync replica dies, I would rather be unavailable than elect an out-of-date leader and lose acknowledged messages.
+[pause: 0.8]
+
+## 10.4 Consumer groups
+
+= dia | MSG-04 · Tier B · The mechanism | Partitions are divided among the consumers of a group
+@ MSG-04
+p10-group
+N: A consumer group shares the work of a topic. Each partition is assigned to exactly one consumer in the group, so order within a partition is kept, and the work is split. In the picture, six partitions and three consumers, two partitions each. Add a fourth consumer, and the group rebalances to two, two, one and one. Add a seventh, and it sits idle, because there are only six partitions. The partition count is the ceiling on a group's parallelism, so it is chosen for the peak, up front.
+
+= panel watch | MSG-04 · Tier B · The price | What a rebalance costs
+In the classic protocol, a rebalance **stops every consumer** in the group, revokes all partitions, and reassigns them.
+Each partition then restarts from its **last committed offset**: work since then is redone.
+Cooperative rebalancing moves only the partitions that change owner; static membership avoids a rebalance on a quick restart.
+N: The price is the rebalance. In the classic protocol, a rebalance stops every consumer in the group, revokes all partitions and reassigns them, and each partition restarts from its last committed offset, so any work since then is redone. A deploy that restarts consumers one by one can trigger a rebalance for each. Cooperative rebalancing moves only the partitions that change owner, and static membership lets a consumer restart quickly without one.
+
+= th | MSG-04 · the line to say | One consumer per partition within a group; the partition count caps parallelism; a rebalance pauses work and replays from the last commit.
+V: A consumer group gives each partition to one consumer, so the partition count caps parallelism and I choose it for peak. A rebalance pauses work and replays from the last committed offset, so I use cooperative rebalancing and commit often enough that the replay is small.
+[pause: 0.8]
+
+## 10.5 Delivery semantics
+
+= table | MSG-05 · Tier A · The failure | Three orderings of two steps, three outcomes
+@ MSG-05
+Consumer does | Crash in between | Result
+Commit offset, then process | After the commit | The message is **never processed**: at most once
+Process, then commit offset | After processing | Processed **twice**: at least once
+Process and commit **atomically** | Impossible to be in between | Processed once in effect
+N: Delivery semantics are about the order of two steps in the consumer. Commit the offset, then process: a crash in between means the message is never processed. That is at most once. Process, then commit: a crash in between means it is processed twice. That is at least once, and it is the opening story. The only way to get once is to make processing and committing a single atomic step, or to make the second processing harmless. No broker setting can do that for you, because the side effect is in your sink.
+
+= dia | MSG-05 · Tier A · The mechanism | The duplicate dies in the sink's transaction
+p10-sink-txn
+N: The first correct construction. The consumer reads a batch at offsets one hundred to one hundred and nine. It opens a transaction in the sink, the ledger database. Inside that one transaction it writes the ten payments, and it writes its own position, offset one hundred and ten, into a table in the same database. Then it commits. On restart, it reads its position from the sink, not from the broker. Crash anywhere, and either the payments and the position are both there, or neither is. The duplicate never happens.
+
+= panel key | MSG-05 · Tier A · One level down | The other construction: replay into a sink that overwrites
+**Checkpoint and replay**: the processor periodically checkpoints its state together with the input offsets. After a crash it restores the state and rewinds the input to those offsets, so it **recomputes** the same outputs.
+The sink must make a repeated output harmless: an **upsert by a deterministic key**, such as (account, window start), or a transactional write committed with the checkpoint.
+Either way the rule is the same: **dedup where the effect lands**, keyed by something stable.
+N: The second construction is checkpoint and replay. The processor periodically checkpoints its state together with the input offsets. After a crash it restores that state and rewinds the input to those offsets, so it recomputes exactly the same outputs. Then the sink must make a repeated output harmless: an upsert by a deterministic key, such as the account and the window start, or a write committed together with the checkpoint. Either way, the rule is the same. The duplicate dies where the effect lands, keyed by something stable.
+
+= table | MSG-05 · Tier A · The alternative and the price | Where to deduplicate
+Where | How | Costs
+In the sink's transaction | Offset stored with the result | The sink must be transactional, and owned by you
+In the sink, by key | Upsert, or a unique constraint on the event ID | A stable ID on every event; a dedup table if effects are not upserts
+At the broker | Idempotent producer, transactional writes between topics | Only covers **log to log**; nothing outside the broker
+N: So where do you deduplicate? In the sink's transaction, with the offset stored beside the result, if the sink is a database you own. In the sink by key, with an upsert or a unique constraint on the event identifier. Or at the broker, with an idempotent producer and transactions between topics. That last one is real and useful, and it only covers moving data from one topic to another. The moment you call a card network or send an email, you are back to deduplicating in the sink.
+
+= th | MSG-05 · the line to say | Exactly-once is at-least-once delivery plus a sink that makes the duplicate harmless, in its own transaction or by a stable key.
+V: When I say exactly once, I mean effectively once: at-least-once delivery, plus a sink that makes a duplicate harmless, either by committing the offset in the same transaction as the result, or by an upsert or a unique constraint on a stable event identifier. Broker transactions only cover topic to topic.
+[pause: 0.8]
+
+## 10.6 Ordering
+
+= dia | MSG-06 · Tier A · The failure | Order lost by a retry, and by a change of partition count
+@ MSG-06
+p10-reorder
+N: Ordering is lost in two quiet ways. On the left of the picture, the producer sends message one and message two for the same account, with two requests in flight. Message one fails and is retried. Message two arrived first. The log now holds two before one. On the right, a topic grows from four partitions to eight. The key's partition is its hash modulo the partition count, so this account's messages move to a new partition. New messages for it can be read before old ones still waiting in the old partition.
+
+= panel key | MSG-06 · Tier A · The mechanism | Order exists only per partition, so choose the key
+A log orders messages **within a partition**. Messages with the same key go to the same partition, so **same key, same order**.
+Choose the key as the **unit that needs order**: the account, not the user; the order, not the product.
+Keep order on retry with an **idempotent producer**, which numbers each message per partition so the broker rejects out-of-order duplicates.
+Never change the partition count of an ordered topic in place: create a new topic and migrate.
+N: The mechanism: a log orders messages only within a partition. Messages with the same key go to the same partition, so same key, same order. So choose the key as the unit that actually needs order: the account, not the user, the order, not the product. Keep order across retries with an idempotent producer, which numbers each message so the broker rejects anything out of sequence. And never change the partition count of an ordered topic in place. Create a new one and migrate.
+
+= panel key | MSG-06 · Tier A · One level down | The price of order: one key, one consumer
+Within a partition, one consumer handles messages **one after another**. A key's throughput is capped by **one consumer's speed**.
+One slow or failing message **blocks** every later message on that partition, including other keys.
+So: order only what must be ordered, process in parallel **across keys** inside a consumer, and give a poison message a way out (10.7).
+N: One level down: what order costs. Within a partition, messages are handled one after another, so one key's throughput is capped by one consumer's speed. And one slow or failing message blocks every later message on that partition, including other keys that did not need to wait. So order only what must be ordered, process different keys in parallel inside a consumer, and give a poison message a way out, which is the next section.
+
+= panel watch | MSG-06 · Tier A · The alternative and the price | Global order, or none
+**Global order**: one partition. Throughput of one consumer, no parallelism. Almost never needed.
+**No order**: free parallelism; consumers must tolerate reordering, with a **version** on each event and "ignore older than what I have".
+That last trick often removes the need for ordering at all.
+N: The alternatives. Global order means one partition, the throughput of one consumer, and it is almost never really needed. No order gives free parallelism, if consumers tolerate reordering. Put a version on each event, and have consumers ignore anything older than what they already hold. That one trick often removes the need for ordering entirely.
+
+= th | MSG-06 · the line to say | Order is per partition, so per key. Choose the key as the unit that needs order, and expect one consumer per key.
+V: A log gives order only within a partition, so I get order per key, and I choose the key as the smallest unit that needs it. I keep it across retries with an idempotent producer, never resize an ordered topic in place, and where I can, I put a version on events so consumers can ignore stale ones and need no ordering at all.
+[pause: 0.8]
+
+## 10.7 Ack deadlines, redelivery, dead letters
+
+= dia | MSG-07 · Tier A · The failure | One message that always crashes the consumer
+@ MSG-07
+p10-poison
+N: A poison message is one that always fails, a malformed payload, or a value the code cannot handle. In the picture it is redelivered, crashes the worker, is redelivered again, and crashes the next worker. On a log, it blocks its partition for ever. On a queue, it burns a worker every time its deadline passes, and with enough copies it can take down the whole consumer fleet. The system needs to recognise a message that will never succeed, and move it out of the way.
+
+= table | MSG-07 · Tier A · The mechanism | Deadline, extension, backoff, dead letter
+Step | What happens
+Deliver | The message is leased to one consumer until an **ack deadline**
+Extend | A consumer still working extends the deadline, so a slow message is not redelivered while in progress
+Redeliver | Deadline passes or a negative ack: deliver again, after a **backoff** that grows
+Dead-letter | After **N attempts**, move it to a dead-letter topic, with the error, and continue
+N: The mechanism has four steps. Deliver: the message is leased to one consumer until an acknowledgement deadline. Extend: a consumer still working on a slow message extends its deadline, so it is not redelivered to someone else mid-way. Redeliver: if the deadline passes, or the consumer says it failed, deliver again after a growing backoff. And dead-letter: after some number of attempts, move the message to a dead-letter topic with the error attached, and carry on with the rest.
+
+= panel key | MSG-07 · Tier A · One level down | The numbers, for Google Cloud Pub/Sub
+Ack deadline: **10 s** by default, at most **600 s**; client libraries extend it automatically while a message is held.
+Retention of unacknowledged messages: **7 days** by default, at most **31**.
+Dead-lettering after a configurable **5 to 100** delivery attempts.
+Ordering keys give order **within a region**.
+(Google Cloud documentation, checked November 2026.)
+N: The numbers for Google Cloud Pub Sub, checked in November twenty twenty-six. The acknowledgement deadline is ten seconds by default, and at most six hundred, and the client libraries extend it automatically while a message is held. Unacknowledged messages are kept for seven days by default, and at most thirty-one. Dead-lettering happens after a configurable five to one hundred delivery attempts. And ordering keys give order within a region.
+
+= panel watch | MSG-07 · Tier A · The alternative and the price | A dead-letter topic is a queue with no consumer
+Every dead letter is a **request someone did not get served**. It needs an owner, an alert on its depth, and a **replay tool** to send fixed messages back.
+Retries that are too fast make a dependency outage worse; retries that are too few dead-letter healthy messages during a short outage.
+N: The price. A dead-letter topic is a queue with no consumer unless you give it one. Every message in it is a request someone did not get served, so it needs an owner, an alert on its depth, and a tool to replay fixed messages back. And tune the retries for outages, not only for bad messages: too fast and they hammer a struggling dependency, too few and a five-minute outage dead-letters thousands of healthy messages.
+
+= th | MSG-07 · the line to say | Lease each message with an ack deadline that the worker extends, redeliver with backoff, and dead-letter after N attempts with an owner and a replay tool.
+V: Each message is leased with an acknowledgement deadline that a working consumer extends, redelivered with growing backoff, and moved to a dead-letter topic after a set number of attempts, so one poison message cannot block the rest. The dead-letter topic has an owner, an alert and a replay tool.
+[pause: 0.8]
+
+## 10.8 Backpressure and lag
+
+= dia | MSG-08 · Tier A · The failure | A slow consumer, and a lag nobody measured in time
+@ MSG-08
+p10-lag
+N: A consumer slows down, perhaps because its database is slow. The dashboard shows consumer lag as a count: two million messages. Is that bad? It depends on the rate. The picture shows the same two million on two topics. On one, at a hundred thousand messages a second, that is twenty seconds behind. On the other, at five hundred a second, it is over an hour. Lag in messages tells you nothing on its own. And if lag grows past the retention period, messages are deleted before they were ever read.
+
+= code | MSG-08 · Tier A · The mechanism | Lag in seconds, and the catch-up arithmetic
+lag in time = now - event time of the oldest unprocessed message
+
+arrivals 10,000 a second, consumer handles 8,000
+    backlog grows 2,000 a second = 7.2 million an hour
+
+fix the consumer; it now handles 15,000 a second
+    net drain 15,000 - 10,000 = 5,000 a second
+    one hour of growth drains in 7.2 million / 5,000 = 1,440 s = 24 minutes
+
+retention 7 days: the outage budget before data is lost
+N: Measure lag in time: now, minus the event time of the oldest unprocessed message. Then the arithmetic. Ten thousand messages a second arrive, the consumer handles eight thousand, so the backlog grows by two thousand a second, seven point two million an hour. Fix the consumer so it handles fifteen thousand. It drains at only five thousand a second net, because new messages keep arriving, so each hour of growth takes twenty-four minutes to drain. And the retention period is the outage budget: past it, data is lost.
+
+= panel key | MSG-08 · Tier A · One level down | What happens upstream when a consumer is slow
+**A log**: nothing, for a while. The log is the buffer, as large as its retention. Producers are unaffected until disk or retention runs out.
+**A bounded queue**: it fills, and then the broker must **block** producers, or **reject** them. Backpressure propagates up to whoever called the producer.
+**A synchronous chain**: callers wait, threads fill, and the slowness spreads upward as timeouts (part 13).
+Choose deliberately: buffer, push back, or shed.
+N: What happens upstream? With a log, nothing for a while: the log is the buffer, as large as its retention, and producers do not notice. With a bounded queue, it fills, and then the broker must either block producers or reject them, and that pressure travels up to whoever called the producer. With a synchronous call chain, callers wait, their threads fill, and slowness spreads upward as timeouts, part thirteen. So choose deliberately, per edge: buffer, push back, or shed.
+
+= panel watch | MSG-08 · Tier A · The alternative and the price | Buffer, push back, or shed
+**Buffer** costs storage and **freshness**: work is late, not lost. Fine for analytics, wrong for a fraud check.
+**Push back** keeps the system honest and moves the problem to the caller, who must handle a rejection.
+**Shed** drops work deliberately, cheapest first (part 12). Say which work is cheapest.
+N: Each choice has a price. Buffering costs storage and freshness: work is late, not lost, fine for analytics and wrong for a fraud check that must happen before the payment. Pushing back keeps the system honest and moves the problem to the caller, who must handle a rejection. Shedding drops work deliberately, lowest value first, which part twelve covers. Say which work you would drop.
+
+= th | MSG-08 · the line to say | Lag is measured in seconds. Catch-up time is backlog over capacity minus arrivals. Retention is the outage budget.
+V: I measure consumer lag in seconds, not messages, and alert on it. Catch-up time is the backlog divided by capacity minus the arrival rate, and the retention period is my outage budget before data is lost. For each edge I decide whether to buffer, push back, or shed.
+[pause: 0.8]
+
+## 10.9 Delayed and priority delivery
+
+= table | MSG-09 · Tier B · The mechanism | Two ways to deliver later, two ways to deliver first
+@ MSG-09
+Need | Mechanism | Note
+Deliver in 30 s or 5 min | **Delay tiers**: one topic per delay level; a consumer waits until each message is due, then forwards it | Few fixed delays; order by due time within a tier is free
+Deliver at an arbitrary time, days ahead | A **timer store** keyed by due time, polled by bucket (part 15) | Precise, durable, more machinery
+Urgent before bulk | **Separate queues**, consumed with weights, say 8 to 1 | Bulk is never starved completely
+Within one queue | Avoid: a priority field on a log does nothing, because order is by arrival
+N: To deliver later, use delay tiers: one topic per delay level, thirty seconds, five minutes, an hour. A message waits in its tier until due, and since everything in a tier has the same delay, they become due in arrival order. For arbitrary times days ahead, use a timer store keyed by due time, part fifteen. To deliver urgent work first, use separate queues consumed with weights, say eight urgent for every bulk message, so bulk is never starved. A priority field on a log does nothing, because a log is ordered by arrival.
+
+= panel watch | MSG-09 · Tier B · The price | Starvation, and a queue that is really a timeline
+**Strict** priority starves the lower class under sustained load; weights prevent it.
+A delay tier with a slow consumer delivers late by the **lag**: alert on it as for any consumer.
+N: The price. Strict priority starves the lower class whenever the urgent load is sustained, which is why weights are used. And a delay tier is a consumer like any other. If it falls behind, messages are delivered late by its lag, so alert on it.
+
+= th | MSG-09 · the line to say | Fixed delays use one topic per delay level; arbitrary times use a timer store; priority uses separate queues with weights.
+V: For delayed delivery I use one topic per fixed delay, or a timer store for arbitrary times. For priority, separate queues consumed with weights, never strict priority, so the lower class is never starved.
+[pause: 0.8]
+
+## 10.10 Fan-out
+
+= tiles | MSG-10 · Tier A · The failure | One post, fifty million followers
+@ MSG-10
+50,000,000 | followers of one account
+1 | post
+50,000,000 | inbox writes, if delivered on write
+17 min | at 50,000 inbox writes a second, before the last follower sees it
+N: Fan-out is the act of turning one event into many deliveries. One account with fifty million followers makes one post. Delivered on write, that post becomes fifty million inbox writes. At fifty thousand inbox writes a second, the last follower sees it seventeen minutes later, and the system has done nothing else in the meantime. The same design that makes ordinary users' timelines fast has just collapsed under one celebrity.
+
+= dia | MSG-10 · Tier A · The mechanism | Push to inboxes on write, or pull and merge on read
+p10-fanout
+N: There are two shapes. On the left, fan-out on write. When someone posts, a worker copies a reference into every follower's inbox. Reading a timeline is then one read of one inbox: fast and cheap, and the work was paid up front, proportional to followers. On the right, fan-out on read. A post is written once, to the author's own outbox. Reading a timeline means reading the outboxes of everyone you follow and merging them. Writes are cheap, and every read pays, proportional to the number of accounts followed.
+
+= code | MSG-10 · Tier A · One level down | The arithmetic that picks the hybrid
+posts                5,000 a second
+followers per post   200 on average
+fan-out on write     1,000,000 inbox writes a second
+timeline reads       100,000 a second, 1 inbox read each
+
+fan-out on read: each read merges ~300 followed accounts
+                     30,000,000 outbox reads a second
+
+hybrid: push for authors under 100,000 followers;
+        pull and merge the few huge accounts at read time
+N: The numbers pick the design. Five thousand posts a second with two hundred followers each is a million inbox writes a second. A hundred thousand timeline reads a second then each cost one inbox read. Fan-out on read instead would merge about three hundred followed accounts per read: thirty million outbox reads a second. So push wins for ordinary authors. But the tail kills it. The hybrid pushes for authors with fewer than, say, a hundred thousand followers, and for the few huge accounts, pulls their recent posts at read time and merges them in.
+
+= panel watch | MSG-10 · Tier A · The alternative and the price | What each shape costs
+**On write**: storage for every inbox entry; wasted work for inactive followers; a backlog after a big post.
+**On read**: latency and load on every read; the merge must be fast across hundreds of sources.
+**Hybrid**: two code paths, and a threshold to tune; a follower of a celebrity sees their post via the merge, so the merge must be cached.
+N: The price of each. On write: storage for every inbox entry, wasted work for followers who never log in, and a backlog after a big post. On read: latency and load on every timeline read. The hybrid has two code paths and a threshold to tune, and the merge of celebrity posts must itself be cached, because every one of their followers runs it.
+
+= th | MSG-10 · the line to say | Push on write for the common case, pull on read for the few accounts with huge followings, and choose the threshold from the arithmetic.
+V: Fan-out on write makes reads cheap and pays per follower at post time. Fan-out on read makes posts cheap and pays on every read. I use a hybrid: push for ordinary authors, pull and merge the few huge accounts at read time, with the threshold set from the write and read arithmetic.
+[pause: 0.8]
+
+## 10.11 Event time, windows and watermarks
+
+= dia | MSG-11 · Tier B · The mechanism | Count by when it happened, not when it arrived
+@ MSG-11
+p10-watermark
+N: Events carry the time they happened, and arrive later, sometimes much later: a phone offline in a tunnel. Counting clicks per minute by arrival time puts them in the wrong minute. So a stream processor groups by event time into windows, say one-minute tumbling windows. But when is the window for ten past twelve complete? The watermark is the processor's estimate that no more events older than time T will arrive. When the watermark passes twelve eleven, the ten past window is closed and emitted. Events that arrive after that are late data.
+
+= panel key | MSG-11 · Tier B · One level down | How the watermark is computed, and the idle partition
+Each source partition reports its own watermark: roughly the **oldest event time it may still deliver**.
+The operator's watermark is the **minimum** across its input partitions.
+So **one idle partition**, with no events, holds the minimum still, and **every window stalls**. Fix: mark a partition idle after a timeout, and exclude it.
+Late data: allow a lateness, say 10 minutes, and **update** the emitted result; beyond it, send to a side output.
+N: One level down: how the watermark is computed. Each input partition reports its own watermark, roughly the oldest event time it might still deliver. The operator's watermark is the minimum across all its inputs. So one idle partition, with no events at all, holds the minimum still, and every window stalls. The fix is to mark a partition idle after a timeout and leave it out. And for late data, allow a lateness, say ten minutes, during which the emitted result is updated, and beyond that, route the stragglers to a side output.
+
+= th | MSG-11 · the line to say | Window by event time; a watermark, the minimum over input partitions, says when a window is complete; late data updates or goes to a side output.
+V: I window by event time. The watermark is the minimum progress across input partitions, and it decides when a window is emitted, so an idle partition must be detected or it stalls everything. Late events within an allowed lateness update the result, and later ones go to a side output.
+[pause: 0.8]
+
+## 10.12 Stateful stream processing
+
+= dia | MSG-12 · Tier B · The mechanism | Local state, checkpointed with the input offsets
+@ MSG-12
+p10-checkpoint
+N: A stream processor that counts per key keeps that state locally, in memory or an embedded store, partitioned like its input. To survive failure, it checkpoints. A barrier flows through the stream with the data, and when each operator sees it, it snapshots its state to durable storage, along with the input offsets the barrier corresponds to. In the picture, checkpoint forty-two records offsets one thousand two hundred on partition zero and nine hundred on partition one. After a crash, every operator restores checkpoint forty-two, and the inputs rewind to those offsets.
+
+= panel watch | MSG-12 · Tier B · The price | Replay time, and the sink
+Recovery replays everything since the last checkpoint: checkpoint every **minute**, replay up to a minute, plus state restore time, which grows with state size.
+Inside the processor, state is exactly once. **Outputs** are recomputed, so the sink must be transactional with the checkpoint or idempotent (10.5).
+N: The price. Recovery replays everything since the last checkpoint, so a checkpoint every minute means up to a minute of replay, plus the time to restore state, which grows with its size. And inside the processor, state is updated exactly once, but outputs are recomputed during the replay, so the sink must be transactional with the checkpoint, or idempotent, as in section ten point five.
+
+= th | MSG-12 · the line to say | Keyed local state, checkpointed together with input offsets; on failure restore and rewind; the sink still deduplicates.
+V: A stateful stream processor keeps keyed state locally and checkpoints it together with the input offsets. On failure it restores the checkpoint and rewinds the input, so state is exactly once, and outputs are recomputed, which the sink must make harmless.
+[pause: 0.8]
+
+## 10.13 Lambda versus Kappa
+
+= table | MSG-13 · Tier B · The mechanism | Two code paths, or one replayable stream
+@ MSG-13
+ | Lambda | Kappa
+Paths | A batch job for correctness, a stream job for freshness, results merged | One stream job
+Reprocessing | Rerun the batch job | Replay the log through a **new version** of the job, side by side, then switch
+Cost | Two implementations of the same logic, which drift apart | Log retention long enough to replay; a job that can catch up fast
+N: Two architectures. Lambda runs a batch job for correct results and a stream job for fresh ones, and merges them. Reprocessing is easy, rerun the batch. The price is two implementations of the same logic, which drift apart. Kappa runs only a stream job. To reprocess, replay the log through a new version of the job, side by side with the old one, and switch readers when it catches up. The price is keeping the log long enough to replay, and a job that can process history quickly.
+
+= panel key | MSG-13 · Tier B · One level down | Why the single path usually wins now
+Modern processors give **exactly-once state, event time and late data** in one engine, which removed the main reason for a batch path.
+Keep a batch path where history is far larger than any log retention, or where a different engine is far cheaper per byte.
+N: One level down: why one path usually wins now. Modern stream processors give exactly-once state, event-time windows and late data handling in one engine, which removed the main reason for a separate batch path. Keep a batch path only where history is far larger than any log you would retain, or where a batch engine is much cheaper per byte.
+
+= th | MSG-13 · the line to say | Prefer one replayable stream job; reprocess by replaying the log through a new version beside the old one.
+V: I prefer one replayable stream path, and reprocess by running a new version of the job over the retained log beside the old one, then switching. I keep a separate batch path only when history is far bigger than any log retention.
+[pause: 0.8]
+
+## 10.14 Schema evolution
+
+= table | MSG-15 · Tier B · The mechanism | Who can read whom, and who upgrades first
+@ MSG-15
+Compatibility | Means | Upgrade first
+Backward | New readers can read **old** data | Consumers
+Forward | Old readers can read **new** data | Producers
+Full | Both | Either, in any order
+N: A topic outlives every version of the code that writes it, so its schema evolves. Backward compatibility means new readers can read old data, so you upgrade consumers first. Forward compatibility means old readers can read new data, so you upgrade producers first. Full compatibility means both, so the order does not matter. In a log retained for seven days, a consumer replaying from the start reads a week of old formats, so backward compatibility is the minimum.
+
+= panel key | MSG-15 · Tier B · One level down | The rules that keep a schema compatible
+**Add** fields as optional, with defaults. **Never** reuse a field number or name for a different meaning. **Never** change a field's type in place.
+To remove a field: stop writing it, wait until no retained data has it, then delete it from the schema.
+A **schema registry** checks every new version against the rule, and rejects a producer whose schema breaks it.
+N: The rules. Add fields as optional, with defaults. Never reuse a field number or name for a different meaning, and never change a field's type in place. To remove a field, stop writing it, wait until no retained data contains it, then delete it from the schema. And a schema registry checks every new version against the compatibility rule, and refuses a producer whose schema would break readers.
+
+= th | MSG-15 · the line to say | Add optional fields with defaults, never reuse or retype a field, and let a registry enforce compatibility.
+V: Topic schemas evolve under a compatibility rule, at least backward, so consumers upgrade first. I only add optional fields with defaults, never reuse or retype a field, and a schema registry rejects any version that breaks the rule.
+[pause: 0.8]
+
+## 10.15 HyperLogLog
+
+= code | DS-02 · Tier B · The mechanism | Count distinct with 12 KB, at under 1% error
+@ DS-02
+hash each item to 64 bits
+first 14 bits  -> which register, of 2^14 = 16,384
+remaining bits -> count leading zeros, plus one
+register keeps the MAXIMUM seen
+
+estimate: from the harmonic mean of 2^register over all registers
+memory:   16,384 registers x 6 bits    = 12 KB
+error:    1.04 / sqrt(16,384)           = 0.81%
+merge:    register-wise maximum: two days' sketches combine into one week's
+N: HyperLogLog counts distinct items, unique visitors, in a few kilobytes. Hash each item. The first fourteen bits pick one of sixteen thousand registers. In the rest, count the leading zeros. A run of k zeros happens about once in two to the k items, so the longest run seen hints at how many distinct items there were. Each register keeps the maximum. The estimate combines all registers with a harmonic mean. Sixteen thousand registers of six bits is twelve kilobytes, for a standard error of about point eight percent.
+
+= panel key | DS-02 · Tier B · One level down | Why it merges, and what it cannot do
+Two sketches with the same hash merge by **taking the maximum per register**: exactly the sketch of the union. Per-shard or per-hour sketches combine for free.
+It **cannot** subtract or intersect exactly. An intersection estimated by inclusion and exclusion has large error when the overlap is small.
+N: Why it merges: two sketches built with the same hash combine by taking the maximum per register, and the result is exactly the sketch of the union. So per-shard or per-hour sketches roll up for free into totals. What it cannot do is subtract, or intersect accurately. Estimating an intersection by inclusion and exclusion gives a large error when the overlap is small.
+
+= th | DS-02 · the line to say | HyperLogLog counts distinct items in 12 KB at under 1% error, and merges by per-register maximum.
+V: For distinct counts at scale I use HyperLogLog: about twelve kilobytes per counter for under one percent error, and sketches merge across shards and time by taking the maximum per register.
+[pause: 0.8]
+
+## 10.16 Count-Min Sketch and heavy hitters
+
+= code | DS-03 · Tier B · The mechanism | d rows of w counters; estimate is the minimum
+@ DS-03
+add(x):    for each row i of d:  counter[i][hash_i(x) mod w] += 1
+count(x):  minimum over the d rows of counter[i][hash_i(x) mod w]
+
+never underestimates; overestimates by at most epsilon x N
+with probability 1 - delta, where N is the total count
+
+width  w = ceil(e / epsilon)          depth  d = ceil(ln(1 / delta))
+epsilon = 0.001, delta = 0.01:  w = 2,719, d = 5
+    13,595 counters x 4 B  = about 54 KB
+N: A Count-Min Sketch estimates how often each item occurs. It is d rows of w counters, with one hash per row. To add an item, increment one counter in every row. To estimate, take the minimum of its d counters. Collisions only add, so it never underestimates, and the error is at most epsilon times the total count, with probability one minus delta. Width is e over epsilon, depth is the log of one over delta. For an error of a tenth of a percent of the total, ninety-nine percent of the time: two thousand seven hundred and nineteen by five, about fifty-four kilobytes.
+
+= panel key | DS-03 · Tier B · One level down | Heavy hitters, and merging
+**Top K**: keep a small heap of the K items with the highest estimates, updated on each add. That is how part 6 finds hot keys.
+**Merge**: two sketches with the same hashes add **counter by counter**.
+The error is relative to the **total**, so rare items are estimated badly. That is fine: the point is the heavy ones.
+N: One level down. For heavy hitters, keep a small heap of the items with the highest estimates, updated on each add. That is how part six found hot keys. Two sketches with the same hashes merge by adding counter by counter. And the error is relative to the total count, so rare items are estimated badly. That is acceptable, because the sketch exists to find the heavy ones.
+
+= th | DS-03 · the line to say | Count-Min: width e over epsilon, depth log one over delta; never under, over by at most epsilon N; a heap on top gives the heavy hitters.
+V: A Count-Min Sketch estimates frequencies in a few tens of kilobytes. It never underestimates and overestimates by at most epsilon times the total, with width e over epsilon and depth log of one over delta. With a small heap on top it finds heavy hitters, and sketches merge by adding counters.
+[pause: 0.8]
+
+## 10.17 Quantile sketches
+
+= panel key | DS-10 · Tier B · The mechanism | Percentiles over a stream, in bounded memory, and mergeable
+@ DS-10
+Keeping every latency to compute a p99 does not scale. A **quantile sketch** keeps a summary with a known error.
+**DDSketch**: logarithmic buckets, so any quantile is within a **relative error** of, say, 1%: a p99 of 200 ms is reported as 198 to 202.
+**t-digest, KLL**: rank-error guarantees, most accurate at the tails.
+All merge: per-host sketches combine into a fleet-wide p99, which **averaging p99s cannot do** (part 14).
+N: Percentiles over a stream need a sketch too, because keeping every latency does not scale. A quantile sketch keeps a summary with a known error. DDSketch uses logarithmic buckets, so any quantile is within a relative error, say one percent: a p99 of two hundred milliseconds is reported as between a hundred and ninety-eight and two hundred and two. T-digest and KLL give rank-error guarantees, most accurate at the tails. And they all merge, so per-host sketches combine into a fleet-wide p99, which averaging p99s cannot do. Part fourteen shows why.
+
+= panel watch | DS-10 · Tier B · The price | Fixed histograms, the cheap alternative
+A **fixed-bucket histogram** also merges by adding counts, and is cheapest. Its error depends on bucket edges: choose them around the SLO threshold.
+A sketch adapts to the data, at a few KB per series.
+N: The cheap alternative is a histogram with fixed buckets. It merges by adding counts too, and its error depends on where the bucket edges are, so put edges around your service level threshold. A sketch adapts to the data, for a few kilobytes per series.
+
+= th | DS-10 · the line to say | Use a mergeable quantile sketch or a fixed histogram for percentiles; merge them, never average percentiles.
+V: For percentiles over a stream I use a mergeable quantile sketch, such as DDSketch for a relative error guarantee, or a fixed histogram with edges around the threshold. I merge sketches across hosts and never average percentiles.
+[pause: 0.8]
+
+## 10.18 Recap
+
+= list | Recap | What to be able to explain without notes
+- **Queue or log**, by what the messages are
+- **Acknowledged** under each replication setting, and the unclean election
+- **Exactly once**: where the duplicate is born, and the two places it dies
+- **Order per key**, and what breaks it
+- **Ack deadlines, backoff, dead letters**, with the Pub/Sub numbers
+- **Lag in seconds** and the catch-up arithmetic
+- **Fan-out** arithmetic and the hybrid
+- **Watermarks** and the idle partition; three **sketches** and how each merges
+N: Without notes: queue or log. What acknowledged means. Exactly once, with the place the duplicate is born and the two places it dies. Order per key and what breaks it. Redelivery and dead letters with the real numbers. Lag in seconds and catch-up time. The fan-out arithmetic and the hybrid. Watermarks and the idle partition. And three sketches, each with its error and its merge.
+
+## 10.19 Probe drills
+
+= probe | Exactly once: what do you actually mean?
+- **At-least-once delivery**, plus a sink that makes duplicates harmless
+- Broker transactions cover **topic to topic** only
+- External effects need **dedup at the sink**, by a stable ID
+C: I mean effectively once. Delivery is at least once, because a consumer can always crash between doing the work and recording that it did. Broker transactions make topic to topic processing exactly once, and nothing beyond. So for any external effect, the sink makes a repeated message harmless, by committing the offset with the result, or by an upsert or unique constraint on a stable event identifier.
+
+= probe | Show me where the duplicate dies.
+- In the **ledger's transaction**: payments and the offset commit together
+- Or by **unique constraint** on the event ID in the ledger
+- Restart reads the offset **from the sink**, not the broker
+C: In the ledger's own transaction. The consumer writes the batch of payments and its new offset into the same database, in one transaction. On restart it reads its offset from the ledger, not from the broker, so either the payments and the offset are both there, or neither is. As a second guard, the ledger has a unique constraint on the event identifier, so even a bug in offset handling cannot post a payment twice.
+
+= probe | One key is ten percent of all events.
+- Its partition, and its **one consumer**, carry ten percent: a hot partition
+- Does it **need order**? If not, salt the key and spread it
+- If it does: a faster consumer per key, or **pre-aggregate** before the ordered step
+C: That key's partition, and the one consumer that owns it, carry ten percent of everything, while other partitions are nearly idle. First question: does that key really need order? If not, I salt it into sub-keys and spread it over partitions. If it does, I make that one consumer faster, or I pre-aggregate the key's events upstream, so the ordered step sees far fewer of them.
+
+= probe | Events arrive two hours late.
+- Window by **event time**; the watermark has long passed
+- Within allowed lateness: **update** the result. Beyond: **side output**
+- Two hours is a product decision: correct later, or count in the arrival window
+C: I window by event time, so these belong to windows the watermark closed long ago. If two hours is within the allowed lateness, the result for those windows is updated and re-emitted, and downstream must accept updates. If not, they go to a side output, and a correction job folds them in later. Which one is a product question: whether a late correction is worth more than a stable number.
+
+= probe | A consumer is slow. What happens upstream?
+- On a **log**: nothing until retention; lag grows, in seconds
+- Catch-up is **backlog over capacity minus arrivals**
+- On a bounded queue: producers are blocked or rejected: **backpressure**
+C: On a log, producers are unaffected, the log absorbs it, and lag grows. I alert on lag in seconds, and the retention period is my budget before data is lost. When the consumer is fixed, catch-up time is the backlog divided by its capacity minus the arrival rate. On a bounded queue, the queue fills and then producers are blocked or rejected, and that pressure travels to their callers, so I decide in advance which work to shed.
+
+## 10.20 Where this shows up
+
+= table | Where this shows up | What each design problem takes from this part
+Problem | Takes
+Notification system | Queues with dead letters; fan-out; priority tiers; idempotent sends
+News feed | Fan-out on write, on read, and the hybrid
+Metrics and ad click aggregation | Event-time windows, watermarks, sketches
+Payments | The duplicate that dies in the ledger's transaction
+Job scheduler | Delayed delivery; ack deadlines as leases
+N: A notification system takes queues, dead letters, fan-out, priority and idempotent sends. A news feed takes fan-out and the hybrid. Metrics and ad-click aggregation take windows, watermarks and sketches. Payments take the duplicate that dies in the ledger. And a job scheduler takes delayed delivery and acknowledgement deadlines as leases.
+
+= panel note | Read next | Where to go deeper
+Akidau et al., *The Dataflow Model*: event time, windows, watermarks and triggers.
+Kreps, Narkhede and Rao, *Kafka: a Distributed Messaging System for Log Processing*, and the Kafka replication design documentation.
+*Designing Data-Intensive Applications*, chapter 4 (schema evolution). *Site Reliability Engineering*, chapter 25, *Data Processing Pipelines*. The Pub/Sub documentation.
+N: To go deeper: The Dataflow Model paper, for event time and watermarks. The original Kafka paper and its replication design notes. Chapter four of Designing Data-Intensive Applications, on schema evolution. Chapter twenty-five of the S-R-E book, on data processing pipelines. And the Pub Sub documentation. Part eleven turns to the network and the API.

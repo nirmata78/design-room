@@ -1,0 +1,380 @@
+#! title: Caching
+#! short: Caching
+
+= th | System design at Staff depth · Part 9 of 17 | Caching | Patterns, eviction and admission, expiry, invalidation, stampedes and leases, hot keys, tiers, negative caching, hit-ratio arithmetic, cold start.
+N: Part nine, caching. Every design has a cache in it, and in most rounds it is drawn as one box with the word cache. The deep questions are all about what that box promises: how stale it may be, what happens when it is empty, and what the database sees when the hit ratio moves by a few points. This part teaches those on one node and one key. The cache as a whole distributed system belongs to the task videos.
+
+## 9.0 Why this part decides rounds
+
+= panel trap | The opening story | The cache restarts cold at peak, and the database follows it down
+A cache tier serves 99% of a million reads a second. The database sees ten thousand, and is sized for twenty.
+A bad deploy restarts every cache node at noon. The hit ratio drops to zero.
+The database receives a **million** reads a second, falls over, and the cache cannot refill from a database that is down.
+N: A cache tier serves ninety-nine percent of a million reads a second. The database sees ten thousand, and is sized for twenty thousand. Then a bad deploy restarts every cache node at noon. The hit ratio drops to zero, and the database receives a million reads a second, fifty times its capacity. It falls over. And the cache cannot refill, because it refills from the database. The system is down, and nothing is broken except that the cache is empty. The cache was not an optimisation. It was load-bearing, and nobody had said so.
+
+= panel note | Assumed reading | What this part does not repeat
+Nishtala et al., *Scaling Memcache at Facebook*, **section 3**: leases, pools, gutter servers.
+The paper's regional and cross-region story stays in the paper. This part does the mechanisms on one key, with the arithmetic.
+N: One reading is assumed: section three of Scaling Memcache at Facebook, on leases, pools and gutter servers. The paper's regional and cross-region deployment stays in the paper. Here we work the mechanisms on one key, with the arithmetic.
+
+= list | Map of the part | Four groups
+- **What the cache is**: patterns, eviction and admission, expiry, hit-ratio arithmetic
+- **Keeping it right**: invalidation, and the stale-set race with leases
+- **Keeping it standing**: stampedes, hot keys and big values, tiers
+- **Keeping the database standing**: negative caching, cold start, node loss
+N: Four groups. What the cache is: patterns, eviction, expiry and the arithmetic. Keeping it right: invalidation and the stale-set race. Keeping it standing: stampedes, hot keys and tiers. And keeping the database standing when the cache cannot help: negative caching, cold start and node loss.
+
+## 9.1 Caching patterns
+
+= table | CAC-01 · Tier A · The failure | A write-behind cache loses money on a crash
+@ CAC-01
+Pattern chosen | Then
+Write-behind for account balances | The node crashes with ten seconds of unflushed balance changes. Gone.
+Write-through for a write-heavy log | Every write pays two hops; the cache fills with data nobody reads
+Cache-aside with no expiry | A missed invalidation makes a value wrong for ever
+N: A caching pattern chosen without thinking about failure shows up in the incident review. Write-behind for account balances, and a node crash loses ten seconds of balance changes that were never flushed. Write-through for a write-heavy log, and every write pays two hops while the cache fills with data nobody reads. Cache-aside with no expiry, and one missed invalidation makes a value wrong for ever. The pattern is a decision about who populates the cache, who invalidates it, and what happens when something fails.
+
+= table sm | CAC-01 · Tier A · The mechanism | Five patterns, by who populates, who invalidates, what failure does
+Pattern | Populates | Invalidates | On failure
+Cache-aside | The application, on a miss | The application, after a write | Cache down: reads go to the database
+Read-through | The cache, calling a loader | TTL, or the application | Same, hidden in a library
+Write-through | Every write goes to cache and store | Writes keep it current | Write fails if either fails
+Write-behind | Writes go to the cache; flushed later | — | **Unflushed writes lost** with the node
+Refresh-ahead | The cache, before expiry | TTL | Wasted refreshes of cold keys
+N: Five patterns. Cache-aside: the application reads the cache, and on a miss reads the database and fills the cache. After a write, it invalidates. Read-through: the same, with the loader inside the cache library. Write-through: every write goes to both, so the cache stays current, and a write fails if either fails. Write-behind: writes go to the cache and are flushed later, fast, and unflushed writes die with the node. Refresh-ahead: the cache reloads popular keys before they expire.
+
+= panel key | CAC-01 · Tier A · One level down | Cache-aside, written correctly
+read(k):   v = cache.get(k); if hit: return v
+           v = db.read(k); cache.add(k, v, ttl); return v     **add**, not set, where available
+write(k):  db.write(k, v); cache.**delete**(k)                 delete, never set
+Why delete: two writers that each **set** can leave the older value last. A delete cannot be out of order in a harmful way; the next read loads the current value.
+Why a TTL anyway: it bounds the damage of any invalidation that is lost.
+N: Cache-aside, written correctly. On a read miss, load from the database and add the value with a time to live. On a write, write the database, then delete the key. Delete, never set. Two writers that each set the cache can finish in the wrong order and leave the older value there. A delete cannot be harmful in any order: the next read loads whatever is current. And always a time to live, even with invalidation, because it bounds the damage of any invalidation that is lost.
+
+= panel watch | CAC-01 · Tier A · The alternative and the price | Which pattern, when
+**Cache-aside** for most reads: simple, the cache can fail without data loss.
+**Write-through** when reads right after writes dominate and the cache must be current.
+**Write-behind** only for data you can lose or rebuild: counters, view tallies, with a stated loss window.
+**Refresh-ahead** for a small set of very hot keys whose miss would hurt.
+N: When to use which. Cache-aside for most reads, because it is simple and the cache can fail without losing data. Write-through when reads right after writes dominate and the cache must be current. Write-behind only for data you can afford to lose or rebuild, like view counters, with the loss window stated. And refresh-ahead for a small set of very hot keys whose miss would hurt.
+
+= th | CAC-01 · the line to say | Cache-aside: read, miss, load, add with a TTL; write the store, then delete the key. Write-behind only for data you may lose.
+V: My default is cache-aside: read the cache, on a miss load from the store and add with a time to live, and on a write update the store and delete the key, never set it. Write-through when the cache must be current. Write-behind only for data I can afford to lose, with the window said aloud.
+[pause: 0.8]
+
+## 9.2 Hit-ratio maths
+
+= code | CAC-10 · Tier A · The mechanism | Backend load is the miss ratio times the traffic
+@ CAC-10
+reads                  1,000,000 a second
+hit ratio 99%   ->  misses 1%    ->  10,000 a second to the database
+hit ratio 95%   ->  misses 5%    ->  50,000
+hit ratio 90%   ->  misses 10%   ->  100,000           ten times the 99% load
+
+mean latency = hit x 0.5 ms + miss x 10 ms
+    99%: 0.6 ms        90%: 1.5 ms
+N: The arithmetic everyone should be able to do. Backend load is the miss ratio times the traffic, not the hit ratio. A million reads a second at ninety-nine percent hits means ten thousand to the database. At ninety-five, fifty thousand. At ninety, a hundred thousand: ten times the load, from a hit ratio that only fell by nine points. Mean latency moves too: with half a millisecond for a hit and ten for a miss, about point six milliseconds at ninety-nine percent, and one and a half at ninety.
+
+= dia | CAC-10 · Tier A · The failure | The backend load curve as the hit ratio falls
+p9-hit-curve
+N: The picture draws that curve. The horizontal axis is the hit ratio, from one hundred percent on the right down to eighty on the left. The vertical axis is load on the database. Near the right, the curve is steep: every point lost near ninety-nine percent adds as much load as the whole previous point. The dashed line is the database's capacity, twenty thousand a second. It is crossed at ninety-eight percent. So a cache that falls from ninety-nine to ninety-seven percent, which looks like a small change on a dashboard, overloads the database.
+
+= panel key | CAC-10 · Tier A · One level down | What sets the hit ratio
+**Working set against cache size**: requests follow a skewed, often Zipf-like distribution, so a cache holding the top 10% of keys may serve 80 to 90% of reads.
+**TTL**: a key expires and misses even if it is hot. With TTL T and request interval I per key, at most one miss per T.
+**Churn**: new keys, a deploy that changes the key format, a resize that moves keys (part 6).
+Measure the hit ratio **per key family**, not overall: one family at 50% hides inside a 97% average.
+N: What sets the hit ratio? First, working set against cache size. Requests are skewed, roughly Zipf-like, so holding the top ten percent of keys can serve eighty or ninety percent of reads. Second, the time to live: a hot key still misses once per expiry. Third, churn: new keys, a deploy that changes key format, a resize that moves keys. And measure hit ratio per family of keys, not overall. A family at fifty percent can hide inside a ninety-seven percent average.
+
+= panel watch | CAC-10 · Tier A · The alternative and the price | Buy hit ratio with memory, or protect the database another way
+More memory moves along a curve of **diminishing returns**: doubling the cache might take 95% to 97%.
+Sometimes cheaper: **size the database for the miss rate you will actually see in a failure**, or add a load-shedding limit in front of it (part 12).
+Treat the cache as **load-bearing**: alert on hit ratio per family, and on database load per hit-ratio point.
+N: You can buy hit ratio with memory, along a curve of diminishing returns: doubling the cache might move ninety-five percent to ninety-seven. Sometimes it is cheaper to size the database for the miss rate you will see during a failure, or to put a load-shedding limit in front of it, from part twelve. Either way, treat the cache as load-bearing: alert on the hit ratio per family, and know how much database load each point costs.
+
+= th | CAC-10 · the line to say | Backend load is miss ratio times traffic. From 99 to 90 percent hits is ten times the database load.
+V: I size the database from the miss ratio, not the hit ratio. Backend load is misses times traffic, so a fall from ninety-nine to ninety percent hits is ten times the load. If the database cannot take the miss rate a failure would cause, the cache is load-bearing, and I design and alert for that.
+[pause: 0.8]
+
+## 9.3 Eviction policies
+
+= table | CAC-02 · Tier A · The failure | One scan empties an LRU cache
+@ CAC-02
+Time | Event | LRU holds
+Before | Steady traffic over 1 million hot keys | The hot keys: 95% hits
+12:00 | A batch job reads 5 million cold keys, once each | The cold keys: each evicted a hot one
+12:05 | Normal traffic returns | Almost nothing useful: hit ratio near zero, then slowly back
+N: Least recently used is the default policy everywhere, and it has a famous failure. Steady traffic over a million hot keys gives ninety-five percent hits. At noon a batch job reads five million cold keys, once each. Each one is the most recently used thing in the cache, so each evicts a hot key. At five past noon normal traffic returns, and the cache holds almost nothing useful. One scan emptied it. Recency alone cannot tell a key that is popular from a key that was touched once a moment ago.
+
+= table | CAC-02 · Tier A · The mechanism | Four policies, and what each keeps
+Policy | Evicts | Strength | Weakness
+LRU | The least recently used | Simple; adapts fast | A scan flushes it
+LFU | The least frequently used | Keeps the truly popular | Old favourites never leave without decay
+CLOCK | A key whose reference bit is clear, sweeping a circle | LRU-like at a fraction of the cost | Coarse
+Sampled LRU | The oldest of a few random keys, say 5 | No list to maintain; scales | Approximate
+N: Four policies. Least recently used evicts the key used longest ago: simple, quick to adapt, and flushed by a scan. Least frequently used keeps the popular keys, and without decay an old favourite never leaves. CLOCK approximates least recently used with one reference bit per key and a hand sweeping round a circle, at a fraction of the cost of a list. And sampled least recently used, which Redis uses, picks a few random keys, five by default, and evicts the oldest of them. No list to maintain, and close enough.
+
+= panel key | CAC-02 · Tier A · One level down | Admission: a new key must earn its place
+**TinyLFU**: before a new key may evict a victim, compare their **estimated frequencies** from a small Count-Min Sketch (part 10). The newcomer gets in only if it is used more often than the victim.
+The sketch **ages**: every N requests, halve all counters, so popularity decays.
+A small LRU **window** in front lets brand-new bursts in. That is W-TinyLFU, as in the Caffeine library.
+A scan's keys are seen once: they lose to the hot victims, and the cache survives the batch job.
+N: The modern fix is admission. Before a new key may evict a victim, compare their estimated frequencies, kept in a small Count-Min Sketch, from part ten. The newcomer is admitted only if it has been seen more often than the victim. The counters are halved every so often, so popularity decays. A small least recently used window in front still lets new bursts in. That is window TinyLFU, as in the Caffeine library. A scan's keys are each seen once, so they lose to the hot victims, and the cache survives the batch job.
+
+= panel watch | CAC-02 · Tier A · The alternative and the price | How to choose, and measure, for your workload
+**Replay a trace**: record a day of key requests, run it through simulators of each policy at several cache sizes, and plot hit ratio against size.
+In production, a **shadow** policy can track keys it would hold, without serving, and report its hit ratio.
+The price of a smarter policy: a few bytes per key for the sketch, and CPU per request.
+N: How do you choose for a workload? Measure. Record a day of key requests, replay the trace through a simulator of each policy at several sizes, and plot hit ratio against cache size. In production, a shadow policy can track the keys it would have kept, without serving them, and report its own hit ratio. The price of a smarter policy is a few bytes per key for the sketch, and a little processor time per request.
+
+= th | CAC-02 · the line to say | LRU is flushed by a scan; an admission filter on a frequency sketch keeps the popular keys. Choose by replaying a trace.
+V: Least recently used adapts fast and is flushed by a single scan. I add frequency-based admission, a small Count-Min Sketch with decay, so a new key only evicts a less popular one. And I choose the policy by replaying a real trace at several cache sizes, not by opinion.
+[pause: 0.8]
+
+## 9.4 Expiry
+
+= dia | CAC-03 · Tier A · The failure | Ten thousand keys set at the same second expire at the same second
+@ CAC-03
+p9-ttl-sync
+N: Time to live has a failure of its own. A warm-up job loads ten thousand popular keys at nine o'clock, each with a TTL of one hour. At ten o'clock, all ten thousand expire in the same second. Every one misses at once, and the database takes ten thousand loads in a second on top of its normal traffic. The picture shows the spike, and then the same thing again an hour later, because they were all reloaded together. Synchronised expiry turns a cache into a metronome that hits the database every hour.
+
+= panel key | CAC-03 · Tier A · The mechanism | Jitter, and two ways to remove expired keys
+**Jitter**: TTL equals the base plus a random amount, say 3,600 s plus or minus 10%. Ten thousand expiries spread over twelve minutes instead of one second.
+**Lazy expiry**: on every read, check the stored expiry time; if past, delete and miss. Costs nothing for keys that are read.
+**Active, sampled expiry**: a few times a second, test a random sample of keys that have a TTL, delete the expired, and repeat at once if many were expired. Reclaims memory from keys that are never read again.
+N: The mechanism has two parts. Jitter: the time to live is a base plus a random amount, an hour plus or minus ten percent, so ten thousand expiries spread over twelve minutes. And removal, in two ways. Lazy expiry: on every read, check the stored expiry, and if it has passed, delete and miss. That costs nothing for keys that are read. Active sampled expiry, as Redis does it: a few times a second, test a random sample of keys with a time to live, delete the expired ones, and repeat immediately if many were expired. That reclaims memory from keys nobody reads again.
+
+= panel key | CAC-03 · Tier A · One level down | The TTL is a staleness bound, chosen per data type
+TTL is the **worst-case staleness** when every invalidation is lost. Choose it from what a stale value costs.
+Price in a catalogue: 5 minutes. A user's own profile: seconds, plus invalidation. A feature flag: 30 seconds. An authorisation decision: as short as you can bear, or not cached.
+And the TTL is also a **refresh rate**: one miss per key per TTL, times the number of hot keys, is a floor on database load.
+N: One level down. The time to live is the worst-case staleness if every invalidation is lost, so choose it from what a stale value costs. A catalogue price, five minutes. A user's own profile, seconds, plus invalidation. A feature flag, thirty seconds. An authorisation decision, as short as you can bear, or not cached at all. And it is also a refresh rate. One miss per hot key per expiry, times the number of hot keys, is a floor on database load that no amount of memory removes.
+
+= panel watch | CAC-03 · Tier A · The alternative and the price | Long TTL with invalidation, or short TTL alone
+**Short TTL alone**: simple, bounded staleness; a floor of misses, and stale reads up to the TTL.
+**Long TTL with invalidation**: fewer misses, usually fresh; the TTL only covers lost invalidations, and the invalidation path must be built and monitored.
+N: The trade. A short time to live alone is simple, and bounds staleness, with a floor of misses and stale reads up to the TTL. A long time to live with invalidation gives fewer misses and usually fresh data, and needs an invalidation path that you build and monitor. The time to live then only covers the invalidations that are lost.
+
+= th | CAC-03 · the line to say | Every TTL gets jitter. The TTL is the worst-case staleness, chosen per data type, and a floor on misses.
+V: Every time to live gets random jitter, so keys loaded together do not expire together. I choose the TTL per type of data as the worst-case staleness I can accept if invalidation fails, and I remember it sets a floor of one miss per hot key per TTL.
+[pause: 0.8]
+
+## 9.5 Invalidation
+
+= dia | CAC-04 · Tier A · The failure | The writer committed, then crashed before deleting the key
+@ CAC-04
+p9-lost-invalidation
+N: Invalidation fails quietly. A writer updates the price in the database and commits. Before it deletes the cache key, the process crashes, or the delete is lost in the network. The database says nineteen dollars. The cache says twenty-five, and will say so until the time to live runs out, an hour, because nobody else knows the key needs deleting. A design that says we invalidate on write has a failure case at every step between the commit and the delete.
+
+= table | CAC-04 · Tier A · The mechanism | Three ways to invalidate, and the staleness each can promise
+Way | How | Staleness bound
+TTL only | Nothing; wait for expiry | The TTL
+Writer deletes after commit | The service that wrote deletes the key | Usually milliseconds; **the TTL** if the writer dies between commit and delete
+From the change stream | A consumer of the database's change log (part 5) deletes keys | The **stream lag**, normally under a second; survives writer crashes
+N: Three ways, each with a bound you can state. Time to live only: staleness up to the TTL. Writer deletes after commit: usually milliseconds, and if the writer dies between commit and delete, staleness falls back to the TTL. Or from the change stream: a consumer of the database's change log, part five, deletes the keys. Its bound is the stream's lag, normally under a second, and it survives writer crashes, because the log has every committed change.
+
+= panel key | CAC-04 · Tier A · One level down | What each can and cannot guarantee about order
+**The change stream** delivers invalidations in **commit order per key**, and a crashed consumer resumes from its position. Nothing is missed; one delete may repeat, which is harmless.
+**Writer deletes** have no order between writers, and can be lost on any crash.
+**Neither** closes the race in which a reader sets an old value **after** the delete. That needs the lease in the next section.
+Facebook's version: a daemon tails the MySQL commit log and broadcasts deletes.
+N: One level down, about order. The change stream delivers invalidations in commit order per key, and a crashed consumer resumes from its saved position, so nothing is missed, and a repeated delete is harmless. Writer deletes have no order between writers and are lost on any crash. Neither one closes the race in which a slow reader sets an old value after the delete. That needs the lease, in the next section. Facebook's version of the change stream is a daemon that tails the database's commit log and broadcasts deletes.
+
+= panel watch | CAC-04 · Tier A · The alternative and the price | What the change stream costs
+A log consumer to run, monitor and scale: its **lag is now your staleness**, so alert on it.
+The consumer must map a row change to **every cache key derived from it**: a product row feeds a product page, a search result and a category list.
+That mapping is the hard part, and the usual source of "we invalidated the wrong key".
+N: The price of the change stream. A log consumer to run and scale, whose lag is now your staleness, so you alert on it. And the consumer must know every cache key derived from a row. One product row may feed a product page, a search result and a category list. That mapping is the hard part, and the usual cause of we invalidated the wrong key.
+
+= th | CAC-04 · the line to say | State the staleness bound: TTL alone, writer deletes with TTL as backstop, or the change stream's lag.
+V: I state the staleness I guarantee, with the mechanism behind it. Invalidation from the database's change stream bounds staleness by the stream's lag and survives writer crashes. A writer deleting after commit is usually fresh, with the time to live as the backstop. And the TTL alone is the worst case.
+[pause: 0.8]
+
+## 9.6 The stale-set race and leases
+
+= dia | CAC-06 · Tier B · The failure | A slow reader writes an old value after the delete
+@ CAC-06
+p9-stale-set
+N: Here is the race, as a sequence. One: reader A misses on key k. Two: A reads the database and gets version one. Three: A is slow, a pause, a long network hop. Four: a writer updates the database to version two. Five: the writer deletes k from the cache, which is empty anyway. Six: A finally sets k to version one. The cache now holds an old value, with a long time to live, and every invalidation has already happened. It will stay wrong until it expires. Deleting on write does not prevent this. Ordering by change stream does not either.
+
+= dia | CAC-06 · Tier B · The mechanism | A lease token on a miss; a delete invalidates it
+p9-lease
+N: The lease closes it. In the picture: one, A misses, and the cache returns a lease token along with the miss, say token seventy-seven. Two, A reads version one from the database. Three, the writer updates the database. Four, the writer's delete removes the key and invalidates token seventy-seven. Five, A tries to set k with token seventy-seven. The cache refuses, because that token is no longer valid. The next reader misses, gets a new token, and loads version two. A set is accepted only from the reader whose lease is still current.
+
+= th | CAC-06 · the line to say | A lease token is issued on a miss and voided by a delete, so a slow reader cannot set a value older than the invalidation.
+V: The stale-set race lets a slow reader write an old value after the invalidation. Leases fix it: the cache hands a token with each miss, a delete voids outstanding tokens, and a set is accepted only with a valid token. The same lease also limits how many readers load a key at once.
+[pause: 0.8]
+
+## 9.7 Stampede control
+
+= tiles | CAC-05 · Tier A · The failure | One hot key expires
+@ CAC-05
+1 | key: the home page's top stories, 20,000 reads a second
+200 ms | to rebuild it from the database
+4,000 | readers miss in those 200 ms, and each one rebuilds it
+4,000× | the database work that one rebuild needed
+N: A stampede, sometimes called a dog pile. One very hot key, the home page's top stories, read twenty thousand times a second. It expires. Rebuilding it takes two hundred milliseconds of database work. In those two hundred milliseconds, four thousand readers miss, and each one starts its own rebuild. The database does four thousand times the work that one rebuild needed, at exactly the moment the key is most wanted.
+
+= table | CAC-05 · Tier A · The mechanism | Four defences
+Defence | How | Where
+Single-flight | The first miss loads; others for the same key **wait for its result** | In one process, or across a node with a lock per key
+Leases | The cache gives a load token to **one** caller per key every few seconds; others wait briefly or get the stale value | In the cache server (9.6)
+Early refresh | Refresh **before** expiry, with a probability that rises as expiry nears | In each reader; no coordination
+Stale-while-revalidate | Serve the expired value for a grace window while **one** background refresh runs | In the cache, or HTTP's own header
+N: Four defences. Single flight: the first miss for a key starts the load, and every other miss for the same key waits for that result instead of loading again. Leases: the cache gives a load token to one caller per key every few seconds, and the others wait briefly or take a stale value. Early refresh: each reader refreshes before expiry with a probability that rises as expiry approaches, so one of them usually does it early, with no coordination. And stale while revalidate: serve the expired value for a short grace window while one background refresh runs.
+
+= code | CAC-05 · Tier A · One level down | Probabilistic early refresh, and why it works
+on each read of a cached value (fetched with: value, delta, expiry):
+    delta  = how long the last rebuild took
+    if now - delta x beta x ln(random()) >= expiry:
+        refresh now, as if it had expired
+
+ln(random()) is negative, so the term pushes "now" forward by a random amount
+scaled to the rebuild time; hotter keys are read more, so one reader
+almost always refreshes shortly before expiry, and only one
+N: One level down: probabilistic early refresh. Each value is stored with how long its last rebuild took. On each read, push the current time forward by a random amount proportional to that rebuild time, and if that passes the expiry, refresh now. Because a hot key is read thousands of times a second, one of those reads almost always refreshes it shortly before it expires, and only one, since the probability is small for each. Cold keys are rarely refreshed early, which is exactly right. No locks, no coordination.
+
+= panel watch | CAC-05 · Tier A · The alternative and the price | What each defence costs
+**Single-flight** per process still sends one load per **process**: a thousand servers, a thousand loads. Use it, and add a lease or a lock across servers for the hottest keys.
+**Stale-while-revalidate** serves data past its TTL: say by how much.
+**Early refresh** does a little extra work on hot keys, all the time.
+N: Each has a price. Single flight inside one process still sends one load per process, so a thousand servers still send a thousand loads. Use it, and add a lease or a lock across servers for the hottest keys. Stale while revalidate serves data past its time to live, so say by how much. And early refresh does a little extra work on hot keys all the time.
+
+= th | CAC-05 · the line to say | One load per key, not per reader: single-flight, a lease, early refresh, or stale-while-revalidate.
+V: On a hot key's expiry, I make sure there is one rebuild, not thousands. Single flight inside each process, a lease across processes for the hottest keys, probabilistic early refresh so the rebuild happens before expiry, or serving the stale value briefly while one refresh runs.
+[pause: 0.8]
+
+## 9.8 Hot keys and big values
+
+= table | CAC-07 · Tier B · The mechanism | One key at 500,000 reads a second
+@ CAC-07
+Option | How | Price
+Local in-process copy | Each app server keeps the hottest keys for 1 to 5 s | Staleness of seconds; memory on every server
+Replicate the key | Store k#1 … k#16 on different nodes; readers pick one at random | 16 copies to invalidate
+Push instead of pull | Precompute and broadcast the value on change | A publish path to build
+N: One key takes five hundred thousand reads a second, and one cache node serves perhaps a hundred thousand. Three options. Keep a local in-process copy of the hottest few keys on each application server for a few seconds: the load on the cache node all but disappears, and the value is stale by seconds. Replicate the key under sixteen suffixes on different nodes, and let readers pick one at random, at the cost of sixteen copies to invalidate. Or push: precompute the value on change and broadcast it.
+
+= panel key | CAC-07 · Tier B · One level down | Big values
+A 5 MB value read 1,000 times a second is **5 GB a second** from one node: the network card, not the CPU, is the limit.
+Split it into chunks under separate keys, compress it, or cache a **smaller projection** that the page actually needs.
+Memcached limits items to 1 MB by default for a reason: large items fragment memory and block the event loop while they are copied.
+N: Big values are the other case. A five megabyte value read a thousand times a second is five gigabytes a second from one node, and the network card gives out first. Split it into chunks under separate keys, compress it, or cache a smaller projection that the page actually needs. Memcached limits items to one megabyte by default for a reason: large items fragment memory and stall the server while they are copied.
+
+= th | CAC-07 · the line to say | A hot key gets a short local copy or replicas under suffixes; a big value gets split, compressed or projected.
+V: A single hot key beyond one node's capacity gets a short-lived in-process copy, or replicas under suffixes read at random. A big value gets split, compressed, or replaced by the smaller projection the reader needs, because the network card saturates before the processor.
+[pause: 0.8]
+
+## 9.9 Multi-tier caching
+
+= dia | CAC-08 · Tier B · The mechanism | In-process first, then remote, then the store
+@ CAC-08
+p9-tiers
+N: Tiers stack caches by distance. A request first checks an in-process cache in the application's own memory, which costs microseconds and holds a few thousand of the hottest keys. On a miss it checks the remote cache cluster, about half a millisecond away, which holds millions. On a miss there, it goes to the database. In the picture the in-process tier absorbs sixty percent, the remote tier ninety-eight percent of the rest, and the database sees under one percent.
+
+= panel watch | CAC-08 · Tier B · The price | The in-process tier is the hard one to invalidate
+There may be **a thousand** in-process caches. A delete must reach all of them, by broadcast, or not at all.
+So give it a **short TTL**, seconds, and accept that staleness; or subscribe each process to an invalidation channel and accept a fan-out on every write.
+Never put per-user, must-be-fresh data in the in-process tier.
+N: The price is invalidation. There may be a thousand in-process caches, and a delete must reach all of them. Either give that tier a short time to live, a few seconds, and accept the staleness, or subscribe every process to an invalidation channel and accept a fan-out on every write. And keep data that must be fresh for one user out of it.
+
+= th | CAC-08 · the line to say | An in-process tier for the hottest keys with a TTL of seconds, a remote tier for the working set, the store last.
+V: I stack an in-process tier for the hottest keys, with a time to live of seconds because it is hard to invalidate, over a remote cache for the working set, over the store. Each tier's hit ratio multiplies down the load on the next.
+[pause: 0.8]
+
+## 9.10 Negative caching and penetration
+
+= dia | CAC-09 · Tier B · The mechanism | Keys that do not exist go straight through the cache
+@ CAC-09
+p9-penetration
+N: A cache only stores what exists. So a request for a key that does not exist always misses and always reaches the database. A buggy client, or an attacker, requests random product identifiers at fifty thousand a second, and every one goes straight through. That is cache penetration. Two defences, in the picture. One: negative caching. Store not found under the key, with a short time to live, say thirty seconds. Two: a Bloom filter of every key that exists, from part seven, checked before the cache. A key the filter says is absent is refused at once.
+
+= panel watch | CAC-09 · Tier B · The price | A short TTL, and a filter to keep current
+A negative entry must be **short-lived**, and deleted when the key is created, or a new product is invisible for its TTL.
+Random keys defeat negative caching (each is new), so the **filter** is what stops an attack. It must be rebuilt or updated as keys are created.
+N: The price. A negative entry must be short-lived, and deleted when the key is created, or a new product stays invisible for the whole time to live. And random keys defeat negative caching, since each one is new, so the filter is what stops an attack, and it must be updated as keys are created.
+
+= th | CAC-09 · the line to say | Cache "not found" with a short TTL, and put a Bloom filter of existing keys in front, so missing keys never reach the store.
+V: Keys that do not exist go straight through a cache. I cache not found with a short time to live, cleared on create, and put a Bloom filter of existing keys in front, so random lookups are refused before they reach the database.
+[pause: 0.8]
+
+## 9.11 Cold start and node loss
+
+= table | CAC-11 · Tier B · The mechanism | Three ways to stop an empty cache from killing the database
+@ CAC-11
+Situation | Defence | How
+A whole tier restarts | **Warm from a warm peer** | A cold cluster reads misses from a warm cluster's cache, not the database, until its hit ratio recovers
+One node of many dies | **Gutter pool** | A small set of spare servers, about 1% of the tier, takes the dead node's keys with a short TTL, instead of rehashing them onto live nodes
+Any restart | **Admission limit** on the database | Shed or queue misses beyond what the database can take (part 12)
+N: Three defences against an empty cache. When a whole tier restarts, warm it from a warm peer: a cold cluster sends its misses to another cluster's cache instead of the database, until its own hit ratio recovers. When one node of many dies, use a gutter pool: a small set of spare servers, about one percent of the tier, takes over the dead node's keys with a short time to live. Rehashing them onto live nodes instead can overload those and cascade. And in every case, put an admission limit in front of the database.
+
+= panel key | CAC-11 · Tier B · One level down | What "64 GB of cache" holds
+Per item: key 30 B + value 100 B + about **50 B** of overhead (hash entry, eviction links, expiry, flags).
+Plus **slab waste**: items are stored in size classes, so a 180 B item may occupy a 192 B slot.
+64 GB / 192 B is about **330 million** items, not the 490 million that 64 GB / 130 B suggests.
+So size by **items**, measured, not by the raw bytes of values.
+N: One level down: what a cache node is inside. A hash table, an eviction list, and items. Each item carries the key, the value and about fifty bytes of overhead: the hash entry, the eviction links, the expiry and flags. Items are stored in size classes, so a hundred and eighty byte item may occupy a slot of a hundred and ninety-two. Sixty-four gigabytes then holds about three hundred and thirty million items, not the four hundred and ninety million that the raw value bytes suggest. Size caches by measured items.
+
+= th | CAC-11 · the line to say | Warm a cold tier from a warm peer, replace a lost node with a gutter pool, and never let the database see the full miss rate unguarded.
+V: An empty cache is a database outage waiting to happen. I warm a cold tier from a warm peer, cover a lost node with a small gutter pool rather than rehashing its keys onto live nodes, and keep an admission limit in front of the database so it never sees the full miss rate.
+[pause: 0.8]
+
+## 9.12 Recap
+
+= list | Recap | What to be able to explain without notes
+- **Cache-aside** written correctly: delete, never set; always a TTL
+- **Backend load is misses times traffic**: 99 to 90 percent is ten times
+- **LRU and scans**, and admission by a frequency sketch
+- **TTL jitter**, lazy and sampled expiry
+- Three **invalidation** paths and the **staleness bound** of each
+- The **stale-set race**, closed by a lease
+- **Stampedes**, hot keys, tiers, negative caching, cold start
+N: Without notes: cache-aside written correctly. Backend load as misses times traffic. Why least recently used fails on a scan, and how admission fixes it. Jitter and the two kinds of expiry. Three invalidation paths with their staleness bounds. The stale-set race and the lease. And stampedes, hot keys, tiers, negative caching and cold start.
+
+## 9.13 Probe drills
+
+= probe | State the staleness you guarantee.
+- Normally: the **change stream's lag**, under a second
+- If the stream stalls: the **TTL**, here five minutes, as the hard bound
+- For the user's own writes: read from the store, or carry a version
+C: Normally the staleness is the lag of the change stream that drives invalidation, under a second, and I alert when that lag rises. If the stream stalls completely, the time to live is the hard bound, here five minutes. And for a user's own writes, where they will notice, the read after a write goes to the store or carries the version it must see.
+
+= probe | And what breaks it?
+- The **stale-set race**, unless sets carry a lease token
+- A **wrong key mapping**: the row changed, a different derived key was cached
+- The **in-process tier**, which only the TTL covers
+C: Three things. The stale-set race, where a slow reader writes an old value after the delete, unless sets require a lease token. A wrong mapping from rows to keys, where the row changed and a derived key nobody listed stays stale until its time to live. And the in-process tier, which invalidation may not reach, so only its own short time to live bounds it.
+
+= probe | One key takes 500,000 requests a second.
+- Beyond one node: **local copies** for a few seconds on each app server
+- Or **replicas** under suffixes, read at random
+- Detect it with a **sketch** first; and fix the stampede on its expiry
+C: That is beyond one cache node, so I spread it. Each application server keeps a local copy for a second or two, which removes almost all the remote load at a staleness of seconds. Or I store it under sixteen suffixes on different nodes and read one at random. I detect such keys with a frequency sketch rather than guessing, and I make sure its expiry triggers one rebuild, with a lease or early refresh.
+
+= probe | LRU or LFU for this workload, and how would you measure it?
+- Scans or one-off reads in the mix: **frequency-based admission** wins
+- Fast-shifting popularity: **LRU** or a large window
+- Measure: **replay a trace** at several sizes, or run a **shadow** policy
+C: If the traffic mixes popular keys with scans or one-off reads, frequency-based admission wins, because it stops one-time keys from evicting popular ones. If popularity shifts fast, recency matters more. But I would not decide by argument. I would replay a day's trace through simulators of each policy at several cache sizes and compare hit ratios, or run a shadow policy in production.
+
+= probe | The cache tier restarts at peak. What happens?
+- Hit ratio near **zero**: the database sees the **full read rate**
+- Defence: **warm from a peer**, admission limit on the database, staggered restarts
+- Design: say the cache is **load-bearing**, and size or protect for it
+C: The hit ratio goes to nearly zero, so the database sees the full read rate, likely many times its capacity. The defences: restart nodes in stages, never all at once; warm a cold tier from a warm peer; and keep an admission limit in front of the database, so excess misses are shed rather than taking it down. And in the design I would say plainly that the cache is load-bearing.
+
+## 9.14 Where this shows up
+
+= table | Where this shows up | What each design problem takes from this part
+Problem | Takes
+Distributed cache | All of it, plus cluster behaviour in its own task video
+News feed and timelines | Hot keys, stampedes, multi-tier, invalidation from the change stream
+Product catalogue and pricing | TTL per data type, the staleness bound, negative caching
+URL shortener | A near-perfect hit ratio, and what it hides
+Rate limiter | In-process counters as a tier
+N: The distributed cache task takes all of it, plus its cluster behaviour. Feeds take hot keys, stampedes, tiers and change-stream invalidation. A catalogue takes per-type staleness and negative caching. A URL shortener takes a near-perfect hit ratio, and what it hides. And a rate limiter uses in-process counters as a tier.
+
+= panel note | Read next | Where to go deeper
+Nishtala et al., *Scaling Memcache at Facebook*, after section 3: regions and consistency across them.
+*Designing Data-Intensive Applications*, chapter 5 (reading your own writes) and chapter 11 (keeping derived data in sync from a change stream).
+Einziger, Friedman and Manes, *TinyLFU: A Highly Efficient Cache Admission Policy*.
+N: To go deeper: the rest of Scaling Memcache at Facebook, for regions. Chapters five and eleven of Designing Data-Intensive Applications, for reading your own writes and derived data. And the TinyLFU paper. Part ten turns to logs, queues and streams.

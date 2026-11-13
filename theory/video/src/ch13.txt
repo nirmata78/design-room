@@ -1,0 +1,467 @@
+#! title: Reliability patterns
+#! short: Reliability
+
+= th | System design at Staff depth · Part 13 of 17 | Reliability patterns | Timeouts, retries and their budget, circuit breakers, bulkheads and cells, hedging, degradation, static stability, redundancy, metastable failure, herds, reconciliation, dependencies, capacity, disaster recovery.
+N: Part thirteen, reliability patterns. This is the vocabulary of the wrap-up phase, where an interviewer asks what happens when a dependency fails, when a zone is lost at peak, when retries arrive in a storm. Each pattern here is cheap to name and expensive to apply correctly, so for each one we take the number that decides whether it helps or hurts.
+
+## 13.0 Why this part decides rounds
+
+= panel trap | The opening story | The trigger is gone, and the system is still down
+A database has a ten-minute slowdown during a backup. Latency rises; clients time out; every layer retries three times.
+The backup finishes. The database is healthy again.
+The system stays down for an hour, because the **retries alone** are now three to twenty-seven times the normal load, and every response is too late to count.
+N: A database slows down for ten minutes during a backup. Latency rises, clients time out, and every layer retries three times. The backup finishes and the database is healthy again. And the system stays down for another hour, because the retries alone are now many times the normal load, and every response arrives too late to count, which causes more retries. The trigger was gone. The system was held down by its own defences. That is a metastable failure, and this part is largely about not building one.
+
+= panel note | Assumed reading | What this part does not repeat
+*Site Reliability Engineering*, chapter 22, *Addressing Cascading Failures*.
+The chapter's anatomy of a cascade, queue management, testing advice and immediate steps during an incident stay there.
+Part 11: deadlines passed down a call chain. Part 12: shedding and client-side throttling.
+N: Chapter twenty-two of the S-R-E book, Addressing Cascading Failures, is assumed. Its anatomy of a cascade, its advice on queues and testing, and what to do during an incident stay in the book. So do two sections of this course: deadlines from part eleven, and shedding from part twelve.
+
+= list | Map of the part | Four groups
+- **Calls that fail**: timeouts, retries, circuit breakers, hedging
+- **Containing damage**: bulkheads and cells, degradation, static stability, dependencies
+- **Surviving loss**: redundancy across zones, capacity and autoscaling, disaster recovery
+- **Failures that feed themselves**: metastable failure, thundering herds; and the safety net, reconciliation
+N: Four groups. Calls that fail: timeouts, retries, breakers and hedging. Containing damage: bulkheads, cells, degraded modes, static stability, and dependencies. Surviving loss: redundancy, capacity and disaster recovery. And failures that feed themselves, metastable states and herds, with reconciliation as the net under everything.
+
+## 13.1 Timeouts and deadlines
+
+= panel trap | REL-01 · Tier A · The failure | The default timeout was thirty seconds
+@ REL-01
+A dependency normally answers in 20 ms, at p99 in 80 ms. The client library's default timeout is **30 seconds**.
+The dependency hangs. Each calling thread now waits 30 s. A server with 200 threads serving 2,000 requests a second runs out of threads in **one tenth of a second**.
+The caller is down, though its own code is fine.
+N: A dependency normally answers in twenty milliseconds, and in eighty at p99. The client library's default timeout is thirty seconds. Then the dependency hangs. Each calling thread now waits thirty seconds. A server with two hundred threads, serving two thousand requests a second, runs out of threads in a tenth of a second. The caller is down, although its own code is fine. A timeout is a capacity decision, because it sets how long a failed dependency can hold your resources.
+
+= code | REL-01 · Tier A · The mechanism | Set the timeout from the dependency's latency, then fit it in the deadline
+dependency latency:  p50 20 ms, p99 80 ms, p99.9 150 ms
+timeout:             about the p99.9, rounded up        ->  200 ms
+    false timeouts: about 0.1% of healthy calls
+
+threads held by a hung dependency:
+    2,000 a second x 0.2 s  = 400 threads   (instead of 60,000 at 30 s)
+
+and it must fit the caller's remaining deadline (part 11):
+    effective timeout = min(200 ms, deadline remaining - own work)
+N: Set the timeout from the dependency's measured latency. With a p99.9 of a hundred and fifty milliseconds, a timeout of two hundred gives false timeouts on about one healthy call in a thousand. A hung dependency now holds two thousand times point two, four hundred threads' worth of work, instead of sixty thousand. And it must fit inside the caller's remaining deadline from part eleven, so the effective timeout is the smaller of the two hundred milliseconds and what is left of the deadline after the caller's own work.
+
+= panel key | REL-01 · Tier A · One level down | Three timeouts per call, not one
+**Connect timeout**: short, tens of milliseconds within a zone: a host that does not accept a connection is down.
+**Per-attempt timeout**: from the dependency's latency, as above.
+**Overall deadline**: across all attempts, from the caller's budget. Retries happen **inside** it, never extending it.
+N: One level down. A call has three timeouts, not one. A connect timeout, short, tens of milliseconds within a zone, because a host that cannot accept a connection is down. A per-attempt timeout, from the dependency's latency. And an overall deadline across all attempts, from the caller's budget. Retries happen inside that deadline, and never extend it.
+
+= th | REL-01 · the line to say | Timeouts come from the dependency's p99.9, fit inside the caller's deadline, and bound how long a failure can hold my resources.
+V: I set each per-attempt timeout from the dependency's p99.9 latency, cap it by what remains of the caller's deadline, and keep retries inside that deadline. A timeout is a capacity decision: it bounds how long a failing dependency can hold my threads.
+[pause: 0.8]
+
+## 13.2 Retries
+
+= code | REL-02 · Tier A · Assumes SRE book ch. 22 | The amplification when every layer retries
+@ REL-02
+three layers; each makes up to 3 attempts when the layer below fails
+
+front end -> service -> backend -> database
+    attempts at the database per user request:  3 x 3 x 3  = 27
+
+a database at 2x overload, everyone retrying:  load can reach 27x
+
+fix:  retry at ONE layer only; others fail fast
+      per-request limit: 3 attempts
+      per-client retry budget: retries at most 10% of requests
+      backoff with full jitter: sleep random(0, min(cap, base x 2^attempt))
+N: Assumes chapter twenty-two. The one calculation to carry: three layers, each making up to three attempts when the layer below fails, means up to twenty-seven attempts at the database for one user request. That is how a database at twice its capacity ends up facing twenty-seven times its load. The fixes: retry at one layer only, and let the others fail fast. Limit each request to three attempts. Give each client a retry budget, retries at most ten percent of its requests. And back off with full jitter, a random sleep up to an exponentially growing cap.
+
+= panel trap | REL-02 · Tier A · The probe the chapter leaves | "Where exactly do retries happen in your design, and who may not retry?"
+Name the **one layer** that retries: usually the one closest to the user that knows the request is idempotent.
+**Not allowed to retry**: anything non-idempotent without a key (part 11); any layer below the chosen one; and any call whose deadline has passed.
+**Retry on** unavailable and 503; **never on** 400s or on DEADLINE_EXCEEDED from below, which means the budget is spent.
+N: The probe the chapter leaves to you: where exactly do retries happen, and who is not allowed to retry? Name one layer that retries, usually the one nearest the user that knows the request is idempotent. Not allowed: any non-idempotent call without a key, every layer below the chosen one, and any call whose deadline has passed. Retry on unavailable and five oh three. Never on four hundreds, and never on a deadline exceeded from below, which means the time budget is already spent.
+
+= th | REL-02 · the line to say | Retry at one layer, at most three attempts, inside a ten percent budget, with jittered backoff. Three layers of three is twenty-seven.
+V: I retry at exactly one layer, with at most three attempts, inside a retry budget of about ten percent of requests, using exponential backoff with full jitter. Every other layer fails fast, because three layers each retrying three times multiply load by twenty-seven exactly when the bottom is weakest.
+[pause: 0.8]
+
+## 13.3 Circuit breaker
+
+= dia | REL-03 · Tier A · The failure | Calling a dependency that is certainly down
+@ REL-03
+p13-no-breaker
+N: A dependency has failed completely. Every call to it waits for its timeout, two hundred milliseconds, and then fails. The caller keeps calling, a thousand times a second, holding two hundred threads in permanent waiting, and adding a thousand requests a second to a dependency that is trying to restart. The picture shows both costs: the caller's latency on every request is the full timeout, and the dependency's recovery is slowed by traffic that cannot succeed.
+
+= dia | REL-03 · Tier A · The mechanism | Closed, open, half-open
+p13-breaker
+N: The circuit breaker is a small state machine around calls to one dependency. Closed: calls pass through, and the breaker counts failures over a window, say the last ten seconds. When the failure rate exceeds a threshold, fifty percent over at least twenty calls, it trips to open. Open: calls fail immediately, without touching the dependency, for a cool-down of thirty seconds. Then half-open: a few trial calls pass. If they succeed, back to closed. If they fail, open again, for another cool-down.
+
+= panel key | REL-03 · Tier A · One level down | What the thresholds must respect
+A **minimum call count** before tripping, or one failure out of two calls opens it.
+**Count the right failures**: timeouts, 503, connection errors. A 400 is the caller's fault; a 429 is a limit, handled by backoff.
+**Per dependency, and per host if hosts fail independently**: one bad replica should be ejected (part 11), not trip the breaker for all.
+The open state needs a **fallback**: a cached value, a default, a degraded mode (13.6), or a clear error.
+N: One level down. Require a minimum number of calls before tripping, or one failure in two calls opens it. Count the right failures: timeouts, five oh threes and connection errors, not four hundreds, which are the caller's fault. Keep a breaker per dependency, and if hosts fail independently, eject the bad host rather than tripping the breaker for all of them. And the open state needs a fallback: a cached value, a default, a degraded mode, or a clear error.
+
+= panel watch | REL-03 · Tier A · The alternative and the price | Breaker, retry budget, or adaptive throttling
+**Retry budget** limits extra load from retries, and still sends every first attempt.
+**Client-side throttling** (part 12) rejects in proportion to the failure rate, smoothly.
+**A breaker** is all or nothing: it stops all calls, and recovers in steps. It suits a dependency that fails **completely**, not one that is merely slow for some calls.
+N: The alternatives. A retry budget limits extra load from retries, and still sends every first attempt. Client-side throttling, from part twelve, rejects in proportion to the failure rate, smoothly. A breaker is all or nothing: it stops every call and recovers in steps. It suits a dependency that fails completely. For one that is slow on some calls, proportional throttling behaves better.
+
+= th | REL-03 · the line to say | A circuit breaker trips open on a failure rate, fails fast during a cool-down, tests half-open, and needs a fallback.
+V: A circuit breaker around each dependency trips open when the failure rate passes a threshold over a minimum number of calls, fails fast for a cool-down, then lets trial calls through half-open. It needs a fallback for the open state, and it suits dependencies that fail completely.
+[pause: 0.8]
+
+## 13.4 Bulkheads and cells
+
+= dia | REL-04 · Tier A · The failure | One slow dependency takes every thread
+@ REL-04
+p13-shared-pool
+N: A service calls three dependencies, recommendations, inventory and payments, from one shared pool of two hundred threads. Recommendations becomes slow. Threads calling it wait, and within a second all two hundred are waiting on recommendations. Now inventory and payments calls cannot get a thread either, though both are healthy. The least important dependency has taken down the most important path. Nothing separated them.
+
+= dia | REL-04 · Tier A · The mechanism | Separate pools inside a process; separate cells across the fleet
+p13-cells
+N: Bulkheads separate resources, as compartments separate a ship. On the left of the picture, inside one process: a pool of forty threads for recommendations, eighty for inventory, eighty for payments. Recommendations can exhaust only its own forty. On the right, the same idea across the whole fleet: cells. A cell is a complete copy of the stack, its own load balancers, servers, caches and databases, serving a fixed subset of customers. A thin cell router sends each customer to their cell. A bad deploy or a poison request damages one cell, one eighth of customers, not all.
+
+= panel key | REL-04 · Tier A · One level down | What a cell is made of, and how a request is pinned
+A cell shares **nothing** on the request path with other cells: its own data stores, caches and queues.
+The **cell router** maps customer to cell from a small table, cached everywhere and changed rarely; it must be the simplest, most available component in the system.
+**Deploys go cell by cell**, so a bad release reaches one cell first (part 16).
+Moving a customer between cells is a **data migration**, so assignments are sticky.
+N: One level down: what a cell is made of. It shares nothing on the request path with other cells, not its stores, caches or queues. The cell router maps a customer to a cell from a small table, cached everywhere and rarely changed, and it must be the simplest and most available component in the system. Deploys go cell by cell, so a bad release reaches one cell first. And moving a customer between cells is a data migration, so assignments are sticky.
+
+= table | REL-04 · Tier A · The alternative and the price | What cells cost
+ | One big deployment | Eight cells
+Blast radius of a bad deploy or poison input | Everyone | One eighth
+Capacity | Pooled; statistically efficient | Each cell has its own headroom: more spare capacity in total
+Operations | One of everything | Eight of everything; automation is mandatory
+Cross-customer features | Easy | Hard: data for two customers may live in two cells
+N: The price. One big deployment pools capacity efficiently and puts everyone in the blast radius. Eight cells limit any bad deploy or poison input to an eighth of customers, and each cell needs its own headroom, so more spare capacity in total. There are eight of everything to operate, so automation is mandatory. And features that join data across customers become hard, because two customers may live in two cells.
+
+= th | REL-04 · the line to say | Bulkheads give each dependency its own pool; cells give each customer slice its own full stack behind a simple router.
+V: Inside a process, each dependency gets its own bounded pool, so a slow one cannot take every thread. Across the fleet I use cells: full copies of the stack serving fixed customer slices behind a very simple router, deployed one cell at a time, so a bad change or poison input reaches one slice.
+[pause: 0.8]
+
+## 13.5 Hedged requests
+
+= panel key | REL-05 · Tier B · The mechanism | Send a second copy after the p95, and take the first answer
+@ REL-05
+A request to one of several replicas waits for its **p95** latency. If no answer yet, send the same request to **another** replica, and use whichever answers first; cancel the other.
+Extra load: only requests slower than p95 are hedged, so at most about **5%** more.
+*The Tail at Scale* reports a benchmark where hedging after 10 ms cut the p99.9 for reading 1,000 keys from **1,800 ms to 74 ms**, for **2%** more requests.
+N: A hedged request waits for the dependency's p95 latency, and if no answer has arrived, sends the same request to another replica, uses whichever answers first, and cancels the other. Only requests slower than the p95 are hedged, so the extra load is at most about five percent. The Tail at Scale reports a benchmark in which hedging after ten milliseconds cut the p99.9 of reading a thousand keys from one thousand eight hundred milliseconds to seventy-four, for two percent more requests.
+
+= panel watch | REL-05 · Tier B · The price | Only for idempotent reads, and never under overload
+Hedge only **idempotent** requests: a hedged write may apply twice.
+Under overload, hedging **adds** load at the worst moment: disable it when the dependency is shedding, or count hedges against the retry budget.
+N: The price. Hedge only idempotent requests, because a hedged write may apply twice. And under overload, hedging adds load exactly when it hurts, so turn it off when the dependency is shedding, or count hedges against the retry budget.
+
+= th | REL-05 · the line to say | Hedge idempotent reads after the p95, for about five percent more load and a much shorter tail; never under overload.
+V: For fan-out reads where the tail decides latency, I hedge: after the p95, send a second copy to another replica and take the first answer. It costs a few percent more requests and cuts the tail sharply, and I use it only for idempotent reads and turn it off under overload.
+[pause: 0.8]
+
+## 13.6 Graceful degradation
+
+= panel trap | REL-06 · Tier A · The failure | Recommendations are down, so the product page shows an error
+@ REL-06
+The product page calls six services. One of them, recommendations, fails.
+The page handler treats any failed call as a failed page, and returns an error.
+Users cannot buy anything, because a box of "you might also like" could not load.
+N: A product page calls six services to build itself. One of them, recommendations, fails. The page handler treats any failed call as a failed page and returns an error. Users cannot buy anything, because a box of you might also like could not load. Nobody decided that recommendations was a hard dependency of buying. It became one by default.
+
+= table | REL-06 · Tier A · The mechanism | Decide, per dependency, what the user sees when it fails
+Dependency | If it fails, the page shows | Dependency is
+Price and stock | An error: we cannot sell without them | **Hard**
+Recommendations | Best-sellers from a static list | Soft
+Reviews | "Reviews unavailable" | Soft
+Personalised banner | The generic banner | Soft
+Search | Cached results for popular queries, older than usual | Soft, degraded
+N: The mechanism is a table, written in the design. For each dependency: what the user sees when it fails. Price and stock: an error, because we cannot sell without them. Those are hard dependencies. Recommendations: a static list of best-sellers. Reviews: a note that they are unavailable. The personalised banner: the generic one. Search: cached results for popular queries, a little older than usual. Everything except the first row is soft, and its failure must not fail the page.
+
+= panel key | REL-06 · Tier A · One level down | Implementing it
+Each soft call has a **short timeout** and a **fallback**, and runs **in parallel**, so a slow soft dependency cannot delay the page beyond its timeout.
+The fallback is **tested**: a degraded mode that has never run will fail when it is needed. Inject the failure in a test environment, regularly.
+Degradation is **visible** to operators: a metric for each fallback served.
+N: One level down. Each soft call gets a short timeout and a fallback, and the calls run in parallel, so a slow soft dependency can delay the page by its timeout at most. The fallback is tested, by injecting the failure regularly in a test environment, because a degraded mode that has never run will fail on the day it is needed. And every fallback served is counted, so operators can see the product is degraded.
+
+= panel watch | REL-06 · Tier A · The alternative and the price | Degrade the product, or degrade the quality
+Some systems degrade **quality** under load rather than features: fewer search results scored, a cheaper model, lower video bitrate.
+Both need a **product owner's decision** in advance: which feature or quality is cut first. That is a requirement, not an implementation detail.
+N: An alternative is to degrade quality instead of features: score fewer search results, use a cheaper model, drop the video bitrate. Either way, a product owner decides in advance which feature or quality is cut first. That is a requirement, not an implementation detail.
+
+= th | REL-06 · the line to say | For each dependency, the design says what the user sees when it fails; soft ones have short timeouts, tested fallbacks and a metric.
+V: My design lists every dependency as hard or soft, with what the user sees when each fails. Soft calls run in parallel with short timeouts and tested fallbacks, and each fallback served is counted, so a failing extra never takes down the core path.
+[pause: 0.8]
+
+## 13.7 Static stability
+
+= dia | REL-07 · Tier A · The failure | The control plane fails, and the data plane stops with it
+@ REL-07
+p13-static
+N: A service's servers read their configuration, routes and credentials from a control plane on every start, and refresh them every minute. The control plane has an outage. On the left of the picture, servers whose refresh failed treat their state as invalid and stop serving, and an autoscaler that cannot reach the control plane cannot launch replacements. The data plane fails because the control plane did. On the right, the statically stable version keeps serving from its last known state, with nothing new happening until the control plane returns.
+
+= panel key | REL-07 · Tier A · The mechanism | Keep working, unchanged, when anything you depend on to change things is down
+**Last known good**: every data-plane component caches the state it needs, on disk, and serves from it when it cannot refresh.
+**Pre-provisioned capacity**: survive the loss of a zone with capacity **already running**, not capacity the autoscaler must launch during the event.
+**No new dependencies in failure paths**: failover must not need the service that has failed.
+N: Static stability means: when anything you rely on to change things is down, keep working, unchanged. Three practices. Last known good: every data plane component caches the state it needs, on disk, and serves from it if it cannot refresh. Pre-provisioned capacity: survive the loss of a zone with capacity already running, not capacity an autoscaler must launch during the event, when the launch service is itself under strain. And no new dependencies in failure paths: failover must not need the service that has failed.
+
+= code | REL-07 · Tier A · One level down | Pre-provisioning for a zone loss, in numbers
+peak load needs 60 servers
+three zones
+
+autoscale after a zone is lost:   40 servers (20 a zone) + launch 20 more
+    during the event, when launches are slow or failing
+
+statically stable:  each zone sized to carry half the peak
+    30 a zone, 90 total, 1.5x peak, already running
+    lose a zone: 60 remain, nothing needs to launch
+N: One level down, in numbers. Peak needs sixty servers across three zones. The autoscaling plan runs forty, twenty per zone, and launches twenty more when a zone is lost, during the event, when launches are slowest or failing. The statically stable plan sizes each zone to carry half the peak: thirty per zone, ninety in total, one and a half times peak, already running. Lose a zone and sixty remain. Nothing needs to launch.
+
+= panel watch | REL-07 · Tier A · The alternative and the price | What it costs, and what it gives up
+**Cost**: idle capacity, here 50% over peak, and caches of state that can be stale.
+**Gives up**: changes during the outage. No new deploys, no config changes, no scaling. That is acceptable for minutes to hours, and the trade must be stated.
+N: The cost is idle capacity, here fifty percent over peak, and cached state that can be stale. What it gives up is change during the outage: no deploys, no config changes, no scaling. For minutes to hours that is acceptable, and the trade should be stated in the design.
+
+= th | REL-07 · the line to say | The data plane keeps serving on last known good when the control plane is down, with zone-loss capacity already running.
+V: I design for static stability: if the control plane is down, the data plane keeps serving from last known good state, and capacity to survive a zone loss is already running, not launched during the event. The price is idle headroom and no changes until the control plane returns.
+[pause: 0.8]
+
+## 13.8 Redundancy and failure domains
+
+= code | REL-08 · Tier A · The failure | Three zones, sized for average
+@ REL-08
+peak 6,000 requests a second; one server handles 100
+needed at peak: 60 servers
+
+deployed: 66 servers, 22 a zone       "N+6, plenty"
+lose one zone at peak: 44 servers left = 4,400 a second
+    shortfall 1,600 a second: 27% of requests fail or queue
+N: Start with the failure. Peak is six thousand requests a second, and one server handles a hundred, so sixty are needed. The team deploys sixty-six, twenty-two per zone, and calls it N plus six. Then a zone is lost at peak. Forty-four servers remain, which handle four thousand four hundred a second. Twenty-seven percent of requests fail or queue. The redundancy was counted in servers, and the failure came in zones.
+
+= table | REL-08 · Tier A · The mechanism | Count spare capacity in the unit that fails
+Survive | With 3 zones | With 4 zones
+One zone lost: N+1 | Each zone carries 1/2 of peak: **1.5x** | Each carries 1/3: **1.33x**
+One zone lost plus one in maintenance: N+2 | Each carries all of peak: **3x** | Each carries 1/2: **2x**
+N: Count spare capacity in the unit that fails. To survive losing one zone of three, each zone must carry half the peak, so one and a half times peak in total. With four zones, each carries a third, so one point three three times. To survive one zone lost while another is down for maintenance, N plus two, three zones must each carry the whole peak, three times, while four zones need only half each, twice. More, smaller failure domains are cheaper to make redundant.
+
+= panel key | REL-08 · Tier A · One level down | The next five minutes after a zone is lost at peak
+**0 s**: requests to the zone fail; balancers eject it in seconds (part 11).
+**Seconds**: the other zones receive its traffic. With N+1 sizing they absorb it; caches there are warm for most keys.
+**Seconds to a minute**: stateful systems fail over leaders in the lost zone: consensus groups re-elect (part 3), async primaries promote (part 5).
+**Minutes**: nothing should be **launched** on the critical path; autoscaling adds margin, not survival.
+**Afterwards**: repair data that lost a replica, by risk (part 7).
+N: One level down: the next five minutes after a zone is lost at peak. At zero, requests to the zone fail, and balancers eject its backends within seconds. Then the other zones take its traffic, and with N plus one sizing they absorb it. Within a minute, stateful systems fail over the leaders that lived in the lost zone: consensus groups re-elect, asynchronous primaries are promoted. Nothing on the critical path should need to be launched. And afterwards, data that lost a replica is repaired, most at-risk first.
+
+= panel watch | REL-08 · Tier A · The alternative and the price | Pay for N+1 across zones, or accept a degraded mode
+N+1 by zone costs **50%** more capacity with three zones. Some systems instead **shed** to the critical traffic when a zone is lost (part 12), and size only for that.
+The decision is a cost against an availability target, made with numbers, not by habit.
+N: The alternative to paying fifty percent more capacity is to shed down to the critical traffic when a zone is lost, and size only for that. Either is defensible. The decision is cost against an availability target, made with numbers.
+
+= th | REL-08 · the line to say | Spare capacity is counted in the unit that fails: surviving one of three zones at peak needs one and a half times peak, already running.
+V: I count redundancy in the unit that fails, usually a zone. Surviving the loss of one of three zones at peak needs each zone to carry half the peak, one and a half times in total, running before the failure. With four zones it is one point three three, which is one reason to prefer more, smaller failure domains.
+[pause: 0.8]
+
+## 13.9 Cascading and metastable failures
+
+= dia | REL-09 · Tier B · Assumes SRE book ch. 22 | The loop that holds a system down
+@ REL-09
+p13-metastable
+N: Assumes chapter twenty-two. The picture is a cycle. A trigger, a spike or a slow backup, raises latency. Higher latency causes timeouts. Timeouts cause retries. Retries add load. More load raises latency further. Once the loop is running, removing the trigger does not stop it: the retries alone keep the load above capacity. A metastable system has two stable states at the same input load, healthy and failed, and a trigger can push it from one to the other.
+
+= panel trap | REL-09 · Tier B · The probe the chapter leaves | "Load is back to normal and latency is not. Why, and what do you do?"
+The **work** has not returned to normal: retries, queued requests that are already past their deadline, and cold caches still add load.
+Break the loop: **shed** load hard, drop queued work past its deadline, **cut retries** (budget to zero), and warm caches before restoring full traffic.
+Then let traffic back **in steps**.
+N: The probe: load is back to normal and latency is not, why? Because the work has not returned to normal. Retries, queued requests already past their deadlines, and cold caches all still add load. Break the loop two ways: shed load hard, dropping queued work past its deadline, and cut retries, setting the budget to zero for a while. Warm caches, then let traffic back in steps.
+
+= th | REL-09 · the line to say | A metastable failure is a loop of latency, timeouts and retries that outlives its trigger; break it by shedding load and cutting retries.
+V: A metastable failure is a sustaining loop: latency causes timeouts, timeouts cause retries, retries cause load, and it survives after the trigger is gone. I break it by shedding hard, dropping expired work and cutting retries, then restoring traffic in steps.
+[pause: 0.8]
+
+## 13.10 Thundering herds
+
+= tiles | REL-10 · Tier A · The failure | Everyone does the same thing at the same second
+@ REL-10
+00:00:00 | a nightly job in 20,000 clients, scheduled for midnight
+20,000 | requests in the same second, against a capacity of 2,000
+1 s | clients retry after exactly one second, together
+again | every retry wave is as large as the first
+N: A thundering herd is many independent clients doing the same thing at the same moment. Twenty thousand clients each run a nightly job scheduled for exactly midnight. Twenty thousand requests arrive in the same second against a capacity of two thousand. Most fail. Each client retries after exactly one second, so the retry wave is as large as the first. The herd was created by synchronisation: the same schedule, the same fixed delay. Part nine's cache stampede and part eleven's reconnect storm are the same failure in other places.
+
+= code | REL-10 · Tier A · The mechanism | Desynchronise: jitter on schedules and on backoff
+schedules:  run at midnight + random(0, 30 min), fixed per client
+    20,000 over 1,800 s  = about 11 a second
+
+retries, full jitter:
+    sleep = random(0, min(cap, base x 2^attempt))
+    base 100 ms, cap 30 s
+    attempt 1: 0 to 200 ms; attempt 2: 0 to 400 ms; attempt 5: 0 to 3.2 s
+
+the randomness is what matters: a fixed exponential backoff
+keeps the herd together, just at longer intervals
+N: The mechanism is to desynchronise. Schedules get a random offset per client: midnight plus up to thirty minutes, so twenty thousand clients arrive at about eleven a second. Retries use full jitter: sleep a random time between zero and an exponentially growing cap. With a base of a hundred milliseconds, the first retry waits up to two hundred, the fifth up to three point two seconds. The randomness is what matters. A fixed exponential backoff, without jitter, keeps the herd together, only at longer intervals.
+
+= panel key | REL-10 · Tier A · One level down | The server can help
+**Retry-After** with a **randomised** value spreads a wave the server can see coming.
+**Admission tokens**: when a dependency recovers, admit clients at a ramped rate rather than all at once.
+Long-poll and connection tiers send a **reconnect hint** with a random delay before shutting down (part 11).
+N: One level down: the server can help too. A retry-after header with a randomised value spreads a wave the server can see coming. After a recovery, admit clients at a ramped rate, rather than all at once. And connection tiers send each client a reconnect hint with a random delay before shutting down, as part eleven described.
+
+= panel watch | REL-10 · Tier A · The alternative and the price | Spread, or provision for the peak
+Provisioning for the synchronised peak, 10x normal for one minute a night, is expensive and rarely necessary.
+The price of jitter is **latency**: a job runs up to 30 minutes later, a retry waits longer. State it.
+N: The alternative is to provision for the synchronised peak, ten times normal load for one minute a night, which is expensive and rarely needed. The price of jitter is latency: a job runs up to half an hour later, a retry waits a little longer. State that in the design.
+
+= th | REL-10 · the line to say | Herds come from synchronisation; random offsets on schedules and full jitter on backoff break it.
+V: Thundering herds come from synchronisation: the same schedule, the same fixed delay. I give every scheduled job a random offset, every retry full jitter, and every reconnect a random delay, and the server ramps admission after a recovery.
+[pause: 0.8]
+
+## 13.11 Reconciliation and invariant audits
+
+= panel trap | REL-11 · Tier A · The failure | A bug that every mechanism above let through
+@ REL-11
+A payment is marked **paid** in your ledger. The card network never received the charge: a bug in an error path.
+Retries, idempotency and transactions all worked as designed. The bug was in the logic they protected.
+Six weeks later finance finds 1,400 orders shipped without payment.
+N: A payment is marked paid in your ledger. The card network never received the charge, because of a bug in an error path. Retries, idempotency keys and transactions all worked exactly as designed. The bug was in the logic they protected. Six weeks later, finance finds fourteen hundred orders shipped without payment. Every mechanism in this part protects against failures you anticipated. Something has to catch the ones you did not.
+
+= table | REL-11 · Tier A · The mechanism | Two kinds of check that run after the fact
+Check | Compares | Example
+Reconciliation | Two systems that should agree | Your ledger against the card network's settlement file, every day
+Invariant audit | One system against a rule that must always hold | Every double-entry transaction sums to zero; stock is never negative; every paid order has a charge
+N: Two kinds of check run after the fact. Reconciliation compares two systems that should agree: your ledger against the card network's settlement file, every day. An invariant audit checks one system against a rule that must always hold: every double-entry transaction sums to zero, stock is never negative, every paid order has a matching charge. Both run continuously or daily, independently of the code paths they check, and they alert on any difference.
+
+= panel key | REL-11 · Tier A · One level down | Building one that scales and gets acted on
+**Partition the comparison** by day and by key range, so a difference narrows to a small range fast, as with Merkle trees (part 5).
+**Allow for timing**: compare only records older than the settlement delay, or the audit alerts on everything in flight.
+**Every class of difference has an owner and a repair**, applied idempotently, and **the repair is itself audited**.
+**Measure detection time**: a daily reconciliation catches a bug within a day, not six weeks.
+N: One level down. Partition the comparison by day and key range, so a difference narrows quickly to a small range, as with Merkle trees in part five. Allow for timing: compare only records older than the settlement delay, or the audit alerts on everything still in flight. Give every class of difference an owner and a repair, applied idempotently, and audit the repairs too. And measure detection time: a daily reconciliation would have caught the bug in a day, not six weeks.
+
+= panel watch | REL-11 · Tier A · The alternative and the price | Cheaper than any prevention for unknown bugs
+It costs a job, read capacity on both systems, and a team that answers the alerts.
+It is the only defence against bugs nobody predicted, and Google's data-integrity practice, in SRE chapter 26, treats it as mandatory for important data.
+N: It costs a job, read capacity on both systems, and a team that answers the alerts. It is the only defence against the bugs nobody predicted, which is why the data integrity chapter of the S-R-E book, chapter twenty-six, treats out-of-band checks as mandatory for any data that matters.
+
+= th | REL-11 · the line to say | Reconcile pairs of systems and audit invariants continuously, independent of the code they check, with an owner and a repair for each difference.
+V: As the net under every other mechanism, I reconcile systems that should agree and audit invariants that must always hold, independently of the code paths that maintain them, partitioned so differences narrow fast, with an owner and an idempotent repair for each class of difference.
+[pause: 0.8]
+
+## 13.12 Dependency hygiene
+
+= dia | REL-12 · Tier B · The mechanism | Hard, soft, and the cycle that prevents a cold start
+@ REL-12
+p13-cycle
+N: List every dependency as hard, needed to serve, or soft, nice to have. Then look for cycles. In the picture, the auth service stores its keys in the config service, and the config service authenticates its callers with the auth service. On a normal day both run. After a full outage, neither can start: each waits for the other. Many large outages last long not because of the trigger, but because of a cycle like this found during the cold start.
+
+= panel key | REL-12 · Tier B · One level down | The rules
+**No cycles** among hard dependencies, checked by a tool over the declared graph.
+**Availability multiplies** along a chain of hard dependencies: five at 99.95% give about **99.75%** (part 1).
+**Test a cold start**: bring the whole system up from nothing, in a test environment, on a schedule.
+N: The rules. No cycles among hard dependencies, checked by a tool over the declared graph. Remember that availability multiplies along a chain of hard dependencies: five at three nines five give about ninety-nine point seven five percent, as in part one. And test a cold start, bringing the whole system up from nothing, regularly, in a test environment.
+
+= th | REL-12 · the line to say | Classify dependencies hard or soft, forbid cycles among hard ones, and test a cold start from nothing.
+V: I classify each dependency as hard or soft, keep the hard chain short because availability multiplies along it, forbid cycles among hard dependencies, and test a full cold start so a cycle is found in a drill, not an outage.
+[pause: 0.8]
+
+## 13.13 Capacity and autoscaling
+
+= table | REL-13 · Tier B · The mechanism | Headroom, lag, and the risky direction
+@ REL-13
+Term | Means | Typical
+Headroom | Spare capacity above current load | Enough for growth until the next scaling step, plus a zone
+Scale-up lag | Signal, decision, launch, warm-up | **Minutes**: faster than demand only if demand grows slowly
+Scale-down | Remove capacity when load falls | **The risky direction**
+N: Three terms. Headroom: spare capacity above current load, enough for growth until the next scaling step, plus a zone. Scale-up lag: from the signal, through the decision and the launch, to a warmed-up server, usually minutes, so autoscaling only keeps up with demand that grows slowly. And scale-down, which is the risky direction.
+
+= panel trap | REL-13 · Tier B · The price | Why scaling down is the dangerous direction
+An upstream outage drops your traffic to near zero. The autoscaler, correctly by its rules, **removes 80% of capacity**.
+The upstream recovers, and full traffic returns in seconds, onto a fleet that needs minutes to grow back.
+Fix: **minimum floors** tied to expected traffic, slow scale-down, and no scale-down while an incident is open.
+N: Why is scaling down the dangerous direction? An upstream outage drops your traffic to almost nothing. The autoscaler, correctly by its rules, removes eighty percent of capacity. Then the upstream recovers, and full traffic returns in seconds onto a fleet that needs minutes to grow back. The fix: minimum floors tied to the expected traffic for the time of day, slow scale-down, and no scale-down while an incident is open.
+
+= th | REL-13 · the line to say | Autoscaling handles slow growth; headroom and floors handle the rest, and scale-down is slow and guarded.
+V: Autoscaling only keeps up with slow growth, because launch and warm-up take minutes, so I keep headroom for spikes and a zone loss. Scale-down is the risky direction: it is slow, has floors tied to expected traffic, and pauses during incidents.
+[pause: 0.8]
+
+## 13.14 Disaster recovery
+
+= table | REL-14 · Tier B · The mechanism | A plan, and the proof that it works
+@ REL-14
+Element | Contains
+Scenarios | A region lost; data corrupted by a bad release; credentials compromised; a key dependency gone for a day
+Per scenario | The RPO and RTO (part 5), the runbook, who decides, what is lost
+Exercises | Run the scenario for real, in production where safe: Google's annual **DiRT** exercises do exactly this
+Restore tests | Data restored from backup, verified, on a schedule (part 7)
+N: Disaster recovery is a plan and the proof that it works. The plan lists scenarios: a region lost, data corrupted by a bad release, credentials compromised, a key dependency gone for a day. For each: the recovery point and time, the runbook, who decides, and what is lost. The proof is exercises. Run the scenario for real, in production where it is safe, as Google's annual disaster recovery testing, DiRT, does. And restore data from backup on a schedule, and verify it.
+
+= panel watch | REL-14 · Tier B · The price | An exercise finds what documents hide
+Every exercise finds something: a runbook step that no longer exists, a credential only one person holds, a dependency nobody listed.
+That is the point, and the price is the risk and effort of running it. Start in test environments; widen as confidence grows.
+N: The price of exercises is their risk and effort, and every one finds something: a runbook step that no longer exists, a credential only one person holds, a dependency nobody listed. That is exactly why you run them. Start in test environments, and widen as confidence grows.
+
+= th | REL-14 · the line to say | A disaster recovery plan lists scenarios with RPO, RTO and owners, and is proven only by exercises and restore tests.
+V: My disaster recovery plan lists scenarios, each with its recovery point and time, runbook and decision owner, and I only trust it once it has been exercised, ideally in production where safe, with restores tested on a schedule.
+[pause: 0.8]
+
+## 13.15 Recap
+
+= list | Recap | What to be able to explain without notes
+- A **timeout** from the p99.9, inside the deadline
+- **Retry amplification**: three layers of three is 27; one layer, a budget, jitter
+- The **breaker**'s three states and its fallback
+- **Bulkheads**, and what a **cell** is made of
+- **Hedging** after the p95, and its price
+- **Degraded modes** decided per dependency; **static stability**
+- **Zone redundancy** arithmetic; the next five minutes after a zone loss
+- The **metastable loop** and how to break it; **herds** and jitter; **reconciliation**
+N: Without notes: timeouts from the p99.9. Retry amplification and its three fixes. The breaker's states. Bulkheads and cells. Hedging. Degraded modes and static stability. Zone redundancy in numbers, and the five minutes after a zone loss. The metastable loop and how to break it, herds and jitter, and reconciliation as the net under all of it.
+
+## 13.16 Probe drills
+
+= probe | Where exactly do retries happen in your design?
+- At **one layer**: the edge service, which knows the call is idempotent
+- At most **3 attempts**, within the deadline, budget **10%**, full jitter
+- Every other layer **fails fast**
+C: At one layer only, the edge service, because it knows which calls are idempotent and holds the user's deadline. At most three attempts, all inside that deadline, with a retry budget of about ten percent of requests and full jitter on backoff. Every layer below fails fast and returns the error upward, because three layers each retrying three times would multiply load by twenty-seven.
+
+= probe | And who is not allowed to retry?
+- Any layer **below** the chosen one
+- Any **non-idempotent** call without an idempotency key
+- Any call whose **deadline has passed**, or that got a 400
+C: Every layer below the one I chose. Any non-idempotent call without an idempotency key, because a retry would repeat the effect. Any call after its deadline has passed, since nobody is waiting for the answer. And nothing that failed with a client error, because it will fail the same way again.
+
+= probe | What does the user see when this dependency fails?
+- Look it up in the **degraded-mode table**: hard or soft
+- Soft: the fallback, within a **short timeout**, counted by a metric
+- Hard: a clear error, and that dependency gets the most redundancy
+C: I would look it up in the design's degraded-mode table. If it is soft, like recommendations, the user sees the fallback, best-sellers, within a short timeout, and we count each fallback served. If it is hard, like price and stock, the user sees a clear error, and that is why hard dependencies get the most redundancy and the shortest list.
+
+= probe | A zone is lost at peak. Walk me through the next five minutes.
+- Seconds: balancers **eject** it; other zones absorb with **N+1** sizing
+- Within a minute: leaders in the zone **fail over**
+- Nothing launched on the critical path; then repair replicas by risk
+C: Within seconds, the balancers eject the zone's backends and the other two zones take its traffic, which they can absorb because each is sized for half the peak. Within a minute, leaders that lived in the zone fail over: consensus groups re-elect, asynchronous primaries are promoted, with their lag as the loss. Nothing needs to be launched to survive. Afterwards, data that lost a replica is repaired, most at-risk first.
+
+= probe | The load is back to normal and latency is not. Why?
+- A **metastable loop**: retries and expired queued work keep load high
+- **Shed** hard, drop expired work, **cut retries** to zero
+- Warm caches, then restore traffic **in steps**
+C: The offered load is normal, but the work is not: retries, queued requests already past their deadlines, and cold caches keep the system above capacity, and its own timeouts keep generating more retries. I would shed load hard, drop queued work past its deadline, set the retry budget to zero for a while, warm the caches, and then let traffic back in steps.
+
+## 13.17 Where this shows up
+
+= table | Where this shows up | What each design problem takes from this part
+Problem | Takes
+Every design's wrap-up | Degraded modes, zone redundancy, retries at one layer
+Payments | Reconciliation and invariant audits; no retries without keys
+Search and feeds | Hedging; degradation of quality under load
+Multi-tenant SaaS | Cells and bulkheads
+Control planes and schedulers | Static stability; dependency hygiene; cold start
+N: Every design's wrap-up takes degraded modes, zone redundancy and retries at one layer. Payments take reconciliation. Search and feeds take hedging and quality degradation. Multi-tenant platforms take cells. And control planes take static stability and cold start.
+
+= panel note | Read next | Where to go deeper
+Dean and Barroso, *The Tail at Scale*: hedged and tied requests, micro-partitions.
+*Site Reliability Engineering*, chapter 26, *Data Integrity*. *Designing Data-Intensive Applications*, chapter 1 (faults and failures) and chapter 8 (timeouts).
+The reliability pillar of the Google Cloud Well-Architected Framework.
+N: To go deeper: The Tail at Scale, for hedging. Chapter twenty-six of the S-R-E book, for data integrity. Chapters one and eight of Designing Data-Intensive Applications, on faults and timeouts. And the reliability pillar of the Google Cloud Well-Architected Framework. Part fourteen turns to observability.

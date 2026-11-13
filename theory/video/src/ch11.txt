@@ -1,0 +1,505 @@
+#! title: Networking, the edge and API contracts
+#! short: Edge and APIs
+
+= th | System design at Staff depth · Part 11 of 17 | Networking, the edge and API contracts | DNS and anycast, load balancing and health, the gateway, RPC semantics, push transports, connection tiers, and the API contract on the wire.
+N: Part eleven, the edge and the API. A request crosses a name lookup, one or two load balancers, a gateway, several remote calls, and an interface contract, before any of the interesting design is reached. Each of those has a failure that interviewers like, because a candidate who draws a box called load balancer often cannot say what it does when a backend is half alive.
+
+## 11.0 Why this part decides rounds
+
+= panel trap | The opening story | A failover that took as long as the DNS TTL
+A region fails. The team changes the DNS record to point at the healthy region, in thirty seconds.
+The record's TTL was **one hour**. Resolvers and clients keep the old address for up to an hour; some clients ignore the TTL and keep it longer.
+The failover was quick. The outage lasted an hour.
+N: A region fails. The team updates the DNS record to point at the healthy region, which takes thirty seconds. But the record's time to live was one hour. Resolvers and clients keep the old address for up to an hour, and some clients ignore the time to live and keep it even longer. The failover was quick, and the outage lasted an hour. The interviewer's question is simple: how long does your failover take, end to end, for a client? The answer is set by a number chosen months earlier.
+
+= panel note | Assumed reading | What this part does not repeat
+*Site Reliability Engineering*, chapter 19, *Load Balancing at the Frontend*, and chapter 20, *Load Balancing in the Datacenter*.
+The chapters' account of DNS and virtual-IP balancing, subsetting and weighted round robin stays there. This part keeps one picture and the probe for each, then goes to RPC and the API contract.
+N: Two chapters of the S-R-E book are assumed: nineteen, on load balancing at the front end, and twenty, on load balancing in the data center. Their explanations of DNS balancing, virtual addresses, subsetting and weighted round robin stay in the book. This part keeps one picture and one probe for each, and spends its time on remote calls and the API contract.
+
+= list | Map of the part | Three groups
+- **Getting to a server**: DNS and anycast, L4 and L7 balancing, health and draining, the gateway
+- **Talking to it**: RPC semantics, push transports, connection tiers
+- **The contract**: style, pagination, idempotent writes, versions, long-running operations, uploads, conditional requests, errors and throttling, and the trie behind routing tables
+N: Three groups. Getting to a server: names, anycast, load balancing, health checks and the gateway. Talking to it: remote call semantics, push transports, and tiers of persistent connections. And the contract on the wire, from pagination to the throttling response, with the data structure that routing tables use.
+
+## 11.1 DNS, geo-routing and anycast
+
+= dia | NET-01 · Tier A · The mechanism | Three ways to send a user to the nearest healthy site
+@ NET-01
+p11-dns-anycast
+N: Three ways to steer a user to a site. In the picture, from the top. Plain DNS: the name resolves to an address, and the resolver caches it for the record's time to live. Geo DNS: the authoritative server answers differently by the resolver's location, so Europe gets the European address. And anycast: every site announces the same address over BGP, the internet's routing protocol, and the network itself carries each packet to the nearest site that announces it. With anycast, failover is a route withdrawal, and takes seconds, with no cache to wait for.
+
+= panel key | NET-01 · Tier A · One level down | What each failover actually takes
+**DNS**: the TTL, plus clients that ignore it. Set short TTLs, 30 to 60 s, on records you may need to move, and accept more lookups.
+**Geo DNS** sees the **resolver's** location, not the user's: a user on a distant public resolver is sent to the wrong continent, unless the resolver passes a client subnet.
+**Anycast**: a withdrawn route converges in seconds. Packets of one TCP connection can move to another site if routes change mid-connection, so anycast suits short exchanges, or a front end that terminates the connection and proxies onward.
+N: One level down: what each failover takes. DNS takes the time to live, plus clients that ignore it. So set short TTLs, thirty to sixty seconds, on records you may need to move, and accept more lookups. Geo DNS sees the location of the resolver, not the user, so a user on a distant public resolver is sent to the wrong continent, unless the resolver passes the client's subnet. Anycast converges in seconds. Its subtlety is that if routes change mid-connection, packets can land at another site, so it suits short exchanges, or a front end that terminates connections and proxies onward.
+
+= table | NET-01 · Tier A · The alternative and the price | Choose by failover time and control
+Method | Failover | Control | Cost
+DNS, short TTL | 30 s to minutes | Per record | More lookups; some clients cache longer
+Geo DNS | Same | Per resolver location | Mis-routing by resolver
+Anycast front end | Seconds | Routing, coarse | Needs your own address space and edge sites
+Global load balancer on anycast, as Google Cloud's | Seconds | Per request, at layer 7 | A managed service
+N: Choose by failover time and control. DNS with a short time to live fails over in thirty seconds to minutes. Geo DNS gives per-location control and the resolver problem. An anycast front end fails over in seconds, with coarse routing control and your own address space. And a global load balancer built on anycast, as Google Cloud's is, adds per-request control at layer seven. For a fast regional failover, the answer is anycast at the edge, with DNS pointing at it and rarely changing.
+
+= th | NET-01 · the line to say | DNS failover takes the TTL plus clients that ignore it. Anycast fails over in seconds by withdrawing a route.
+V: DNS failover takes at least the record's time to live, plus clients that cache longer, so records I may move get short TTLs. For fast regional failover I put an anycast front end at the edge: every site announces one address, and failover is a route withdrawal that converges in seconds.
+[pause: 0.8]
+
+## 11.2 L4 versus L7 load balancing
+
+= dia | NET-02 · Tier A · Assumes SRE book ch. 19 and 20 | Packets, or requests
+@ NET-02
+p11-l4-l7
+N: Assumes chapters nineteen and twenty of the S-R-E book. The one picture: a layer four balancer sees connections and packets. It picks a backend per connection, often by a consistent hash of the connection's addresses, and forwards packets, so it is fast and protocol-agnostic. Google's Maglev is one. A layer seven balancer terminates the connection, reads each request, and picks a backend per request, by path, header or load. It can retry, route and observe, and it costs more processing per request.
+
+= panel trap | NET-02 · Tier A · The probe the chapters leave | "One backend gets all the traffic over a few long connections."
+A **layer 4** balancer balances **connections**. A client with one HTTP/2 or gRPC connection sends every request to one backend.
+Fix: balance at **layer 7**, per request; or have clients open several connections and rotate them; or cap a connection's lifetime so it reconnects elsewhere.
+N: The probe the chapters do not spell out. A few clients with long-lived connections send all their traffic to one backend. A layer four balancer balances connections, not requests, and one gRPC connection carries thousands of requests. Fix it by balancing per request at layer seven, by having clients hold several connections and rotate among them, or by capping each connection's lifetime so it reconnects and is placed again.
+
+= th | NET-02 · the line to say | Layer 4 balances connections and is fast; layer 7 balances requests and can route and retry. Long-lived connections need layer 7.
+V: A layer four balancer places connections, fast and protocol-blind; a layer seven balancer places each request and can route, retry and observe. With long-lived multiplexed connections, I balance at layer seven, or cap connection lifetime.
+[pause: 0.8]
+
+## 11.3 Health checks and draining
+
+= dia | NET-03 · Tier A · Assumes SRE book ch. 20 | Healthy, half alive, or dead, and the panic threshold
+@ NET-03
+p11-health
+N: The picture: the balancer probes each backend, and also watches real traffic. A backend that fails probes, or returns errors to real requests well above its peers, is ejected: outlier ejection. Draining is the reverse path for a planned stop. The backend fails its readiness check, the balancer stops sending new requests, existing requests finish, and only then does the process exit. And the box at the bottom: if more than half the backends look unhealthy, the balancer stops ejecting and sends traffic to all of them, because the likelier problem is the health check.
+
+= panel trap | NET-03 · Tier A · The probe | "A deploy drops in-flight requests."
+The process was killed **before** the balancer stopped sending to it. Order matters:
+1. fail **readiness**; 2. wait for the balancer to notice, a few probe intervals; 3. finish in-flight work, bounded by a deadline; 4. exit.
+And never let a health check depend on a shared dependency: when the database blips, **every** backend fails, and everyone is ejected.
+N: The probe: a deploy drops in-flight requests. The process was killed before the balancer stopped sending to it. The order is: fail readiness, wait a few probe intervals for the balancer to notice, finish in-flight work up to a deadline, then exit. And a health check must not depend on a shared dependency. If it checks the database, then a database blip fails every backend at once, and the balancer ejects all of them. That is the panic threshold's reason for existing.
+
+= th | NET-03 · the line to say | Eject outliers, drain by failing readiness before exit, and never eject everyone: past a threshold, send traffic to all.
+V: Health checks eject outliers, using both probes and real error rates. A planned stop fails readiness first, waits for the balancer, finishes in-flight requests, then exits. And past a panic threshold the balancer sends traffic to every backend, because a health check that fails everywhere is usually the check that is wrong.
+[pause: 0.8]
+
+## 11.4 The API gateway
+
+= dia | NET-04 · Tier A · The failure | A gateway that grew business logic
+@ NET-04
+p11-gateway-bloat
+N: The gateway is the reverse proxy in front of the services: it terminates TLS, authenticates, applies limits and routes. The failure in the picture is what happens when it is convenient. Year one: routing and auth. Year two: someone adds a response transformation for one client. Year three: a little orchestration, calling two services and merging their answers. Now every team's change needs a gateway deploy, the gateway team is a bottleneck, and a bug in one client's transformation takes down the front door for everyone.
+
+= table | NET-04 · Tier A · The mechanism | What belongs in the gateway, and what does not
+In the gateway | Not in the gateway
+TLS termination, HTTP/2 and HTTP/3 | Business rules
+Authentication; coarse authorisation | Per-resource authorisation (the service knows the resource)
+Rate limits and quotas per client (part 12) | Orchestrating several services: put it in a backend-for-frontend service
+Routing, retries on idempotent calls, deadlines | Per-client response shaping
+Request IDs, logging, metrics | Anything that needs the request body's meaning
+N: So draw the line explicitly. In the gateway: TLS, the newer HTTP versions, authentication and coarse authorisation, per-client rate limits, routing, retries of idempotent calls, deadlines, request identifiers and metrics. Things every request needs and no service should repeat. Out of the gateway: business rules, authorisation of a specific resource, which the owning service understands, orchestration of several services, and shaping responses for one client. Those go into a backend-for-frontend service owned by the client team.
+
+= panel key | NET-04 · Tier A · One level down | The gateway is the one box every request crosses
+Its **availability caps** the product's: at 99.99%, nothing behind it can be better.
+Its config is **code**, rolled out in stages (part 4); a bad route rule is a global outage.
+It must **fail static**: if the config or auth service is down, keep serving with the last known good config and cached keys.
+Keep it **stateless** and horizontally scaled, behind the layer 4 balancer.
+N: One level down. Every request crosses the gateway, so its availability caps the product's. At four nines, nothing behind it can do better. Its configuration is code, rolled out in stages, as in part four, because one bad route rule is a global outage. It must fail static: if the config service or the auth key service is down, keep serving with the last known good config and cached keys. And keep it stateless, scaled out behind the layer four balancer.
+
+= panel watch | NET-04 · Tier A · The alternative and the price | Gateway, sidecar mesh, or library
+**Edge gateway**: one place for edge policy. Bottleneck risk if it grows logic.
+**Service mesh** with a sidecar proxy per service: retries, mutual TLS and metrics for **east-west** calls, at the price of a proxy hop and a control plane to run.
+**A shared client library**: no hop, and every language and version must be upgraded to change policy.
+N: The alternatives. An edge gateway is one place for edge policy, and a bottleneck if it grows logic. A service mesh puts a proxy beside every service, giving retries, mutual TLS and metrics for calls between services, at the cost of an extra hop and a control plane to operate. A shared client library has no hop, and changing policy means upgrading every language and every version that uses it.
+
+= th | NET-04 · the line to say | The gateway does what every request needs: TLS, auth, limits, routing, deadlines, IDs. No business logic, and it fails static.
+V: My gateway does only what every request needs: TLS, authentication, per-client limits, routing, deadlines and request identifiers. Business logic and orchestration live in services. Because every request crosses it, its config rolls out in stages and it fails static on last known good.
+[pause: 0.8]
+
+## 11.5 RPC semantics
+
+= dia | NET-07 · Tier A · The failure | The caller gave up; the callee did not
+@ NET-07
+p11-orphan-work
+N: A remote call is not a local call, and the failure in the picture shows the difference. The front end calls service A with a one second timeout. A calls B, which calls C, a slow database query. After one second the front end gives up and returns an error. But A, B and C know nothing of that. They keep working for another four seconds, and C finishes a query whose answer nobody will read. Under load, most of the work in the system can be this kind of orphan.
+
+= dia | NET-07 · Tier A · The mechanism | Pass a deadline, not a timeout
+p11-deadline
+N: The fix is to pass an absolute deadline down the call chain. The front end sets the deadline at now plus eight hundred milliseconds and sends it with the request. A receives it, spends fifty milliseconds, and calls B with the same deadline, so B has seven hundred and fifty left. B calls C with what remains. Each hop checks the deadline before starting work, and refuses work that cannot finish in time. When the front end gives up, it sends a cancellation, and every hop stops. gRPC carries both, deadline and cancellation, for this reason.
+
+= code | NET-07 · Tier A · One level down | The deadline budget across three hops
+user-facing SLO: p99 under 1,000 ms; front end keeps 200 ms for itself
+deadline sent to A:          now + 800 ms
+
+hop A: own work p99  50 ms   ->  calls B with  750 ms left
+hop B: own work p99  80 ms   ->  calls C with  670 ms left
+hop C: query p99    300 ms   ->  fits, with 370 ms spare
+
+if C is slow at 700 ms: B's deadline passes first;
+B returns DEADLINE_EXCEEDED to A; A does NOT retry, there is no time left
+N: The budget, in numbers. The user-facing target is a p99 under a second, and the front end keeps two hundred milliseconds for itself, so it sends a deadline eight hundred milliseconds away. A's own work takes fifty, so B gets seven hundred and fifty. B's own work takes eighty, so C gets six hundred and seventy, and C's query, three hundred at p99, fits. If C takes seven hundred, B's deadline passes first, B returns deadline exceeded, and A does not retry, because there is no time left to retry in.
+
+= table | NET-07 · Tier A · The alternative and the price | Four rules for calls between services
+Rule | Why
+Deadline passed down, checked before work | No orphan work; no work started that cannot finish
+Retry only **idempotent** calls, from **one layer** | A retry of a non-idempotent call duplicates its effect; retries at every layer multiply (part 13)
+**Subsetting**: each client talks to a subset of backends | 1,000 clients times 1,000 backends is a million connections otherwise
+Unknown outcome is a **third** result | A timeout means "maybe", not "failed": the caller needs an idempotency key to find out
+N: Four rules. Pass a deadline down and check it before starting work. Retry only idempotent calls, and from one layer only, because retries at every layer multiply, which part thirteen works through. Use subsetting, so each client talks to a subset of backends, since a thousand clients times a thousand backends is a million connections. And treat a timeout as a third outcome, unknown, not failed. Only an idempotency key lets the caller find out safely what happened.
+
+= th | NET-07 · the line to say | Pass an absolute deadline and cancellation down every call, retry only idempotent calls from one layer, and treat a timeout as unknown.
+V: Between services I pass an absolute deadline and cancellation down the whole chain, so no hop starts work it cannot finish and nobody works for a caller who has gone. I retry only idempotent calls, from one layer. And a timeout means unknown, so non-idempotent calls carry an idempotency key.
+[pause: 0.8]
+
+## 11.6 Polling, long polling, SSE and WebSocket
+
+= table | NET-08 · Tier A · The failure | Polling a million clients every five seconds
+@ NET-08
+Clients | Poll every | Requests a second | Of which carry news
+1,000,000 | 5 s | **200,000** | Perhaps 1%
+N: The failure first. A million clients poll for updates every five seconds. That is two hundred thousand requests a second, each with headers, TLS work and a database lookup, and perhaps one percent of them carry any news. Ninety-nine percent of the fleet's work answers nothing new. And the latency of an update is still up to five seconds. Polling is the simplest transport, and at scale it is the most expensive way to say nothing.
+
+= table | NET-08 · Tier A · The mechanism | Four transports in one table
+Transport | Direction | Latency | Costs | Use for
+Polling | Client asks | Up to the interval | A request per interval, mostly empty | Rare updates, tiny scale
+Long polling | Client asks; server holds until news or timeout | About one round trip | A held request per client; reconnect per message | Fallback where nothing else works
+Server-Sent Events | Server to client over one HTTP response | Immediate | An open connection; text only; auto-reconnect with last event ID | Streams of updates, **streamed model output**
+WebSocket | Both ways, over one upgraded connection | Immediate | An open connection; your own framing and reconnect | Chat, collaboration, games
+N: Four transports. Polling: the client asks every interval, simple and wasteful. Long polling: the client asks and the server holds the request until there is news or a timeout, so latency is about one round trip, at the cost of a reconnect per message. Server-sent events: one long HTTP response the server writes events into, one way, text only, with automatic reconnection that resumes from the last event identifier. And WebSocket: a two-way connection, upgraded from HTTP, with your own message framing and reconnect logic.
+
+= panel key | NET-08 · Tier A · One level down | Why server-sent events for streamed responses
+A streamed model answer is **one direction**: the server sends tokens; the client sent its prompt in the request.
+SSE is plain HTTP: it passes through proxies, load balancers and HTTP/2 multiplexing unchanged, and **resumes** from `Last-Event-ID`.
+WebSocket adds two-way framing that this case does not need, and some proxies handle it badly.
+Choose WebSocket when the **client** sends often during the session: typing, cursor positions, game input.
+N: One level down: the probe about streamed responses, like a model's answer arriving token by token. The flow is one direction: the client sent its prompt in the request, and the server streams tokens back. Server-sent events are plain HTTP, so they pass through proxies and load balancers unchanged, multiplex over HTTP two, and resume from the last event identifier after a drop. WebSocket adds two-way framing this case does not need. Choose WebSocket when the client sends often during the session: typing, cursors, game input.
+
+= panel watch | NET-08 · Tier A · The alternative and the price | Push costs a connection per client
+Any push transport holds **one open connection per online client**. A million online users is a million connections, with memory, file descriptors and heartbeats (next section).
+And a mobile app in the background cannot hold one: it needs a platform push service, which is part of the notification task.
+N: The price of push: one open connection per online client, so a million online users is a million connections, each with memory, a file descriptor and heartbeats, which the next section sizes. And a mobile app in the background cannot keep a connection open at all. It needs the platform's push service, which belongs to the notification task.
+
+= th | NET-08 · the line to say | Polling for rare updates, server-sent events for one-way streams such as model output, WebSocket when the client also sends often.
+V: I choose the transport by direction and rate. Polling only for rare updates at small scale. Server-sent events for a one-way stream such as a streamed model answer, because it is plain HTTP and resumes from the last event. WebSocket when the client sends often too. Every push transport costs a connection per online client.
+[pause: 0.8]
+
+## 11.7 Persistent-connection tiers
+
+= dia | NET-09 · Tier B · The mechanism | Gateways hold connections; a routing table says where each user is
+@ NET-09
+p11-conn-tier
+N: A tier of connection gateways holds the open connections, and nothing else. In the picture, user forty-two connects to gateway seven. Gateway seven writes user forty-two, gateway seven, into a routing table, with a lease it renews by heartbeat. When a message for user forty-two arrives from any service, the dispatcher looks up the table, and sends it to gateway seven, which writes it down the connection. If user forty-two has three devices, the table has three entries. The gateways are stateless apart from the connections themselves.
+
+= code | NET-09 · Tier B · One level down | Ten million connections, and the reconnect storm
+per connection: TLS and socket buffers, about 10 to 30 KB
+10,000,000 connections x 20 KB          = 200 GB of memory
+at 500,000 connections per gateway      = 20 gateways, plus headroom: 30
+
+one gateway dies: 500,000 clients reconnect at once
+    without jitter: 500,000 TLS handshakes in a second, on the survivors
+    with reconnect spread over 30 s by random backoff: about 17,000 a second
+N: One level down, the numbers. Each connection costs ten to thirty kilobytes of TLS state and socket buffers. Ten million connections at twenty kilobytes is two hundred gigabytes of memory. At half a million connections per gateway, that is twenty gateways, thirty with headroom. Now the probe. One gateway dies, and half a million clients reconnect. Without jitter they all try in the same second: half a million TLS handshakes on the survivors. With a random backoff spread over thirty seconds, about seventeen thousand a second, which the tier can absorb.
+
+= th | NET-09 · the line to say | A connection tier holds sockets and registers each user's gateway under a lease; clients reconnect with jittered backoff.
+V: A persistent-connection tier only holds sockets. Each gateway registers its users in a routing table under a lease, a dispatcher looks users up to deliver, and clients reconnect with randomised backoff so that losing a gateway does not become a handshake storm on the others.
+[pause: 0.8]
+
+## 11.8 API style
+
+= table | API-01 · Tier A · The mechanism | Resource-oriented, RPC, or query
+@ API-01
+Style | Shape | Wins when | Price
+Resource-oriented REST | Nouns and standard methods: GET, POST, PATCH, DELETE on /orders/42 | Public APIs; caching; tooling everyone knows | Awkward for actions that are not CRUD
+RPC, such as gRPC | Verbs: Charge(request) with typed messages | Service to service; streaming; strict schemas | Harder for browsers; less cacheable
+Query, such as GraphQL | The client describes the shape it wants | Many client screens over one graph | Cost control: one query can fan out to thousands of loads
+N: Three styles. Resource-oriented REST: nouns with standard methods, get, post, patch and delete on an order. It suits public APIs, caches well, and every tool understands it, and it is awkward for actions that are not create, read, update and delete. RPC, such as gRPC: verbs with typed messages, best between services and for streaming. And a query language such as GraphQL, where each client describes the shape it wants, which suits many screens over one data graph, at the price of controlling what one query can cost.
+
+= panel key | API-01 · Tier A · One level down | Google's convention: resources with standard methods, plus custom methods
+Google's API design guide maps resources to **standard methods**: Get, List, Create, Update, Delete, over gRPC and HTTP alike.
+Anything else is a **custom method** on the resource: `POST /v1/orders/42:cancel`.
+One model, two transports: a gRPC service definition with HTTP annotations serves both.
+N: Google's own convention, from its API design guide, takes a middle path. Model resources, give them standard methods, get, list, create, update and delete, and express anything else as a custom method on the resource, like a post to order forty-two colon cancel. The same definition is served over gRPC and over HTTP. In an interview that is a strong default: a resource model, with typed messages underneath.
+
+= panel watch | API-01 · Tier A · The alternative and the price | What each style costs you later
+**REST** without discipline drifts into inconsistent verbs in URLs.
+**gRPC** needs a proxy or a transcoding layer for browsers.
+**GraphQL** needs **query cost limits**, depth limits and persisted queries, or one client can take down the backend with one request.
+N: Each style costs something later. REST without discipline drifts into verbs inside URLs, each team inventing its own. gRPC needs a proxy or transcoding for browsers. GraphQL needs cost limits, depth limits and persisted queries, or one client can ask for something that fans out to thousands of loads.
+
+= th | API-01 · the line to say | A resource model with standard methods and custom methods for actions, over gRPC inside and HTTP outside.
+V: My default is a resource model with standard methods, get, list, create, update and delete, and custom methods for actions, defined once and served over gRPC between services and HTTP at the edge. GraphQL when many screens share one graph, with query cost limits.
+[pause: 0.8]
+
+= panel trap | API-01 · Tier A · The probe | "Why not GraphQL here?"
+Answer with the **consumers**: how many client screens, how different their shapes, and who controls them.
+One mobile app and one web app, owned by the same team: a backend-for-frontend with plain methods is simpler.
+Dozens of independent clients over one graph: GraphQL earns its cost-control machinery.
+N: The probe: why not GraphQL here? Answer with the consumers. How many client screens, how different are their shapes, and who controls them? One mobile app and one web app owned by the same team are served more simply by a backend-for-frontend with plain methods. Dozens of independent clients over one large graph is where GraphQL earns the machinery it needs.
+
+## 11.9 Pagination
+
+= dia | API-02 · Tier A · The failure | Offset pagination under inserts
+@ API-02
+p11-offset
+N: Offset pagination asks for page two as skip twenty, take twenty. The failure is in the picture. The user reads page one: items one to twenty, newest first. While they read, three new items are inserted at the top. They ask for page two: skip twenty. Everything has shifted down by three, so items eighteen, nineteen and twenty appear again, at the top of page two. With deletes, items are silently skipped. And a deep offset is slow: skip a million rows means reading a million rows to throw them away.
+
+= code | API-02 · Tier A · The mechanism | A cursor encodes where you stopped, not how far you went
+page 1:  SELECT ... WHERE feed = 7 ORDER BY created_at DESC, id DESC LIMIT 20
+         last row: created_at 12:04:07.331, id 98812
+         next_page_token = base64( { "t": "12:04:07.331", "id": 98812, "v": 1 } )
+
+page 2:  SELECT ... WHERE feed = 7
+           AND (created_at, id) < ('12:04:07.331', 98812)
+         ORDER BY created_at DESC, id DESC LIMIT 20
+N: A cursor encodes where you stopped, not how far you went. Page one orders by creation time, then by identifier as a tie-breaker, and returns twenty rows. The last row's time and identifier go into the next page token. Page two asks for rows strictly before that pair, in the same order. Inserts at the top do not shift anything, because the position is a value, not a count. And it is fast at any depth, because it is an index range seek, not a skip.
+
+= panel key | API-02 · Tier A · One level down | What the token must carry
+**A unique sort key**: time alone has ties; add the ID.
+**The filter and sort it belongs to**: a token used with different filters must be **rejected**, not silently reinterpreted.
+**A version**, so the format can change.
+**Opaque** to clients: encode it, and ideally sign or encrypt it, so nobody builds tokens by hand and you can change the scheme.
+Across shards, the token holds **one position per shard** (part 6).
+N: One level down: what the token carries. A unique sort key: time alone has ties, so add the identifier. The filter and sort it belongs to, so a token reused with different filters is rejected. A version, so the format can change. And it must be opaque: encoded, ideally signed, so clients never build tokens by hand and you remain free to change the scheme. Across shards, the token holds one position per shard, as in part six.
+
+= panel watch | API-02 · Tier A · The alternative and the price | What cursors cannot do
+No **jump to page 50**, and no exact **total count** for free. If the product needs them, compute an approximate count separately, and limit how deep jumps go.
+Offsets are fine for small, static lists: an admin table of 200 rows.
+N: What cursors cannot do: jump to page fifty, or give an exact total count for free. If the product needs those, compute an approximate count separately and limit how deep a jump can go. And offsets remain fine for a small, static list, an admin table of two hundred rows.
+
+= th | API-02 · the line to say | Paginate with an opaque cursor holding the last unique sort key, never an offset: stable under inserts and fast at any depth.
+V: I paginate with an opaque cursor that encodes the last row's unique sort key, plus a version and the query it belongs to. It is stable under inserts and deletes and costs an index seek at any depth. Offsets only for small static lists.
+[pause: 0.8]
+
+## 11.10 Idempotent writes
+
+= code | API-03 · Tier A · The mechanism | An idempotent POST on the wire
+@ API-03
+POST /v1/payments
+Idempotency-Key: 6f1c2a9e-4b1d-4f0e-9a63-2d7c4e8b11f0
+Content-Type: application/json
+
+{"amount": 2000, "currency": "EUR", "source": "card_8812"}
+
+first time:   201 Created   {"id": "pay_41", "status": "succeeded"}
+retry:        201 Created   {"id": "pay_41", "status": "succeeded"}
+              same bytes, replayed
+in progress:  409 Conflict  Retry-After: 1
+other body:   422 Unprocessable: key reused with a different request
+N: Part eight built the dedup table. Here is what it looks like on the wire. The client generates a random key once per user action, and sends it in an idempotency key header with the post. The first time, the server creates the payment and returns created, with its body. A retry with the same key gets exactly the same response, replayed. A retry that arrives while the first is still running gets conflict, with a hint to retry after a second. And the same key with a different body is rejected as a client bug.
+
+= panel key | API-03 · Tier A · One level down | Who generates the key, and how long it lives
+The **client** generates it, **once per user intent**, before the first attempt, and reuses it on every retry, including after an app restart: persist it with the pending action.
+The server remembers it for **longer than any client retries**, say 24 hours, scoped to the caller, so two customers cannot collide.
+PUT and DELETE on a known resource are idempotent **by design**; POST that creates needs the key.
+N: One level down. The client generates the key, once per user intent, before the first attempt, and reuses it on every retry, even after the app restarts, so it is stored with the pending action. The server remembers it for longer than any client retries, say a day, and scopes it to the caller, so two customers cannot collide. And put or delete on a known resource are idempotent by design. It is the post that creates something which needs the key.
+
+= panel trap | API-03 · Tier A · The probe | "For how long do you remember the key?"
+Longer than the **longest retry window** of any client, including offline mobile clients that retry on reconnect: perhaps **days**, not minutes.
+After expiry, a late retry **would** create a duplicate. So either keep keys longer than any retry, or reject requests whose client timestamp is older than the key retention.
+N: The probe: for how long do you remember the key? Longer than the longest retry window of any client, including mobile clients that were offline and retry when they reconnect, so perhaps days, not minutes. After expiry, a very late retry would create a duplicate. So either keep keys longer than any retry can arrive, or reject requests stamped older than your key retention.
+
+= th | API-03 · the line to say | The client sends one idempotency key per intent; the server replays the stored response for its lifetime, longer than any retry.
+V: A create that may be retried carries an idempotency key chosen by the client once per intent and persisted with it. The server replays the stored response for any retry within the key's lifetime, answers conflict while the first is in progress, and keeps keys longer than any client can retry.
+[pause: 0.8]
+
+## 11.11 Versioning and compatibility
+
+= table | API-04 · Tier B · The mechanism | What is a breaking change
+@ API-04
+Change | Breaking?
+Add an optional request field, or a response field | No, if clients ignore unknown fields
+Rename or remove a field; change a type; make an optional field required | **Yes**
+Change a default, an enum's meaning, an error code | **Yes**, quietly: behaviour breaks without a parse error
+Add an enum value | Often yes: old clients meet a value they cannot handle
+N: Versioning starts with knowing what breaks. Adding an optional field, in a request or a response, is safe if clients ignore fields they do not know. Renaming or removing a field, changing its type, or making it required, breaks clients. So does changing a default, an enum's meaning or an error code, which is worse, because nothing fails to parse: behaviour just changes. And even adding an enum value often breaks old clients that switch over the values they know.
+
+= panel key | API-04 · Tier B · One level down | Major versions in the path, and a deprecation clock
+A breaking change gets a **new major version**, `v2`, running beside `v1`.
+`v1` gets a **deprecation date**, announced, with usage measured per client, so you know who to chase.
+Within a version, only additive changes. **Google's guidance**: version in the path, no minor versions visible to clients.
+N: One level down. A breaking change gets a new major version, v2, running beside v1. V1 gets a deprecation date, announced in advance, and its usage is measured per client, so you know exactly who to chase. Within a version, only additive changes. Google's API guidance puts the major version in the path and exposes no minor versions to clients.
+
+= th | API-04 · the line to say | Within a version, only additive changes; a breaking change is a new major version beside the old one, with a measured deprecation.
+V: Within an API version I only make additive changes. A breaking change becomes a new major version running beside the old, with a deprecation date and per-client usage measured, so the old one can actually be turned off.
+[pause: 0.8]
+
+## 11.12 Long-running operations
+
+= code | API-05 · Tier B · The mechanism | Return an operation, not a result
+@ API-05
+POST /v1/videos:transcode    {"source": "gs://in/a.mov"}
+202 Accepted
+{"name": "operations/op-7781", "done": false,
+ "metadata": {"progress_percent": 0}}
+
+GET /v1/operations/op-7781
+{"name": "operations/op-7781", "done": true,
+ "response": {"output": "gs://out/a.mp4"}}
+
+also: cancel, list, and a wait call with a deadline
+N: Work that takes minutes cannot hold an HTTP request open. So the call returns an operation instead: a name, done false, and some progress metadata, with status accepted. The client polls the operation, or waits on it with a deadline, until done is true, and then reads either a response or an error. The operation can be listed and cancelled. This is Google's long-running operation pattern, and it means a client crash, a deploy, or a dropped connection loses nothing: the name is enough to come back.
+
+= panel watch | API-05 · Tier B · The price | The operation is a durable record
+Operations must be **stored**, with an owner and an expiry, and survive the server that created them.
+Make the start call **idempotent** too, with a key, or a retried start launches the job twice.
+Offer a **callback** or event for clients that should not poll.
+N: The price is that each operation is a durable record, stored with an owner and an expiry, surviving the server that created it. The start call must be idempotent too, with a key, or a retried start launches the job twice. And clients that should not poll get a callback or an event on completion.
+
+= th | API-05 · the line to say | Long work returns a named, durable operation that clients poll, wait on or cancel, started idempotently.
+V: For work longer than a request I return a long-running operation: a durable name the client can poll, wait on with a deadline, or cancel, created by an idempotent start call. A dropped connection or a deploy then loses nothing.
+[pause: 0.8]
+
+## 11.13 Resumable and multipart upload
+
+= dia | API-06 · Tier B · The mechanism | Start a session, send chunks, resume from the last byte the server has
+@ API-06
+p11-resumable
+N: A five gigabyte upload over a mobile network will fail part way. A resumable upload, in the picture, has three steps. One: the client starts a session and gets a session address. Two: it sends the file in chunks, say eight megabytes each, each with its byte range. Three: after a drop, the client asks the session how much it has, gets back up to byte four hundred and nineteen million, and continues from there. Multipart upload is the parallel variant: upload numbered parts independently, then a complete call assembles them in order.
+
+= panel watch | API-06 · Tier B · The price | Sessions expire, and parts must be cleaned up
+A session holds state on the server: give it an **expiry**, a week for example.
+Parts uploaded and never completed are **orphans** (part 7): a lifecycle rule deletes them.
+Verify a **checksum** of the whole object on completion.
+N: The price: a session is server state, so give it an expiry, perhaps a week. Parts uploaded and never completed are orphans, as in part seven, and a lifecycle rule must delete them. And verify a checksum of the whole object at completion, so a resumed upload is proven intact.
+
+= th | API-06 · the line to say | Large uploads use a resumable session or numbered parts, resume from the server's byte count, and verify a checksum on completion.
+V: Large uploads go through a resumable session or a multipart upload. After a failure, the client asks the server how many bytes it holds and continues from there, parts expire if never completed, and the whole object's checksum is verified at the end.
+[pause: 0.8]
+
+## 11.14 Conditional requests
+
+= code | API-07 · Tier B · The mechanism | ETags for caching and for safe updates
+@ API-07
+GET /v1/docs/42                      ->  200  ETag: "v7"   (body)
+GET /v1/docs/42  If-None-Match: "v7" ->  304 Not Modified (no body)
+
+PATCH /v1/docs/42  If-Match: "v7"    ->  200  ETag: "v8"
+PATCH /v1/docs/42  If-Match: "v7"    ->  412 Precondition Failed: someone else wrote v8
+N: Conditional requests are part eight's optimistic concurrency on the wire. Every response carries an entity tag, an opaque version, here v seven. A client that already has v seven asks with if-none-match, and gets not modified, with no body: a cheap revalidation. A client that wants to update sends if-match v seven. If the document is still at v seven, the update succeeds and returns v eight. If someone else wrote first, the server answers precondition failed, and the client re-reads and merges.
+
+= panel key | API-07 · Tier B · One level down | Where it pays
+**Caches and CDNs** revalidate with If-None-Match: bandwidth saved on every unchanged object.
+**Read-modify-write over HTTP** becomes safe without locks; **Google's API guidance** carries the etag in the resource body for the same reason.
+The etag must change on **every** change, and a weak etag must never be used for If-Match.
+N: Where it pays. Caches and content networks revalidate with if-none-match, saving bandwidth on every unchanged object. Read, modify, write over HTTP becomes safe without locks, which is why Google's API guidance carries the etag inside the resource body too. And the etag must change on every change of the resource.
+
+= th | API-07 · the line to say | ETags give cheap revalidation with If-None-Match and lock-free safe updates with If-Match, answered by 412 on conflict.
+V: Every resource carries an entity tag. Clients revalidate cheaply with if-none-match, and update safely with if-match, getting precondition failed if someone else wrote first. It is optimistic concurrency, on the wire.
+[pause: 0.8]
+
+## 11.15 The error and throttling contract
+
+= panel trap | API-08 · Tier A · The failure | Errors that clients cannot act on
+@ API-08
+A service returns **500** for "you sent a bad field", for "you are over your quota" and for "the database is down".
+Clients cannot tell which to retry. So they retry **all** of them, including the bad requests, forever, and the quota rejections at full speed.
+The overload makes itself worse because the error carried no instruction.
+N: The failure: a service returns the same server error for a bad field, for over quota, and for the database being down. Clients cannot tell which ones to retry, so they retry all of them, including the bad requests, for ever, and the quota rejections at full speed. The overload makes itself worse, because the error carried no instruction. An error response is a message to a program, and it must say what that program should do next.
+
+= table | API-08 · Tier A · The mechanism | Status, meaning, and what the client should do
+Status | Meaning | Client should
+400 / 422 | The request is wrong | **Not retry**; fix the request
+401 / 403 | Not authenticated / not allowed | Refresh credentials once; otherwise stop
+409 | Conflict: in progress, or a version clash | Re-read, or retry after a moment
+429 | **You** are over a limit | Wait **Retry-After**, then retry with backoff
+503 | **The service** is overloaded or down | Retry with backoff and jitter, within a retry budget
+N: The contract, by status. Four hundred or four twenty-two: the request is wrong, do not retry. Four oh one or four oh three: not authenticated, or not allowed. Refresh credentials once, otherwise stop. Four oh nine: a conflict, re-read or retry shortly. Four twenty-nine: you, this client, are over a limit, so wait for the retry-after time. Five oh three: the service is overloaded or down, so retry with backoff and jitter, within a retry budget, part thirteen.
+
+= code | API-08 · Tier A · One level down | A 429 on the wire
+HTTP/1.1 429 Too Many Requests
+Retry-After: 7
+RateLimit-Policy: "default";q=100;w=60
+RateLimit: "default";r=0;t=7
+Content-Type: application/json
+
+{"error": {"code": 429, "status": "RESOURCE_EXHAUSTED",
+  "message": "Quota 'writes per minute' exceeded for project p-81",
+  "details": [{"reason": "RATE_LIMIT_EXCEEDED", "quota_limit": "100/min"}]}}
+N: One level down: a four twenty-nine on the wire. The status, and a retry-after header saying seven seconds. Rate limit headers describing the policy, a hundred requests per sixty seconds, with zero remaining and a reset in seven. And a structured body: a machine-readable status, resource exhausted in Google's vocabulary, a human message naming the exact quota, and a detail a program can switch on. A well-behaved client reads the header and waits. A badly behaved one is cut off sooner, by the limiter in part twelve.
+
+= panel watch | API-08 · Tier A · The alternative and the price | 429 or 503, and why the difference matters
+**429** says "slow down, you": the client should back off, and others are unaffected.
+**503** says "we are hurting": every client should back off, and the server may shed by criticality (part 12).
+Sending 503 for a per-client limit makes **innocent clients** back off; sending 429 for overload makes nobody back off enough.
+N: Why the difference matters. Four twenty-nine says slow down, you, and others are unaffected. Five oh three says the service is hurting, so everyone should back off, and the server may shed by criticality. Send five oh three for a per-client limit, and innocent clients slow down. Send four twenty-nine for an overload, and nobody slows down enough.
+
+= th | API-08 · the line to say | Every error tells the client what to do: never retry 400s, wait Retry-After on 429, back off with a budget on 503.
+V: My error contract tells clients what to do. Bad requests are never retried. Four twenty-nine means this client is over its limit, with retry-after and rate limit headers. Five oh three means the service is overloaded, retried with backoff and jitter inside a retry budget. And the body is structured, so programs can switch on the reason.
+[pause: 0.8]
+
+## 11.16 Tries, radix trees and FSTs
+
+= dia | DS-05 · Tier B · The mechanism | Longest-prefix match for routes and IP ranges
+@ DS-05
+p11-trie
+N: Routing tables, gateway path routes and IP blocklists all ask the same question: which stored prefix is the longest match for this key? A trie answers it by walking the key one symbol at a time, remembering the last node that held a value. In the picture, routes slash api, slash api slash v1, and slash api slash v1 slash orders. The path slash api slash v1 slash users walks to v1, finds no users child, and returns the last match, slash api slash v1. A radix tree compresses chains of single children into one edge, so it stays small.
+
+= panel key | DS-05 · Tier B · One level down | Where each variant is used
+**IP ranges**: a binary radix tree over address bits; a lookup is at most 32 steps for IPv4, 128 for IPv6.
+**Autocomplete**: a trie of terms, each node keeping its **top completions**, so a prefix returns suggestions in one walk.
+**FST**, a finite-state transducer: a trie that also shares **suffixes**, so a dictionary of millions of terms fits in tens of megabytes. Search engines use it for their term dictionaries.
+N: Where each variant is used. For IP ranges, a binary radix tree over the address bits: at most thirty-two steps for IPv4. For autocomplete, a trie of terms in which each node keeps its top completions, so a prefix returns suggestions in one walk. And a finite-state transducer is a trie that also shares suffixes, so a dictionary of millions of terms fits in tens of megabytes. Search engines use one for their term dictionaries.
+
+= th | DS-05 · the line to say | A trie or radix tree answers longest-prefix match in key-length steps; an FST shares suffixes to make big dictionaries small.
+V: For longest-prefix match, routes, IP ranges or autocomplete, I use a trie or a radix tree: a lookup costs the length of the key, not the size of the table. When a term dictionary must be compact, a finite-state transducer shares suffixes as well as prefixes.
+[pause: 0.8]
+
+## 11.17 Recap
+
+= list | Recap | What to be able to explain without notes
+- Failover time for **DNS** versus **anycast**
+- **Layer 4 and layer 7**, and the long-connection imbalance
+- **Draining** in the right order; the **panic threshold**
+- What stays **out of the gateway**
+- **Deadlines** passed down, with the budget across three hops
+- The four **transports**, and SSE for streamed output
+- **Ten million connections** and the reconnect storm
+- **Cursors**, idempotent POST, versions, operations, uploads, ETags, and the **429 contract**
+N: Without notes: DNS and anycast failover times. Layer four and seven, and long connections. Draining in order, and the panic threshold. What stays out of the gateway. Deadlines and the three-hop budget. The four transports. Ten million connections and the reconnect storm. And the contract: cursors, idempotent posts, versions, operations, uploads, entity tags and the throttling response.
+
+## 11.18 Probe drills
+
+= probe | Server push for a streamed response: which transport, and why?
+- **Server-sent events**: one direction, plain HTTP, resumes from the last event ID
+- Passes proxies and multiplexes over HTTP/2
+- WebSocket only if the client sends often during the stream
+C: Server-sent events. The flow is one direction, the server streams tokens to a client that already sent its request. It is plain HTTP, so it works through proxies and load balancers and multiplexes over HTTP two, and it resumes from the last event identifier after a drop. I would choose WebSocket only if the client also sent frequently during the stream, which this does not.
+
+= probe | Make this POST safe to retry.
+- Client sends an **Idempotency-Key**, generated once per intent
+- Server claims it with a **unique insert**, stores the response with the effect
+- Retries get the **same response**; in progress gets 409
+C: The client generates an idempotency key once per user action and sends it in a header on every attempt. The server claims the key with a unique insert before doing anything, performs the effect and stores the response in the same transaction, and replays that response on any retry. A retry that arrives during the first gets conflict, and the same key with a different body is rejected.
+
+= probe | For how long do you remember the key?
+- Longer than the **longest client retry**, including offline mobile clients
+- So **days**, scoped to the caller
+- Or reject requests older than the retention
+C: Longer than any client could retry, including a phone that was offline and replays its queue on reconnect. So days, not minutes, and scoped to the caller so keys cannot collide across customers. If that is too expensive, I reject requests whose client timestamp is older than my key retention, so a late retry fails safely instead of duplicating.
+
+= probe | A deploy drops in-flight requests. Why, and the fix?
+- The process exited **before** the balancer stopped sending
+- Fail **readiness**, wait a few probe intervals, finish in-flight, then exit
+- Bound the drain with a deadline
+C: The process exited before the load balancer had stopped sending it requests. The fix is the drain order: fail the readiness check, wait a few probe intervals until the balancer has noticed, let in-flight requests finish up to a deadline, then exit. For long-lived connections, also tell clients to reconnect, so they move gracefully rather than all at once.
+
+= probe | Ten million open connections reconnect at once.
+- 10 million TLS handshakes is a **self-inflicted outage**
+- Clients use **randomised exponential backoff**; servers can hint a delay
+- Shed handshakes beyond capacity early and cheaply
+C: That is a self-inflicted outage, because TLS handshakes are expensive and the gateways cannot do ten million in a few seconds. Clients must reconnect with randomised exponential backoff, so the wave spreads over tens of seconds. The servers can send a reconnect delay hint when they shut down, and refuse handshakes beyond capacity cheaply and early, rather than accepting them and timing out.
+
+## 11.19 Where this shows up
+
+= table | Where this shows up | What each design problem takes from this part
+Problem | Takes
+Chat and messaging | WebSocket, the connection tier, routing table, reconnect storms
+Notification system | Push transports; idempotent sends; the 429 contract with providers
+Model-serving or chat assistant | SSE for streamed output; deadlines; long-running operations
+Payments | Idempotent POST on the wire; error contract
+Any public API | Resource style, cursors, versions, ETags, the gateway boundary
+N: Chat takes WebSocket, the connection tier and reconnect storms. Notifications take push transports and the throttling contract with providers. A model-serving system takes server-sent events, deadlines and long-running operations. Payments take the idempotent post. And every public API takes the resource style, cursors, versions, entity tags and the gateway boundary.
+
+= panel note | Read next | Where to go deeper
+Eisenbud et al., *Maglev: A Fast and Reliable Software Network Load Balancer*.
+The API Improvement Proposals at aip.dev: pagination, long-running operations, request identification, etags.
+*Designing Data-Intensive Applications*, chapter 4: the problems with remote procedure calls.
+N: To go deeper: the Maglev paper, for a software layer four balancer. The API Improvement Proposals at a i p dot dev, for pagination, long-running operations, request identification and etags. And chapter four of Designing Data-Intensive Applications, on what remote procedure calls get wrong. Part twelve turns to rate limiting and overload.

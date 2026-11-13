@@ -1,0 +1,350 @@
+#! title: Observability and time-series storage
+#! short: Observability
+
+= th | System design at Staff depth · Part 14 of 17 | Observability and time-series storage | Series and cardinality, percentiles and sketches, push or pull, roll-ups, alerting on burn rate, logs, SLOs, golden signals, columnar storage, compression and the label index.
+N: Part fourteen, observability. In the wrap-up of almost every round comes the question: how would you know it is broken, before a customer tells you? This part gives you the measurements to name, the arithmetic of storing them, and the alerting that turns them into a page at the right moment. Then it opens the time-series database, which is itself a design question.
+
+## 14.0 Why this part decides rounds
+
+= panel trap | The opening story | Someone adds a user ID as a label
+A latency metric has labels for method, status, endpoint and instance: about **half a million** series.
+An engineer adds `user_id` to debug one customer. There are a million active users.
+The metric now has up to **five hundred billion** possible series. The monitoring system runs out of memory, and the company is blind during the incident the label was meant to help with.
+N: A latency metric has labels for method, status, endpoint and instance, about half a million series in total. An engineer adds the user identifier as a label, to debug one customer. There are a million active users. The metric can now have up to five hundred billion series. The monitoring system runs out of memory and falls over, and the company is blind, during the very incident the label was meant to help with. Observability is a system with its own capacity limits, and the first one is cardinality.
+
+= panel note | Assumed reading | What this part does not repeat
+*Site Reliability Engineering*, chapter 4 (*Service Level Objectives*) and chapter 6 (*Monitoring Distributed Systems*).
+*The Site Reliability Workbook*, chapter 2 (*Implementing SLOs*) and chapter 5 (*Alerting on SLOs*).
+How to choose SLIs, the burn-rate derivation and its table of windows, and alert hygiene stay in those chapters.
+N: Four chapters are assumed: chapters four and six of the S-R-E book, on service level objectives and monitoring, and chapters two and five of the workbook, on implementing them and alerting on them. How to choose indicators, the derivation of burn rates and alert hygiene stay there. This part keeps the formulas worth carrying, and then goes to the storage underneath.
+
+= list | Map of the part | Three groups
+- **What to measure**: golden signals, SLIs, SLOs and error budgets
+- **How to measure it**: series and cardinality, percentiles and sketches, push or pull, roll-ups, logs
+- **How to alert, and the store underneath**: burn-rate alerting, detection time, columnar storage, compression, the label index
+N: Three groups. What to measure: the golden signals and service levels. How to measure it: series, cardinality, percentiles, collection, roll-ups and logs. And how to alert on it, with the storage engine that holds it all.
+
+## 14.1 The four golden signals
+
+= table | OBS-09 · Tier A · Assumes SRE book ch. 6 | Four measurements for any user-facing service
+@ OBS-09
+Signal | Measures | Watch out for
+Latency | Time to serve a request | Measure **successes and failures separately**: fast errors flatter the average
+Traffic | Demand: requests a second, or sessions | A drop is as alarming as a spike
+Errors | Failed requests: explicit, wrong content, or too slow | "Too slow" is an error if it breaks the SLO
+Saturation | How full the most constrained resource is | It leads: queues and memory fill before latency moves
+N: Assumes chapter six of the S-R-E book. The four golden signals. Latency, measured separately for successes and failures, because fast errors make the average look healthy. Traffic, where a sudden drop is as alarming as a spike. Errors, including responses that were wrong, or too slow to count. And saturation, how full the most constrained resource is, which leads the others: queues and memory fill before latency moves.
+
+= panel trap | OBS-09 · Tier A · The probe the chapter leaves | "Your error rate is flat and users are complaining."
+Look for errors the server cannot see: **clients timing out** before the server answers, requests that never arrived because of DNS or the load balancer, **wrong answers** returned as 200.
+So measure at the edge and from probes outside, not only in the server.
+N: The probe the chapter leaves open: your error rate is flat, and users are complaining. Look for errors the server cannot see. Clients that time out before the server answers, so the server logs a success. Requests that never arrived, because of DNS or the load balancer. And wrong answers returned with a success code. So measure at the edge and from external probes too, not only inside the server.
+
+= th | OBS-09 · the line to say | Latency, traffic, errors and saturation, with latency split by success and failure, measured at the edge as well as the server.
+V: For any user-facing service I watch latency, split by success and failure, traffic, errors, and saturation of the tightest resource, and I measure at the edge and from outside probes as well as in the server, because the worst failures never reach it.
+[pause: 0.8]
+
+## 14.2 SLI, SLO and error budget
+
+= code | OBS-08 · Tier A · Assumes SRE book ch. 4 and workbook ch. 2 | The budget in minutes, and what happens when it is spent
+@ OBS-08
+SLI:  good requests / valid requests, e.g. served under 300 ms with no error
+SLO:  99.9% of requests good, over a rolling 30 days
+
+error budget = 0.1% of 30 days = 43.2 minutes of total outage
+             or 0.1% of requests: at 1 billion a month, 1 million bad requests
+
+policy when the budget is spent:
+    freeze feature launches; spend engineering on reliability
+    until the rolling window recovers
+N: Assumes chapter four of the S-R-E book and chapter two of the workbook. An indicator is a ratio: good requests over valid requests, for example served within three hundred milliseconds without an error. The objective is a target for that ratio over a window: ninety-nine point nine percent over thirty days. The error budget is what remains: a tenth of a percent, forty-three minutes of total outage, or a million bad requests out of a billion. And the policy says what happens when the budget is spent: launches freeze and engineering goes to reliability until the window recovers.
+
+= panel trap | OBS-08 · Tier A · The probe the chapters leave | "Why not 100%?"
+Because users cannot tell 99.99% from 100% through their own networks and devices, and every extra nine costs about **ten times** more.
+And because a budget is what lets you **ship**: a 100% target means no risky change is ever allowed.
+Set the SLO a little **below** what the system achieves, so it alerts before users suffer, not after.
+N: The probe the chapters leave: why not one hundred percent? Because users cannot tell four nines from one hundred through their own phones and networks, and each extra nine costs roughly ten times more. And because the budget is what lets you ship: a hundred percent target forbids every risky change. Set the objective a little below what the system really achieves, so you are warned before users suffer.
+
+= th | OBS-08 · the line to say | An SLI is good over valid; the SLO is its target over a window; the budget is the rest, and a written policy says what happens when it is spent.
+V: My indicator is good requests over valid requests, the objective is a target for it over thirty days, and the error budget, a tenth of a percent, forty-three minutes a month, is spent on launches and failures alike. A written policy says what happens when it is gone: launches stop until reliability recovers.
+[pause: 0.8]
+
+## 14.3 The metric model and cardinality
+
+= code | OBS-01 · Tier B · The mechanism | A series is a name plus one combination of label values
+@ OBS-01
+http_request_seconds{method="GET", status="200",
+                     endpoint="/orders", instance="10.1.4.7"}
+
+series = product of the distinct values of each label
+    method 5 x status 10 x endpoint 50 x instance 200   = 500,000 series
+
+add user_id, 1,000,000 values:
+    500,000 x 1,000,000                                  = 5 x 10^11 possible series
+
+rule: a label's values must be few and bounded; never IDs, never free text
+N: A time series is a metric name plus one combination of label values. Every distinct combination is a separate series, stored and indexed separately. So the number of series is the product of the number of values of each label. Five methods, ten status codes, fifty endpoints and two hundred instances is half a million series. Add a user identifier with a million values, and it multiplies to five hundred billion. The rule: a label's values must be few and bounded. Never identifiers, never free text.
+
+= panel key | OBS-01 · Tier B · One level down | Where the per-user question goes instead
+Per-user and per-request detail goes into **logs and traces** (14.7), which are indexed by ID and sampled.
+Or into an **exemplar**: a metric sample that carries one trace ID, linking a slow bucket to an example request.
+Guard the store: a **per-metric series limit** that drops new series beyond a ceiling and alerts the owner.
+N: Where does the per-user question go instead? Into logs and traces, which are indexed by identifier and sampled. Or into an exemplar: a metric sample that carries one trace identifier, linking a slow latency bucket to one example request. And guard the store with a per-metric series limit that refuses new series beyond a ceiling and alerts the metric's owner, so one label cannot take down monitoring for everyone.
+
+= th | OBS-01 · the line to say | Series count is the product of label cardinalities; labels stay bounded, and IDs go to logs, traces and exemplars.
+V: The number of series is the product of each label's distinct values, so labels must be few and bounded. Per-user detail goes into logs, traces and exemplars, and the store enforces a series limit per metric.
+[pause: 0.8]
+
+## 14.4 Percentiles and sketches
+
+= table | OBS-02 · Tier A · The failure | Averaging percentiles gives a number nobody measured
+@ OBS-02
+Host | Requests | p99
+A | 9,800 | 50 ms
+B | 200 (all slow, about 900 ms) | 900 ms
+Average of the p99s | — | 475 ms
+Traffic-weighted average | — | 67 ms
+**True p99 of all 10,000** | — | **about 900 ms**: the slowest 1% are all on B
+N: Two hosts. Host A serves nine thousand eight hundred requests with a p99 of fifty milliseconds. Host B serves two hundred, all slow, about nine hundred milliseconds. The average of the two p99s is four hundred and seventy-five. Weighted by traffic, sixty-seven. The true p99 of all ten thousand requests: the slowest one percent is a hundred requests, all on host B, so about nine hundred milliseconds. Both averages are wrong, one by half and one by more than ten times. A percentile cannot be averaged, because it is a position in a sorted list, not a sum.
+
+= dia | OBS-02 · Tier A · The mechanism | Aggregate distributions, then read the percentile
+p14-histograms
+N: The mechanism is to aggregate the distribution, not the percentile. In the picture each host keeps a histogram: counts of requests in latency buckets, under ten milliseconds, ten to twenty-five, and so on. Histograms add. Sum the counts bucket by bucket across all hosts, and you have the fleet's distribution. Then read the p99 from the summed histogram: walk up the buckets until ninety-nine percent of the total count is below you. Ten thousand hosts are no harder than two.
+
+= panel key | OBS-02 · Tier A · One level down | Bucket edges set the error
+A fixed histogram reports a percentile **within its bucket**: with buckets at 250 and 500 ms, a p99 of 300 ms reads as "between 250 and 500".
+So put **edges around the SLO threshold**: if the SLO is 300 ms, have an edge at 300, and the SLI is exact.
+**Exponential buckets**, each about 10% wider than the last, give a bounded **relative** error everywhere, which is what the sketches of part 10 do adaptively.
+Cost: one counter per bucket per series, so buckets multiply cardinality too.
+N: One level down: bucket edges set the error. A fixed histogram can only place a percentile within its bucket. With edges at two hundred and fifty and five hundred, a p99 of three hundred reads as somewhere between them. So put an edge exactly at the objective's threshold, three hundred, and the indicator is exact. Exponential buckets, each about ten percent wider than the last, give a bounded relative error everywhere, which is what part ten's sketches do adaptively. And remember that each bucket is a counter per series, so buckets multiply cardinality too.
+
+= panel watch | OBS-02 · Tier A · The alternative and the price | Histograms, sketches, or raw samples
+**Fixed histogram**: cheapest, mergeable, error set by edges.
+**Quantile sketch** (part 10): adapts, mergeable, a few KB per series.
+**Raw samples**: exact, and impossible at scale; acceptable only for traces of sampled requests.
+**Precomputed percentiles** per host: cheap and **not mergeable**. Avoid them for anything aggregated.
+N: The alternatives. A fixed histogram, cheapest and mergeable, with error set by its edges. A quantile sketch from part ten, adaptive and mergeable, at a few kilobytes per series. Raw samples, exact and impossible at scale, acceptable only for sampled traces. And percentiles precomputed on each host, cheap and not mergeable, which is how the wrong numbers in the first table are made.
+
+= th | OBS-02 · the line to say | Percentiles cannot be averaged. Keep histograms or sketches, merge them across hosts, then read the percentile, with a bucket edge at the SLO.
+V: I never average percentiles. Each host keeps a histogram or a mergeable sketch, the fleet's distribution is their sum, and the p99 is read from that sum. And I put a bucket edge exactly at the objective's threshold, so the indicator is exact.
+[pause: 0.8]
+
+= panel trap | OBS-02 · Tier A · The probe | "p99 across 10,000 hosts."
+Each host exports a **histogram** with shared bucket edges, or a sketch.
+The query **sums bucket counts** across hosts, then computes the p99 once.
+Cost: buckets x hosts series, so keep buckets to a few dozen, and pre-aggregate by region in a recording rule.
+N: The probe: p99 across ten thousand hosts. Each host exports a histogram with the same bucket edges, or a sketch. The query sums the bucket counts across hosts, then computes the p99 once. The cost is buckets times hosts series, so keep buckets to a few dozen, and pre-aggregate per region in a recording rule, so the dashboard does not sum ten thousand series every time it refreshes.
+
+## 14.5 Push versus pull collection
+
+= table | OBS-03 · Tier B · The mechanism | Who opens the connection
+@ OBS-03
+ | Pull (the collector scrapes) | Push (the target sends)
+Knows a target is down | Yes: the scrape fails, `up = 0` | Only by **absence**, which needs a list of who should report
+Short-lived jobs | Missed between scrapes | Natural: push before exit
+Across firewalls, many networks | Collector must reach every target | Targets reach one endpoint
+Load control | Collector sets the pace | Targets can flood the collector
+Examples | Prometheus | Monarch, StatsD, OpenTelemetry export
+N: Who opens the connection? With pull, the collector scrapes each target on a schedule, as Prometheus does. A failed scrape is itself a signal that the target is down, and the collector controls its own load. Short-lived jobs can be missed between scrapes, and the collector must reach every target. With push, targets send to an endpoint, as Monarch and OpenTelemetry exporters do. Short jobs and firewalled networks are easy, a down target shows only as an absence, and targets can flood the collector.
+
+= panel key | OBS-03 · Tier B · One level down | Detecting absence with push
+Keep an **expected set**: from the scheduler or the service registry (part 4).
+Alert when a member of that set has not reported for N intervals.
+Rate-limit and authenticate pushes, or one buggy client fills the store.
+N: One level down: detecting absence with push. Keep the set of targets that should be reporting, taken from the scheduler or the service registry, and alert when a member has not reported for a few intervals. And rate-limit and authenticate pushes, or one buggy client can fill the store.
+
+= th | OBS-03 · the line to say | Pull sees a dead target and controls load; push suits short jobs and many networks, and needs an expected set to detect absence.
+V: Pull collection notices a dead target and paces itself. Push suits short-lived jobs and many networks, and detects a dead target only against an expected set from the registry, with pushes rate-limited.
+[pause: 0.8]
+
+## 14.6 Roll-ups and retention
+
+= code | OBS-04 · Tier B · The mechanism | Keep resolution only as long as anyone looks at it
+@ OBS-04
+tier     resolution   kept      samples per series   at 1.37 B each
+raw      10 s         14 days   120,960              166 KB
+5 min    5 min        90 days    25,920               36 KB
+1 hour   1 h          2 years    17,520               24 KB
+
+roll-up keeps, per interval: min, max, sum, count, and the histogram buckets
+    so rates, averages AND percentiles still work at low resolution
+N: Roll-ups trade resolution for retention. Raw samples every ten seconds for fourteen days: about a hundred and twenty thousand samples per series, a hundred and sixty-six kilobytes at the compression of section fourteen point eleven. Five-minute roll-ups for ninety days, thirty-six kilobytes. Hourly for two years, twenty-four. Each roll-up keeps the minimum, maximum, sum and count of its interval, and the histogram buckets, so rates, averages and percentiles still work at low resolution.
+
+= panel watch | OBS-04 · Tier B · The price | What a roll-up loses
+A 30-second spike disappears inside a 5-minute average; the **max** keeps it.
+Percentiles **cannot** be rolled up from percentiles; only from buckets.
+Queries spanning tiers must switch resolution at the boundary, and say so on the graph.
+N: The price. A thirty-second spike disappears inside a five-minute average, which is why the maximum is kept. Percentiles can be rolled up only from buckets, never from percentiles. And a query spanning tiers switches resolution at the boundary, which graphs should show.
+
+= th | OBS-04 · the line to say | Raw for days, roll-ups for months and years, each keeping min, max, sum, count and buckets.
+V: I keep raw samples for a couple of weeks and roll-ups for months and years, each roll-up storing min, max, sum, count and histogram buckets, so spikes, rates and percentiles all survive the loss of resolution.
+[pause: 0.8]
+
+## 14.7 Logging pipelines
+
+= dia | OBS-06 · Tier B · The mechanism | Agent, buffer, queue, index; drop the cheapest first
+@ OBS-06
+p14-logs
+N: A logging pipeline, in the picture. On each host, an agent tails structured log lines and buffers them on local disk. It ships them to a queue, a partitioned log from part ten, which absorbs bursts. Indexers consume from the queue and write into a searchable store, and older data moves to cheap object storage. The arithmetic: two thousand requests a second, twenty lines each, five hundred bytes a line, is twenty megabytes a second, about one point seven terabytes a day, from one service.
+
+= panel key | OBS-06 · Tier B · One level down | What is dropped first, by design
+Under pressure the pipeline **drops in a stated order**: debug first, then sampled info, never errors or **audit** logs.
+**Sample** high-volume success logs, say 1 in 100, and keep every error; record the sample rate, so counts can be scaled.
+Audit logs take a **separate, lossless** path, because they are evidence, not diagnostics.
+The pipeline must never block the application: the agent drops, the app keeps serving.
+N: One level down: what is dropped first, decided in advance. Under pressure the pipeline drops debug lines first, then sampled info, and never errors or audit records. Sample high-volume success logs, one in a hundred, keep every error, and record the sample rate so counts can be scaled back up. Audit logs take a separate lossless path, because they are evidence, not diagnostics. And the pipeline must never block the application. If anything has to give, the agent drops lines and the service keeps serving.
+
+= th | OBS-06 · the line to say | Agent with a disk buffer, a queue, indexers, cheap storage for old data; drop in a stated order and never block the app.
+V: Logs go from an agent with a local buffer through a queue into an index, and age into object storage. Under pressure the pipeline drops in a stated order, debug first, never errors or audit records, and it never blocks the application.
+[pause: 0.8]
+
+## 14.8 Alerting
+
+= table | OBS-05 · Tier A · Assumes workbook ch. 5 | Page on error-budget burn, over two windows at once
+@ OBS-05
+Burn rate | Long window | Short window | Budget spent at alert | Action
+14.4 | 1 hour | 5 minutes | 2% | Page
+6 | 6 hours | 30 minutes | 5% | Page
+1 | 3 days | 6 hours | 10% | Ticket
+N: Assumes chapter five of the workbook. Alert on how fast the error budget is burning, not on raw thresholds. A burn rate of one spends exactly the month's budget in a month. The workbook's recommended set, for a thirty-day objective: page when the burn rate exceeds fourteen point four over an hour, which has spent two percent of the budget. Page when it exceeds six over six hours, five percent. Open a ticket when it exceeds one over three days. Each alert also requires a short window, a twelfth as long, to still be burning, so the alert stops soon after the problem does.
+
+= code | OBS-05 · Tier A · The probe the chapter leaves | "Cut detection from two minutes to fifteen seconds. What does it cost?"
+detection time = scrape interval + evaluation interval + "for" duration + notification
+    today:  30 s + 30 s + 60 s + 10 s     = about 2 min 10 s
+    target: 5 s  + 5 s  + 0 s  + 5 s      = about 15 s
+
+cost:  6x the samples ingested and stored for those series
+       no "for" window: every blip pages -> more false alarms
+cut first: the "for" window and the evaluation interval, on a few critical SLIs only
+N: The probe the chapter leaves: cut detection from two minutes to fifteen seconds. Detection time is the scrape interval, plus the rule evaluation interval, plus the for duration a condition must hold, plus notification. Today: thirty, thirty, sixty and ten seconds, about two minutes. To reach fifteen seconds, scrape and evaluate every five seconds and drop the for window. The cost: six times the samples for those series, and with no for window every blip pages. So do it for a few critical indicators only, and decide what false-alarm rate on-call will accept.
+
+= th | OBS-05 · the line to say | Page on burn rate over a long and a short window, 14.4 over an hour and 6 over six hours; detection time is the sum of four intervals.
+V: I alert on error-budget burn rate, with a long and a short window, paging at fourteen point four over an hour and six over six hours, and ticketing at one over three days. Detection time is scrape, evaluation, hold and notification added up, and I shorten it only for the few indicators that justify the cost and the false alarms.
+[pause: 0.8]
+
+= panel trap | OBS-05 · Tier A · The probe | "Who monitors the monitor?"
+The alerting path must **not depend on what it watches**: separate infrastructure, another region or another provider.
+A **dead man's switch**: an alert that **always fires**, received by an external service that pages when it **stops** arriving.
+And a second, small, independent monitor that checks the main one from outside.
+N: The probe: who monitors the monitor? The alerting path must not depend on what it watches, so it runs on separate infrastructure, in another region or with another provider. Add a dead man's switch: an alert that always fires, sent to an external service that pages when it stops arriving. Silence then means the monitoring is broken, not that all is well. And a small independent monitor checks the main one from outside.
+
+## 14.9 Columnar storage
+
+= dia | STO-06 · Tier B · The mechanism | Store each column together, read only the columns you need
+@ STO-06
+p14-columnar
+N: An analytics query, average latency by region last week, touches three columns of a table with a hundred. Row storage, on the left of the picture, keeps each row's hundred values together, so reading three columns reads all hundred. Columnar storage, on the right, keeps each column together in its own file or block. The query reads three columns, three percent of the data. And values of one column are alike, so they compress very well.
+
+= panel key | STO-06 · Tier B · One level down | The encodings
+**Dictionary**: replace "europe-west1" with a small integer; store the dictionary once.
+**Run-length**: sorted or repetitive data, "region 3, 40,000 times", becomes one pair.
+**Bit-packing**: integers that fit in 5 bits are stored in 5 bits, not 64.
+Then a general compressor on top. Ten times smaller is common, and queries can often run **on the encoded data** without decoding.
+N: One level down, the encodings. A dictionary replaces long repeated strings with small integers. Run-length encoding turns forty thousand repeats of one value into one pair. Bit-packing stores integers in only as many bits as they need. Then a general compressor goes on top. Ten times smaller is common, and many filters and aggregations run directly on the encoded data without decoding it.
+
+= th | STO-06 · the line to say | Columnar storage reads only the needed columns and compresses them by dictionary, run-length and bit-packing.
+V: For analytical scans I use columnar storage: each column stored together, so a query reads only the columns it needs, compressed by dictionary, run-length and bit-packing, often ten times. The price is slow single-row writes and lookups, so it is fed in batches.
+[pause: 0.8]
+
+## 14.10 Time-series compression
+
+= code | STO-07 · Tier B · The mechanism | Delta-of-delta timestamps, XOR values, on four samples
+@ STO-07
+timestamps:   1000   1015   1030   1046
+deltas:              15     15     16
+delta of delta:              0      1        -> '0' = 1 bit;  small value = a few bits
+
+values:       12.0   12.0   12.5   12.5
+XOR with previous:   0      bits   0        -> identical = 1 bit;
+                                               different: only the meaningful bits
+
+Gorilla reports about 1.37 bytes per sample, against 16 raw
+N: A time-series database compresses with two tricks, here on four samples. Timestamps arrive at a regular interval, so store the delta of the delta. Fifteen, fifteen, sixteen gives deltas of deltas of zero and one. A zero costs one bit. Values change slowly, so store each value XOR the previous one. An identical value gives zero, one bit. A different value gives a word with most bits zero, and only the meaningful middle bits are stored. Facebook's Gorilla paper reports about one point three seven bytes per sample, against sixteen uncompressed.
+
+= panel key | STO-07 · Tier B · One level down | Memory for the head block
+Recent samples sit in memory, compressed, per **active series**: a few KB each with index and buffers.
+**10 million** active series at about **3 KB** = **30 GB** of memory, before queries.
+That, not disk, is what cardinality exhausts first: the opening story.
+N: One level down. Recent samples live in memory, compressed, in a head block per active series, which costs a few kilobytes each with its index and buffers. Ten million active series at about three kilobytes is thirty gigabytes of memory before a single query runs. That, not disk, is what cardinality exhausts first, which is the opening story again.
+
+= th | STO-07 · the line to say | Delta-of-delta timestamps and XOR-encoded values bring a sample to about 1.4 bytes; memory per active series is the real limit.
+V: Time-series stores encode timestamps as deltas of deltas and values as XOR with the previous value, about one point four bytes a sample. The binding limit is memory per active series, a few kilobytes each, so ten million series is tens of gigabytes.
+[pause: 0.8]
+
+## 14.11 The inverted index from label to series
+
+= dia | DS-06 · Tier B · The mechanism | Each label value lists its series; a query intersects the lists
+@ DS-06
+p14-postings
+N: A query asks for the series where job is api and status is five hundred. Scanning every series would be slow. So the store keeps an inverted index: for each label and value, a sorted list of the series that have it, called a postings list. Job equals api lists series three, seven, nine and twelve. Status equals five hundred lists seven, twelve and twenty. Intersect the sorted lists by walking them together: seven and twelve. The same structure, with words instead of labels, is the index of every search engine.
+
+= panel watch | DS-06 · Tier B · The price | Long lists and negative matches
+A label with few values, such as `status="200"`, has a list covering most series: intersect **shortest first**.
+A negative or regular-expression match, `endpoint=~"/api/.*"`, must merge many lists: expensive.
+Each new series adds an entry to every one of its labels' lists: cardinality costs index too.
+N: The price. A value shared by almost every series, like status two hundred, has a huge list, so intersect the shortest lists first. A regular-expression or negative match must merge many lists, and is expensive. And every new series adds an entry to the list of each of its labels, so cardinality costs index space as well as memory.
+
+= th | DS-06 · the line to say | An inverted index maps each label value to a sorted list of series; queries intersect lists, shortest first.
+V: The time-series store finds series through an inverted index: each label value maps to a sorted postings list, and a query intersects the lists, shortest first. Search engines use the same structure for words.
+[pause: 0.8]
+
+## 14.12 Recap
+
+= list | Recap | What to be able to explain without notes
+- The **golden signals**, latency split by outcome
+- **SLI, SLO, budget** in minutes, and the policy when spent
+- **Cardinality** as a product, and where IDs go instead
+- Why **percentiles cannot be averaged**, and the histogram fix
+- **Burn-rate alerting**: 14.4 over an hour, 6 over six hours
+- The **detection-time** sum, and what cutting it costs
+- **Who monitors the monitor**: independence and a dead man's switch
+- **Columnar** encodings, **Gorilla** compression, the **postings** index
+N: Without notes: the golden signals. The objective, the budget in minutes, and its policy. Cardinality as a product. Why percentiles cannot be averaged, and the histogram fix. Burn-rate alerting. The detection-time sum. Who monitors the monitor. And the storage: columns, compression and the postings index.
+
+## 14.13 Probe drills
+
+= probe | p99 latency across 10,000 hosts.
+- Hosts export **histograms** with shared edges, or mergeable sketches
+- **Sum** bucket counts, then compute the p99 once
+- Pre-aggregate by region; keep an edge at the SLO threshold
+C: Every host exports a latency histogram with the same bucket edges, or a mergeable sketch. The query sums bucket counts across all hosts and reads the p99 from the sum. Averaging per-host p99s would be wrong. To keep it cheap I pre-aggregate per region with a recording rule, and I put a bucket edge exactly at the objective's threshold so the indicator is exact.
+
+= probe | Who monitors the monitor?
+- Alerting runs on **independent** infrastructure
+- A **dead man's switch**: an always-firing alert, paged on silence
+- An external probe of the monitoring system itself
+C: The alerting path runs on infrastructure that does not share failure with what it watches, in another region or with another provider. A dead man's switch sends an alert that always fires to an external service, which pages if it stops arriving. And a small independent monitor probes the main monitoring system from outside, so its outage is itself noticed.
+
+= probe | Cut detection time from two minutes to fifteen seconds.
+- Detection is **scrape + evaluate + for + notify**
+- Shorten scrape and evaluation to 5 s, drop the for window
+- Cost: **6x** samples, and more false pages; only for a few critical SLIs
+C: Detection time is the sum of the scrape interval, the evaluation interval, the for window and notification, here about two minutes. To reach fifteen seconds I scrape and evaluate every five seconds and remove the for window. That costs six times the samples for those series, and pages on short blips. So I would do it only for the few indicators where fifteen seconds matters.
+
+= probe | And what false-alarm rate do you accept?
+- Set by **on-call load**: at most a couple of pages a shift
+- Every page must be **actionable**; a false one is a cost, tracked
+- Measure precision of each alert, and retune or delete the noisy ones
+C: That is set by what on-call can sustain, roughly no more than a couple of pages per shift, every one actionable. I would track each alert's precision, the fraction of its pages that needed action, and retune or delete alerts that fall below, say, half. A fast alert that pages falsely every night is worse than a slower one people trust.
+
+= probe | Someone added a user ID as a label. What now?
+- **Cardinality** explodes: product of label values
+- Drop the label at ingestion; enforce a **per-metric series limit**
+- Per-user detail goes to logs, traces or **exemplars**
+C: The series count multiplies by the number of users, and the store runs out of memory. Immediately, I drop that label at ingestion with a relabelling rule. Permanently, a per-metric series limit refuses new series past a ceiling and alerts the owner. And the per-user question is answered by logs and traces, indexed by identifier, or exemplars that link a metric bucket to one trace.
+
+## 14.14 Where this shows up
+
+= table | Where this shows up | What each design problem takes from this part
+Problem | Takes
+Metrics and monitoring system | All of it: model, cardinality, collection, roll-ups, compression, index, alerting
+Every design's wrap-up | Golden signals, an SLO with a budget, burn-rate alerts
+Logging or analytics platform | The pipeline, drop order, columnar storage
+Ad click aggregation | Columnar storage, roll-ups, sketches
+N: The metrics system task takes all of it. Every design's wrap-up takes the golden signals, an objective with a budget, and burn-rate alerting. A logging or analytics platform takes the pipeline and columnar storage. And ad-click aggregation takes columns, roll-ups and sketches.
+
+= panel note | Read next | Where to go deeper
+Adams et al., *Monarch: Google's Planet-Scale In-Memory Time Series Database*.
+Pelkonen et al., *Gorilla: A Fast, Scalable, In-Memory Time Series Database*.
+*Designing Data-Intensive Applications*, chapter 3: column-oriented storage.
+N: To go deeper: the Monarch paper, Google's planet-scale time-series database. The Gorilla paper, for compression. And chapter three of Designing Data-Intensive Applications, on column-oriented storage. Part fifteen turns to scheduling and control planes.
