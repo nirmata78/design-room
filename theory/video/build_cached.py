@@ -36,5 +36,9 @@ class Cached:
 bv.Kokoro = Cached
 bv.SAY = {**bv.SAY, **SAY}
 ap = argparse.ArgumentParser(); ap.add_argument("script"); ap.add_argument("--frames"); ap.add_argument("--out"); ap.add_argument("--dissolve", type=float, default=0.0); ap.add_argument("--chapter-gap", type=float, default=None)
+# --captions sidecar (2026-11-21, reference solutions): nothing burned in; NAME.srt + NAME.vtt beside the MP4 for YouTube.
+ap.add_argument("--captions", choices=["burn", "soft", "sidecar"], default="burn"); ap.add_argument("--reveal-fade", type=float, default=0.8)
+ap.add_argument("--max-minutes", type=float, default=0)
 a = ap.parse_args()
-bv.build(pathlib.Path(a.script), pathlib.Path(a.frames), pathlib.Path(a.out), "burn", 0, 1080, 1.3, False, dissolve=a.dissolve, chapter_gap=a.chapter_gap)
+bv.build(pathlib.Path(a.script), pathlib.Path(a.frames), pathlib.Path(a.out), a.captions, a.max_minutes, 1080, 1.3, False,
+         dissolve=a.dissolve, chapter_gap=a.chapter_gap, reveal_fade=a.reveal_fade)

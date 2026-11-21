@@ -39,6 +39,9 @@ pdf-kit/.venv/
 **/video/audio/
 **/video/.v[0-9]*/
 **/video/.*.v[0-9]*.md
+# sidecar captions written beside a reference-solution MP4 (build_video.py --captions sidecar); upload, don't commit
+**/video/*.srt
+**/video/*.vtt
 *.mp4
 # Course builder output (theory/video/course.py): MP4s, slide PDFs, chapter files; inside the repo, never ~/Movies
 theory/**/out/

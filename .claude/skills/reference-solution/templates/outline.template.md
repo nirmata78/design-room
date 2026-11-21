@@ -1,6 +1,6 @@
 # SD-NN · <Question> — reference-solution video outline
 
-Target level: staff (manager layer AUX) · Target length: __ min (≤ 90) · Word budget: __ (≈ minutes × 133)
+Target level: staff (manager layer AUX) · Target length: __ min (75–100) · Word budget: __ (≈ minutes × 120) · Reveal steps: __
 
 ## Thesis and definition
 
@@ -40,6 +40,7 @@ Target level: staff (manager layer AUX) · Target length: __ min (≤ 90) · Wor
    | Mechanism | Protects | Rules out | Costs |
    |---|---|---|---|
 5. Options matrix (rows = approaches, columns = deciding properties, last column = fails when). Pick: · Gives up:
+   Mechanisms at work: the container view labelled by mechanism; 1–2 sequences at protocol level (which mechanism, which messages):
 6. Failure catalogue (becomes the challenge list):
 
 ## 4 · API and entities
@@ -57,9 +58,17 @@ Entities (conceptual), then physical tables and keys:
 | V2 | | | |
 | V3 | | | |
 
-Baseline spine, left to right:
-Flows, one per functional requirement (numbered steps):
-C4 and sequence views that follow:
+Baseline spine, left to right (this is also the reveal order):
+C4 context (chapter 1): actors and external systems:
+C4 containers (right after V3): one line per container, what the narration says about it:
+Flows and sequences, one of each per functional requirement (numbered steps):
+
+## 5.1 · Components and technologies
+
+C4 component view per in-scope service (components, library or mechanism, timeouts):
+
+| Container | Choice | How it is built (one level down) | Rejected (≥ 2) and why | Theory part |
+|---|---|---|---|---|
 
 ## 7 · Challenges
 
