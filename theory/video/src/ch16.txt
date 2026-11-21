@@ -5,6 +5,7 @@
 N: Part sixteen. A correct design is half of a Staff answer. The other half is how it is secured, changed, operated and paid for, and how a team delivers it. This part covers authentication and tenant isolation, the mechanics of changing a running system safely, and then the manager layer: phases, team seams, build or buy, risks, objectives as contracts, and readiness.
 
 ## 16.0 Why this part decides rounds
+N: First, a story about a correct change that broke every region at once.
 
 = panel trap | The opening story | A correct design, shipped to every region at once
 A configuration change was reviewed, tested and correct for every case anyone had thought of.
@@ -12,10 +13,11 @@ It was pushed to **every region in the same five minutes**. One field was parsed
 A third of the world's traffic failed at once, with no region left untouched to fail over to.
 N: A configuration change was reviewed, tested, and correct for every case anyone had thought of. It went to every region in the same five minutes. One field was parsed differently by an older binary still running on a third of the fleet. A third of all traffic failed at once, and no untouched region was left to fail over to. The design was right. The way it was changed was not. Most large outages begin with a change, and a Staff candidate is expected to say how changes are made safe.
 
-= panel note | Assumed reading | What this part does not repeat
-*The Site Reliability Workbook*, chapter 16, *Canarying Releases*.
-Canary evaluation and metric selection stay in the chapter.
-N: Chapter sixteen of the Site Reliability Workbook, Canarying Releases, is assumed. How a canary is evaluated and which metrics to compare stay in the chapter.
+= cards c3 | OPS-01 · From the ground up | A canary, from the coal mine to the release
+The idea :: Miners carried a canary: it fell ill before the air was dangerous for people. A release does the same with a **small slice** of traffic.
+The comparison :: Send 1% of requests to the new version and compare it with the old one, the **baseline**, on the same metrics at the same time.
+The decision :: Healthy after a bake time: widen the slice. Worse: **roll back automatically**, before most users ever saw it.
+N: From the ground up, a canary. Miners once carried a canary, which fell ill before the air was dangerous for people. A release does the same with a small slice of traffic. Send one percent of requests to the new version, and compare it with the old version, the baseline, on the same metrics at the same time. If it stays healthy for a bake time, widen the slice. If it looks worse, roll back automatically, before most users ever saw it. As always, green slides start from nothing.
 
 = panel note | About the AUX badge | The manager layer, marked
 Slides marked **AUX** carry the engineering-manager layer: phases, team shape, build or buy, risks, contracts, adoption, readiness.
@@ -29,6 +31,13 @@ N: A note on the badge some slides carry from here on. Slides marked aux carry t
 N: Three groups. Security: authentication, tenant isolation and abuse. Changing and running the system: rollout, migration, version skew, background work, kill switches, testing, regions and cost. And leading the delivery, the manager layer.
 
 ## 16.1 Authentication
+N: We start with security. Proving who is calling, and taking that proof back.
+
+= cards c2 | SEC-01 · From the ground up | Two kinds of pass, at a festival
+A wristband :: Checked at a glance at every gate, with no phone call. Valid until Sunday, and **very hard to take back** from someone who should not have it.
+A guest list :: Checked against the list at each door, which costs a moment. Strike a name, and that person is **out at once**.
+> **Authentication** proves who you are. **Authorisation** decides what you may do. A token carries the first, and often some of the second.
+N: From the ground up, two kinds of pass, at a festival. A wristband is checked at a glance at every gate, with no phone call to anyone. It is valid until Sunday, and very hard to take back from someone who should not have it. A guest list is checked at each door, which takes a moment, but strike a name and that person is out at once. Self-contained tokens are wristbands, and opaque tokens are the guest list. And two words: authentication proves who you are, authorisation decides what you may do.
 
 = table | SEC-01 · Tier A · The failure | A stolen token that cannot be revoked
 @ SEC-01
@@ -58,11 +67,17 @@ N: One level down: the usual design combines them. A short-lived access token, s
 **Short access plus refresh**: a refresh call every few minutes per client, and exposure bounded by minutes.
 N: The price of each. Opaque tokens everywhere give instant revocation and put the auth service on every request path, so its outage is yours. Long self-contained tokens remove the dependency and remove revocation. Short access tokens with a refresh token cost a refresh call every few minutes per client, and bound the exposure to minutes.
 
+= panel now | SEC-01 · Since 2024 | Passkeys
+Most large consumer services now offer **passkeys**: the login is a key pair held by the user's device, unlocked by a fingerprint or face, and bound to the site.
+There is no password to steal, reuse or type into a fake page. The design questions move to **account recovery** and to devices that are lost.
+E: Since 2024, most large consumer services offer passkeys. The login is a key pair held on the user's device, unlocked by a fingerprint or a face, and bound to the one site that created it. There is no password to steal, to reuse elsewhere, or to type into a fake page. The hard design questions move to account recovery, and to what happens when the device is lost.
+
 = th | SEC-01 · the line to say | Short self-contained access tokens verified locally, opaque revocable refresh tokens, mutual TLS with workload identity between services.
 V: Users get short-lived signed access tokens, verified locally, plus an opaque refresh token the auth service can revoke at once, so a stolen token is useful for minutes. Services authenticate each other with mutual TLS and automatically rotated workload identities, and authorisation of a specific resource happens in the service that owns it.
 [pause: 0.8]
 
 ## 16.2 Tenant isolation
+N: Next, tenant isolation: one customer must never see, or slow down, another.
 
 = panel trap | SEC-04 · Tier A · The failure | One query without a tenant filter
 @ SEC-04
@@ -95,6 +110,7 @@ V: I isolate tenants in three ways: data, by a tenant identifier taken from the 
 [pause: 0.8]
 
 ## 16.3 Abuse resistance
+N: Next, abuse. Making bad behaviour expensive without punishing good users.
 
 = table | SEC-07 · Tier B · The mechanism | Make abuse expensive, at several layers
 @ SEC-07
@@ -115,31 +131,29 @@ V: Against abuse I layer defences: rate limits at the edge, friction scaled by r
 [pause: 0.8]
 
 ## 16.4 Progressive rollout
+N: Now operating the system. First, rolling out a change a little at a time.
 
-= code | OPS-01 · Tier A · Assumes workbook ch. 16 | A rollout is a statistics problem
+= math | OPS-01 · Tier A · The mechanism | A rollout is a statistics problem
 @ OPS-01
-baseline error rate 0.1%; traffic 10,000 requests a second
-canary 1% of traffic = 100 a second; bake 30 minutes = 180,000 requests
-    expected errors 180, standard deviation about 13
+~ Baseline error rate 0.1% at 10,000 requests a second. A 1% canary for 30 minutes sees 180,000 requests.
+$$ \mu = 180{,}000 \times 0.001 = 180 $$ :: expected errors
+$$ \sigma \approx \sqrt{180} \approx 13 $$ :: their natural spread
+$$ 198 \approx \mu + 1.4\,\sigma $$ :: a 10% regression: lost in the noise
+$$ \mu + 3\sigma \approx 220 \Rightarrow +22\% $$ :: the smallest regression this canary reliably sees
+N: A rollout is a statistics problem. The baseline error rate is a tenth of a percent at ten thousand requests a second. A one percent canary for thirty minutes sees a hundred and eighty thousand requests, and expects a hundred and eighty errors, give or take about thirteen. A regression that doubles errors is obvious. A ten percent regression is about one and a half standard deviations, invisible. The smallest regression this canary reliably sees is about twenty-two percent. Smaller ones need a bigger canary or a longer bake.
 
-regression that doubles errors: 360        -> obvious
-regression of +10%: 198                     -> 1.4 sigma, invisible
-smallest regression seen at about 3 sigma: about +22%
-
-to see smaller ones: a bigger canary, or a longer bake
-N: Assumes chapter sixteen of the workbook. A rollout is a statistics problem. The baseline error rate is a tenth of a percent at ten thousand requests a second. A one percent canary for thirty minutes sees a hundred and eighty thousand requests, and expects a hundred and eighty errors, give or take about thirteen. A regression that doubles errors is obvious. A ten percent regression is about one and a half standard deviations, invisible. The smallest regression this canary reliably sees is about twenty-two percent. Smaller ones need a bigger canary or a longer bake.
-
-= panel trap | OPS-01 · Tier A · The probe the chapter leaves | "Rollout applies to what, exactly?"
+= panel trap | OPS-01 · Tier A · The probe | "Rollout applies to what, exactly?"
 **Binaries, configuration and data** alike: the opening story was a config change.
 Stages: one canary, one zone, one region, then the rest, with **bake time** and an automated health gate at each, and **automatic rollback** on a failed gate.
 **Never two regions at once** until the change has baked in one.
-N: The probe the chapter leaves: rollout applies to what? To binaries, configuration and data changes alike, because the opening story was a config change. The stages: a canary, then one zone, one region, then the rest, with bake time and an automated health gate at each, and automatic rollback when a gate fails. And never two regions at once, until the change has baked in one.
+N: The probe: rollout applies to what? To binaries, configuration and data changes alike, because the opening story was a config change. The stages: a canary, then one zone, one region, then the rest, with bake time and an automated health gate at each, and automatic rollback when a gate fails. And never two regions at once, until the change has baked in one.
 
 = th | OPS-01 · the line to say | Every change, binary, config or data, goes canary, zone, region, rest, with bake time, health gates and automatic rollback.
 V: Every change, binary, configuration or data, rolls out in stages: canary, zone, region, then the rest, with bake time sized so the canary can actually detect a regression, automated health gates and automatic rollback, and never to two regions at once.
 [pause: 0.8]
 
 ## 16.5 Online migration
+N: Next, migrating live data without downtime, and with a way back.
 
 = panel trap | OPS-02 · Tier A · The failure | A migration with a weekend of downtime, then a rollback that loses data
 @ OPS-02
@@ -172,6 +186,7 @@ Without it: rollback means **replaying two days of writes** into the old schema,
 N: The probe: roll back after two days of writes. If reverse replication has been running, switch back, because the old system has every write. Without it, rollback means replaying two days of writes into the old schema, if they can even be expressed there, or it means no rollback. Which one it is should have been written down before the switch, not discovered after.
 
 ## 16.6 Version skew
+N: Next, version skew: two releases running side by side.
 
 = table | OPS-03 · Tier B · The mechanism | The two-release rule
 @ OPS-03
@@ -192,6 +207,7 @@ V: Every format or protocol change follows the two-release rule: first ship a ve
 [pause: 0.8]
 
 ## 16.7 Background versus foreground work
+N: Next, background work that must never hurt the foreground.
 
 = table | OPS-05 · Tier A · The failure | A backfill that took down the product
 @ OPS-05
@@ -206,13 +222,12 @@ Plus a **hard ceiling** on background share, say 30% of disk bandwidth, and a **
 Schedule what can wait into **off-peak** hours.
 N: The mechanism: background work runs under a controller tied to the foreground target. Every few seconds, measure foreground p99 latency. If it is comfortably under target, raise the background rate. If it is over, cut sharply. Add a hard ceiling on background share, say thirty percent of disk bandwidth, and a lower I/O priority. And schedule whatever can wait into off-peak hours.
 
-= code | OPS-05 · Tier A · One level down | The price is time
-backfill 10 TB
-    at 400 MB/s, full speed:       25,000 s   = about 7 hours, and an outage
-    at 100 MB/s, throttled:       100,000 s   = about 28 hours
-    at 100 MB/s, off-peak only, 12 h a day:   about 2.3 days
-
-and the slower the backfill, the longer the dual-write window (16.5)
+= math | OPS-05 · Tier A · One level down | The price is time
+~ A backfill of 10 TB.
+$$ 10\ \text{TB} / 400\ \text{MB/s} = 25{,}000\ \text{s} \approx 7\ \text{h} $$ :: at full speed, and an outage
+$$ 10\ \text{TB} / 100\ \text{MB/s} = 10^{5}\ \text{s} \approx 28\ \text{h} $$ :: throttled
+$$ 28\ \text{h} / 12\ \text{h a day} \approx 2.3\ \text{days} $$ :: throttled, off-peak only
+~ And the slower the backfill, the longer the dual-write window (16.5).
 N: One level down: the price is time. Ten terabytes at full speed takes about seven hours, and causes an outage. Throttled to a hundred megabytes a second, twenty-eight hours. Off-peak only, twelve hours a day, a little over two days. And a slower backfill lengthens the migration's dual-write window. That is the trade to state: the project plan absorbs the time, so the users do not absorb the latency.
 
 = panel watch | OPS-05 · Tier A · The alternative and the price | Separate hardware for background work
@@ -225,6 +240,7 @@ V: All background work, backfills, compaction, repair, runs under a controller t
 [pause: 0.8]
 
 ## 16.8 Kill switches and safe limits
+N: Next, kill switches, and limits on what automation may do.
 
 = panel trap | OPS-07 · Tier A · The failure | An automation that did exactly what it was told
 @ OPS-07
@@ -258,26 +274,33 @@ V: Every automation that changes production is bounded: a rate, a maximum fracti
 [pause: 0.8]
 
 ## 16.9 Testing distributed systems
+N: Next, testing distributed systems, where the bugs live in the timing.
 
-= table | OPS-08 · Tier B · Assumes SWE at Google ch. 14 | Tests that find distributed bugs
+= table | OPS-08 · Tier B · The mechanism | Tests that find distributed bugs
 @ OPS-08
 Test | Finds
 Fault injection in staging: kill nodes, drop and delay packets, skew clocks | Missing timeouts, retries that multiply, failover that never ran
 Consistency checking under faults, Jepsen-style | Lost writes, stale reads, broken claims about isolation
 Deterministic simulation | Rare interleavings, reproducibly, from a seed
 Game days and disaster tests in production | Runbooks, people and dependencies nobody listed
-N: Assumes chapter fourteen of Software Engineering at Google, on larger tests. Four kinds of test find distributed bugs. Fault injection in staging: kill nodes, drop and delay packets, skew clocks. Consistency checking under faults, in the style of Jepsen, which finds lost writes and stale reads. Deterministic simulation, which runs the whole system in one process with simulated time and network, and replays a rare interleaving from its seed. And game days in production, which test the runbooks and the people.
+N: Four kinds of test find distributed bugs. Fault injection in staging: kill nodes, drop and delay packets, skew clocks. Consistency checking under faults, in the style of Jepsen, which finds lost writes and stale reads. Deterministic simulation, which runs the whole system in one process with simulated time and network, and replays a rare interleaving from its seed. And game days in production, which test the runbooks and the people.
 
-= panel trap | OPS-08 · Tier B · The probe the chapter leaves | "How would you know your failover works?"
+= panel trap | OPS-08 · Tier B · The probe | "How would you know your failover works?"
 Because it **ran recently**, on purpose: a scheduled failover in production, during business hours, with the on-call watching.
 A failover path that has not run in six months **does not work**; something it depends on has changed.
-N: The probe the chapter leaves: how do you know your failover works? Because it ran recently, on purpose: a scheduled failover in production, in business hours, with on-call watching. A failover path that has not run for six months does not work. Something it depends on has changed since.
+N: The probe: how do you know your failover works? Because it ran recently, on purpose: a scheduled failover in production, in business hours, with on-call watching. A failover path that has not run for six months does not work. Something it depends on has changed since.
+
+= panel now | OPS-08 · Since 2024 | Deterministic simulation went mainstream
+FoundationDB and TigerBeetle built deterministic simulation in from the first day; in 2024 it became a commercial service (Antithesis) that runs ordinary systems that way.
+The pitch is the same as the slide: a rare interleaving, found once, **replays exactly from its seed**, so it can be debugged and fixed.
+E: Since 2024, deterministic simulation has gone mainstream. FoundationDB and TigerBeetle built it in from the first day, and in 2024 it became a commercial service, Antithesis, that runs ordinary systems that way. The value is the one on the previous slide. A rare interleaving, found once, replays exactly from its seed, so it can be debugged and fixed instead of shrugged at.
 
 = th | OPS-08 · the line to say | Inject faults, check consistency under them, simulate deterministically, and exercise failover in production on a schedule.
 V: I test the distributed behaviour, not only the code: fault injection, consistency checks under faults, deterministic simulation for rare interleavings, and scheduled failovers in production, because a failover path that has not run recently does not work.
 [pause: 0.8]
 
 ## 16.10 Multi-region operation
+N: Next, operating in several regions that must fail independently.
 
 = table | OPS-09 · Tier A · The failure | Three regions that fail together
 @ OPS-09
@@ -312,20 +335,11 @@ V: Multiple regions only help if they fail independently, so each region has its
 [pause: 0.8]
 
 ## 16.11 Cost and efficiency ownership
+N: Next, cost, owned as a number per request.
 
-= code | OPS-10 · Tier B · The mechanism | Unit cost, and its biggest lever
+= dia | OPS-10 · Tier B · The mechanism | Unit cost, and its biggest lever
 @ OPS-10
-monthly cost   $180,000   for   900 million requests
-unit cost      $0.20 per 1,000 requests
-
-breakdown:
-    storage, 3 replicas x 400 TB        45%
-    compute, average utilisation 25%     35%
-    network across zones and regions     15%
-    other                                 5%
-
-lever: compute at 25% utilisation -> 50% halves 35% of the bill
-lever: storage 3 replicas -> erasure coding 1.5x (part 7) for cold data
+p16-cost
 N: Cost is owned as a unit cost: a hundred and eighty thousand dollars a month for nine hundred million requests is twenty cents per thousand requests. Then the breakdown, which shows the biggest lever. Here storage at three replicas is forty-five percent, compute at twenty-five percent average utilisation is thirty-five. Raising utilisation to fifty percent halves a third of the bill. Moving cold data from three replicas to erasure coding, part seven, halves its storage. Name the biggest line item and its lever, with a number.
 
 = panel watch | OPS-10 · Tier B · The price | Efficiency spends headroom
@@ -338,6 +352,7 @@ V: I state the cost as a unit cost, such as dollars per thousand requests, name 
 [pause: 0.8]
 
 ## 16.12 Scope and phases
+N: Now the manager layer, marked AUX. First, scope and phases.
 
 = table aux | EM-01 · Tier A · The failure | A plan that delivers everything at the end
 @ EM-01
@@ -363,6 +378,7 @@ V: I phase the work: first the thinnest end-to-end path that real users can try,
 [pause: 0.8]
 
 ## 16.13 Team shape
+N: Next, team shape, cut along the design's contracts.
 
 = table aux | EM-02 · Tier A · The mechanism | Cut teams along contracts, not along layers
 @ EM-02
@@ -388,6 +404,7 @@ V: I cut teams along the design's contracts, not its layers, fix each contract b
 [pause: 0.8]
 
 ## 16.14 Build, reuse or buy
+N: Next, build, reuse or buy.
 
 = table aux | EM-03 · Tier A · The mechanism | Three questions
 @ EM-03
@@ -412,6 +429,7 @@ V: I build what differentiates us and buy or reuse the rest when it meets the re
 [pause: 0.8]
 
 ## 16.15 The risk register
+N: Next, the risk register.
 
 = table aux | EM-04 · Tier A · The mechanism | One row per risk, with an owner and a trigger
 @ EM-04
@@ -436,6 +454,7 @@ V: I keep a risk register where every risk has a likelihood, an impact, a mitiga
 [pause: 0.8]
 
 ## 16.16 SLOs as a contract
+N: Next, service level objectives as a contract between teams.
 
 = table aux | EM-05 · Tier A · The mechanism | An SLO between two teams
 @ EM-05
@@ -461,6 +480,7 @@ V: Between teams I write the objective as a contract: what is promised, what the
 [pause: 0.8]
 
 ## 16.17 Client adoption and migration
+N: Next, moving two hundred client teams off an old API.
 
 = table aux | EM-06 · Tier B · The mechanism | Moving 200 client teams off an old API
 @ EM-06
@@ -481,8 +501,9 @@ V: To migrate clients I measure usage per client, make moving cheap with guides,
 [pause: 0.8]
 
 ## 16.18 Operational readiness
+N: Last, operational readiness: what must exist before launch.
 
-= table aux | EM-07 · Tier A · Assumes SRE book ch. 27 | Before launch, a short list that is actually checked
+= table aux | EM-07 · Tier A · The mechanism | Before launch, a short list that is actually checked
 @ EM-07
 Area | Ready when
 Observability | SLOs defined, dashboards, burn-rate alerts that page the owning team
@@ -490,18 +511,19 @@ Capacity | Load-tested at 2 to 3x the launch forecast; headroom for a zone loss
 Rollout and rollback | Staged rollout and a rehearsed rollback; kill switch for the new feature
 Failure | Degraded modes tested; dependencies listed hard or soft
 People | Runbooks for the top alerts; an on-call rotation trained on them
-N: Assumes chapter twenty-seven of the S-R-E book, on reliable product launches. Before launch, a short list that is actually checked. Observability: objectives, dashboards, and burn-rate alerts that page the owning team. Capacity: a load test at two to three times the forecast, and headroom for a zone loss. Rollout: staged, with a rehearsed rollback and a kill switch. Failure: degraded modes tested, dependencies classified. And people: runbooks for the top alerts, and an on-call rotation trained on them.
+N: Before launch, a short list that is actually checked. Observability: objectives, dashboards, and burn-rate alerts that page the owning team. Capacity: a load test at two to three times the forecast, and headroom for a zone loss. Rollout: staged, with a rehearsed rollback and a kill switch. Failure: degraded modes tested, dependencies classified. And people: runbooks for the top alerts, and an on-call rotation trained on them.
 
-= panel trap aux | EM-07 · Tier A · The probe the chapter leaves | "Who says no to a launch?"
+= panel trap aux | EM-07 · Tier A · The probe | "Who says no to a launch?"
 The **owning team's lead**, against the written checklist, with an SRE or production reviewer as a second signature for critical systems.
 A launch that fails the list goes ahead only as an **explicit, recorded exception**, with an owner and a date to close it.
-N: The probe the chapter leaves: who says no to a launch? The owning team's lead, against the written checklist, with a production reviewer as a second signature for critical systems. A launch that fails the list goes ahead only as an explicit, recorded exception, with an owner and a date to close it. That is what makes the list more than a ritual.
+N: The probe: who says no to a launch? The owning team's lead, against the written checklist, with a production reviewer as a second signature for critical systems. A launch that fails the list goes ahead only as an explicit, recorded exception, with an owner and a date to close it. That is what makes the list more than a ritual.
 
 = th aux | EM-07 · the line to say | A launch passes a checked list: SLOs and alerts, load test, staged rollout and rollback, degraded modes, runbooks and trained on-call.
 V: Before launch I check observability with paging alerts, a load test at two to three times the forecast, a staged rollout with rehearsed rollback and a kill switch, tested degraded modes, and runbooks with a trained on-call. Anything missing is a recorded exception with an owner.
 [pause: 0.8]
 
 ## 16.19 Recap
+N: Time to gather the whole part onto one page.
 
 = list | Recap | What to be able to explain without notes
 - **Short access tokens plus revocable refresh tokens**; mutual TLS between services
@@ -516,6 +538,7 @@ V: Before launch I check observability with paging alerts, a load test at two to
 N: Without notes: tokens and revocation. Tenant isolation in three dimensions. Rollout as statistics. Online migration in seven steps with reverse replication. The two-release rule. Background work under a controller. Bounds on automation. Regions that fail independently, and unit cost. And the manager layer, from phases to readiness.
 
 ## 16.20 Probe drills
+N: Now the drills. Pause after each question, answer it aloud, then compare.
 
 = probe | A bad push is blocking a continent. Stop it.
 - **Halt** the rollout: the pipeline's stop, or the **kill switch**
@@ -542,6 +565,7 @@ C: I would cut scope, not quality: the thinnest end-to-end path, one region, the
 C: Anything that is not why customers choose us and has a product that meets the requirements in numbers: identity, the message queue, metrics, the workflow engine. I would build the part that differentiates us, here the core data path. And I would state when I would revisit each, for instance if the bought queue's cost per message became the biggest line item at ten times the volume.
 
 ## 16.21 Where this shows up
+N: Finally, where this part shows up in the design problems.
 
 = table | Where this shows up | What each design problem takes from this part
 Problem | Takes

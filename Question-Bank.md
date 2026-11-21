@@ -1,4 +1,4 @@
-# Question Bank — 93 system-design questions
+# Question Bank — 94 system-design questions
 
 The index. Cue sheets live in `questions/<LETTER>-<archetype>.md`, one file per archetype, each
 question anchored as `### SD-nn`.
@@ -13,7 +13,7 @@ question anchored as `### SD-nn`.
 **Candidates: don't read the cue sheets before a round** — they contain the answer. This index is safe.
 
 **Reference solutions** — full stage-by-stage answer keys — exist for the rows marked
-**solution**: SD-08, SD-09, SD-15, SD-25, SD-44, SD-47 ([index](solutions/README.md)). Run the round first,
+**solution**: SD-08, SD-09, SD-15, SD-24, SD-25, SD-44, SD-47 ([index](solutions/README.md)). Run the round first,
 read the solution after. The building blocks they rely on are in [Theory](theory/README.md).
 
 ## How the bank is organised — four ways to slice it
@@ -56,7 +56,7 @@ minutes (`levels.md` §3).
 
 | ID | Question | T | Kind | Domain | Levels | Asked by | Loads |
 |---|---|:-:|---|---|---|---|---|
-| SD-08 | News feed / home timeline · [**solution**](solutions/SD-08-news-feed.md) | 1 | Build | social | Sr St EM | M★ G | fan-out write vs read, the celebrity problem, ranking |
+| SD-08 | News feed / home timeline · [**solution**](solutions/SD-08-news-feed.md) · [**reference video**](solutions/SD-08-news-feed/video/README.md) | 1 | Build | social | Sr St EM | M★ G | fan-out write vs read, the celebrity problem, ranking |
 | SD-09 | Chat / messaging (1:1 + groups) · [**solution**](solutions/SD-09-chat-messaging.md) | 1 | Build | social | Sr St EM | M★ MS★ | connection state, ordering, delivery receipts, offline |
 | SD-10 | Live comments & reactions on a live stream | 2 | Build | social media | Sr St | M★ | pub/sub fan-out, backpressure, shedding |
 | SD-11 | Photo & video sharing (Instagram-like) | 2 | Build | social media | Sr EM | M★ | blob + metadata split, thumbnails, CDN |
@@ -77,12 +77,13 @@ minutes (`levels.md` §3).
 | SD-21 | Data warehouse / batch analytics platform | 2 | Build | data | St EM SEM | A G N | columnar storage, partitioning, orchestration, cost |
 | SD-22 | Change data capture & replication pipeline | 2 | Build | data | St EM | A MS N | log-based CDC, schema evolution, ordering, backfill |
 | SD-23 | Multi-tenant SaaS platform isolation | 2 | Build | saas | St EM SEM | MS★ A G | noisy neighbours, quotas, cells, per-tenant data |
+| SD-96 | URL shortener · [**solution**](solutions/SD-96-url-shortener/SD-96_URL_Shortener_Reference_Design.md) · [video](solutions/SD-96-url-shortener/video/README.md) | 1 | Build | general | Sr St EM | G M A MS | code generation, read-heavy redirect, hot keys, 301 vs 302, async analytics, takedowns |
 
 ## D · Infrastructure & control planes → [`questions/D-infrastructure-control-planes.md`](questions/D-infrastructure-control-planes.md)
 
 | ID | Question | T | Kind | Domain | Levels | Asked by | Loads |
 |---|---|:-:|---|---|---|---|---|
-| SD-24 | Distributed lock / coordination service | 2 | Build | infra | St Pr | G★ A | consensus, fencing, lease expiry, safety vs liveness |
+| SD-24 | Distributed lock / coordination service · [**solution**](solutions/SD-24-distributed-lock/SD-24_Distributed_Lock_Reference_Design.md) | 2 | Build | infra | St Pr | G★ A | consensus, fencing, lease expiry, safety vs liveness |
 | SD-25 | Rate limiter (distributed) · [**solution**](solutions/SD-25-rate-limiter.md) | 1 | Build | infra | Sr St EM | G★ M★ A MS | algorithms, distributed counters, cell-local vs global |
 | SD-26 | Feature flags & config delivery | 2 | Build | infra | Sr St EM | M★ N G | push vs poll, staleness, kill switches, targeting |
 | SD-27 | Authorization / permission graph (Zanzibar-like) | 2 | Build | infra saas | St Pr | G★ MS | graph evaluation, caching consistency, tuple storage |
@@ -94,6 +95,7 @@ minutes (`levels.md` §3).
 | SD-33 | Cluster scheduler / capacity manager (Borg-like) | 2 | Build | infra | St Pr | G★ MS | bin packing, priority/preemption, quota, bad-node ejection |
 | SD-34 | Secrets management & key rotation | 2 | Build | infra | St EM | MS A G | root of trust, rotation without downtime, blast radius |
 | SD-35 | Progressive deployment & automatic rollback | 2 | Build | infra | St EM SEM | G N A | canary gates, halt conditions, blast radius, rollback safety |
+| SD-94 | Blocking / denylist system | 2 | Build | infra | St EM SEM | G★ | in-process check vs slow distribution, staleness bound, fail policy, safe rule rollout |
 
 ## E · Search, geo & ML → [`questions/E-search-geo-ml.md`](questions/E-search-geo-ml.md)
 
@@ -112,24 +114,25 @@ See also archetype **I** for AI & LLM systems — SD-42 is the serving prerequis
 
 ## F · Transactions, payments & commerce → [`questions/F-transactions-payments.md`](questions/F-transactions-payments.md)
 
-**SD-77–82 are the fintech expansion** — card issuing, KYC/AML, reconciliation, FX, payouts, credit. Pair with archetype **J** for digital-asset roles.
+**SD-77–82 and SD-95 are the fintech expansion** — card issuing, KYC/AML, reconciliation, FX, payouts, credit, loan servicing. A lending loop (BNPL, POS finance) usually draws on SD-82 → SD-95 → SD-77. Pair with archetype **J** for digital-asset roles.
 
 | ID | Question | T | Kind | Domain | Levels | Asked by | Loads |
 |---|---|:-:|---|---|---|---|---|
-| SD-44 | Payment processing & double-entry ledger · [**solution**](solutions/SD-44-payments-ledger.md) | 1 | Build | fintech | Sr St EM | A★ G MS | idempotency, exactly-once effects, sagas, reconciliation |
+| SD-44 | Payment processing & double-entry ledger · [**solution**](solutions/SD-44-payments-ledger.md) · [**reference**](solutions/SD-44-payments-ledger/) | 1 | Build | fintech | Sr St EM | A★ G MS | idempotency, exactly-once effects, sagas, reconciliation |
 | SD-45 | Payment gateway integration (multi-PSP) | 2 | Build | fintech commerce | Sr St EM | A MS | adapter design, retries against third parties, webhooks |
 | SD-46 | Digital wallet & balance transfers | 2 | Build | fintech | Sr St | A G | atomic balance moves, hot accounts, holds, audit |
 | SD-47 | Ticket / seat booking under contention · [**solution**](solutions/SD-47-ticket-booking/SD-47_Ticket_Booking_Reference_Design.md) | 1 | Build | commerce | Sr St EM | A★ G MS | holds vs locks, oversell, fairness, expiry |
 | SD-48 | Inventory & order management at scale | 1 | Build | commerce | St EM | A★ | reservation vs availability, distributed inventory, sagas |
 | SD-49 | Delivery dispatch & order lifecycle | 2 | Build | mobility commerce | St EM | U★ A | long-lived state machines, assignment, real-time tracking |
 | SD-50 | Subscription billing & usage metering | 2 | Build | saas fintech | St EM | A MS G | metering accuracy, proration, idempotent invoicing |
-| SD-77 | Card authorisation & issuer processing | 1 | Build | fintech | Sr St EM | FT★ A MS | holds, stand-in, auth ↔ clearing matching |
+| SD-77 | Card authorisation & issuer processing · [**solution**](solutions/SD-77-card-authorisation/SD-77_Card_Authorisation_Reference_Design.md) · [**reference video**](solutions/SD-77-card-authorisation/video/README.md) | 1 | Build | fintech | Sr St EM | FT★ A MS | holds, stand-in, auth ↔ clearing matching |
 | SD-93 | Personal investment tracker with price alerts | 1 | Build | fintech data | Sr St EM | FT G | two data speeds, inverted alert matching, unreliable third parties, restated history |
 | SD-78 | KYC / AML onboarding & sanctions screening | 2 | Build | fintech | Sr EM | FT★ MS | durable workflow, fuzzy screening, continuous re-screening |
 | SD-79 | Reconciliation & settlement engine | 1 | Build | fintech | St EM SEM | FT★ A MS | multi-pass matching, expectations, exception workflow |
 | SD-80 | Cross-border payments & FX | 2 | Build | fintech | St EM | FT★ A | locked quotes, exposure, prefunding, multi-currency ledger |
 | SD-81 | Payouts & disbursements to bank rails | 2 | Build | fintech commerce | Sr St EM | FT★ A U | exactly-once outbound, ambiguous rail status, returns |
-| SD-82 | Real-time credit decisioning (BNPL) | 2 | Build | fintech ai | St EM | FT★ A | explainable decisions under budget, loan servicing |
+| SD-82 | Real-time credit decisioning & origination (BNPL) · [**solution**](solutions/SD-82-credit-decisioning/SD-82_Credit_Decisioning_Reference_Design.md) · [**reference video**](solutions/SD-82-credit-decisioning/video/README.md) | 1 | Build | fintech ai | St EM | FT★ A | slow paid vendors under one deadline, atomic booking, explainable decisions, PII vault |
+| SD-95 | Instalment loan servicing: ledger & collections scheduler · [**solution**](solutions/SD-95-loan-servicing/SD-95_Loan_Servicing_Reference_Design.md) · [**reference video**](solutions/SD-95-loan-servicing/video/README.md) | 1 | Build | fintech | Sr St EM | FT★ A MS | double entry, unknown outcomes, rail limits, returns, reconciliation |
 
 ## G · Media & delivery → [`questions/G-media-delivery.md`](questions/G-media-delivery.md)
 
@@ -227,7 +230,7 @@ bar on your home domain).
 | Domain | Questions | Core test in this domain |
 |---|---|---|
 | `general` | SD-55 SD-56 SD-57 SD-58 SD-59 SD-60 SD-61 SD-62 SD-83 SD-84 SD-85 SD-86 SD-87 SD-88 SD-90 SD-91 | judgment, sequencing, review — domain-neutral rounds |
-| `fintech` | SD-43 SD-44 SD-45 SD-46 SD-50 SD-71 SD-75 SD-76 SD-77 SD-78 SD-79 SD-80 SD-81 SD-82 SD-84 SD-93 | correctness under retry; you are not the only ledger |
+| `fintech` | SD-43 SD-44 SD-45 SD-46 SD-50 SD-71 SD-75 SD-76 SD-77 SD-78 SD-79 SD-80 SD-81 SD-82 SD-84 SD-93 SD-95 | correctness under retry; you are not the only ledger |
 | `crypto` | SD-71 SD-72 SD-73 SD-74 SD-75 SD-76 | irreversible value, key custody, reorgs |
 | `ai` | SD-41 SD-42 SD-43 SD-63 SD-64 SD-65 SD-66 SD-67 SD-68 SD-69 SD-70 SD-82 | expensive, non-deterministic components; evaluation without ground truth |
 | `social` | SD-02 SD-08 SD-09 SD-10 SD-11 SD-12 SD-13 SD-14 SD-68 | fan-out, the celebrity problem, abuse at scale |
@@ -236,7 +239,7 @@ bar on your home domain).
 | `search` | SD-36 SD-37 SD-38 SD-67 | precomputation under a latency budget |
 | `mobility` | SD-39 SD-40 SD-49 | geo indexing, matching under contention |
 | `saas` | SD-17 SD-18 SD-19 SD-23 SD-27 SD-50 SD-89 | tenancy, isolation, collaboration |
-| `infra` | SD-04 SD-05 SD-07 SD-15 SD-16 SD-17 SD-20 SD-24 SD-25 SD-26 SD-27 SD-28 SD-29 SD-30 SD-31 SD-32 SD-33 SD-34 SD-35 SD-53 SD-66 SD-92 | control plane vs data plane, blast radius |
+| `infra` | SD-04 SD-05 SD-07 SD-15 SD-16 SD-17 SD-20 SD-24 SD-25 SD-26 SD-27 SD-28 SD-29 SD-30 SD-31 SD-32 SD-33 SD-34 SD-35 SD-53 SD-66 SD-92 SD-94 | control plane vs data plane, blast radius |
 | `data` | SD-01 SD-03 SD-04 SD-06 SD-07 SD-21 SD-22 SD-54 SD-69 SD-74 SD-93 | event time, exactly-once accounting, lineage |
 
 ## Browse by kind
@@ -258,7 +261,7 @@ bar on your home domain).
 | **Amazon L6/L7** | SD-48, SD-44, SD-47, SD-28, SD-30, SD-56, SD-57, SD-61, SD-90 |
 | **Microsoft Principal / M2** | SD-23, SD-19, SD-09, SD-34, SD-56, SD-59, SD-63 |
 | **Netflix** | SD-51, SD-52, SD-41, SD-35, SD-57 |
-| **Fintech** (payments, neobank, issuing, lending) | SD-44, SD-77, SD-79, SD-81, SD-45, SD-80, SD-78, plus SD-84 |
+| **Fintech** (payments, neobank, issuing, lending) | SD-44, SD-77, SD-79, SD-81, SD-45, SD-80, SD-78, plus SD-84; **lending**: SD-82, SD-95, SD-77 |
 | **Crypto exchange / custodian** | SD-71, SD-72, SD-73, SD-44, SD-75, SD-76 |
 | **AI lab / AI platform** | SD-42, SD-63, SD-64, SD-66, SD-65, SD-67 |
 | **Director / Head of Engineering loops** | SD-89, SD-91, SD-90, SD-92, SD-62, SD-60 |
@@ -296,7 +299,7 @@ the next question should load that dimension hard:
 
 1. Build the sheet with `Cue-Sheet-Template.md`.
 2. Append it to the right archetype file as `### SD-nn · Title   [T1 · G★ M]`. **IDs are global and
-   monotonic** — take the next free number (currently **SD-94**) even if it lands in an older
+   monotonic** — take the next free number (currently **SD-97**) even if it lands in an older
    archetype; the archetype file's header lists its ranges.
 3. Add a row here with Kind, Domain and Levels.
 4. Open a pull request — see `CONTRIBUTING.md`.

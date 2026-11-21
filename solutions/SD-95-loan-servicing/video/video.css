@@ -1,0 +1,157 @@
+/* Lighter video slides on top of pdf-kit style.css + deck.css: one idea per slide, big type, one diagram max.
+   Rendered at 13.333 x 7.5 in → 1920 x 1080 frames. */
+.slide { padding: 0.5in 0.7in 0.55in; }
+.slide .k { font-size: 13pt; font-weight: 700; letter-spacing: 2pt; text-transform: uppercase; color: var(--blue); margin-bottom: 4pt; }
+.slide .k.r { color: var(--red); }
+.slide h1 { font-size: 30pt; letter-spacing: -0.4pt; margin: 0 0 14pt !important; padding-bottom: 8pt; }
+.lead { font-size: 20pt; line-height: 1.4; color: #3a424a; margin: 0 0 14pt; max-width: 11.5in; }
+.lead b { color: var(--ink); }
+.slide figure.grow { display: flex; align-items: center; justify-content: center; margin: 0; min-height: 0; }
+.slide figure.grow svg { width: 100%; height: 100%; max-height: 100%; }
+.slide.dia { padding-top: 0.38in; }
+.slide.dia h1 { font-size: 25pt; margin-bottom: 8pt !important; padding-bottom: 5pt; }
+.big li { font-size: 21pt; line-height: 1.4; margin-bottom: 12pt; }
+.big { padding-left: 26pt; }
+table.bt { font-size: 17pt; width: 100%; } table.bt th, table.bt td { padding: 8pt 12pt; }
+table.bt th { font-size: 14pt; }
+.cards { display: grid; gap: 18pt; margin-top: 6pt; }
+.cards.c2 { grid-template-columns: 1fr 1fr; } .cards.c3 { grid-template-columns: 1fr 1fr 1fr; }
+.cards.c4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+.cd { border: 1px solid var(--line); border-top: 6px solid var(--blue); border-radius: 7pt; padding: 16pt 18pt; }
+.cd h3 { font-size: 21pt; margin: 0 0 8pt; } .cd p { font-size: 17pt; line-height: 1.42; margin: 0 0 6pt; color: #3a424a; }
+.cd.red { border-top-color: var(--red); } .cd.amb { border-top-color: #d18f1c; } .cd.grn { border-top-color: var(--green); }
+.tiles { display: grid; gap: 18pt; grid-template-columns: repeat(var(--n, 4), 1fr); margin: 10pt 0 22pt; }
+.tile { background: var(--soft); border: 1px solid var(--line); border-radius: 8pt; padding: 18pt 18pt 16pt; }
+.tile b { display: block; font-size: 40pt; font-weight: 800; letter-spacing: -1pt; color: var(--red); line-height: 1.05; }
+.tile span { display: block; font-size: 15pt; color: var(--muted); margin-top: 6pt; }
+.tile.blue b { color: var(--blue); }
+.line { font-size: 22pt; font-weight: 600; border-left: 6px solid var(--green); background: var(--green-bg);
+  padding: 14pt 20pt; border-radius: 0 7pt 7pt 0; color: #173d24; margin-top: auto; }
+.line.r { border-left-color: var(--red); background: var(--red-bg); color: #5a1308; }
+.line.a { border-left-color: #d18f1c; background: var(--amber-bg); color: #4a3207; }
+/* question slides */
+.qs { justify-content: center; background: #f3f0fb; }
+.qs .who { font-size: 14pt; font-weight: 700; letter-spacing: 2pt; color: #5b44b5; text-transform: uppercase; }
+.qs .qq { font-size: 40pt; font-weight: 750; letter-spacing: -0.8pt; line-height: 1.18; color: #2a1d66; margin: 14pt 0 22pt; max-width: 11.6in; }
+.qs .hint { font-size: 18pt; color: #5b5f8a; }
+.qs .ans { margin-top: 16pt; font-size: 20pt; background: #fff; border-left: 6px solid var(--green); padding: 14pt 20pt; border-radius: 0 7pt 7pt 0; max-width: 11.6in; }
+/* thesis slides */
+.th { background: var(--ink); color: #fff; justify-content: center; padding: 0.9in 1in; }
+.th .lbl { font-size: 14pt; font-weight: 700; letter-spacing: 2.5pt; color: #ff9b8a; text-transform: uppercase; }
+.th .s { font-size: 44pt; font-weight: 800; letter-spacing: -1.2pt; line-height: 1.14; margin: 16pt 0 20pt; max-width: 11.4in; }
+.th .s em { font-style: normal; color: #ff7a66; }
+.th .sub { font-size: 20pt; color: #c7ced6; max-width: 11in; line-height: 1.45; }
+.th .foot { color: #6e7781; }
+pre.big { font-size: 15pt; line-height: 1.45; padding: 12pt 16pt; }
+.slide .foot { font-size: 10pt; }
+.th ol.check { margin: 0; } .th ol.check li { font-size: 25pt; color: #d6dbe0; margin-bottom: 12pt; line-height: 1.3; }
+/* v2 (2026-10-29): a slide number on every frame, so reviewers can say "slide 23"; and a marker on the
+   auxiliary EM-layer slides that a Staff/IC candidate may skip in the real round. */
+body { counter-reset: sl; }
+.slide { counter-increment: sl; }
+.slide::after { content: counter(sl); position: absolute; top: 0.2in; right: 0.28in; min-width: 0.42in; text-align: center;
+  font: 700 13pt/1 Inter, sans-serif; padding: 5pt 7pt; border-radius: 6pt; background: #eef1f4; color: #57606a; }
+.slide.th::after { background: #2d333b; color: #c9d1d9; }
+.slide.aux::before { content: "AUX · EM LAYER · OPTIONAL IN A STAFF / IC ROUND"; position: absolute; top: 0.24in; right: 1.0in;
+  font: 700 10.5pt/1 Inter, sans-serif; letter-spacing: 1pt; padding: 5pt 9pt; border-radius: 5pt;
+  background: #fdf3e1; color: #7a4c0c; border: 1px solid #d18f1c; }
+.slide.th.aux::before { background: #4a3207; color: #ffd591; border-color: #a86a12; }
+pre.wire { font-size: 13pt; line-height: 1.38; padding: 10pt 14pt; margin: 0 0 10pt; }
+.cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16pt; }
+.cols2 pre.wire { margin: 0; }
+table.bt.sm { font-size: 14.5pt; } table.bt.sm th, table.bt.sm td { padding: 6pt 10pt; }
+table.bt td.calc { font-family: "DejaVu Sans Mono", monospace; font-size: 13pt; color: #0b3d6e; }
+.cols2 pre.wire { font-size: 11.5pt; white-space: pre; overflow: hidden; }
+
+/* readable code slides (2026-10-29 review): 16pt, comments on their own line, ≤ 16 lines */
+pre.code { font-size: 16pt; line-height: 1.5; padding: 12pt 18pt; white-space: pre; }
+pre.code .cm, pre.wire .cm { color: #6e7781; font-style: italic; }
+pre.code .kw { color: #c8341f; font-weight: 700; }
+
+/* v3 (2026-11-12): reference-solution format — devices carried over from the reference walkthroughs
+   (design-room/.claude/skills/reference-solution-video/GUIDELINES.md): chip strip, stage ribbon, question titles,
+   case / fix strips, state traces, scope pair, traceability tags, options matrix, signal and symptom tables. */
+.chips { font: 600 14.5pt/1.3 "DejaVu Sans Mono", monospace; color: var(--blue); margin: -6pt 0 10pt; }
+.chips i { font-style: normal; color: #9aa4ae; margin: 0 9pt; }
+.ribbon { display: flex; gap: 6pt; margin: 0 0 14pt; }
+.ribbon span { flex: 1; font: 700 12.5pt/1 Inter, sans-serif; padding: 9pt 8pt; background: #eef1f4; color: #6e7781;
+  border-radius: 5pt; text-align: center; white-space: nowrap; }
+.ribbon span.done { background: var(--green-bg); color: #1d5c34; }
+.ribbon span.on { background: var(--red); color: #fff; }
+.th .ribbon { margin-top: 26pt; } .th .ribbon span { background: #2d333b; color: #9aa4ae; }
+.th .ribbon span.done { background: #1d3b29; color: #9fd8b3; } .th .ribbon span.on { background: #ff7a66; color: #1f2328; }
+/* a challenge slide: the title is the interviewer's question */
+.slide h1.q { color: #7a1a0c; border-bottom-color: var(--red); }
+.slide h1.q::before { content: "Q"; display: inline-block; background: var(--red); color: #fff; font-size: 0.72em;
+  font-weight: 800; padding: 1pt 8pt 2pt; border-radius: 5pt; margin-right: 11pt; vertical-align: 3pt; }
+.vtag { display: inline-block; font: 800 0.66em/1 Inter, sans-serif; background: var(--blue); color: #fff;
+  padding: 4pt 9pt; border-radius: 5pt; margin-right: 10pt; vertical-align: 3pt; letter-spacing: .5pt; }
+.strip { display: grid; grid-template-columns: 1fr 1fr; gap: 14pt; margin-top: 10pt; }
+.strip.one { grid-template-columns: 1fr; } .strip.three { grid-template-columns: 1fr 1fr 1fr; }
+.case, .fixb, .whyb, .hedge { font-size: 16.5pt; line-height: 1.36; padding: 10pt 14pt 11pt; border-radius: 0 6pt 6pt 0;
+  border-left: 6px solid; }
+.case b.t, .fixb b.t, .whyb b.t, .hedge b.t { display: block; font-size: 11pt; letter-spacing: 1.6pt;
+  text-transform: uppercase; margin-bottom: 3pt; }
+.case { background: var(--red-bg); border-color: var(--red); color: #5a1308; } .case b.t { color: var(--red); }
+.fixb { background: var(--green-bg); border-color: var(--green); color: #173d24; } .fixb b.t { color: var(--green); }
+.whyb { background: var(--blue-bg); border-color: var(--blue); color: #0b2540; } .whyb b.t { color: var(--blue); }
+.hedge { background: var(--amber-bg); border-color: #d18f1c; color: #4a3207; } .hedge b.t { color: var(--amber); }
+/* state trace: one line per event, mechanism before name */
+pre.trace { font: 15.5pt/1.55 "DejaVu Sans Mono", monospace; background: #fff; border: 1px solid var(--line);
+  border-left: 6px solid var(--ink); border-radius: 0 6pt 6pt 0; padding: 12pt 18pt; margin: 0 0 10pt; white-space: pre; }
+pre.trace .t { color: #6e7781; } pre.trace .bad { color: var(--red); font-weight: 700; }
+pre.trace .ok { color: var(--green); font-weight: 700; } pre.trace .hl { background: #fff3c4; }
+/* IN / OUT scope pair */
+.scope2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18pt; }
+.scope2 > div { border-radius: 7pt; padding: 14pt 18pt; border: 1px solid; }
+.scope2 .in { background: var(--green-bg); border-color: var(--green); } .scope2 .out { background: var(--red-bg); border-color: var(--red); }
+.scope2 h3 { font-size: 13pt; letter-spacing: 2pt; text-transform: uppercase; margin: 0 0 8pt; }
+.scope2 .in h3 { color: var(--green); } .scope2 .out h3 { color: var(--red); }
+.scope2 li { font-size: 18.5pt; line-height: 1.35; margin-bottom: 7pt; } .scope2 ul { margin: 0; padding-left: 20pt; }
+/* traceability: which requirement an API serves, which entity it writes */
+.tr { display: flex; flex-wrap: wrap; gap: 7pt; margin: 0 0 10pt; }
+.tr span { font: 700 12.5pt/1 "DejaVu Sans Mono", monospace; padding: 5pt 10pt; border-radius: 12pt; border: 1.5px solid; }
+.tr .fr { color: #215a9a; border-color: #2f6fb5; background: #dbeafe; } .tr .api { color: #2a1d66; border-color: #6b4fc4; background: #e6dcfb; }
+.tr .ent { color: #0d3b2a; border-color: #1f8a63; background: #d3f3e6; } .tr .nfr { color: #4a3207; border-color: #b7860b; background: #fdf0c2; }
+/* options matrix: the pick in green, rejected rows greyed, never erased */
+table.mx tr.pick td { background: var(--green-bg); font-weight: 600; } table.mx tr.pick td:first-child { border-left: 6px solid var(--green); }
+table.mx tr.rej td { color: #8c959f; } table.mx tr.rej td:first-child { text-decoration: line-through; }
+table.mx td.y { color: var(--green); font-weight: 700; } table.mx td.n { color: var(--red); font-weight: 700; }
+table.mx td.why { font-size: 0.9em; }
+/* weak signal vs strong signal · symptom pair → conclusion */
+table.sig td:nth-child(2) { background: var(--red-bg); color: #5a1308; } table.sig td:nth-child(3) { background: var(--green-bg); color: #173d24; }
+table.sym td:nth-child(3) { font-weight: 700; } table.sym td.up::after { content: " ↑"; color: var(--red); font-weight: 800; }
+table.sym td.dn::after { content: " ↓"; color: var(--blue); font-weight: 800; }
+/* theory chapter: every slide carries the badge, so a viewer can tell theory from design */
+.slide.theory .k { color: #6b4fc4; }
+.slide.theory::before { content: "THEORY"; position: absolute; top: 0.24in; right: 1.0in; font: 700 10.5pt/1 Inter, sans-serif;
+  letter-spacing: 1.5pt; padding: 5pt 9pt; border-radius: 5pt; background: #efe9fd; color: #4a2fa3; border: 1px solid #6b4fc4; }
+.prop { border: 1px solid var(--line); border-left: 7px solid #6b4fc4; border-radius: 0 7pt 7pt 0; padding: 12pt 18pt; margin-bottom: 12pt; }
+.prop .lbl { font: 800 11.5pt/1 Inter, sans-serif; letter-spacing: 2pt; text-transform: uppercase; color: #6b4fc4; }
+.prop p { font-size: 20pt; line-height: 1.36; margin: 6pt 0 0; } .prop.safe { border-left-color: var(--red); } .prop.safe .lbl { color: var(--red); }
+.prop.live { border-left-color: var(--green); } .prop.live .lbl { color: var(--green); }
+/* pause marker on a question slide · the "if asked, I'd say" closer · the coach's grading note */
+.qs .pz { margin-top: 20pt; font: 700 13pt/1 Inter, sans-serif; letter-spacing: 2pt; text-transform: uppercase; color: #5b44b5; }
+.qs .pz::before { content: "❚❚"; margin-right: 9pt; font-size: 0.85em; }
+.th.say .s { font-size: 31pt; font-weight: 650; letter-spacing: -0.4pt; line-height: 1.3; }
+.grade { font-size: 16.5pt; line-height: 1.36; padding: 10pt 14pt; background: #f3f0fb; border-left: 6px solid #5b44b5;
+  border-radius: 0 6pt 6pt 0; color: #2a1d66; margin-top: auto; }
+.grade b.t { display: block; font-size: 11pt; letter-spacing: 1.6pt; text-transform: uppercase; color: #5b44b5; margin-bottom: 3pt; }
+
+/* 2026-11-20 readability rework (course-builder pacing port) */
+table.tl { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--line); border-left: 6px solid var(--ink);
+  border-radius: 0 6pt 6pt 0; margin: 0 0 12pt; font-size: 19pt; line-height: 1.4; }
+table.tl th { text-align: left; white-space: nowrap; color: #57606a; font-weight: 700; font-size: 15pt; padding: 9pt 14pt 9pt 18pt;
+  vertical-align: top; width: 1%; border-bottom: 1px solid #eef0f2; letter-spacing: .3pt; }
+table.tl td { padding: 9pt 18pt 9pt 6pt; border-bottom: 1px solid #eef0f2; }
+table.tl tr:last-child th, table.tl tr:last-child td { border-bottom: 0; }
+table.tl .bad { color: var(--red); font-weight: 700; } table.tl .ok, table.tl .good { color: var(--green); font-weight: 700; }
+table.tl .hl { background: #fff3c4; } table.tl .t { color: #6e7781; }
+pre.code { font-size: 18pt; position: relative; } pre.wire { font-size: 15pt; } .cols2 pre.wire { font-size: 14pt; white-space: pre-wrap; }
+pre.code::before, pre.wire::before { content: "pseudocode"; position: absolute; top: 6pt; right: 10pt; font: 700 10pt/1 "Inter", sans-serif;
+  letter-spacing: 1.5pt; text-transform: uppercase; color: #8c959f; }
+pre.wire { position: relative; } pre.wire::before { content: "wire format"; }
+pre.code .kw { color: #cf222e; } pre.code .fn, pre.wire .k { color: #8250df; }
+.th.card .s { font-size: 54pt; } .th.card .lbl { font-size: 17pt; }
+.slide .cols2 pre.wire { font-size: 16.5pt; line-height: 1.42; }
+.slide pre.code { font-size: 17pt; }

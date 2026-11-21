@@ -9,9 +9,22 @@ import build_video as bv
 from say import SAY
 CACHE = pathlib.Path.home() / ".cache/sd-course/tts"; CACHE.mkdir(parents=True, exist_ok=True)
 RealKokoro = bv.Kokoro
+# A beat between sentences inside one spoken line (2026-11-17): a statement gets a short breath, a question or a colon
+# that sets up an answer gets a longer one, so the listener can follow a chain of reasoning. Seconds of silence.
+import re
+BEAT = {".": 0.38, "!": 0.38, "?": 0.75, ":": 0.55}
+SPLIT = re.compile(r"(?<=[.?!:])\s+(?=[A-Z0-9\"'])")
 class Cached:
     def __init__(self, *a): self.a, self.k = a, None
     def create(self, text, voice, speed, lang):
+        parts = [x for x in SPLIT.split(text.strip()) if x]
+        if len(parts) < 2: return self.one(text, voice, speed, lang)
+        out, sr = [], 24000
+        for j, x in enumerate(parts):
+            a, sr = self.one(x, voice, speed, lang); out.append(a)
+            if j + 1 < len(parts): out.append(np.zeros(int(sr * BEAT.get(x.rstrip()[-1:], 0.38)), dtype=np.float32))
+        return np.concatenate(out), sr
+    def one(self, text, voice, speed, lang):
         h = hashlib.sha1(f"{voice}|{speed}|{lang}|{text}".encode()).hexdigest()
         p = CACHE / f"{h}.npz"
         if p.exists():

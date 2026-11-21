@@ -5,16 +5,19 @@
 N: Part seventeen, the building blocks. Every design is drawn from about twenty boxes. This part is a field guide to them: one card per block, saying when to draw it, when not to, and which part of this course teaches what is inside. Then three facts worth having exact, a map from design problems to parts, and three small assemblies.
 
 ## 17.0 Why this part decides rounds
+N: First, the two words every interviewer says when you draw a box: open that up.
 
 = panel trap | The opening story | "Open that up."
 The candidate draws a box labelled **Kafka** and moves on. The interviewer points at it: "Open that up. What decides ordering, and what happens to a consumer when the group rebalances?"
 A name without a mechanism is a Depth miss. A mechanism without a name is fine.
 N: The candidate draws a box labelled Kafka and moves on. The interviewer points at it and says: open that up. What decides ordering, and what happens to a consumer when the group rebalances? A name without the mechanism behind it is a miss on depth. A mechanism without a product name is perfectly fine. So each card in this part points to where the mechanism was taught, and the product names come last.
 
-= panel note | Assumed reading | What this part does not repeat
-*Site Reliability Engineering*, chapter 2, *The Production Environment at Google, from the Viewpoint of an SRE*.
-Each block's mechanism is in the part named on its card. This part only says when to draw it.
-N: One reading is assumed: chapter two of the S-R-E book, which tours Google's production environment, Borg, Chubby, Bigtable, Spanner and the rest, as a working whole. Each block's mechanism is in the part named on its card, so this part only says when to draw it, and when not.
+= cards c4 | BLK-01 · From the ground up | How to read a block card
+grn Draw it for :: The problems this box is the boring, correct answer to.
+red Not for :: The tempting use that fails, and why.
+amb Open up :: The part and section of this course that teaches what is inside.
+Products :: In the title: Google's own system first, then the common open or cloud equivalents. Names come **last**.
+N: From the ground up, how to read the cards in this part. Green says what to draw the box for: the problems it is the boring, correct answer to. Red says what it is not for: the tempting use that fails, and why. Amber says where to open it up: the part and section of this course that teaches what is inside. And the title carries product names, Google's own system first, then the common equivalents. Names come last, because in a round the mechanism is what counts.
 
 = list | Map of the part | Five groups of blocks, then three assemblies
 - **The front door**: DNS and anycast, L4 balancer, L7 proxy, real-time gateway
@@ -25,6 +28,7 @@ N: One reading is assumed: chapter two of the S-R-E book, which tours Google's p
 N: Five groups. The front door. Databases and stores. Memory and coordination. Messaging and processing. And platforms and backends. Then three facts, the map from problems to parts, and three assemblies.
 
 ## 17.1 The front door
+N: We start at the front door, where requests arrive.
 
 = dia | The front door | What is inside: packets, then requests
 p11-l4-l7
@@ -59,6 +63,7 @@ amb Open up :: transports, the connection tier, the routing table, reconnect sto
 N: The real-time gateway, a tier of persistent connections you usually build yourself. Draw it for server push, presence, chat and streamed model output. Not for plain request and response. Open it up with part eleven, sections six and seven: the transports, the routing table and the reconnect storm.
 
 ## 17.2 Databases and stores
+N: Next, databases and stores: six kinds, and when to draw each.
 
 = dia | Databases and stores | What is inside: a log, a memory table, sorted files
 p7-lsm-write
@@ -107,6 +112,7 @@ amb Open up :: layout, erasure coding, integrity, repair, orphans: part 7; resum
 N: The object store, Cloud Storage on Colossus. Draw it for large immutable objects, backups and data lakes. Not for small hot records or in-place updates. Open it up with part seven's blob half and part eleven's resumable upload.
 
 ## 17.3 Memory and coordination
+N: Next, memory and coordination: the cache and the coordination service.
 
 = dia | Memory and coordination | What is inside: register under a lease, watch, check on every request
 p4-registry
@@ -127,6 +133,7 @@ amb Open up :: sessions, primitives, election with epochs, correctness locks: pa
 N: The coordination service, Chubby at Google. Draw it for election, locks, membership and small configuration. Not for bulk data or high write rates, since it is one consensus group. Open it up with parts three and four.
 
 ## 17.4 Messaging and processing
+N: Next, messaging and processing: logs, queues, streams, batches and warehouses.
 
 = dia | Messaging and processing | What is inside: segments, offsets, retention
 p10-segments
@@ -168,6 +175,7 @@ amb Open up :: columnar storage and encodings: part 14; roll-ups: part 14
 N: The columnar warehouse, BigQuery on Dremel. Draw it for ad hoc analytics over huge tables. Not for point lookups or transactions. Open it up with part fourteen's columnar storage and roll-ups.
 
 ## 17.5 Platforms and backends
+N: Last of the blocks, the platforms underneath: metrics, workflows, clusters, flags and tracing.
 
 = dia | Platforms and backends | What is inside: a control plane that decides, a data plane that serves
 p15-planes
@@ -209,6 +217,7 @@ amb Open up :: the logging pipeline and drop order: part 14; exemplars linking m
 N: The tracing and logging backends, Dapper at Google. Draw them for debugging across services and for audit. Not for aggregate metrics, which belong in the time-series store. Open them up with part fourteen's pipeline and exemplars.
 
 ## 17.6 Three facts worth having exact
+N: Next, three facts that are easy to get wrong, checked this month.
 
 = list | Three facts | Easy to get wrong, checked November 2026
 - **Pub/Sub**: ack deadline 10 s by default, at most 600 s; retention 7 days by default, at most 31; dead-lettering after 5 to 100 attempts; ordering keys give order within a region
@@ -217,6 +226,7 @@ N: The tracing and logging backends, Dapper at Google. Draw them for debugging a
 N: Three facts worth having exact, checked in November twenty twenty-six. Pub Sub's acknowledgement deadline is ten seconds by default and at most six hundred, retention seven days by default and at most thirty-one, and dead-lettering after five to one hundred attempts, with ordering keys giving order within a region. Kafka removed ZooKeeper in version four point oh, in March twenty twenty-five, and its controllers now agree through Raft. And Colossus keeps its file-system metadata in Bigtable behind a metadata service, while data flows directly between clients and file servers.
 
 ## 17.7 Which parts each design problem leans on
+N: Next, a map from each design problem to the parts it leans on.
 
 = table | The map, 1 of 2 | The parts each design problem turns on
 Problem | Turns on parts
@@ -237,6 +247,7 @@ Data migration | 1, 2, 5, 8, 10, 13, 16
 N: Part two of the map. A job scheduler turns on consensus, transactions, streams, reliability and part fifteen. Booking on transactions, caching, the API contract and limits. A key-value store on consensus, replication, partitioning, storage and transactions. Blob storage on the same core plus reliability. And a migration on replication, transactions, streams, reliability and part sixteen. Estimation and the manager layer of part sixteen apply to every one of them.
 
 ## 17.8 Three assemblies
+N: Next, three small assemblies, built from the blocks.
 
 = table | Assembly · a cache tier | Which blocks, what each owns, the managed replacement
 Box | Owns | On Google Cloud
@@ -265,6 +276,7 @@ Background services | Scrubbing, repair by risk, rebalancing, orphan collection 
 N: Third, a blob store. The front end owns resumable uploads, conditional requests and authentication. A metadata service on a consistent store owns names, versions, chunk lists and the moment an object becomes visible. Chunk servers own immutable, erasure-coded chunks across racks. And background services own scrubbing, repair by risk, rebalancing and orphan collection. On Google Cloud all of that is Cloud Storage, on Colossus. Building it yourself means part seven, with parts five and six.
 
 ## 17.9 Probe drills
+N: Now the drills. Pause after each question, answer it aloud, then compare.
 
 = probe | Why a wide-column store and not a relational database here?
 - The **write rate** exceeds one primary, and access is by **row-key range**
@@ -291,6 +303,7 @@ C: Because this lock protects correctness: two holders would corrupt the ledger 
 C: I would name the mechanisms the product provides and open the part for each. For a cache, partitioning and caching, parts six and nine. For a scheduler, consensus, coordination and part fifteen. For a blob store, replication, partitioning and storage, parts five to seven. And I would go deep on the mechanism the question is really about, keeping the rest as clearly labelled boxes.
 
 ## 17.10 Where this shows up
+N: Finally, the whole course, as one vocabulary.
 
 = panel note | Where this shows up | Every design, as its vocabulary
 This part is the index of the course. The task videos cite these cards when they draw a box, and the part named on each card when they open it.

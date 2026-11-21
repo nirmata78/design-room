@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam state {
+  BackgroundColor #e8f0fa
+  BorderColor #2f6fb5
+  ArrowColor #24292f
+}
+[*] --> FREE
+FREE --> HELD : Acquire commits\ntoken = log index
+HELD --> HELD : heartbeat extends the lease\n(same token)
+HELD --> FREE : Release(token)\ncompare by token
+HELD --> EXPIRED : no heartbeat for one lease\nSessionExpired committed
+HELD --> REVOKED : ForceRevoke (audited)
+EXPIRED --> FREE : names freed
+REVOKED --> FREE : names freed
+FREE --> HELD : next grant\nstrictly higher token
+note right of EXPIRED
+  The old holder may not know.
+  Its writes carry the old token
+  and the resource rejects them.
+end note
+@enduml

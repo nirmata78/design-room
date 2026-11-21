@@ -5,6 +5,7 @@
 N: Part fifteen, scheduling and control planes. A job scheduler, a cron service, a cluster manager, a workflow engine: all are control planes, systems that decide what should run and make it so. The interviewer's favourite question about any of them is about a crash at an awkward moment: the scheduler started a job and died before recording it. This part builds the answer.
 
 ## 15.0 Why this part decides rounds
+N: First, a story about a control plane that went down, and a fleet that either noticed or did not.
 
 = panel trap | The opening story | The control plane goes down. Does anything else notice?
 A cluster manager's control plane is unavailable for an hour: no new scheduling, no rescheduling, no config pushes.
@@ -12,11 +13,13 @@ In a well-built system, **every running service keeps serving**. Users notice no
 In a badly built one, nodes that cannot reach it **kill their workloads**, and the whole fleet goes dark within minutes.
 N: A cluster manager's control plane is unavailable for an hour: nothing new can be scheduled or moved. In a well-built system, every running service keeps serving, and users notice nothing. In a badly built one, nodes that cannot reach the control plane decide they are orphaned and kill their workloads, and the whole fleet goes dark within minutes. The difference is one design decision about what the data plane does when its control plane is silent.
 
-= panel note | Assumed reading | What this part does not repeat
-*Site Reliability Engineering*, chapter 24, *Distributed Periodic Scheduling with Cron*.
-The chapter's design history of the cron service and its handling of large installations stay there.
-Part 3 (consensus), part 2 (fencing), part 13 (static stability).
-N: Chapter twenty-four of the S-R-E book, on distributed periodic scheduling with cron, is assumed. Its design history and its treatment of large installations stay there. So do three earlier parts: consensus, fencing tokens, and static stability.
+= cards c3 | SCH-06 · From the ground up | Cron, from one machine to a fleet
+One machine :: A table of times and commands: *at 02:00, run the backup*. Simple, until that machine is down at 02:00, and the backup silently does not happen.
+Two machines :: Run the same table on both. Now the backup runs **twice**, and two copies write the same file.
+A scheduler service :: One elected leader decides each launch, records it through consensus **before** starting it, and runs it on any healthy machine.
+> And for every job, someone must decide: if a launch is in doubt, **skip it or run it again**? That depends on whether running twice is harmless.
+N: From the ground up, scheduled jobs. On one machine, cron is a table of times and commands: at two in the morning, run the backup. Simple, until that machine is down at two, and the backup silently does not happen. Run the same table on two machines, and the backup runs twice, and two copies write the same file. So a scheduler service elects one leader, which decides each launch, records it through consensus before starting it, and runs it on any healthy machine.
+N: And for every job someone must decide: if a launch is in doubt, skip it, or run it again? That depends on whether running twice is harmless. As always, green slides start from nothing.
 
 = list | Map of the part | Three groups
 - **The shape**: control plane versus data plane; desired state and reconcile loops
@@ -25,6 +28,12 @@ N: Chapter twenty-four of the S-R-E book, on distributed periodic scheduling wit
 N: Three groups. The shape of a control plane: how it separates from the data plane, and the reconcile loop at its heart. Deciding where work runs: placement, priority and preemption, and liveness. And deciding when, and making it happen exactly once: timers, task leasing and durable workflows.
 
 ## 15.1 Control plane versus data plane
+N: We start with the split every scheduler is built on: the control plane and the data plane.
+
+= cards c2 | OPS-04 · From the ground up | Two planes, as a control tower and the aircraft
+Control plane :: The tower: plans routes, assigns runways, changes the plan. Slow, careful, central. Its outage stops **changes**.
+Data plane :: The aircraft: fly the plan they were given, in real time. Fast, local, many. They must keep flying if the radio goes quiet.
+N: From the ground up, the two planes, as an airport. The control plane is the tower. It plans routes, assigns runways, and changes the plan. It is slow, careful and central, and when it is down, nothing can change. The data plane is the aircraft. They fly the plan they were given, in real time, fast, local and many. And if the radio goes quiet, an aircraft keeps flying its filed plan. It does not fall out of the sky. That is the property the opening story is about.
 
 = table | OPS-04 · Tier A · The failure | A data plane that asks the control plane on every request
 @ OPS-04
@@ -56,22 +65,25 @@ V: I separate the control plane, which decides and pushes versioned state, from 
 [pause: 0.8]
 
 ## 15.2 Desired state and reconciliation
+N: Next, desired state, and the loop that keeps reality matching it.
 
 = dia | SCH-01 · Tier A · The failure | An edge-triggered controller misses one event
 @ SCH-01
 p15-edge
 N: A controller keeps three replicas of a service running. It is edge-triggered: it reacts to events. Replica died: start one. In the picture, a replica dies while the controller is restarting, and the event is lost. The controller comes back, waits for events, and none arrive. Two replicas run for ever, and nothing will ever correct it, because the system only acts on changes it happened to see.
 
-= code | SCH-01 · Tier A · The mechanism | A level-triggered reconcile loop
-desired:   service "api": replicas 3, image v42        (in the consistent store)
-observed:  2 replicas running v42                      (from the nodes)
-
-loop, on any event AND every 30 s regardless:
-    diff = desired - observed
-    for each difference: one idempotent action
-        missing replica -> place and start one
-        wrong image     -> replace one at a time
-    write status: observed generation, conditions
+= code python | SCH-01 · Tier A · The mechanism | A level-triggered reconcile loop
+# runs on every event, AND every 30 s regardless
+def reconcile(name):
+    want = store.get(name)        # desired: replicas 3, image v42
+    have = nodes.running(name)    # observed: 2 replicas of v42
+    for i in range(len(have), want.replicas):
+        start(f"{name}-{i}", want.image)   # same name twice: one copy
+    for r in have:
+        if r.image != want.image:
+            replace(r, want.image)         # one at a time
+            break
+    store.set_status(name, observed=want.generation)
 N: The fix is a level-triggered reconcile loop. Desired state lives in a consistent store: three replicas of image v forty-two. Observed state comes from the nodes: two replicas running. The controller repeatedly compares the two and takes one idempotent action per difference. A replica is missing, so it places and starts one. It runs on every event, as a speed-up, and also every thirty seconds regardless. A missed event no longer matters, because the next pass sees the difference, not the event.
 
 = panel key | SCH-01 · Tier A · One level down | Why level-triggered wins, and what each action must be
@@ -91,6 +103,7 @@ V: My control plane keeps desired state in a consistent store and runs level-tri
 [pause: 0.8]
 
 ## 15.3 Placement
+N: Next, placement: choosing a machine for each task.
 
 = table | SCH-02 · Tier B · The mechanism | Filter, then score
 @ SCH-02
@@ -111,6 +124,7 @@ V: The scheduler filters out nodes that cannot run the task, scores the rest, an
 [pause: 0.8]
 
 ## 15.4 Priority, quota and preemption
+N: Next, priority and preemption, when the cluster is full.
 
 = dia | SCH-03 · Tier B · The mechanism | A high-priority task arrives on a full cluster
 @ SCH-03
@@ -129,6 +143,7 @@ V: Priority decides who may evict whom, quota caps how much any team can claim, 
 [pause: 0.8]
 
 ## 15.5 Node liveness and eviction
+N: Next, a node that goes silent. Dead, or only cut off?
 
 = dia | SCH-05 · Tier B · The mechanism | A partition makes healthy nodes look dead
 @ SCH-05
@@ -146,6 +161,7 @@ V: A silent node is presumed dead only after a timeout, evictions are rate-limit
 [pause: 0.8]
 
 ## 15.6 Timers at scale
+N: Next, timers at scale: a million jobs due at midnight.
 
 = tiles | SCH-06 · Tier B · The failure | A million jobs at midnight
 @ SCH-06
@@ -170,6 +186,7 @@ V: For timers at scale I key them by due-time bucket and shard, so each schedule
 [pause: 0.8]
 
 ## 15.7 Heaps and timing wheels
+N: Next, the two data structures behind what is due next.
 
 = table | DS-08 · Tier B · The mechanism | Two structures for "what is due next"
 @ DS-08
@@ -189,6 +206,7 @@ V: For a few thousand timers a heap is enough. For millions, a hierarchical timi
 [pause: 0.8]
 
 ## 15.8 Task leasing
+N: Next, running each task once, even when the scheduler dies halfway.
 
 = dia | SCH-07 · Tier A · The failure | The scheduler starts a job and dies before recording it
 @ SCH-07
@@ -220,6 +238,7 @@ V: The scheduler writes a launch record through consensus before any side effect
 [pause: 0.8]
 
 ## 15.9 Durable workflows
+N: Last, durable workflows: multi-step work that survives any crash.
 
 = dia | SCH-08 · Tier B · The mechanism | The workflow's code is replayed from an event history
 @ SCH-08
@@ -232,11 +251,17 @@ Changing workflow code while old instances are running needs **versioning**, or 
 History grows with steps: very long workflows **continue as new** with a fresh history.
 N: The price is the same as state-machine replication in part three. Workflow code must be deterministic: no local clock, no random numbers, no direct input or output, all of which must go through recorded steps. Changing the code while old instances are running needs explicit versioning, or replay diverges from the history. And the history grows with every step, so very long workflows periodically continue as a new instance with a fresh history.
 
+= panel now | SCH-08 · Since 2024 | Durable execution became a category
+Workflow engines that record each step and resume by replay are now a standard building block: Temporal, Restate, DBOS, AWS Step Functions, Azure Durable Functions.
+A common new use is the **long-running AI agent**: each model call and tool call is a recorded step, so a crash or a deploy resumes the agent where it stopped, instead of paying for every call again.
+E: Since 2024, durable execution has become a category of its own. Engines that record each step and resume by replay are a standard building block: Temporal, Restate, DBOS, AWS Step Functions and Azure Durable Functions. A common new use is the long-running A-I agent. Each model call and each tool call is a recorded step, so a crash or a deploy resumes the agent where it stopped, instead of paying for every call again, and instead of repeating a tool call that had side effects.
+
 = th | SCH-08 · the line to say | A durable workflow records each step's result in a history and resumes after a crash by deterministic replay.
 V: For long multi-step processes I use a durable workflow engine: each step's result is recorded in a history, and after a crash the code replays deterministically, skipping completed steps, and resumes. The rules are determinism, explicit versioning and bounded history.
 [pause: 0.8]
 
 ## 15.10 Recap
+N: Time to gather the whole part onto one page.
 
 = list | Recap | What to be able to explain without notes
 - **Control plane and data plane**, and why the data plane rides through
@@ -250,6 +275,7 @@ V: For long multi-step processes I use a durable workflow engine: each step's re
 N: Without notes: the two planes and why the data plane rides through. The level-triggered loop. Filter, score and bind. Preemption under quota. Rate-limited eviction. Timers at scale. The launch record, the lease and the attempt identifier that answer the crash after start. And durable workflows by replay.
 
 ## 15.11 Probe drills
+N: Now the drills. Pause after each question, answer it aloud, then compare.
 
 = probe | The scheduler dies after starting a job and before recording it.
 - Prevent it: write a **launch record through consensus first**, state starting
@@ -276,6 +302,7 @@ C: Only tasks of lower priority, never the same band, and only if the arriving j
 C: Everything that is running keeps running, from last known good state, so users notice nothing. What stops is change: no new placements, no rescheduling after failures, no config pushes. Crucially, nodes do not kill their workloads because they cannot reach the control plane. That would turn a control-plane outage into a total one.
 
 ## 15.12 Where this shows up
+N: Finally, where schedulers and control planes show up in the design problems.
 
 = table | Where this shows up | What each design problem takes from this part
 Problem | Takes

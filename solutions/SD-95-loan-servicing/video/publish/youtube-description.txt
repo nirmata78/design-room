@@ -1,0 +1,42 @@
+600,000 repayments are due on the 1st. It sounds like a thundering herd; it is 42 a second. The hard parts of loan servicing are elsewhere: a card charge that times out, a bank debit that settles and comes back 40 days later, a refund that changes the schedule of a live loan, and a month-end where the ledger says $400 more than the bank. A full reference solution at the Staff bar (L6/L7): theory, a three-version design, eight challenges that break it, and the build cost. 75 minutes, 162 numbered slides, with an interviewer, a candidate and a coach.
+
+The thesis: throughput is never the problem here; correctness over months is. An immutable double-entry ledger, a payment state machine that admits unknown and returned, a scheduler bounded by the payment rail rather than the database, and a daily three-way reconciliation.
+
+IN THIS VIDEO
+• Estimates as arithmetic: 42 a second on the busy day, a 22-minute card window under a 100/s contract, $90M on one morning
+• Theory: safety and liveness, seven mechanisms, an options matrix (including why a message broker solves the wrong problem)
+• Eight challenges: the processor timed out, the morning of the 1st, a debit that settled and came back, a refund mid-loan, a payoff with a debit in flight, $400 more than the bank, the card processor down on the 1st, and how you would know
+• The build cost and team seams (marked AUX, the manager layer)
+
+HOW TO USE IT
+Run the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first. Slides badged AUX are the manager layer: skip them in a Staff round.
+
+CHAPTERS
+0:00 0 Cold open
+3:11 1 Requirements and scope
+8:24 2 Estimates
+12:49 3 Theory
+22:58 4 API and entities
+28:25 5 High-level design
+36:16 6 Bridge
+37:01 7 Challenges
+37:19 7.1 Challenge 1: The processor timed out
+41:42 7.2 Challenge 2: The morning of the 1st
+46:07 7.3 Challenge 3: It settled, then it came back
+50:32 7.4 Challenge 4: A refund in the middle of the loan
+54:31 7.5 Challenge 5: Paying off with a debit in flight
+58:37 7.6 Challenge 6: Four hundred dollars more than the bank
+1:02:45 7.7 Challenge 7: The card processor is down on the 1st
+1:06:14 7.8 Challenge 8: How would you know before month-end?
+1:10:01 8 Build cost
+1:12:30 9 Recap
+
+LINKS
+Written reference design: https://github.com/nirmata78/design-room/blob/main/solutions/SD-95-loan-servicing/SD-95_Loan_Servicing_Reference_Design.md
+Run this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room
+All videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md
+
+ABOUT THIS VIDEO
+This is a scripted walkthrough, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script, diagrams and the written design were produced with Claude Code. Numbers are back-of-the-envelope estimates for the exercise, labelled as given, illustrative or initial targets, not any company's real figures, and this is not any company's actual design. Bank-debit return rules were checked against public rule summaries in November 2026. Not legal, accounting or compliance advice. The technical content has not been reviewed by a person.
+
+#SystemDesign #Fintech #SoftwareEngineering

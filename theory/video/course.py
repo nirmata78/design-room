@@ -11,12 +11,14 @@ Ported from the GCP ACE course builder; see README.md for the source format.
   course.py companion [NN…]    companion/SD-Building-Blocks-Companion.md: reading plan, then per part the readings, concepts with
                                their lines to say, figures, traps and probe drills, all extracted from the sources
   course.py stats              words, slides, questions, estimated and real durations
-Heavy output lives in ~/.cache/sd-course/ and ~/Movies/SD-Building-Blocks-course/, outside the repository."""
+Intermediates live in ~/.cache/sd-course/; the MP4s and slide PDFs go to <root>/out/ inside the repository (gitignored).
+Never ~/Movies or any folder outside the repository (author's decision, 2026-11-21)."""
 import html, json, pathlib, re, subprocess, sys, concurrent.futures as cf
 
 TOOL = pathlib.Path(__file__).resolve().parent
 # --root DIR builds another deck with the same tool (a task's episode series): DIR holds src/, svg/ and series.json
-# {"name": "SD-20", "footer": "Distributed cache", "unit": "Episode", "title": "...", "out": "~/Movies/...", "teacher": "COACH"}.
+# {"name": "SD-20", "footer": "Distributed cache", "unit": "Episode", "title": "...", "out": "out", "teacher": "COACH"}.
+# "out" is relative to the root and must stay inside the repository.
 ROOT = pathlib.Path(sys.argv[sys.argv.index("--root") + 1]).resolve() if "--root" in sys.argv else TOOL
 if "--root" in sys.argv:
     i = sys.argv.index("--root"); del sys.argv[i:i + 2]
@@ -25,7 +27,10 @@ NAME, UNIT = CFG.get("name", "SD"), CFG.get("unit", "Part")
 HERE = ROOT
 SRC, SVG, SHOTS = HERE / "src", HERE / "svg", HERE / "shots"
 BUILD = pathlib.Path.home() / ".cache/sd-course/build" / (NAME if CFG else "")
-OUT = pathlib.Path(CFG.get("out", "~/Movies/SD-Building-Blocks-course")).expanduser()
+REPO = TOOL.parents[1]
+OUT = (ROOT / CFG.get("out", "out")).resolve()
+if not OUT.is_relative_to(REPO):
+    sys.exit(f"series.json out={OUT} is outside the repository {REPO}; videos stay in the repository (use \"out\")")
 KIT = pathlib.Path.home() / ".claude/skills/slide-video-kit/scripts"
 PDFPY = pathlib.Path.home() / "Projects/design-room/pdf-kit/.venv/bin/python"
 TTSPY = pathlib.Path.home() / ".cache/kokoro-tts/.venv/bin/python"
@@ -34,17 +39,73 @@ TTSPY = pathlib.Path.home() / ".cache/kokoro-tts/.venv/bin/python"
 HEAD = """<!-- voices: N=af_heart@0.92 I=bf_emma@0.95 C=am_michael@0.9 V=af_bella@0.86 E=af_sarah@0.94 -->
 <!-- labels: N=@TEACHER@ I=INTERVIEWER C=CANDIDATE V=SAY_THIS E=ASIDE -->
 """
+# A series may override single voices from the approved set, e.g. a mock round where the key lines are the candidate's
+# own, slower: series.json "voices": {"V": "am_michael@0.84"} (only voices the author has approved).
+for _c, _v in CFG.get("voices", {}).items():
+    HEAD = re.sub(rf"\b{_c}=[\w@.]+", f"{_c}={_v}", HEAD, count=1)
+for _c, _l in CFG.get("labels", {}).items():
+    HEAD = re.sub(rf"(labels:.*?)\b{_c}=\S+", rf"\g<1>{_c}={_l}", HEAD, count=1)
 SPEECH = re.compile(r"^([NVICE]): (.+)$")
 SENT = "\x01"          # marks a body line that appears only after the [reveal] cue
 ASIDE_PANELS = ("trap", "watch", "now", "new")
 SENTENCES = re.compile(r"(?<=[.?!])\s+")
 BADSPOKEN = re.compile(r"[→·≥≤~&%`*_=<>\[\]{}|]|--")
 
+# Pacing (2026-11-17, after the author's review of part 1: "too fast, too aggressive, hard to follow the reasoning").
+# Silence is written into the script as [pause: S] cues, so every course built with this tool gets the same rhythm.
+# Inside a narration line, build_cached.py adds a beat between sentences (longer after a question).
+PACE = dict(
+    section_out=1.4,    # after the last line of a section, before its successor's title card
+    card_in=1.2,        # the title card on screen, silent, before the spoken introduction
+    card_out=1.8,       # after the introduction, before the first slide of the section
+    reveal=0.6,         # after a [reveal] crossfade, before speech goes on
+    probe_think=4.0,    # the question on screen before the strong answer fades in
+    probe_after=1.2,    # after the strong answer appears
+)
+# before a slide: by the kind of slide just finished (a key line deserves a longer beat). After a slide appears: by the kind
+# of slide now on screen (a diagram or a table needs a moment to be read before the voice starts).
+PAUSE_AFTER = {"th": 1.6, "panel": 1.1, "dia": 1.1, "table": 1.0, "math": 1.2, "code": 1.0, "probe": 0.0, "q": 0.6}
+PAUSE_BEFORE = {"dia": 1.3, "table": 1.0, "math": 1.2, "code": 1.0, "shot": 1.2, "cards": 0.8, "tiles": 0.8, "list": 0.7, "th": 0.7, "panel": 0.7}
+DEFAULT_AFTER, DEFAULT_BEFORE = 0.8, 0.7
+
+TEXJS = pathlib.Path(__file__).resolve().parent / "tex.js"
+_TEX = {}
+def tex(src, display=False):
+    r"""LaTeX → MathML (KaTeX, cached on disk). Inline in any slide text as \( … \); a whole formula row with $$ … $$."""
+    key = f"{int(display)}|{src}"
+    if not _TEX:
+        f = pathlib.Path.home() / ".cache/sd-course/tex.json"
+        if f.exists(): _TEX.update(json.loads(f.read_text()))
+    if key not in _TEX:
+        r = subprocess.run(["node", str(TEXJS)], input=json.dumps([[src, display]]), capture_output=True, text=True)
+        if r.returncode: sys.exit(f"LaTeX error in {src!r}: {r.stderr.strip().splitlines()[-1] if r.stderr else ''}")
+        _TEX[key] = json.loads(r.stdout)[0]
+        f = pathlib.Path.home() / ".cache/sd-course/tex.json"; f.parent.mkdir(parents=True, exist_ok=True); f.write_text(json.dumps(_TEX))
+    return _TEX[key]
+
+HLJS = pathlib.Path(__file__).resolve().parent / "hl.js"
+LANGS = {"sql": "sql", "http": "http", "python": "python", "json": "json", "yaml": "yaml", "go": "go", "proto": "protobuf",
+         "bash": "bash", "promql": "plaintext", "java": "java", "ts": "typescript", "ini": "ini"}
+_HL = {}
+def highlight(code, lang):
+    """Syntax-highlighted HTML for a code slide (highlight.js, cached on disk next to the LaTeX cache)."""
+    key = f"{lang}|{code}"
+    f = pathlib.Path.home() / ".cache/sd-course/hl.json"
+    if not _HL and f.exists(): _HL.update(json.loads(f.read_text()))
+    if key not in _HL:
+        r = subprocess.run(["node", str(HLJS)], input=json.dumps([[code, LANGS[lang]]]), capture_output=True, text=True)
+        if r.returncode: sys.exit(f"highlight error ({lang}): {r.stderr.strip()[-300:]}")
+        _HL[key] = json.loads(r.stdout)[0]; f.write_text(json.dumps(_HL))
+    return _HL[key]
+
 def inline(s):
     codes = []
     def stash(m):
         codes.append(f"<code>{html.escape(m.group(1))}</code>"); return f"\0{len(codes)-1}\0"
     s = re.sub(r"`([^`]+)`", stash, s)
+    def math(m):
+        codes.append(f'<span class="tex">{tex(m.group(1))}</span>'); return f"\0{len(codes)-1}\0"
+    s = re.sub(r"\\\((.+?)\\\)", math, s)
     s = html.escape(s, quote=False).replace("&lt;em&gt;", "<em>").replace("&lt;/em&gt;", "</em>").replace("&lt;br&gt;", "<br>")
     s = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", s)
     s = re.sub(r"==(.+?)==", r"<mark>\1</mark>", s)
@@ -52,6 +113,7 @@ def inline(s):
     return re.sub(r"\0(\d+)\0", lambda m: codes[int(m.group(1))], s)
 
 def plain(s):
+    s = re.sub(r"\\\((.+?)\\\)", r"\1", s)
     return re.sub(r"\*\*|==|`|(?<![\w*])\*(?=\S)|(?<=\S)\*(?![\w*])", "", s)
 
 def cells(line):
@@ -80,6 +142,8 @@ class Chapter:
         self.pending_q = None
         self.concepts, self.missing = [], []
         self.staged, self.b_idx = False, 0
+        self.after_card, self.last_type = False, None
+        self.hold = 0.0
 
     def head(self, flags):
         return " ".join(f for f in flags if f in ("new",))
@@ -100,20 +164,30 @@ class Chapter:
         else:
             self._add(cls, inner, True)
 
-    def chapter_card(self, title):
-        """A title card for every '## n.m Title' section: shown on its own for one second, then the first slide of the section."""
+    def chapter_card(self, title, intro):
+        """A title card for every '## n.m Title' section. It breaks the flow on purpose: a beat of silence, the card alone, one
+        spoken sentence on what the section is about (the N: lines written right under the heading, shown on the card too),
+        and another beat before the first slide. A section with no introduction gets its title read out, and a lint note."""
         m = re.match(r"^(\d+\.\d+)\s+(.*)$", title)
         num, name = m.groups() if m else ("", title)
+        if not intro:
+            self.lint.append(f"section {title!r} has no spoken introduction"); intro = [("N", plain(name) + ".")]
+        sub = " ".join(t for _, t in intro)
+        if self.slides: self.script.append(f"[pause: {PACE['section_out']}]")
         self.script.append(f"\n## {title}")
         self.slides.append(f'<div class="slide ch-title extra"><div class="ct-ep">{UNIT} {self.n} · {html.escape(self.title)}</div>'
-                           f'<div class="ct-num">{html.escape(num)}</div><div class="ct-t">{inline(name)}</div></div>')
-        self.script += [f"[slide: @@{len(self.slides)}@@]", "[pause: 1.0]"]
+                           f'<div class="ct-num">{html.escape(num)}</div><div class="ct-t">{inline(name)}</div>'
+                           f'<div class="ct-sub">{html.escape(sub)}</div></div>')
+        self.script += [f"[slide: @@{len(self.slides)}@@]", f"[pause: {PACE['card_in']}]"]
+        self.script += [f"{c}: {t}" for c, t in intro] + [f"[pause: {PACE['card_out']}]"]
+        self.after_card, self.last_type = True, None
 
     def top(self, k, t, red=False):
         return f'<div class="k{" r" if red else ""}">{inline(k)}</div><h1>{inline(t)}</h1>' if t else f'<div class="k{" r" if red else ""}">{inline(k)}</div>'
 
     def emit(self, typ, flags, fields, body):
         new = " ".join(f for f in ("new", "aux") if f in flags)
+        if fields and "From the ground up" in fields[0]: new += " gu"     # foundation slide: green kicker
         red = "r" in flags
         k = fields[0] if fields else ""; t = fields[1] if len(fields) > 1 else ""
         self.staged = any(b.startswith(SENT) for b in body)
@@ -160,8 +234,25 @@ class Chapter:
             name = body[0].strip(); cap = "".join(f'<figcaption>{inline(b[2:])}</figcaption>' for b in body[1:] if b.startswith("~ "))
             if not (SHOTS / name).exists(): self.lint.append(f"missing screenshot {name}")
             self.slide("dia shot " + new, self.top(k, t, red) + f'<figure class="grow shot"><img src="{(SHOTS / name).as_uri()}" alt=""></figure>{cap}{lines}')
+        elif typ == "math":
+            # rows "$$ LaTeX $$ :: what it means"; the meaning is optional. A '~ text' line is a lead sentence above the rows.
+            rows = ""
+            for b in body:
+                b, h = un(b)
+                if b.startswith("~ "): rows += f'<p class="lead{" rv" if h else ""}">{inline(b[2:])}</p>'; continue
+                m = re.match(r"^\$\$(.+?)\$\$\s*(?:::\s*(.+))?$", b)
+                if not m: sys.exit(f"bad math row: {b}")
+                rows += (f'<div class="fx{" rv" if h else ""}"><div class="fm">{tex(m.group(1).strip(), True).replace(' display="block"', "")}</div>'
+                         f'<div class="fw">{inline(m.group(2) or "")}</div></div>')
+            self.slide("mathsl " + new, self.top(k, t, red) + f'<div class="fxs">{rows}</div>{lines}')
         elif typ == "code":
-            self.slide(new, self.top(k, t, red) + f'<pre class="code">{html.escape(chr(10).join(body))}</pre>{lines}')
+            # Real code only, with its language as a flag (= code sql | …): it is syntax-highlighted. Arithmetic belongs
+            # on a math slide, a comparison in a table, a flow or a budget in a diagram — never prose in monospace.
+            lang = next((f for f in flags if f in LANGS), None)
+            src = chr(10).join(body)
+            if not lang: self.lint.append(f"{t!r}: code slide without a language (make it math, table or dia, or name one of {sorted(LANGS)})")
+            code = highlight(src, lang) if lang else html.escape(src)
+            self.slide(new, self.top(k, t, red) + f'<pre class="code hl">{code}</pre>{lines}')
         elif typ == "panel":
             kind = next((f for f in flags if f in ("trap", "watch", "tip", "key", "new", "note", "now")), "key")
             label = {"trap": "Trap", "watch": "Easy to confuse", "tip": "How to spot it", "key": "Remember", "new": "New in the June 2026 guide", "note": "Worth knowing", "now": "Then and now"}[kind]
@@ -204,20 +295,30 @@ class Chapter:
         voiced = [k for k, s in enumerate(speech) if isinstance(s, tuple) and s[0] in "NE"]
         has_bar = any(re.match(r"^>[!~]? ", b) for b in body)
         if typ in ("th", "code", "q") or not has_bar or not voiced or "[reveal]" in speech: return body, speech
-        if sum(len(SENTENCES.split(speech[k][1])) for k in voiced) < 3: return body, speech
-        k = voiced[-1]; sents = SENTENCES.split(speech[k][1])
-        speech = list(speech)
-        if len(sents) >= 2:
-            speech[k:k + 1] = [(speech[k][0], " ".join(sents[:-1])), "[reveal]", (speech[k][0], sents[-1])]
-        elif len(voiced) >= 2:
-            speech.insert(k, "[reveal]")
-        else:
-            return body, speech
+        total = sum(len(SENTENCES.split(speech[k][1])) for k in voiced)
+        if total < 3: return body, speech
+        # the bar fades in about 60% of the way through the narration (2026-11-17: on the last sentence it was gone
+        # before it could be read), and never later than two sentences before the end
+        at = min(max(1, round(total * 0.6)), max(1, total - 2)); speech = list(speech); seen = 0
+        for k in voiced:
+            sents = SENTENCES.split(speech[k][1])
+            if seen + len(sents) > at:
+                cut = at - seen
+                new = ([(speech[k][0], " ".join(sents[:cut]))] if cut else []) + ["[reveal]", (speech[k][0], " ".join(sents[cut:]))]
+                speech[k:k + 1] = new; break
+            seen += len(sents)
         return [SENT + b if re.match(r"^>[!~]? ", b) else b for b in body], speech
 
     def flush_slide(self, cur):
         typ, flags, fields, body, speech = cur
         aside = typ == "panel" and any(f in ASIDE_PANELS for f in flags)
+        if self.after_card:
+            pass                                         # the card already ended with its own beat
+        elif self.last_type is not None and PAUSE_AFTER.get(self.last_type, DEFAULT_AFTER) + self.hold > 0:
+            self.script.append(f"[pause: {round(PAUSE_AFTER.get(self.last_type, DEFAULT_AFTER) + self.hold, 2)}]")
+        self.hold = 0.0
+        self.after_card, self.last_type = False, typ
+        mark = len(self.script)
         if typ == "q":
             self.question(flags, fields, body)
         elif typ == "probe":
@@ -225,14 +326,21 @@ class Chapter:
         else:
             body, speech = self.prep(typ, body, speech)
             self.emit(typ, flags, fields, body)
+            if "[reveal]" in speech:
+                after = sum(len(x[1].split()) for x in speech[speech.index("[reveal]"):] if isinstance(x, tuple))
+                shown = sum(len(plain(un(b)[0]).split()) for b in body if un(b)[1])
+                self.hold = min(4.5, max(1.0, 1.2 + 0.28 * shown - 0.42 * after))
         self.staged = False
+        cue = next((i for i in range(mark, len(self.script)) if self.script[i].lstrip().startswith("[slide:")), None)
+        if cue is not None and typ not in ("q", "probe"):
+            self.script.insert(cue + 1, f"[pause: {PAUSE_BEFORE.get(typ, DEFAULT_BEFORE)}]")
         for s in speech:
             if isinstance(s, tuple):
                 code, text = s
                 if code == "N" and (aside or re.match(r"^(A story|Here are three stories)", text)): code = "E"
                 self.script.append(f"{code}: {text}")
             elif s == "[reveal]":
-                self.script.append(f"[reveal: @@{self.b_idx}@@]")
+                self.script += [f"[reveal: @@{self.b_idx}@@]", f"[pause: {PACE['reveal']}]"]
             else:
                 self.script.append(s)
 
@@ -241,7 +349,9 @@ class Chapter:
         def flush():
             nonlocal cur
             if cur: self.flush_slide(cur); cur = None
-        for raw in text.splitlines():
+        lines = text.splitlines(); skip = set()
+        for li, raw in enumerate(lines):
+            if li in skip: continue
             line = raw.rstrip()
             if line.startswith("#!"):
                 m = re.match(r"#!\s*(\w+):\s*(.+)", line); setattr(self, m.group(1), m.group(2)); continue
@@ -249,7 +359,16 @@ class Chapter:
                 cur[3].append(line); continue
             if not line.strip(): continue
             if line.startswith("## "):
-                flush(); self.section = line[3:]; self.chapter_card(line[3:]); continue
+                flush(); self.section = line[3:]
+                intro, j = [], li + 1                # N:/E: lines right under the heading, before its first slide, introduce it
+                while j < len(lines) and not lines[j].startswith(("= ", "## ")):
+                    m = SPEECH.match(lines[j].rstrip())
+                    if m:
+                        if BADSPOKEN.search(m.group(2)): self.lint.append("symbol in speech: " + m.group(2)[:70])
+                        intro.append((m.group(1), m.group(2))); skip.add(j)
+                    elif lines[j].strip(): break
+                    j += 1
+                self.chapter_card(line[3:], intro); continue
             if line.startswith("= "):
                 flush()
                 parts = cells(line[2:]); head = parts[0].split()
@@ -280,7 +399,8 @@ class Chapter:
                             f'<div class="pa"><div class="hintA">Pause and answer aloud. Then compare.</div>'
                             f'<div class="alab rv">A strong answer</div><ul class="big rv">{its}</ul>{lines}</div>')
         self.staged = False
-        self.script.append("I: " + plain(q)); self.script.append("[pause: 3.0]"); self.script.append(f"[reveal: @@{self.b_idx}@@]")
+        self.script.append("I: " + plain(q)); self.script.append(f"[pause: {PACE['probe_think']}]")
+        self.script += [f"[reveal: @@{self.b_idx}@@]", f"[pause: {PACE['probe_after']}]"]
 
     def write(self):
         d = BUILD / f"ch{self.nn}"; d.mkdir(parents=True, exist_ok=True)
@@ -333,9 +453,18 @@ def video_ch(nn):
     out = OUT / f"{NAME}-{UNIT}-{nn}-{slug}.mp4"
     log = d / "build.log"
     with log.open("w") as lf:
-        subprocess.run([str(TTSPY), str(TOOL / "build_cached.py"), str(d / f"ch{nn}.script.md"), "--frames", str(d / "frames"), "--out", str(out), "--dissolve", "0.3", "--chapter-gap", "0"],
+        subprocess.run([str(TTSPY), str(TOOL / "build_cached.py"), str(d / f"ch{nn}.script.md"), "--frames", str(d / "frames"), "--out", str(out), "--dissolve", "0.5", "--chapter-gap", "0"],
                        check=True, stdout=lf, stderr=subprocess.STDOUT)
+    youtube(out, f"{CFG.get('footer', 'System design')} · {UNIT} {c.n}: {c.title}")
     print(log.read_text().splitlines()[-1] if False else f"built {out.name}", flush=True)
+
+def youtube(mp4, title):
+    """<video>.youtube.txt next to each episode: a title and the chapter list in the form YouTube turns into chapters
+    (first stamp 0:00, at least three, each at least ten seconds)."""
+    ch = [(float(c["start_time"]), c["tags"]["title"]) for c in probe(mp4)["chapters"]]
+    if not ch or ch[0][0] > 0.5: ch.insert(0, (0.0, "Introduction"))
+    keep = [x for i, x in enumerate(ch) if i + 1 == len(ch) or ch[i + 1][0] - x[0] >= 10]
+    mp4.with_suffix(".youtube.txt").write_text(title + "\n\nChapters\n" + "".join(f"{clock(a)} {t}\n" for a, t in keep), encoding="utf-8")
 
 def probe(p):
     r = subprocess.run(["ffprobe", "-v", "error", "-show_chapters", "-show_streams", "-show_format", "-of", "json", str(p)], check=True, capture_output=True, text=True)

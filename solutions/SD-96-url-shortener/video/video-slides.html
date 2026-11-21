@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>SD-96 URL shortener: slides</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="deck.css">
+<link rel="stylesheet" href="video.css">
+</head><body>
+<!-- v-001 card Cold open -->
+<div class="slide th">
+<div class="lbl">Chapter 0 of 9</div><div class="s">Cold open</div><div class="sub">Design a URL shortener</div><div class="ribbon"><span class="">Requirements</span><span class="">Estimates</span><span class="">Theory</span><span class="">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-002 &lt;div class="who"&gt;Interviewer · the promp -->
+<div class="slide qs">
+<div class="who">Interviewer · the prompt</div><div class="qq">“Design a URL shortener: a long URL goes in, a short link comes out, and anyone who opens the short link is redirected.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-003 &lt;div class="k"&gt;Why it is harder than it  -->
+<div class="slide">
+<div class="k">Why it is harder than it looks</div><h1>Three places where the simple answer fails</h1><p class="chips">unique without a lock<i>·</i>one viral key<i>·</i>a takedown in 5 min</p><figure class="grow"><!--SVG:tension--></figure>
+</div>
+<!-- v-004 &lt;div class="k"&gt;Before the design&lt;/div&gt;&lt;h -->
+<div class="slide">
+<div class="k">Before the design</div><h1>What this question grades</h1><table class="bt sm sig"><tr><th>Axis</th><th>Weak signal</th><th>Strong signal</th></tr><tr class=""><td><b>Requirements</b></td><td>“Shorten and redirect”, no numbers</td><td>Read to write ratio, lifetime, aliases, analytics and the takedown time, asked first</td></tr><tr class=""><td><b>Correctness</b></td><td>Hash the URL, take six characters; check, then insert</td><td>Code length from arithmetic; ranges or random with retry; the key constraint decides</td></tr><tr class=""><td><b>Trade-offs</b></td><td>“Use a cache and a NoSQL store”</td><td>An options matrix for codes; 301 against 302 as a product decision; lossy counts, stated</td></tr><tr class=""><td><b>Depth</b></td><td>Stops at “add a cache”</td><td>Hot key: in-process cache and single flight; codes that cannot be walked; takedown through every copy</td></tr><tr class=""><td><b>Operations</b></td><td>CPU and error rate</td><td>A create-then-follow probe, hit rate against store reads, takedown time as an SLI</td></tr></table><div class="grade"><b class="t">Coach · what is graded here</b>The redirect is the product. Everything else must stand beside it, never in front of it.</div>
+</div>
+<!-- v-005 &lt;div class="lbl"&gt;The thesis&lt;/div&gt;&lt;div cl -->
+<div class="slide th">
+<div class="lbl">The thesis</div><div class="s">A read path with a write path attached: codes <em>unique</em> without a lock, <em>unguessable</em> without a lookup, a redirect that is <em>one memory read</em>, and nothing standing between the click and the answer.</div>
+</div>
+<!-- v-006 &lt;div class="k"&gt;The order I will follow&lt;/ -->
+<div class="slide">
+<div class="k">The order I will follow</div><h1>Scope, numbers, theory, a simple design, then I break it</h1><div class="ribbon" style="margin-top:14pt"><span>Requirements</span><span>Estimates</span><span>Theory</span><span>API + data</span><span>Design</span><span>Challenges</span><span>Cost · AUX</span><span>Recap</span></div><div class="cards c3" style="margin-top:18pt"><div class="cd"><h3>First</h3><p>Requirements and scope. Numbers. A short theory chapter.</p></div><div class="cd grn"><h3>Then</h3><p>API and data. A design in three versions, each answering the one before.</p></div><div class="cd red"><h3>Most of the time</h3><p>Eight challenges that break the design. A build cost. A recap.</p></div></div>
+</div>
+<!-- v-007 card Requirements and scope -->
+<div class="slide th">
+<div class="lbl">Chapter 1 of 9</div><div class="s">Requirements and scope</div><div class="sub">Ask first. Cut on purpose. Put numbers on it.</div><div class="ribbon"><span class="on">Requirements</span><span class="">Estimates</span><span class="">Theory</span><span class="">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-008 &lt;div class="who"&gt;Clarifying question 1 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 1 of 6</div><div class="qq">How many links, and how many clicks?</div><div class="ans">100 million new links a month. 10 billion redirects a month. A viral link can take 40,000 clicks a second.</div>
+</div>
+<!-- v-009 &lt;div class="who"&gt;Clarifying question 2 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 2 of 6</div><div class="qq">How long does a link live?</div><div class="ans">Forever by default. The creator can set an optional expiry.</div>
+</div>
+<!-- v-010 &lt;div class="who"&gt;Clarifying question 3 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 3 of 6</div><div class="qq">Custom aliases?</div><div class="ans">Yes, for paying users. First come, first served.</div>
+</div>
+<!-- v-011 &lt;div class="who"&gt;Clarifying question 4 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 4 of 6</div><div class="qq">What analytics?</div><div class="ans">Clicks per link by day and by country, shown to the owner. Not billed today; product may bill per click later.</div>
+</div>
+<!-- v-012 &lt;div class="who"&gt;Clarifying question 5 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 5 of 6</div><div class="qq">What about abuse?</div><div class="ans">Phishing and malware links exist. Legal wants a reported link dead everywhere within five minutes.</div>
+</div>
+<!-- v-013 &lt;div class="who"&gt;Clarifying question 6 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 6 of 6</div><div class="qq">Who calls us?</div><div class="ans">Browsers following links, and integrators creating links in bulk through an API.</div>
+</div>
+<!-- v-014 &lt;div class="k"&gt;Requirements · functional -->
+<div class="slide">
+<div class="k">Requirements · functional</div><h1>Four things the system must do</h1><div class="cards c2"><div class="cd"><h3>FR1 · Create</h3><p>Long URL in, short link out. Optional alias and expiry. A retried request gets the same answer.</p></div><div class="cd grn"><h3>FR2 · Redirect</h3><p>A request for a code gets the long URL as a redirect, or a not-found or gone page.</p></div><div class="cd amb"><h3>FR3 · Count</h3><p>Clicks per link per day per country, visible to the owner within minutes.</p></div><div class="cd red"><h3>FR4 · Withdraw</h3><p>The owner deletes, or trust and safety blocks, a link. It stops redirecting everywhere within five minutes.</p></div></div>
+</div>
+<!-- v-015 &lt;div class="k"&gt;Requirements · non-functi -->
+<div class="slide">
+<div class="k">Requirements · non-functional</div><h1>The numbers, and what each is for</h1><p class="chips">all initial targets, not measurements</p><div class="tiles" style="--n:4"><div class="tile blue"><b>20 ms</b><span>redirect p99 at the server</span></div><div class="tile blue"><b>99.99 %</b><span>redirect availability</span></div><div class="tile"><b>200 ms</b><span>create p99, 99.9 %</span></div><div class="tile red"><b>5 min</b><span>takedown, at every layer</span></div></div><div class="line a">Counts may lag by minutes and may lose a tiny, measured fraction, until clicks are billed.</div>
+</div>
+<!-- v-016 &lt;div class="k"&gt;Requirements · scope&lt;/div -->
+<div class="slide">
+<div class="k">Requirements · scope</div><h1>In, and out on purpose</h1><div class="cards c2"><div class="cd grn"><h3>In scope</h3><p>Create, redirect, custom aliases, expiry, counts by day and country, takedown, a bulk API with a rate limit per key.</p></div><div class="cd red"><h3>Out, on purpose</h3><p>The malware classifier itself (a service we call). Accounts and billing. QR codes (a picture of the same link). Link-in-bio pages. Editing a link's target.</p></div></div><div class="line ">Editing a target is a takedown plus a create, as far as every cache is concerned.</div>
+</div>
+<!-- v-017 &lt;div class="lbl"&gt;The core&lt;/div&gt;&lt;div clas -->
+<div class="slide th">
+<div class="lbl">The core</div><div class="s">The core is three things: a <em>code generator</em> that never collides, a <em>redirect path</em> that is one memory read, and a <em>side path</em> for counting and withdrawal that never sits in front of it.</div>
+</div>
+<!-- v-018 card Estimates -->
+<div class="slide th">
+<div class="lbl">Chapter 2 of 9</div><div class="s">Estimates</div><div class="sub">Each number as arithmetic, with what it decides</div><div class="ribbon"><span class="done">Requirements</span><span class="on">Estimates</span><span class="">Theory</span><span class="">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-019 &lt;div class="k"&gt;Estimates · traffic&lt;/div&gt; -->
+<div class="slide">
+<div class="k">Estimates · traffic</div><h1>Writes are tiny; the peak is one key</h1><table class="bt sm"><tr><th>Number</th><th>Arithmetic</th><th>Label</th><th>Decides</th></tr><tr class=""><td>Creates</td><td>10⁸ ÷ (30 × 86,400 s) ≈ <b>40/s</b>, peak ×10 = <b>400/s</b></td><td>derived</td><td>Throughput is easy; uniqueness is the problem</td></tr><tr class=""><td>Redirects</td><td>10¹⁰ ÷ 2.6 × 10⁶ s ≈ <b>4,000/s</b></td><td>derived</td><td>Read to write 100 : 1; optimise the read</td></tr><tr class=""><td>Viral peak</td><td><b>40,000/s</b> on one code</td><td>given</td><td>A hot key, not a big fleet</td></tr></table>
+</div>
+<!-- v-020 &lt;div class="k"&gt;Estimates · the code spac -->
+<div class="slide">
+<div class="k">Estimates · the code space</div><h1>Six characters or seven?</h1><p class="chips">62 symbols: a–z A–Z 0–9<i>·</i>1.2 × 10¹⁰ links in ten years</p><figure class="grow"><!--SVG:codespace--></figure>
+</div>
+<!-- v-021 &lt;div class="k"&gt;Estimates · storage and m -->
+<div class="slide">
+<div class="k">Estimates · storage and memory</div><h1>The data is small; the hot set fits in RAM</h1><table class="bt sm"><tr><th>Number</th><th>Arithmetic</th><th>Label</th><th>Decides</th></tr><tr class=""><td>Storage</td><td>1.2 × 10¹⁰ × ~500 B ≈ <b>6 TB</b>, × 3 replicas = 18 TB</td><td>illustrative</td><td>A sharded store, easily; not the hard part</td></tr><tr class=""><td>Hot set</td><td>2 % of links take 90 % of clicks: 2 × 10⁸ × 500 B ≈ <b>100 GB</b></td><td>illustrative, to measure</td><td>A few cache nodes hold it</td></tr><tr class=""><td>Store reads</td><td>4,000/s × 1 % miss ≈ <b>40/s</b>; cold cache: up to 4,000/s</td><td>derived</td><td>The store is off the hot path, until the cache is cold</td></tr></table>
+</div>
+<!-- v-022 &lt;div class="k"&gt;Estimates · coordination  -->
+<div class="slide">
+<div class="k">Estimates · coordination and side paths</div><h1>Small numbers that shape the design</h1><table class="bt sm"><tr><th>Number</th><th>Arithmetic</th><th>Label</th><th>Decides</th></tr><tr class=""><td>Range leases</td><td>400 creates/s ÷ 1,000 per lease = <b>0.4 leases/s</b></td><td>derived</td><td>The allocator can be a small consistent store</td></tr><tr class=""><td>Click events</td><td>4,000/s × ~200 B ≈ <b>0.8 MB/s</b>, ≈ 70 GB a day</td><td>illustrative</td><td>A log and an aggregator, not a counter on the row</td></tr><tr class=""><td>One hot shard</td><td>40,000/s on one cache shard, plus its other keys</td><td>derived</td><td>Its tail becomes every viral click's tail</td></tr></table>
+</div>
+<!-- v-023 &lt;div class="k"&gt;Estimates · the latency b -->
+<div class="slide">
+<div class="k">Estimates · the latency budget</div><h1>Twenty milliseconds, with room for one miss</h1><p class="chips">initial target<i>·</i>at the server</p><figure class="grow"><!--SVG:budget--></figure>
+</div>
+<!-- v-024 &lt;div class="k"&gt;Estimates · the takedown  -->
+<div class="slide">
+<div class="k">Estimates · the takedown budget</div><h1>Five minutes is a sum of lifetimes</h1><div class="cards c3"><div class="cd"><h3>Status and shared cache</h3><p>Written and deleted directly by the takedown: seconds.</p></div><div class="cd amb"><h3>In-process caches</h3><p>Dropped by an event; if the event is lost, a 60 s TTL ends it.</p></div><div class="cd red"><h3>Edge</h3><p>Purged by API; if that fails, a 60 s cache time ends it.</p></div></div><div class="line a">Every layer's lifetime has to fit inside five minutes, summed along the worst path.</div>
+</div>
+<!-- v-025 card Theory -->
+<div class="slide th theory">
+<div class="lbl">Chapter 3 of 9</div><div class="s">Theory</div><div class="sub">What makes this problem hard, in words that outlive any product name</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="on">Theory</span><span class="">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-026 &lt;div class="lbl"&gt;Theory · 1 of 6 · what  -->
+<div class="slide th theory">
+<div class="lbl">Theory · 1 of 6 · what it is</div><div class="s">A map from a <em>short, unique, hard-to-guess</em> code to a long URL, answered in <em>milliseconds from anywhere</em>, that can be <em>withdrawn everywhere</em> within a stated time.</div>
+</div>
+<!-- v-027 &lt;div class="k"&gt;Theory · 1 of 6 · what it -->
+<div class="slide theory">
+<div class="k">Theory · 1 of 6 · what it is not</div><h1>Four things it is confused with</h1><div class="cards c2"><div class="cd"><h3>Not a hash function</h3><p>Hashing the URL is one way to make a key. It is not the system, and it is not unique once truncated.</p></div><div class="cd amb"><h3>Not a cache</h3><p>The map is the source of truth. A cache is a copy that may be wrong for a bounded time.</p></div><div class="cd red"><h3>Not a secret</h3><p>Seven characters can be sampled. A link that must stay private needs authentication.</p></div><div class="cd"><h3>Not a CDN</h3><p>The edge is a layer that answers for us, and that we must be able to take back.</p></div></div>
+</div>
+<!-- v-028 &lt;div class="k"&gt;Theory · 2 of 6 · the two -->
+<div class="slide theory">
+<div class="k">Theory · 2 of 6 · the two properties</div><h1>State safety and liveness separately</h1><div class="prop safe"><div class="lbl">Safety · must never happen</div><p><b>S1</b> Two different long URLs are given the same code.<br><b>S2</b> A withdrawn code is answered by any layer after the takedown bound.</p></div><div class="prop live"><div class="lbl">Liveness · must eventually happen</div><p><b>L1</b> A create gets a code without waiting for another create.<br><b>L2</b> A redirect for a live code answers within the target, even at a viral peak or with the store down.<br><b>L3</b> Every click is eventually counted, with a stated, measured loss.</p></div>
+</div>
+<!-- v-029 &lt;div class="k"&gt;Theory · 3 of 6 · the cen -->
+<div class="slide dia theory">
+<div class="k">Theory · 3 of 6 · the central tension</div><h1>Speed of the answer against control over it</h1><figure class="grow"><!--SVG:tension--></figure>
+</div>
+<!-- v-030 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 1 of 6</div><h1>Counter ranges plus base-62</h1><div class="prop safe"><div class="lbl">Property it protects</div><p>S1 and L1.</p></div><div class="prop"><div class="lbl">How it works</div><p>Each create server leases a block of 1,000 IDs from an allocator in one conditional write, then hands them out locally and encodes each in base-62.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>Two servers handing out the same code; a lock or a round trip on every create.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>Gaps when a server dies holding a range: harmless at 290× headroom. Codes are sequential, unless mechanism 2.</p></div>
+</div>
+<!-- v-031 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 2 of 6</div><h1>A keyed permutation</h1><div class="prop safe"><div class="lbl">Property it protects</div><p>Non-enumerability.</p></div><div class="prop"><div class="lbl">How it works</div><p>A small Feistel network over the code space with a secret round key, plus cycle walking to stay below 62⁷. A bijection: distinct in, distinct out.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>Scrapers walking codes in order; codes that reveal how many links we create.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>A key to keep and rotate. It is not secrecy: private links still need authentication.</p></div>
+</div>
+<!-- v-032 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 3 of 6</div><h1>The unique constraint as the final authority</h1><div class="prop safe"><div class="lbl">Property it protects</div><p>S1 for aliases and random codes.</p></div><div class="prop"><div class="lbl">How it works</div><p>Insert with a unique key on the code. The one shard that owns the code accepts one insert and rejects the other.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>Check-then-insert races between two creators.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>A conflict answer the API must surface (409); a retry loop if codes are random.</p></div>
+</div>
+<!-- v-033 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 4 of 6</div><h1>Cache-aside with an in-process hot cache and single flight</h1><div class="prop live"><div class="lbl">Property it protects</div><p>L2.</p></div><div class="prop"><div class="lbl">How it works</div><p>Shared cache in front of the store; a small in-process cache on every redirect server; concurrent misses for one code wait on one lookup.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>A miss storm on one key; every viral click paying a network hop.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>Bounded staleness per layer, which the takedown budget must absorb. Memory on every server.</p></div>
+</div>
+<!-- v-034 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 5 of 6</div><h1>An asynchronous click log</h1><div class="prop live"><div class="lbl">Property it protects</div><p>L2 and L3.</p></div><div class="prop"><div class="lbl">How it works</div><p>The redirect answers first, then appends a click event to a local buffer; batches go to a log partitioned by code; an aggregator counts per minute.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>A counter update on the hot path; a hot row per viral link.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>Counts are minutes late; a small, stated loss on a crash, or a durable buffer if clicks are billed.</p></div>
+</div>
+<!-- v-035 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 6 of 6</div><h1>Status, invalidation and bounded lifetimes everywhere</h1><div class="prop safe"><div class="lbl">Property it protects</div><p>S2.</p></div><div class="prop"><div class="lbl">How it works</div><p>A status in the store; an invalidation event to every cache; a purge at the edge; and a maximum lifetime at every layer, chosen so their sum fits the bound.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>A blocked phishing link still answered by a cache or an edge.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>Short lifetimes cost hit rate. A purge path to the CDN. 302 instead of 301.</p></div>
+</div>
+<!-- v-036 &lt;div class="k"&gt;Theory · 5 of 6 · the opt -->
+<div class="slide theory">
+<div class="k">Theory · 5 of 6 · the options for codes</div><h1>Six ways to make a code</h1><table class="bt sm mx"><tr><th>Approach</th><th>Unique without per-create coordination</th><th>Length</th><th>Guessable?</th><th>Fails when</th></tr><tr class="rej"><td>A · Hash the URL, keep 7 characters</td><td>no: truncation collides</td><td>7</td><td>deterministic</td><td>same URL, two owners; a probe loop anyway</td></tr><tr class=""><td>B · Random 7 characters, insert with retry</td><td>yes, via the constraint</td><td>7</td><td>no</td><td>rarely: 0.34 % retries by year ten</td></tr><tr class="rej"><td>C · One global counter, base-62</td><td>no: a round trip each</td><td>6–7</td><td><b>yes</b></td><td>the counter is a bottleneck and a single point</td></tr><tr class="pick"><td>D · Ranges + keyed permutation + constraint</td><td>yes, one lease per 1,000</td><td>7</td><td>no</td><td>the allocator is down longer than a range lasts</td></tr><tr class="rej"><td>E · Time-based IDs (time + machine + sequence)</td><td>yes</td><td>10–11</td><td>partly</td><td>too long for a short link</td></tr><tr class="rej"><td>F · A pre-generated pool handed out from a queue</td><td>yes</td><td>7</td><td>no</td><td>a second system to fill, monitor and not lose</td></tr></table>
+</div>
+<!-- v-037 &lt;div class="k"&gt;Theory · 5 of 6 · the pic -->
+<div class="slide theory">
+<div class="k">Theory · 5 of 6 · the pick, and what it gives up</div><h1>D, with B as the simpler equal</h1><div class="cards c2"><div class="cd grn"><h3>Why D</h3><p>No retry loop, ever; six-character codes possible for a premium tier; creation stays fast when the store is slow; coordination once per thousand links.</p></div><div class="cd red"><h3>What it gives up</h3><p>An allocator service to run, and a permutation key to manage. B needs neither: the constraint does all the work.</p></div></div><div class="line a">Choose B if creates stay under a few thousand a second and seven characters are always fine.</div>
+</div>
+<!-- v-038 &lt;div class="k"&gt;Theory · 6 of 6 · the fai -->
+<div class="slide theory">
+<div class="k">Theory · 6 of 6 · the failure catalogue</div><h1>What will go wrong</h1><table class="bt sm"><tr><th>#</th><th>Failure</th><th>Becomes</th></tr><tr class=""><td>F1</td><td>Two servers, one code; a custom-alias race</td><td><b>Challenge 1</b></td></tr><tr class=""><td>F2</td><td>Codes walked in order</td><td><b>Challenge 2</b></td></tr><tr class=""><td>F3</td><td>One viral code; a cold cache after a restart</td><td><b>Challenge 3</b></td></tr><tr class=""><td>F4</td><td>A layer answering that we cannot see or recall: 301, the edge</td><td><b>Challenge 4</b></td></tr><tr class=""><td>F5</td><td>A phishing link still live after five minutes</td><td><b>Challenge 5</b></td></tr><tr class=""><td>F6</td><td>Counting on the hot path; billed clicks</td><td><b>Challenge 6</b></td></tr><tr class=""><td>F7</td><td>A region, or the store's primary, lost</td><td><b>Challenge 7</b></td></tr><tr class=""><td>F8</td><td>Nobody notices a broken redirect</td><td><b>Challenge 8</b></td></tr><tr class=""><td>F9</td><td>A creator floods the bulk API</td><td>rate limit per key, on the API slide</td></tr></table>
+</div>
+<!-- v-039 &lt;div class="k"&gt;Theory · what each mechan -->
+<div class="slide theory">
+<div class="k">Theory · what each mechanism serves</div><h1>Every mechanism names its property</h1><table class="bt sm"><tr><th>Mechanism</th><th>Serves</th><th>Where it returns</th></tr><tr class=""><td>M1 Counter ranges</td><td>S1, L1</td><td>challenges 1 and 7</td></tr><tr class=""><td>M2 Keyed permutation</td><td>non-enumerability</td><td>challenge 2</td></tr><tr class=""><td>M3 Constraint as authority</td><td><b>S1</b></td><td>challenge 1</td></tr><tr class=""><td>M4 Layered cache, single flight</td><td><b>L2</b></td><td>challenges 3 and 4</td></tr><tr class=""><td>M5 Asynchronous click log</td><td>L2, L3</td><td>challenge 6</td></tr><tr class=""><td>M6 Status, invalidation, lifetimes</td><td><b>S2</b></td><td>challenges 4 and 5</td></tr></table><div class="grade"><b class="t">Coach · what is graded here</b>A mechanism with no stated property is decoration. Say which one each fix serves.</div>
+</div>
+<!-- v-040 card API and entities -->
+<div class="slide th">
+<div class="lbl">Chapter 4 of 9</div><div class="s">API and entities</div><div class="sub">Each call tagged with the requirement it serves and the data it touches</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="on">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-041 &lt;div class="k"&gt;API · the calls&lt;/div&gt;&lt;h1&gt; -->
+<div class="slide">
+<div class="k">API · the calls</div><h1>Four public calls, one internal</h1><table class="bt sm"><tr><th>Call</th><th>Serves</th><th>Touches</th><th>Note</th></tr><tr class=""><td><code>POST /v1/links {url, alias?, expiresAt?}</code> + Idempotency-Key → <code>201 {code, shortUrl}</code></td><td>FR1</td><td>writes Link</td><td>409 alias taken · aliases ≥ 8 characters · 422 blocked URL · rate limit per key</td></tr><tr class=""><td><code>GET /{code}</code> → <code>302</code> · <code>404</code> · <code>410</code></td><td>FR2</td><td>reads Link, cache first</td><td>410 Gone for a withdrawn code, so crawlers stop</td></tr><tr class=""><td><code>GET /v1/links/{code}/stats?from&amp;to&amp;by=day,country</code></td><td>FR3</td><td>reads DailyCount</td><td>says how fresh: <code>asOf</code></td></tr><tr class=""><td><code>DELETE /v1/links/{code}</code> · <code>POST /v1/takedowns {code, reason}</code></td><td>FR4</td><td>writes Link.status, Takedown</td><td>invalidation event, audit row</td></tr><tr class=""><td>internal <code>LeaseRange()</code> → <code>{start, end}</code></td><td>FR1</td><td>writes RangeLease</td><td>1,000 IDs a lease</td></tr></table>
+</div>
+<!-- v-042 &lt;div class="k"&gt;API · the redirect on the -->
+<div class="slide">
+<div class="k">API · the redirect on the wire</div><h1>What the browser actually receives</h1><pre class="wire"><span class="cm"># request</span>
+GET /aZ3kQ9x HTTP/1.1
+Host: sho.rt
+
+<span class="cm"># response</span>
+HTTP/1.1 302 Found
+Location: https://example.com/spring-sale?utm=news
+Cache-Control: private, max-age=0
+CDN-Cache-Control: max-age=60</pre><div class="strip one"><div class="whyb"><b class="t">Why these headers</b>The browser must ask again every time (so we count and can recall). The edge may keep it for 60 s (so a viral link is cheap). Both lifetimes are in the takedown budget.</div></div>
+</div>
+<!-- v-043 &lt;div class="k"&gt;Entities · conceptual&lt;/di -->
+<div class="slide">
+<div class="k">Entities · conceptual</div><h1>Links, clicks, counts, takedowns, leases</h1><figure class="grow"><!--SVG:erd-chen--></figure>
+</div>
+<!-- v-044 &lt;div class="k"&gt;Entities · physical&lt;/div&gt; -->
+<div class="slide">
+<div class="k">Entities · physical</div><h1>The keys follow the hot path</h1><table class="bt sm"><tr><th>Table</th><th>Key</th><th>Columns</th><th>Note</th></tr><tr class=""><td><b>link</b></td><td><code>code</code> PK, sharded by code</td><td>long_url, owner_id, created_at, expires_at, status</td><td>12 billion rows in ten years; the only hot key</td></tr><tr class=""><td>link_by_owner</td><td><code>(owner_id, created_at)</code></td><td>code</td><td>the owner's dashboard; never on the hot path</td></tr><tr class=""><td>range_lease</td><td><code>server_id</code></td><td>start, end, leased_at</td><td>a consensus store; 0.4 leases a second</td></tr><tr class=""><td>daily_count</td><td><code>(code, day, country)</code></td><td>n</td><td>written by the aggregator</td></tr><tr class=""><td>in each redirect server</td><td>code</td><td>url, status; 30–60 s lifetime; in-flight map</td><td>single flight: one lookup per code per server</td></tr></table><div class="line a">A hash of the URL is not a key: one URL may have many links. A click never updates the link row.</div>
+</div>
+<!-- v-045 &lt;div class="k"&gt;Entities · two rules&lt;/div -->
+<div class="slide">
+<div class="k">Entities · two rules</div><h1>What I would defend in review</h1><div class="cards c2"><div class="cd grn"><h3>The code is the only hot key</h3><p>Shard by code. Every redirect is one key lookup. Owner queries go to a second table, written on create.</p></div><div class="cd red"><h3>No counter on the link row</h3><p>A click never writes to the link. A viral link would make that row the hottest lock in the system.</p></div></div>
+</div>
+<!-- v-046 card High-level design -->
+<div class="slide th">
+<div class="lbl">Chapter 5 of 9</div><div class="s">High-level design</div><div class="sub">Three versions, each answering the objection to the one before</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="on">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-047 &lt;div class="k"&gt;Design · V1&lt;/div&gt;&lt;h1&gt;&lt;spa -->
+<div class="slide">
+<div class="k">Design · V1</div><h1><span class=vtag>V1</span>The simplest thing that works</h1><p class="chips">one service<i>·</i>one table<i>·</i>random codes</p><figure class="grow"><!--SVG:base-v1--></figure>
+</div>
+<!-- v-048 &lt;div class="k"&gt;Design · V2&lt;/div&gt;&lt;h1&gt;&lt;spa -->
+<div class="slide">
+<div class="k">Design · V2</div><h1><span class=vtag>V2</span>Split the paths; cache the read</h1><p class="chips">answers: different loads, different tolerances</p><figure class="grow"><!--SVG:base-v2--></figure>
+</div>
+<!-- v-049 &lt;div class="k"&gt;Design · V3&lt;/div&gt;&lt;h1&gt;&lt;spa -->
+<div class="slide">
+<div class="k">Design · V3</div><h1><span class=vtag>V3</span>Protect the redirect; make every copy withdrawable</h1><p class="chips">edge<i>·</i>click log<i>·</i>takedown channel<i>·</i>safety check</p><figure class="grow"><!--SVG:base-v3--></figure>
+</div>
+<!-- v-050 &lt;div class="k"&gt;Design · the three versio -->
+<div class="slide">
+<div class="k">Design · the three versions</div><h1>Each answers the one before</h1><table class="bt sm"><tr><th>Version</th><th>Adds</th><th>Answers</th><th>Leaves</th></tr><tr class=""><td>V1</td><td>One service, one table, random codes</td><td>—</td><td>one hot row; a write per click; nothing scales out</td></tr><tr class=""><td>V2</td><td>Split paths; shared cache; sharded store; ranges</td><td>different loads, different tolerances</td><td>one hot cache key; no click path; takedown behind caches</td></tr><tr class=""><td>V3</td><td>Edge; in-process cache; click log; takedown channel; safety check</td><td>nothing in front of the redirect; every copy withdrawable</td><td>the details: challenges 1 to 8</td></tr></table>
+</div>
+<!-- v-051 &lt;div class="k"&gt;Flow · FR1 create&lt;/div&gt;&lt;h -->
+<div class="slide dia">
+<div class="k">Flow · FR1 create</div><h1>Four numbered steps</h1><figure class="grow"><!--SVG:flow-fr1--></figure>
+</div>
+<!-- v-052 &lt;div class="k"&gt;Sequence · create&lt;/div&gt;&lt;h -->
+<div class="slide dia">
+<div class="k">Sequence · create</div><h1>Check, number, permute, insert</h1><figure class="grow"><!--SVG:seq-create--></figure>
+</div>
+<!-- v-053 &lt;div class="k"&gt;Flow · FR2 redirect&lt;/div&gt; -->
+<div class="slide dia">
+<div class="k">Flow · FR2 redirect</div><h1>Eight numbered steps, almost all in memory</h1><figure class="grow"><!--SVG:flow-fr2--></figure>
+</div>
+<!-- v-054 &lt;div class="k"&gt;Sequence · redirect&lt;/div&gt; -->
+<div class="slide dia">
+<div class="k">Sequence · redirect</div><h1>The click is recorded after the answer</h1><figure class="grow"><!--SVG:seq-redirect--></figure>
+</div>
+<!-- v-055 &lt;div class="k"&gt;Flow · FR3 count&lt;/div&gt;&lt;h1 -->
+<div class="slide dia">
+<div class="k">Flow · FR3 count</div><h1>Five numbered steps, none on the redirect's clock</h1><figure class="grow"><!--SVG:flow-fr3--></figure>
+</div>
+<!-- v-056 &lt;div class="k"&gt;Flow · FR4 withdraw&lt;/div&gt; -->
+<div class="slide dia">
+<div class="k">Flow · FR4 withdraw</div><h1>Five numbered steps to every copy</h1><figure class="grow"><!--SVG:flow-fr4--></figure>
+</div>
+<!-- v-057 &lt;div class="k"&gt;Sequence · takedown&lt;/div&gt; -->
+<div class="slide dia">
+<div class="k">Sequence · takedown</div><h1>Status first, then every copy</h1><figure class="grow"><!--SVG:seq-takedown--></figure>
+</div>
+<!-- v-058 &lt;div class="k"&gt;Architecture · C4 context -->
+<div class="slide dia">
+<div class="k">Architecture · C4 context</div><h1>Who uses the system, and what it depends on</h1><figure class="grow"><!--SVG:c4-context--></figure>
+</div>
+<!-- v-059 &lt;div class="k"&gt;Architecture · C4 contain -->
+<div class="slide dia">
+<div class="k">Architecture · C4 containers</div><h1>Eight containers inside the boundary</h1><figure class="grow"><!--SVG:c4-containers--></figure>
+</div>
+<!-- v-060 &lt;div class="k"&gt;Design · technology, agai -->
+<div class="slide">
+<div class="k">Design · technology, against the alternatives</div><h1>Mechanism first, then a product class</h1><table class="bt sm mx"><tr><th>Need</th><th>Choice</th><th>Rejected</th><th>Because</th></tr><tr class=""><td>Link store</td><td>sharded key-value or relational, keyed by code</td><td>one relational primary</td><td>fine for writes; reads and storage outgrow it, and it is one failure domain</td></tr><tr class=""><td>Shared cache</td><td>in-memory cache, cache-aside</td><td>read-through in the store</td><td>the cache must survive the store being slow</td></tr><tr class=""><td>Allocator</td><td>small consensus-backed store</td><td>a counter row in the link store</td><td>couples create to the busiest store; no lease semantics</td></tr><tr class=""><td>Click path</td><td>local buffer → partitioned log → aggregator</td><td>a counter per link</td><td>a hot row per viral link</td></tr><tr class=""><td>Edge</td><td>bought CDN with a purge API</td><td>build our own</td><td>points of presence are not our business</td></tr></table>
+</div>
+<!-- v-061 card Bridge -->
+<div class="slide th">
+<div class="lbl">Chapter 6 of 9</div><div class="s">Bridge</div><div class="sub">It works. Where does it break first?</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="on">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-062 &lt;div class="k"&gt;Challenge map&lt;/div&gt;&lt;h1&gt;Ei -->
+<div class="slide dia">
+<div class="k">Challenge map</div><h1>Eight attack points on the same baseline</h1><p class="chips">each fix creates the next question</p><figure class="grow"><!--SVG:map--></figure>
+</div>
+<!-- v-063 card Challenges -->
+<div class="slide th">
+<div class="lbl">Chapter 7 of 9</div><div class="s">Challenges</div><div class="sub">Eight ways to break it, and what survives</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="done">Design</span><span class="on">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-064 card Challenge 1: Two servers, one code -->
+<div class="slide th card">
+<div class="lbl">7.1 · Challenge 1</div><div class="s">Two servers, one code</div>
+</div>
+<!-- v-065 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 1 of 8</div><div class="qq">“Two create servers run at the same time. How do they never hand out the same code, without asking each other every time?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-066 &lt;div class="k r"&gt;Challenge 1 of 8 · two  -->
+<div class="slide dia">
+<div class="k r">Challenge 1 of 8 · two servers, one code</div><h1 class="q">Who decides that a code is free?</h1><figure class="grow"><!--SVG:ch1-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Generate a random code, check whether it exists, and insert it if it doesn't.”</div><div class="case"><b class="t">Break</b>Check-then-insert in the create service: the check is stale the moment it returns.</div></div>
+</div>
+<!-- v-067 &lt;div class="k r"&gt;Challenge 1 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 1 of 8 · the trace</div><h1 class="q">Two customers, one alias, three milliseconds apart</h1><table class="tl"><tr><th>10:00:00.001</th><td>server A: SELECT code &#8202;=&#8202; 'sale' → none</td></tr><tr><th>10:00:00.002</th><td>server B: SELECT code &#8202;=&#8202; 'sale' → none</td></tr><tr><th>10:00:00.004</th><td>server A: INSERT sale → shop-a.example</td></tr><tr><th>10:00:00.006</th><td>server B: INSERT sale → shop-b.example: <span class="bad">overwrites A's row</span></td></tr><tr><th>next day</th><td><span class="bad">A's printed flyers open B's page</span></td></tr></table><div class="hedge"><b class="t">Same race, random codes</b>Two servers draw aZ3kQ9x. Rare at 0.34 %, but at 400 creates a second, rare happens every day.</div>
+</div>
+<!-- v-068 &lt;div class="k"&gt;Challenge 1 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 1 of 8 · the fix</div><h1>Disjoint ranges for generated codes; the constraint for the rest</h1><figure class="grow"><!--SVG:ch1-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>Each server leases 1,000 IDs in one conditional write and hands them out locally. Every insert carries UNIQUE(code): one alias race ends in one 201 and one 409.</div><div class="whyb"><b class="t">Property</b>S1 is decided by the one place that sees every write for a code: its shard. L1: a create waits only on its own insert.</div></div>
+</div>
+<!-- v-069 &lt;div class="k"&gt;Challenge 1 of 8 · how ra -->
+<div class="slide dia">
+<div class="k">Challenge 1 of 8 · how ranges work</div><h1>Coordination once per thousand links</h1><figure class="grow"><!--SVG:ranges--></figure>
+</div>
+<!-- v-070 &lt;div class="k"&gt;Challenge 1 of 8 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 1 of 8 · sequence</div><h1>A lease, then an alias conflict</h1><figure class="grow"><!--SVG:seq-ch1-lease--></figure>
+</div>
+<!-- v-071 &lt;div class="k"&gt;Challenge 1 of 8 · the le -->
+<div class="slide">
+<div class="k">Challenge 1 of 8 · the lease, as code</div><h1>One conditional write per thousand links</h1><pre class="code" data-lang="python"><span class="kw">def</span> lease(store, size=1000):
+    <span class="kw">while</span> True:
+        cur = store.get(<span class="st">"next_id"</span>)
+        <span class="kw">if</span> store.compare_and_set(<span class="st">"next_id"</span>, cur, cur + size):
+            <span class="kw">return</span> range(cur, cur + size)   <span class="cm"># ours alone</span>
+        <span class="cm"># lost the race to another server: read again</span></pre><div class="strip one"><div class="whyb"><b class="t">Why it works</b>Compare-and-set makes leases disjoint. Inside a lease no coordination is needed; across leases none is possible to get wrong.</div></div>
+</div>
+<!-- v-072 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“The allocator is down. Or a server crashes holding half a range.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-073 &lt;div class="k"&gt;Challenge 1 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 1 of 8 · the second fix, and the honest limit</div><h1>Runway, a replicated allocator, and the right failure</h1><div class="cards c3"><div class="cd grn"><h3>Runway</h3><p>Lease the next block at half-used: 500 to 1,500 IDs in hand. At the 400/s peak over ten servers that is 12–37 s; at the 40/s average, two to six minutes.</p></div><div class="cd"><h3>A replicated allocator</h3><p>A small consensus-backed store: losing one node is not an outage. 0.4 leases a second is no load.</p></div><div class="cd amb"><h3>A crashed server</h3><p>Its unused IDs are skipped: a gap, not a collision.</p></div></div><div class="line r">If the allocator is down for minutes, creates stop. Redirects never depended on it. That is the right way round.</div>
+</div>
+<!-- v-074 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“Each create server leases a block of a thousand IDs, so coordination happens once per thousand links, not once per link. The unique constraint on the code is the final authority, so an alias race ends in one success and one conflict. If the allocator goes down, servers have their leased runway, and redirects never depended on it.”</div>
+</div>
+<!-- v-075 card Challenge 2: Codes in order -->
+<div class="slide th card">
+<div class="lbl">7.2 · Challenge 2</div><div class="s">Codes in order</div>
+</div>
+<!-- v-076 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 2 of 8</div><div class="qq">“Your codes come from a counter. What can someone learn from that?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-077 &lt;div class="k r"&gt;Challenge 2 of 8 · code -->
+<div class="slide dia">
+<div class="k r">Challenge 2 of 8 · codes in order</div><h1 class="q">Base-62 of a counter is a counter</h1><figure class="grow"><!--SVG:ch2-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Base-62 makes them look random.”</div><div class="case"><b class="t">Break</b>The encoder after the range: neighbouring IDs give neighbouring codes.</div></div>
+</div>
+<!-- v-078 &lt;div class="k r"&gt;Challenge 2 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 2 of 8 · the trace</div><h1 class="q">Our volume, and someone's private document, for free</h1><table class="tl"><tr><th>Mon 09:00</th><td>a user creates a link: 0000g8Q</td></tr><tr><th>Mon 09:10</th><td>the same user: 0000gBA → <span class="bad">2,000 links in 10 minutes: our creation rate</span></td></tr><tr><th>Mon 09:11</th><td>a scraper requests 0000g8R, 0000g8S, 0000g8T …</td></tr><tr><th>Mon 09:12</th><td><span class="bad">reads every link created that morning</span>, including an unlisted document share</td></tr></table><div class="hedge"><b class="t">What leaks</b>Business volume to a competitor, and links their owners believed nobody would find.</div>
+</div>
+<!-- v-079 &lt;div class="k"&gt;Challenge 2 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 2 of 8 · the fix</div><h1>A keyed permutation between the counter and the code</h1><figure class="grow"><!--SVG:ch2-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>ID → a four-round Feistel network over 42 bits with a secret key, cycle-walked below 62⁷ → base-62. Plus a rate limit on 404s per client.</div><div class="whyb"><b class="t">Property</b>Uniqueness comes from the counter, unpredictability from the key. The two are separated, so neither weakens the other.</div></div>
+</div>
+<!-- v-080 &lt;div class="k"&gt;Challenge 2 of 8 · what t -->
+<div class="slide dia">
+<div class="k">Challenge 2 of 8 · what the permutation does</div><h1>Unique in, unique out, neighbours unrelated</h1><figure class="grow"><!--SVG:feistel--></figure>
+</div>
+<!-- v-081 &lt;div class="k"&gt;Challenge 2 of 8 · the pe -->
+<div class="slide">
+<div class="k">Challenge 2 of 8 · the permutation, as code</div><h1>Four rounds, then walk back into range</h1><pre class="code" data-lang="python">N = 62 ** 7                       <span class="cm"># 3.5 × 10¹² codes</span>
+<span class="kw">def</span> permute(i, key):
+    <span class="kw">while</span> True:
+        l, r = i &gt;&gt; 21, i &amp; (2**21 - 1)  <span class="cm"># 42 bits, two halves</span>
+        <span class="kw">for</span> k <span class="kw">in</span> range(4):
+            l, r = r, l ^ (prf(key, k, r) &amp; (2**21 - 1))
+        i = (l &lt;&lt; 21) | r
+        <span class="kw">if</span> i &lt; N: <span class="kw">return</span> base62(i, width=7)  <span class="cm"># cycle walk</span></pre><div class="strip one"><div class="whyb"><b class="t">Why it works</b>Each round is invertible, so the whole is a bijection on 42 bits. Walking until the value falls below 62⁷ keeps it a bijection on the code space.</div></div>
+</div>
+<!-- v-082 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“The key leaks. Or a customer says short links to private files must not be guessable at all.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-083 &lt;div class="k"&gt;Challenge 2 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 2 of 8 · the second fix, and the honest limit</div><h1>Rotate the key; and a short code is not a secret</h1><div class="cards c2"><div class="cd grn"><h3>A leaked key</h3><p>New codes use a new key with a version marker, or a fresh slice of the ID space. Old codes stay valid: they are stored, never recomputed.</p></div><div class="cd red"><h3>Private content</h3><p>42 bits can be sampled by an attacker with many addresses. Private files need authentication, or a long random token, not a short link. Say so to product.</p></div></div>
+</div>
+<!-- v-084 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“A counter gives uniqueness, but base-62 of a counter is still a counter: it leaks our volume and lets anyone walk the links. I pass the ID through a keyed permutation, which keeps it unique and makes neighbours unrelated. And I'm clear that a short code is not a secret: private links need authentication.”</div>
+</div>
+<!-- v-085 card Challenge 3: One link at 40,000 clicks a second -->
+<div class="slide th card">
+<div class="lbl">7.3 · Challenge 3</div><div class="s">One link at 40,000 clicks a second</div>
+</div>
+<!-- v-086 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 3 of 8</div><div class="qq">“A link goes viral: forty thousand clicks a second, all on one code. What happens?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-087 &lt;div class="k r"&gt;Challenge 3 of 8 · one  -->
+<div class="slide dia">
+<div class="k r">Challenge 3 of 8 · one viral link</div><h1 class="q">One key, one shard, one row</h1><figure class="grow"><!--SVG:ch3-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“It's cached, so it's fine.”</div><div class="case"><b class="t">Break</b>The shared-cache shard that owns the key, then the store when that shard restarts.</div></div>
+</div>
+<!-- v-088 &lt;div class="k r"&gt;Challenge 3 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 3 of 8 · the trace</div><h1 class="q">A hot key, then a cold one</h1><table class="tl"><tr><th>14:02</th><td>code k7Pq2mZ goes from 3 clicks/s to <span class="bad">40,000/s</span></td></tr><tr><th>14:02</th><td>its cache shard: p99 0.8 ms → <span class="bad">9 ms</span>; every other code on that shard slows too</td></tr><tr><th>14:05</th><td>a deploy restarts the shard: 200 ms of misses</td></tr><tr><th>14:05</th><td><span class="bad">8,000 identical SELECTs on one row</span> in those 200 ms</td></tr></table><div class="hedge"><b class="t">Label the numbers</b>Illustrative. The shape is the point: one key concentrates load that a fleet would spread.</div>
+</div>
+<!-- v-089 &lt;div class="k"&gt;Challenge 3 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 3 of 8 · the fix</div><h1>Answer from memory on every server; one miss per server</h1><figure class="grow"><!--SVG:ch3-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>An in-process cache on every redirect server (a few hundred thousand entries, 30–60 s). Single flight: concurrent misses for one code wait on one lookup. Negative caching for unknown codes.</div><div class="whyb"><b class="t">Property</b>L2: the hot key's load is spread across all servers' memory. The store sees at most one query per server per code, not one per click.</div></div>
+</div>
+<!-- v-090 &lt;div class="k"&gt;Challenge 3 of 8 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 3 of 8 · sequence</div><h1>A thousand requests, one lookup</h1><figure class="grow"><!--SVG:seq-ch3-flight--></figure>
+</div>
+<!-- v-091 &lt;div class="k"&gt;Challenge 3 of 8 · single -->
+<div class="slide">
+<div class="k">Challenge 3 of 8 · single flight, as code</div><h1>The first caller looks up; the rest wait</h1><pre class="code" data-lang="python">inflight = {}                       <span class="cm"># code → future</span>
+<span class="kw">def</span> resolve(code):
+    hit = local.get(code)
+    <span class="kw">if</span> hit: <span class="kw">return</span> hit
+    leader = code <span class="kw">not in</span> inflight
+    fut = inflight.setdefault(code, Future())
+    <span class="kw">if</span> leader:
+        fut.set(shared_cache.get(code) <span class="kw">or</span> store.get(code))
+        local.put(code, fut.value, ttl=30); inflight.pop(code)
+    <span class="kw">return</span> fut.wait()</pre><div class="strip one"><div class="whyb"><b class="t">Why it works</b>However many clicks arrive, each server sends at most one lookup per code per lifetime: load on the store is servers × hot codes, not clicks.</div></div>
+</div>
+<!-- v-092 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“Now the in-process lifetime means a takedown takes up to a minute longer. And a whole region's servers restart together.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-093 &lt;div class="k"&gt;Challenge 3 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 3 of 8 · the second fix, and the honest limit</div><h1>Budget the lifetime; warm before serving</h1><div class="cards c3"><div class="cd amb"><h3>Takedown</h3><p>The 60 s lifetime is a line in the takedown budget, and the invalidation channel drops entries early. Challenge five.</p></div><div class="cd grn"><h3>Restarts</h3><p>Roll them. A starting server warms its cache from the last hour's top codes before it takes traffic.</p></div><div class="cd"><h3>The real answer for a global viral link</h3><p>The edge, a minute from every user. Challenge four.</p></div></div>
+</div>
+<!-- v-094 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“A viral link is a hot key, not a load problem. I answer it from memory on every redirect server and coalesce misses, so each server sends one query, whatever the click rate. The cost is a short staleness window, which I count in the takedown budget.”</div>
+</div>
+<!-- v-095 card Challenge 4: 301 or 302? -->
+<div class="slide th card">
+<div class="lbl">7.4 · Challenge 4</div><div class="s">301 or 302?</div>
+</div>
+<!-- v-096 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 4 of 8</div><div class="qq">“Should the redirect be a 301 or a 302?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-097 &lt;div class="k r"&gt;Challenge 4 of 8 · 301  -->
+<div class="slide dia">
+<div class="k r">Challenge 4 of 8 · 301 or 302</div><h1 class="q">An answer we cannot see, and cannot take back</h1><figure class="grow"><!--SVG:ch4-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“301. It's permanent, and it saves servers.”</div><div class="case"><b class="t">Break</b>The browser: with a 301 it answers by itself, forever, and never asks us again.</div></div>
+</div>
+<!-- v-098 &lt;div class="k r"&gt;Challenge 4 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 4 of 8 · the trace</div><h1 class="q">Yesterday's click was the last one we saw</h1><table class="tl"><tr><th>Mon 10:00</th><td>a user clicks k7Pq2mZ; we answer <b>301</b>; the browser caches it</td></tr><tr><th>Tue 09:00</th><td>the same user clicks again: <span class="bad">answered by the browser; not counted</span></td></tr><tr><th>Tue 15:00</th><td>trust and safety blocks k7Pq2mZ: it now leads to a phishing page</td></tr><tr><th>Tue 15:20</th><td><span class="bad">that user's browser still goes straight to the phishing page</span></td></tr></table><div class="hedge"><b class="t">Two losses</b>The owner loses the count. We lose the ability to protect the user.</div>
+</div>
+<!-- v-099 &lt;div class="k"&gt;Challenge 4 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 4 of 8 · the fix</div><h1>302 by default; a short, purgeable edge cache</h1><figure class="grow"><!--SVG:ch4-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>302 with browser caching off; the edge may keep it 60 s and can be purged. 301 only as an owner's opt-in for permanent, uncounted links.</div><div class="whyb"><b class="t">Property</b>Control (counting, and S2) stays at layers we can reach. The edge gives most of 301's saving at a bounded cost in freshness.</div></div>
+</div>
+<!-- v-100 &lt;div class="k"&gt;Challenge 4 of 8 · the la -->
+<div class="slide">
+<div class="k">Challenge 4 of 8 · the layers</div><h1>Where a redirect is answered, and what each layer costs</h1><table class="bt sm"><tr><th>Layer</th><th>Answers in</th><th>Sees the click?</th><th>Can we take it back?</th></tr><tr class=""><td>Browser, 301</td><td>0 ms</td><td>never again</td><td><b>no</b></td></tr><tr class=""><td>Edge, 302 cached 60 s</td><td>~5 ms near the user</td><td>from edge logs, minutes late</td><td>yes: purge, or 60 s</td></tr><tr class=""><td>Redirect service + caches</td><td>~1 ms at the server</td><td>every click, exact</td><td>yes: invalidation, or 60 s</td></tr><tr class=""><td>Link store</td><td>~5 ms, misses only</td><td>—</td><td>it is the truth</td></tr></table>
+</div>
+<!-- v-101 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“Finance says the edge bill for ten billion requests is too high. Or edge-log counts arrive twenty minutes late.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-102 &lt;div class="k"&gt;Challenge 4 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 4 of 8 · the second fix, and the honest limit</div><h1>Price both sides; say where exact counts come from</h1><div class="cards c2"><div class="cd amb"><h3>The edge bill</h3><p>Compare the per-request edge cost with the servers and cross-region traffic it saves. Turn edge caching on per link, by click rate: only hot links need it.</p></div><div class="cd"><h3>Late counts</h3><p>Edge-log counts carry their lag, shown as <code>asOf</code>. When clicks are billed, the count comes from our servers or a signed edge function, not from logs.</p></div></div>
+</div>
+<!-- v-103 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“301 against 302 is a product decision, not an optimisation. A 301 is answered by the browser forever, so we lose the click and the ability to take a link down. I default to 302, let the edge cache it for a minute, and offer 301 only to owners who want a permanent, uncounted link.”</div>
+</div>
+<!-- v-104 card Challenge 5: Dead everywhere in five minutes -->
+<div class="slide th card">
+<div class="lbl">7.5 · Challenge 5</div><div class="s">Dead everywhere in five minutes</div>
+</div>
+<!-- v-105 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 5 of 8</div><div class="qq">“Legal reports a phishing link. It must stop working everywhere within five minutes. Show me.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-106 &lt;div class="k r"&gt;Challenge 5 of 8 · dead -->
+<div class="slide dia">
+<div class="k r">Challenge 5 of 8 · dead everywhere</div><h1 class="q">Every copy of the answer is a liability</h1><p class="chips">naive: “delete the row”<i>·</i>none of these layers reads the row on a hit</p><figure class="grow"><!--SVG:ch5-attack--></figure>
+</div>
+<!-- v-107 &lt;div class="k r"&gt;Challenge 5 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 5 of 8 · the trace</div><h1 class="q">Twenty minutes later, a victim still lands on the page</h1><table class="tl"><tr><th>15:00:00</th><td>row deleted (or status &#8202;=&#8202; blocked)</td></tr><tr><th>15:00:00</th><td>still answering: shared cache (TTL <span class="bad">1 h</span>), 40 servers' memory (60 s), edge in 30 cities (60 s)</td></tr><tr><th>15:00:00</th><td>and browsers that got a 301 last week: <span class="bad">forever</span></td></tr><tr><th>15:20:00</th><td><span class="bad">a victim still lands on the phishing page</span>, from the shared cache</td></tr></table><div class="hedge"><b class="t">The real question</b>Not "how do we delete", but "what is the longest any copy can live after we decide".</div>
+</div>
+<!-- v-108 &lt;div class="k"&gt;Challenge 5 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 5 of 8 · the fix</div><h1>Status, a direct delete, an invalidation, and a lifetime at every layer</h1><p class="chips">status<i>·</i>direct delete<i>·</i>invalidate<i>·</i>purge<i>·</i>410 Gone</p><figure class="grow"><!--SVG:ch5-fix--></figure>
+</div>
+<!-- v-109 &lt;div class="k"&gt;Challenge 5 of 8 · the bu -->
+<div class="slide dia">
+<div class="k">Challenge 5 of 8 · the budget</div><h1>The worst case is a sum, and it fits</h1><p class="chips">if the event is lost<i>·</i>initial target</p><figure class="grow"><!--SVG:takedown-budget--></figure>
+</div>
+<!-- v-110 &lt;div class="k"&gt;Challenge 5 of 8 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 5 of 8 · sequence</div><h1>Status first, then every copy</h1><figure class="grow"><!--SVG:seq-takedown--></figure>
+</div>
+<!-- v-111 &lt;div class="k"&gt;Challenge 5 of 8 · before -->
+<div class="slide">
+<div class="k">Challenge 5 of 8 · before the link exists</div><h1>The cheapest takedown is the one you never need</h1><div class="cards c3"><div class="cd grn"><h3>On create</h3><p>Check the URL against the classifier. Known-bad: 422, no code issued.</p></div><div class="cd amb"><h3>After create</h3><p>When the classifier's list updates, rescan live links created recently and block matches through the same path.</p></div><div class="cd"><h3>Audit</h3><p>Every takedown: who, why, when, and when each layer answered 410.</p></div></div>
+</div>
+<!-- v-112 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“The invalidation event is lost. Or the link was created as a 301.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-113 &lt;div class="k"&gt;Challenge 5 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 5 of 8 · the second fix, and the honest limit</div><h1>Lifetimes are the backstop; a 301 cannot be recalled</h1><div class="cards c2"><div class="cd grn"><h3>A lost event</h3><p>The lifetimes are the backstop by design: about two minutes. An hourly test takedown measures the real time at every layer (challenge eight).</p></div><div class="cd red"><h3>A 301</h3><p>Cannot be recalled from a browser. That is why it is opt-in, and why the safety check runs before a 301 link is issued.</p></div></div>
+</div>
+<!-- v-114 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“Every copy of the answer is a liability. A takedown writes the status, deletes the shared-cache key directly, sends an invalidation and purges the edge, and the lifetime at every layer is chosen so that even with a lost message the worst case is inside five minutes. A 301 can't be recalled, which is one more reason it isn't the default.”</div>
+</div>
+<!-- v-115 card Challenge 6: Counting without slowing the redirect -->
+<div class="slide th card">
+<div class="lbl">7.6 · Challenge 6</div><div class="s">Counting without slowing the redirect</div>
+</div>
+<!-- v-116 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 6 of 8</div><div class="qq">“How do you count clicks per link per country without touching the redirect latency?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-117 &lt;div class="k r"&gt;Challenge 6 of 8 · coun -->
+<div class="slide dia">
+<div class="k r">Challenge 6 of 8 · counting</div><h1 class="q">A counter on the row is a lock on the hot path</h1><figure class="grow"><!--SVG:ch6-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“UPDATE links SET clicks = clicks + 1 on every redirect.”</div><div class="case"><b class="t">Break</b>The link store, on every click: one row per viral link, a write inside the redirect.</div></div>
+</div>
+<!-- v-118 &lt;div class="k r"&gt;Challenge 6 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 6 of 8 · the trace</div><h1 class="q">Five milliseconds becomes nine hundred</h1><table class="tl"><tr><th>14:02</th><td>k7Pq2mZ at 40,000 clicks/s → <span class="bad">40,000 UPDATEs/s on one row</span></td></tr><tr><th>14:02</th><td>the row lock serialises them: one at a time</td></tr><tr><th>14:03</th><td>each redirect waits for its write: p99 5 ms → <span class="bad">900 ms</span></td></tr><tr><th>14:04</th><td>the cache was fine. <span class="bad">the counter broke the redirect</span></td></tr></table><div class="hedge"><b class="t">Label the numbers</b>Illustrative. The cache had solved the read; the write put the hot key back on the critical path.</div>
+</div>
+<!-- v-119 &lt;div class="k"&gt;Challenge 6 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 6 of 8 · the fix</div><h1>Answer first, then record; count in batches</h1><p class="chips">after the 302<i>·</i>buffer → log → aggregate<i>·</i>drops counted</p><figure class="grow"><!--SVG:ch6-fix--></figure>
+</div>
+<!-- v-120 &lt;div class="k"&gt;Challenge 6 of 8 · precis -->
+<div class="slide">
+<div class="k">Challenge 6 of 8 · precision</div><h1>Say exactly what the count promises</h1><table class="bt sm"><tr><th>Today (not billed)</th><th>If clicks are billed</th></tr><tr class=""><td>At-most-once from the server: a crash loses the unflushed second</td><td>At-least-once: a durable buffer on disk, resent until acknowledged</td></tr><tr class=""><td>No event ID; drops counted and shown</td><td>An event ID at the redirect; de-duplicated in the aggregator</td></tr><tr class=""><td>Bots counted as clicks</td><td>Bots filtered before anything is billed</td></tr><tr class=""><td>Counts eventually consistent, minutes late</td><td>Same lag; exact once settled; stated in the billing terms</td></tr></table>
+</div>
+<!-- v-121 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“Product now bills per click. A lost click is lost money, and a double-counted one is a refund.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-122 &lt;div class="k"&gt;Challenge 6 of 8 · the se -->
+<div class="slide dia">
+<div class="k">Challenge 6 of 8 · the second fix</div><h1>Event IDs, a durable buffer, de-duplication</h1><figure class="grow"><!--SVG:seq-ch6-billed--></figure>
+</div>
+<!-- v-123 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“The click is recorded after the answer, never before it. Events go to a local buffer and a log, and an aggregator counts per minute. Today that's lossy by choice and we measure the loss. If clicks are billed, I add event IDs, a durable buffer and de-duplication, and the redirect still doesn't wait.”</div>
+</div>
+<!-- v-124 card Challenge 7: A region goes dark -->
+<div class="slide th card">
+<div class="lbl">7.7 · Challenge 7</div><div class="s">A region goes dark</div>
+</div>
+<!-- v-125 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 7 of 8</div><div class="qq">“The region holding your link store's primary goes down. What still works?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-126 &lt;div class="k r"&gt;Challenge 7 of 8 · a re -->
+<div class="slide dia">
+<div class="k r">Challenge 7 of 8 · a region goes dark</div><h1 class="q">Creates fail; misses hit a read-only store</h1><figure class="grow"><!--SVG:ch7-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“We fail over the database.”</div><div class="case"><b class="t">Break</b>The store's primary and the allocator's leader were in the lost region.</div></div>
+</div>
+<!-- v-127 &lt;div class="k r"&gt;Challenge 7 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 7 of 8 · the trace</div><h1 class="q">Which requests fail, and which merely slow</h1><table class="tl"><tr><th>03:10</th><td>the primary region is lost</td></tr><tr><th>03:10</th><td>redirects in Europe and Asia: 98 % from caches, <span class="bad">2 % miss to a store that is now read-only</span></td></tr><tr><th>03:10</th><td>creates: <span class="bad">fail</span>: the primary and the allocator's leader are gone</td></tr><tr><th>03:11</th><td>bulk integrators retry, with their idempotency keys</td></tr></table>
+</div>
+<!-- v-128 &lt;div class="k"&gt;Challenge 7 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 7 of 8 · the fix</div><h1>Redirects are regional; creates are regional too</h1><figure class="grow"><!--SVG:regions--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>Each region has a replica of the link store and its own caches: a redirect never crosses regions. Each region leases from its own slice of the ID space, so it can create alone.</div><div class="whyb"><b class="t">Property</b>L2 depends only on regional state. S1 holds because the slices are disjoint.</div></div>
+</div>
+<!-- v-129 &lt;div class="k"&gt;Challenge 7 of 8 · on the -->
+<div class="slide dia">
+<div class="k">Challenge 7 of 8 · on the baseline</div><h1>The replica beside the store</h1><figure class="grow"><!--SVG:ch7-fix--></figure>
+</div>
+<!-- v-130 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“A link created in Asia is clicked in Europe two hundred milliseconds later, before replication.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-131 &lt;div class="k"&gt;Challenge 7 of 8 · the se -->
+<div class="slide dia">
+<div class="k">Challenge 7 of 8 · the second fix</div><h1>One cross-region lookup, not an error</h1><figure class="grow"><!--SVG:seq-ch7-region--></figure>
+</div>
+<!-- v-132 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“Redirects never leave their region: replicas and caches answer them even with the primary gone. Creates are regional because each region owns a slice of the ID space. The one gap is a brand-new link clicked elsewhere before it replicates, and that costs one cross-region lookup, not an error.”</div>
+</div>
+<!-- v-133 card Challenge 8: How would you know it is broken? -->
+<div class="slide th card">
+<div class="lbl">7.8 · Challenge 8</div><div class="s">How would you know it is broken?</div>
+</div>
+<!-- v-134 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 8 of 8</div><div class="qq">“Your dashboards are green. How do you know redirects are actually working?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-135 &lt;div class="k r"&gt;Challenge 8 of 8 · how  -->
+<div class="slide dia">
+<div class="k r">Challenge 8 of 8 · how would you know</div><h1 class="q">Green boxes, a slower product</h1><figure class="grow"><!--SVG:ch8-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Error rate and CPU.”</div><div class="case"><b class="t">Break</b>The monitoring view watches boxes. Nothing measures the path a user takes.</div></div>
+</div>
+<!-- v-136 &lt;div class="k r"&gt;Challenge 8 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 8 of 8 · the trace</div><h1 class="q">Nothing failed, and the morning peak paged</h1><table class="tl"><tr><th>01:55</th><td>a config change sets the shared cache's lifetime to 0</td></tr><tr><th>02:00</th><td>errors 0; p50 unchanged; p99 6 ms → 18 ms</td></tr><tr><th>02:00</th><td>store reads <span class="bad">40/s → 4,000/s</span>: nobody is watching</td></tr><tr><th>09:00</th><td>the peak arrives: <span class="bad">the store saturates; the first page</span></td></tr></table>
+</div>
+<!-- v-137 &lt;div class="k"&gt;Challenge 8 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 8 of 8 · the fix</div><h1>Probe the path, in every region</h1><figure class="grow"><!--SVG:ch8-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>Synthetic probes in every region create a link and follow it through the edge every minute. Hourly, a test takedown is timed until every layer answers 410.</div><div class="whyb"><b class="t">Property</b>The SLI measures what the user gets, end to end, per region: latency, success, create-to-first-redirect, takedown time.</div></div>
+</div>
+<!-- v-138 &lt;div class="k"&gt;Challenge 8 of 8 · sympto -->
+<div class="slide">
+<div class="k">Challenge 8 of 8 · symptom pairs</div><h1>Two metrics, one cause</h1><table class="bt sm"><tr><th>When you see</th><th>Together with</th><th>It means</th></tr><tr class=""><td>Cache hit rate down</td><td>store reads up, traffic flat</td><td><b>a cold or misconfigured cache</b>, not more users (this trace)</td></tr><tr class=""><td>404 rate up</td><td>creates flat</td><td><b>scanning</b>: someone is walking codes</td></tr><tr class=""><td>p99 up</td><td>hit rate flat</td><td><b>something synchronous</b> crept onto the redirect path</td></tr><tr class=""><td>Click drops up</td><td>buffer full on many servers</td><td><b>the log or the aggregator is slow</b>, not the redirect</td></tr><tr class=""><td>Takedown time up</td><td>invalidation lag up</td><td><b>the channel is behind</b>: the lifetimes are carrying us</td></tr></table>
+</div>
+<!-- v-139 &lt;div class="k"&gt;Challenge 8 of 8 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 8 of 8 · sequence</div><h1>The probe, minute by minute</h1><figure class="grow"><!--SVG:seq-ch8-probe--></figure>
+</div>
+<!-- v-140 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“The probes pass, but one country's DNS sends users to the wrong region.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-141 &lt;div class="k"&gt;Challenge 8 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 8 of 8 · the second fix</div><h1>Real users, compared with the probes</h1><div class="cards c2"><div class="cd grn"><h3>Real-user monitoring</h3><p>From edge logs, per country: latency and the region that answered. Probes say the path works; real users say they reach it.</p></div><div class="cd amb"><h3>Alert on divergence</h3><p>Probes healthy and one country slow is the signal: routing, not our servers.</p></div></div>
+</div>
+<!-- v-142 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“I measure the path, not the boxes: probes that create a link and follow it in every region, and a test takedown every hour, timed until every layer answers 410. Then pairs of metrics give me causes: hit rate down with store reads up means a cold cache, not more traffic.”</div>
+</div>
+<!-- v-143 card Build cost -->
+<div class="slide th aux">
+<div class="lbl">Chapter 8 of 9</div><div class="s">Build cost</div><div class="sub">Who, how long, buy or build: the manager layer</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="done">Design</span><span class="done">Challenges</span><span class="on">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-144 &lt;div class="k"&gt;Build cost · three releas -->
+<div class="slide aux">
+<div class="k">Build cost · three releases</div><h1>Not one project</h1><table class="bt sm"><tr><th></th><th>V1</th><th>V2</th><th>V3</th></tr><tr class=""><td>Scope</td><td>One service, one table, random codes, a cache</td><td>Split paths, ranges, permutation, sharded store</td><td>In-process cache, click pipeline, takedown channel, edge, regions</td></tr><tr class=""><td>People</td><td>2</td><td>+2</td><td>a team of 5–6</td></tr><tr class=""><td>Time</td><td>6 weeks</td><td>2 months</td><td>2 quarters</td></tr><tr class=""><td>On-call</td><td>business hours</td><td>shared rotation</td><td>24/7, error budgets</td></tr></table>
+</div>
+<!-- v-145 &lt;div class="k"&gt;Build cost · two teams, o -->
+<div class="slide aux">
+<div class="k">Build cost · two teams, one quarter</div><h1>Split along the contract</h1><div class="cards c2"><div class="cd"><h3>Links and redirect</h3><p>Create, codes, store, caches, edge. Owns the redirect SLO and the takedown time.</p></div><div class="cd grn"><h3>Clicks and trust</h3><p>Event pipeline, stats, the takedown service and its channel, the classifier integration.</p></div></div><div class="line a">The contract between them: the click event schema, and the invalidation channel.</div>
+</div>
+<!-- v-146 &lt;div class="k"&gt;Build cost · buy, build,  -->
+<div class="slide aux">
+<div class="k">Build cost · buy, build, or don't</div><h1>Most of this is bought</h1><table class="bt sm mx"><tr><th>Part</th><th>Decision</th><th>Why</th></tr><tr class=""><td>Link store, cache, log</td><td>buy managed</td><td>commodity; the design is in how we use them</td></tr><tr class=""><td>Edge</td><td>buy</td><td>points of presence and a purge API</td></tr><tr class=""><td>URL classifier</td><td>buy, or an internal service</td><td>a specialist problem</td></tr><tr class=""><td>Code generation, redirect, takedown path</td><td>build</td><td>small, and it is the product</td></tr><tr class=""><td>The whole thing</td><td><b>don't</b>, if shortening is not our business</td><td>an off-the-shelf shortener is a fine answer</td></tr></table>
+</div>
+<!-- v-147 &lt;div class="k"&gt;Build cost · cost and ris -->
+<div class="slide aux">
+<div class="k">Build cost · cost and risks</div><h1>The edge bill is the biggest line</h1><div class="cards c2"><div class="cd amb"><h3>Cost, illustrative</h3><p>A handful of redirect servers at 4,000/s. 100 GB of cache RAM. 18 TB of storage. The edge is billed per request: at 10 billion a month, the largest line, which is why its default lifetime is a business decision.</p></div><div class="cd red"><h3>Top risks</h3><p>The code format is a one-way door: codes are printed on paper. Takedown time untested until a real incident. Analytics becoming billing without the exactness work.</p></div></div>
+</div>
+<!-- v-148 card Recap -->
+<div class="slide th">
+<div class="lbl">Chapter 9 of 9</div><div class="s">Recap</div><div class="sub">One picture, four paths, the mistakes, the thesis</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="done">Design</span><span class="done">Challenges</span><span class="done">Cost · AUX</span><span class="on">Recap</span></div>
+</div>
+<!-- v-149 &lt;div class="k"&gt;Recap&lt;/div&gt;&lt;h1&gt;The whole  -->
+<div class="slide dia">
+<div class="k">Recap</div><h1>The whole design on one baseline</h1><p class="chips">ranges<i>·</i>permutation<i>·</i>in-process cache<i>·</i>302 + edge<i>·</i>click log<i>·</i>takedown channel<i>·</i>probes</p><figure class="grow"><!--SVG:base-final--></figure>
+</div>
+<!-- v-150 &lt;div class="k"&gt;Recap · one sentence per  -->
+<div class="slide">
+<div class="k">Recap · one sentence per path</div><h1>Four paths</h1><table class="bt"><tr><th>Path</th><th>In one sentence</th></tr><tr class=""><td><b>Create</b></td><td>Check the URL, lease, permute, insert under the constraint</td></tr><tr class=""><td><b>Redirect</b></td><td>Memory, then the shared cache, then the store; answer; then count</td></tr><tr class=""><td><b>Count</b></td><td>Buffer, log, aggregate, and say how fresh</td></tr><tr class=""><td><b>Withdraw</b></td><td>Status, a direct delete, invalidate, purge, and lifetimes that sum to under five minutes</td></tr></table>
+</div>
+<!-- v-151 &lt;div class="k"&gt;Recap · eight fixes&lt;/div&gt; -->
+<div class="slide">
+<div class="k">Recap · eight fixes</div><h1>Each names the property it protects</h1><table class="bt sm"><tr><th>Challenge</th><th>Fix</th><th>Property</th></tr><tr class=""><td>1 Two servers, one code</td><td>leased ranges; the constraint decides</td><td>S1, L1</td></tr><tr class=""><td>2 Codes in order</td><td>keyed permutation; 404 rate limit</td><td>non-enumerable</td></tr><tr class=""><td>3 One viral link</td><td>in-process cache; single flight</td><td>L2</td></tr><tr class=""><td>4 301 or 302</td><td>302 default; edge 60 s; 301 opt-in</td><td>S2, counting</td></tr><tr class=""><td>5 Takedown in 5 min</td><td>status, direct delete, invalidation, lifetimes</td><td><b>S2</b></td></tr><tr class=""><td>6 Counting</td><td>after the answer; buffer, log, aggregate</td><td>L2, L3</td></tr><tr class=""><td>7 A region lost</td><td>regional replicas; ID slices</td><td>L2, S1</td></tr><tr class=""><td>8 How would you know</td><td>probes, test takedowns, symptom pairs</td><td>all</td></tr></table>
+</div>
+<!-- v-152 &lt;div class="k"&gt;Recap · common mistakes i -->
+<div class="slide">
+<div class="k">Recap · common mistakes in this round</div><h1>Nine ways this round goes wrong</h1><div class="cards c2"><div class="cd red"><h3>Design</h3><ul style="font-size:17pt"><li>Hash and truncate, with no collision story</li><li>Six characters without the arithmetic</li><li>Check, then insert</li><li>A counter update on every click</li><li>Codes that are a counter in disguise</li></ul></div><div class="cd amb"><h3>Judgment</h3><ul style="font-size:17pt"><li>“Add a cache” with no plan for one hot key</li><li>301 by default</li><li>Forgetting every cached copy must be withdrawable</li><li>No number on the takedown time</li></ul></div></div>
+</div>
+<!-- v-153 &lt;div class="lbl"&gt;The close&lt;/div&gt;&lt;div cla -->
+<div class="slide th">
+<div class="lbl">The close</div><div class="s">The redirect is <em>one memory read</em>. Codes are unique by <em>blocks and a constraint</em>, unguessable by a <em>key</em>. Everything else lives <em>beside</em> the redirect, with a number on how late it may be.</div>
+</div>
+</body></html>

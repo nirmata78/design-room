@@ -1,450 +1,724 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
-<title>SD-44 payments ledger video slides</title>
+<title>SD-44 payments and the double-entry ledger: slides</title>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="deck.css">
 <link rel="stylesheet" href="video.css">
 </head><body>
-<!-- One idea per slide, ≤ ~25 words of body, one figure max. Content follows ../../SD-44-payments-ledger.md;
-     the four follow-ups are new for this video. -->
-
-<!-- v-01 title -->
+<!-- v-001 card Cold open -->
 <div class="slide th">
-  <div class="lbl">Mock system design round · L6 Engineering Manager</div>
-  <div class="s">Payments and a double-entry ledger:<br>how the round could go.</div>
-  <div class="sub">Take a payment, record it, never lose or double-charge. The design, then four manager follow-ups.</div>
-  <div class="foot"><span>design-room · SD-44</span><span>interviewer · candidate · coach</span></div>
+<div class="lbl">Chapter 0 of 9</div><div class="s">Cold open</div><div class="sub">Design payment processing and the double-entry ledger</div><div class="ribbon"><span class="">Requirements</span><span class="">Estimates</span><span class="">Theory</span><span class="">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
 </div>
-
-<!-- v-02 weighed -->
-<div class="slide">
-<div class="k">Before you start</div>
-<h1>What an L6 EM panel weighs most</h1>
-<div class="cards c3">
-<div class="cd red"><h3>Operations and cost</h3><p>UNKNOWN rate, the balance check, reconciliation breaks, processor fees.</p></div>
-<div class="cd"><h3>Leadership</h3><p>The one-way doors, team seams, who decides risk.</p></div>
-<div class="cd grn"><h3>Depth, once</h3><p>The bank timed out: the next ten minutes and the next ten days.</p></div>
-</div>
-<div class="line a">The curveball: "approve offline", a processor outage, a second processor, the fee bill.</div>
-<div class="foot"><span>Payments · mock round</span><span>levels: em = L6 / M1</span></div>
-</div>
-
-<!-- v-03 prompt -->
+<!-- v-002 &lt;div class="who"&gt;Interviewer · the promp -->
 <div class="slide qs">
-<div class="who">Interviewer · the prompt</div>
-<div class="qq">"Design the system that takes a payment and records it: the ledger the company's money is accounted for in."</div>
-<div class="hint">Ask what must never happen, in order.</div>
+<div class="who">Interviewer · the prompt</div><div class="qq">“Design the system that takes a payment and records it: the ledger the company's money is accounted for in.”</div><div class="pz">Pause and answer before you continue</div>
 </div>
-
-<!-- v-04 clarify 1 -->
+<!-- v-003 &lt;div class="k"&gt;Why it is harder than it  -->
+<div class="slide dia">
+<div class="k">Why it is harder than it looks</div><h1>The truth arrives over months; the answer is due in two seconds</h1><p class="chips">2 s<i>·</i>minutes<i>·</i>next day<i>·</i>months</p><figure class="grow"><!--SVG:truth--></figure>
+</div>
+<!-- v-004 &lt;div class="k"&gt;Before the design&lt;/div&gt;&lt;h -->
 <div class="slide">
-<div class="k">Clarify · minutes 0–6</div>
-<h1>Volume, latency, and the outside world</h1>
-<table class="bt"><tr><th>I ask</th><th>They answer</th><th>Why it matters</th></tr>
-<tr><td>Volume?</td><td>10 k payments/s peak, 50 currencies</td><td>ledger write rate</td></tr>
-<tr><td>Latency?</td><td>a decision within 2 s</td><td>the processor call dominates</td></tr>
-<tr><td>External parties?</td><td>time out, answer ambiguously, go down</td><td><b>unknown outcomes</b> are the core</td></tr>
-<tr><td>Ledger rule?</td><td>always balances, no exceptions</td><td>double entry, atomic posting</td></tr>
-</table>
-<div class="foot"><span>Payments · clarify</span><span>stage 1</span></div>
+<div class="k">Before the design</div><h1>What this question grades</h1><table class="bt sm sig"><tr><th>Axis</th><th>Weak signal</th><th>Strong signal</th></tr><tr class=""><td><b>Requirements</b></td><td>“Charge the card and store it”</td><td>Asks what must never happen, in order; how the outside parties fail; refunds, disputes, audit</td></tr><tr class=""><td><b>Correctness</b></td><td>A balance column, “retries are safe”, floats</td><td>Double entry, derived balances, an idempotency key inserted first, integer minor units</td></tr><tr class=""><td><b>Trade-offs</b></td><td>“A distributed transaction with the bank”</td><td>Says why that is unavailable; picks a state machine with an unknown state and says what it costs</td></tr><tr class=""><td><b>Depth</b></td><td>“Retry with backoff”</td><td>Timeout walk: unknown, inquiry by our reference, reversal, settlement file; outbox; hot account</td></tr><tr class=""><td><b>Operations</b></td><td>API uptime</td><td>Unknown count and age, approval rate per processor, a ledger that must sum to zero, breaks by age</td></tr></table><div class="grade"><b class="t">Coach · what is graded here</b>The one sentence that separates candidates: exactly-once does not exist across the bank boundary. Say it, then design around it.</div>
 </div>
-
-<!-- v-05 clarify 2 -->
-<div class="slide">
-<div class="k">Clarify · audit, refunds, retries</div>
-<h1>Every number explainable for seven years</h1>
-<table class="bt"><tr><th>I ask</th><th>They answer</th><th>Why it matters</th></tr>
-<tr><td>Audit?</td><td>every balance from immutable records</td><td>append-only, no UPDATE</td></tr>
-<tr><td>Refunds?</td><td>partial, months later; chargebacks</td><td>adjusting entries</td></tr>
-<tr><td>Retries?</td><td>"what do you require of clients?"</td><td>idempotency keys</td></tr>
-</table>
-<div class="line">Never, in order: lose money or double-charge · an unbalanced ledger · a slow payment.</div>
-<div class="foot"><span>Payments · clarify</span><span>stage 1</span></div>
-</div>
-
-<!-- v-06 scope -->
-<div class="slide">
-<div class="k">Clarify · scope</div>
-<h1>In and out, said aloud</h1>
-<div class="cards c2">
-<div class="cd grn"><h3>In scope</h3><p>Authorise, capture, refund, the state machine, the ledger, webhooks, reconciliation.</p></div>
-<div class="cd amb"><h3>Out of scope</h3><p>Fraud scoring, card vaulting, FX pricing, merchant onboarding, payouts.</p></div>
-</div>
-<div class="foot"><span>Payments · scope</span><span>stage 1</span></div>
-</div>
-
-<!-- v-07 THESIS -->
+<!-- v-005 &lt;div class="lbl"&gt;The thesis&lt;/div&gt;&lt;div cl -->
 <div class="slide th">
-  <div class="lbl">Key line · land it by minute ten</div>
-  <div class="s">Exactly-once does not exist <em>across the bank boundary</em>.</div>
-  <div class="sub">At-least-once delivery, idempotent operations, a pending state for unknowns, and reconciliation, on an immutable double-entry journal.</div>
-  <div class="foot"><span>Payments · the thesis</span><span>key line</span></div>
+<div class="lbl">The thesis</div><div class="s">At-least-once delivery, <em>one effect per intent</em>, a state for <em>not knowing yet</em>, and a <em>reconciliation</em> that finds what the rest missed, on an append-only double-entry journal.</div>
 </div>
-
-<!-- v-08 NFRs -->
+<!-- v-006 &lt;div class="k"&gt;The order I will follow&lt;/ -->
 <div class="slide">
-<div class="k">Non-functional targets</div>
-<h1>Four commitments</h1>
-<div class="tiles">
-<div class="tile"><b>zero</b><span>double charges</span></div>
-<div class="tile blue"><b>every commit</b><span>the ledger balances</span></div>
-<div class="tile blue"><b>2 s</b><span>payment decision, p99</span></div>
-<div class="tile"><b>daily</b><span>reconciliation, breaks owned</span></div>
+<div class="k">The order I will follow</div><h1>Scope, numbers, theory, a simple design, then I break it</h1><div class="ribbon" style="margin-top:14pt"><span>Requirements</span><span>Estimates</span><span>Theory</span><span>API + data</span><span>Design</span><span>Challenges</span><span>Cost · AUX</span><span>Recap</span></div><div class="cards c3" style="margin-top:18pt"><div class="cd"><h3>First</h3><p>Requirements and scope. Numbers. A short theory chapter.</p></div><div class="cd grn"><h3>Then</h3><p>API and data. A high-level design in three versions, each answering the one before.</p></div><div class="cd red"><h3>Most of the time</h3><p>Eight challenges that break the design. A build cost. A recap.</p></div></div>
 </div>
-<div class="foot"><span>Payments · targets</span><span>stage 1</span></div>
-</div>
-
-<!-- v-09 numbers -->
-<div class="slide">
-<div class="k">Estimation · writes and storage</div>
-<h1>Partition by account; immutable makes archiving easy</h1>
-<div class="tiles" style="--n:3">
-<div class="tile blue"><b>~40 k/s</b><span>journal entries: 10 k payments × ~4</span></div>
-<div class="tile blue"><b>~500–600 TB</b><span>over seven years</span></div>
-<div class="tile"><b>&lt; 200 ms</b><span>for everything we own; the processor takes the rest</span></div>
-</div>
-<div class="foot"><span>Payments · estimation</span><span>stage 2</span></div>
-</div>
-
-<!-- v-10 hot merchant -->
+<!-- v-007 card Requirements and scope -->
 <div class="slide th">
-  <div class="lbl">Estimation · the number that shapes the data model</div>
-  <div class="s">One merchant, <em>5,000 updates a second</em> to one balance row.</div>
-  <div class="sub">It serialises on the row lock. So entries are appended and the balance is derived, which is what auditors want anyway.</div>
-  <div class="foot"><span>Payments · estimation</span><span>key number</span></div>
+<div class="lbl">Chapter 1 of 9</div><div class="s">Requirements and scope</div><div class="sub">Ask first. Cut on purpose. Put numbers on it.</div><div class="ribbon"><span class="on">Requirements</span><span class="">Estimates</span><span class="">Theory</span><span class="">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
 </div>
-
-<!-- v-11 API -->
-<div class="slide">
-<div class="k">API · minutes 11–17</div>
-<h1>Every mutating call carries an idempotency key</h1>
-<pre class="big">POST /v1/payments     Idempotency-Key: &lt;uuid&gt;
-  {merchantId, amount: {value: 1050, currency: "EUR"},   -- integer minor units
-   paymentMethodToken, capture: auto | manual}
-  → 201 {paymentId, status: authorized | captured | declined | pending}
-POST /v1/payments/{id}/capture     POST /v1/payments/{id}/refunds
-Webhooks: signed, event IDs, retried; merchants dedupe</pre>
-<div class="foot"><span>Payments · API</span><span>stage 3</span></div>
-</div>
-
-<!-- v-12 states -->
-<div class="slide dia">
-<div class="k">The payment state machine</div>
-<h1>UNKNOWN is a real state</h1>
-<figure class="grow"><!--SVG:states--></figure>
-<div class="foot"><span>Payments · states</span><span>stage 3</span></div>
-</div>
-
-<!-- v-13 ledger tables -->
-<div class="slide">
-<div class="k">The ledger</div>
-<h1>Immutable journal; balances are a projection</h1>
-<table class="bt"><tr><th>Table</th><th>Holds</th><th>Mutability</th></tr>
-<tr><td><b>accounts</b></td><td>owner, type, currency</td><td>rarely changes</td></tr>
-<tr><td><b>journal_transactions</b></td><td>idempotency key, payment, type</td><td><b>immutable</b></td></tr>
-<tr><td><b>journal_entries</b></td><td>account, debit or credit, minor units</td><td><b>immutable</b></td></tr>
-<tr><td><b>balances</b></td><td>derived, as of an entry</td><td>rebuildable</td></tr>
-<tr><td><b>idempotency, outbox</b></td><td>stored response; events to publish</td><td>TTL; relayed</td></tr>
-</table>
-<div class="foot"><span>Payments · ledger</span><span>stage 3</span></div>
-</div>
-
-<!-- v-14 example entries -->
-<div class="slide">
-<div class="k">Double entry · €10.50 captured, €0.30 fee</div>
-<h1>Debits equal credits, in every transaction</h1>
-<table class="bt"><tr><th>Account</th><th style="text-align:right">Debit</th><th style="text-align:right">Credit</th></tr>
-<tr><td>Processor receivable</td><td style="text-align:right">1,050</td><td></td></tr>
-<tr><td>Merchant payable</td><td></td><td style="text-align:right">1,020</td></tr>
-<tr><td>Fee revenue</td><td></td><td style="text-align:right">30</td></tr>
-</table>
-<div class="line">Enforced in the posting code and checked in the database, in one transaction.</div>
-<div class="foot"><span>Payments · ledger</span><span>stage 3</span></div>
-</div>
-
-<!-- v-15 C4 context -->
-<div class="slide dia">
-<div class="k">Architecture · C4 level 1 · system context</div>
-<h1>Merchants in; processors and banks are the uncertain outside</h1>
-<figure class="grow"><!--SVG:c4-context--></figure>
-<div class="foot"><span>Payments · C4 context</span><span>stage 4</span></div>
-</div>
-
-<!-- v-16 C4 containers -->
-<div class="slide dia">
-<div class="k">Architecture · C4 level 2 · containers</div>
-<h1>One transaction per transition; inquiry and reconciliation beside</h1>
-<figure class="grow"><!--SVG:c4-containers--></figure>
-<div class="foot"><span>Payments · containers</span><span>stage 4</span></div>
-</div>
-
-<!-- v-17 seq pay -->
-<div class="slide dia">
-<div class="k">Sequence · one successful payment</div>
-<h1>Commit before the call; commit everything after it</h1>
-<figure class="grow"><!--SVG:seq-pay--></figure>
-<div class="foot"><span>Payments · happy path</span><span>stage 4</span></div>
-</div>
-
-<!-- v-18 tech -->
-<div class="slide">
-<div class="k">Technology choices</div>
-<h1>Mechanism and reason</h1>
-<table class="bt"><tr><th>Component</th><th>Choice and reason</th></tr>
-<tr><td><b>Ledger and state</b></td><td>relational, by account: atomic postings, constraints</td></tr>
-<tr><td><b>Events</b></td><td>transactional outbox: no dual writes</td></tr>
-<tr><td><b>Processors</b></td><td>an adapter each; retry only with idempotent references</td></tr>
-<tr><td><b>Reconciliation</b></td><td>batch over raw files and ledger expectations</td></tr>
-<tr><td><b>Money</b></td><td>integer minor units and a currency: floats lose cents</td></tr>
-</table>
-<div class="foot"><span>Payments · technology</span><span>stage 5</span></div>
-</div>
-
-<!-- v-19 component -->
-<div class="slide dia">
-<div class="k">C4 level 3 · inside the payment service</div>
-<h1>Guard, state machine, postings, the invariant, the outbox</h1>
-<figure class="grow"><!--SVG:c4-component-payment--></figure>
-<div class="foot"><span>Payments · component</span><span>stage 5</span></div>
-</div>
-
-<!-- v-20 Q timeout -->
+<!-- v-008 &lt;div class="who"&gt;Clarifying question 1 o -->
 <div class="slide qs">
-<div class="who">Interviewer · deep dive one</div>
-<div class="qq">"The authorisation call to the bank timed out. Was the customer charged?"</div>
-<div class="hint">The next ten minutes, and the next ten days.</div>
+<div class="who">Clarifying question 1 of 7</div><div class="qq">What volume?</div><div class="ans">10,000 payments a second at peak, in 50 currencies.</div>
 </div>
-
-<!-- v-21 seq timeout -->
-<div class="slide dia">
-<div class="k">Sequence · the timeout</div>
-<h1>UNKNOWN, inquiry by our reference, the settlement file</h1>
-<figure class="grow"><!--SVG:seq-timeout--></figure>
-<div class="foot"><span>Payments · unknown outcome</span><span>stage 6</span></div>
+<!-- v-009 &lt;div class="who"&gt;Clarifying question 2 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 2 of 7</div><div class="qq">How fast must the client get an answer?</div><div class="ans">An authorisation decision within 2 seconds.</div>
 </div>
-
-<!-- v-22 timeout key line -->
+<!-- v-010 &lt;div class="who"&gt;Clarifying question 3 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 3 of 7</div><div class="qq">Who actually moves the money?</div><div class="ans">Card networks and banks, through processors. They time out, return ambiguous results, and sometimes go down for hours.</div>
+</div>
+<!-- v-011 &lt;div class="who"&gt;Clarifying question 4 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 4 of 7</div><div class="qq">What is the ledger's rule?</div><div class="ans">It must always balance. No exceptions.</div>
+</div>
+<!-- v-012 &lt;div class="who"&gt;Clarifying question 5 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 5 of 7</div><div class="qq">How long must it be auditable?</div><div class="ans">Every balance explainable from immutable records for seven years.</div>
+</div>
+<!-- v-013 &lt;div class="who"&gt;Clarifying question 6 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 6 of 7</div><div class="qq">Refunds and disputes?</div><div class="ans">Partial refunds, full refunds and chargebacks, arriving days or months later.</div>
+</div>
+<!-- v-014 &lt;div class="who"&gt;Clarifying question 7 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 7 of 7</div><div class="qq">What must never happen, in order?</div><div class="ans">Your call. I'll tell you if I disagree.</div>
+</div>
+<!-- v-015 &lt;div class="k"&gt;Requirements · functional -->
+<div class="slide">
+<div class="k">Requirements · functional</div><h1>Five things the system must do</h1><div class="cards c3"><div class="cd"><h3>FR1 · Pay</h3><p>Authorise and capture a payment, automatic or manual capture. Idempotent per client key.</p></div><div class="cd"><h3>FR2 · Adjust</h3><p>Void, partial or full refund, chargeback. Each references the original payment.</p></div><div class="cd amb"><h3>FR3 · Notify</h3><p>Every state change reaches the merchant, as a signed webhook, and internal consumers.</p></div><div class="cd"><h3>FR4 · Reconcile</h3><p>Match our books against each processor’s settlement file daily. Every difference becomes an owned break.</p></div><div class="cd grn"><h3>FR5 · Explain</h3><p>Any account’s balance at any time, from the journal.</p></div></div>
+</div>
+<!-- v-016 &lt;div class="k"&gt;Requirements · non-functi -->
+<div class="slide">
+<div class="k">Requirements · non-functional</div><h1>The numbers, and what each is for</h1><p class="chips">all initial targets, not measurements</p><div class="tiles" style="--n:4"><div class="tile"><b>0</b><span>double charges, ever</span></div><div class="tile blue"><b>&lt; 2 s</b><span>decision at p99, or an honest “pending”</span></div><div class="tile blue"><b>15 min</b><span>an unknown outcome resolved, for 99 %</span></div><div class="tile"><b>1 day</b><span>every break found and owned</span></div></div>
+</div>
+<!-- v-017 &lt;div class="k"&gt;Requirements · scope&lt;/div -->
+<div class="slide">
+<div class="k">Requirements · scope</div><h1>In scope, out of scope</h1><p class="chips">authorise<i>·</i>capture<i>·</i>refund<i>·</i>chargeback<i>·</i>reconcile</p><div class="scope2"><div class="in"><h3>In scope</h3><ul><li>Authorise, capture, void, refund, chargeback</li><li>Webhooks to merchants</li><li>The double-entry ledger</li><li>Daily reconciliation</li><li>Amounts in 50 currencies, no conversion</li></ul></div><div class="out"><h3>Out of scope, on purpose</h3><ul><li>Fraud scoring: a service we call (SD-43)</li><li>Card data: a tokenisation service</li><li>FX pricing (SD-80)</li><li>Merchant onboarding and KYC (SD-78)</li><li>Payouts to merchants (SD-81)</li></ul></div></div>
+</div>
+<!-- v-018 &lt;div class="lbl"&gt;The core is four things -->
 <div class="slide th">
-  <div class="lbl">Key line · the timeout</div>
-  <div class="s">A timeout is an <em>unknown</em>, not a failure.</div>
-  <div class="sub">No retry creates a second charge, because every call carries the same reference.</div>
-  <div class="foot"><span>Payments · unknown outcome</span><span>key line</span></div>
+<div class="lbl">The core is four things</div><div class="s">A <em>state machine</em> that admits “unknown”, an <em>idempotent</em> API, an <em>immutable</em> double-entry journal, and <em>reconciliation</em> against the outside world.</div>
 </div>
-
-<!-- v-23 Q idempotency -->
-<div class="slide qs">
-<div class="who">Interviewer · deep dive two</div>
-<div class="qq">"Three retries arrive at once. And then a fourth, with the same key and a different amount."</div>
-<div class="hint">One wins. And the fourth?</div>
-</div>
-
-<!-- v-24 seq idem -->
-<div class="slide dia">
-<div class="k">Sequence · idempotency</div>
-<h1>One insert wins; a changed payload is a 422</h1>
-<figure class="grow"><!--SVG:seq-idem--></figure>
-<div class="foot"><span>Payments · idempotency</span><span>stage 6</span></div>
-</div>
-
-<!-- v-25 seq outbox -->
-<div class="slide dia">
-<div class="k">Deep dive · crash between ledger and publish</div>
-<h1>It can't be inconsistent: one transaction, then the relay</h1>
-<figure class="grow"><!--SVG:seq-outbox--></figure>
-<div class="foot"><span>Payments · outbox</span><span>stage 6</span></div>
-</div>
-
-<!-- v-26 hot account -->
-<div class="slide dia">
-<div class="k">Deep dive three · the hot merchant account</div>
-<h1>Append, derive, and check only where it matters</h1>
-<figure class="grow"><!--SVG:hot-account--></figure>
-<div class="foot"><span>Payments · hot account</span><span>stage 6</span></div>
-</div>
-
-<!-- v-27 refunds -->
-<div class="slide">
-<div class="k">Deep dive · refunds and chargebacks</div>
-<h1>New entries, never edits</h1>
-<div class="cards c3">
-<div class="cd"><h3>Refund</h3><p>A new transaction referencing the original payment.</p></div>
-<div class="cd amb"><h3>The limit</h3><p>Refunds plus this one ≤ captured, under a conditional update.</p></div>
-<div class="cd red"><h3>Chargeback</h3><p>Posted dated now, with the original reference. Closed periods stay closed.</p></div>
-</div>
-<div class="foot"><span>Payments · refunds</span><span>stage 6</span></div>
-</div>
-
-<!-- v-28 seq recon -->
-<div class="slide dia">
-<div class="k">Deep dive four · reconciliation, a permanent component</div>
-<h1>The settlement file is the final word</h1>
-<figure class="grow"><!--SVG:seq-recon--></figure>
-<div class="foot"><span>Payments · reconciliation</span><span>stage 6</span></div>
-</div>
-
-<!-- v-29 Q midround -->
-<div class="slide qs">
-<div class="who">Interviewer · a requirement added mid-round</div>
-<div class="qq">"A bug double-posted forty thousand entries last night. Some of that money has already been paid out."</div>
-<div class="hint">Stop, find, correct, recover. Never DELETE.</div>
-</div>
-
-<!-- v-30 midround dia -->
-<div class="slide dia">
-<div class="k">Mid-round · the correction</div>
-<h1>Reversing entries, tagged with an incident ID</h1>
-<figure class="grow"><!--SVG:midround-fix--></figure>
-<div class="foot"><span>Payments · mid-round</span><span>stage 7</span></div>
-</div>
-
-<!-- v-31 failures -->
-<div class="slide">
-<div class="k">Failure modes · minutes 45–50</div>
-<h1>What breaks, and the response</h1>
-<table class="bt"><tr><th>Failure</th><th>Response</th></tr>
-<tr><td><b>Processor outage</b></td><td>secondary processor where contracts allow; never approve offline by default</td></tr>
-<tr><td><b>Processor slow</b></td><td>timeout to UNKNOWN and inquiry, not retry loops</td></tr>
-<tr><td><b>Database failover</b></td><td>clients retry with the same key: safe</td></tr>
-<tr><td><b>Outbox lag</b></td><td>alert on outbox age; merchants can poll</td></tr>
-<tr><td><b>Breaks growing</b></td><td>an ageing SLO, owners, escalation</td></tr>
-</table>
-<div class="foot"><span>Payments · failures</span><span>stage 8</span></div>
-</div>
-
-<!-- v-32 SLOs -->
-<div class="slide">
-<div class="k">SLOs and observability</div>
-<h1>The alerts that fire before finance notices</h1>
-<div class="cards c3">
-<div class="cd"><h3>Decisions</h3><p>API success excluding real declines; p99 under 2 s.</p></div>
-<div class="cd red"><h3>Unknowns and balance</h3><p>UNKNOWN rate and age; any imbalance pages immediately.</p></div>
-<div class="cd amb"><h3>Approval and breaks</h3><p>Approval rate per processor vs baseline; unreconciled amount by age.</p></div>
-</div>
-<div class="foot"><span>Payments · SLOs</span><span>stage 9</span></div>
-</div>
-
-<!-- v-33 cost -->
+<!-- v-019 card Estimates -->
 <div class="slide th">
-  <div class="lbl">Cost · say it plainly</div>
-  <div class="s">Processor fees dwarf the servers. The levers are <em>routing</em> and <em>false declines</em>.</div>
-  <div class="foot"><span>Payments · cost</span><span>stage 9</span></div>
+<div class="lbl">Chapter 2 of 9</div><div class="s">Estimates</div><div class="sub">Every number is arithmetic, and every number changes something</div><div class="ribbon"><span class="done">Requirements</span><span class="on">Estimates</span><span class="">Theory</span><span class="">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
 </div>
-
-<!-- v-34 phases -->
-<div class="slide dia">
-<div class="k">The manager layer · how you'd build it</div>
-<h1>An MVP, then refunds, then a second processor</h1>
-<figure class="grow"><!--SVG:em-phases--></figure>
-<div class="foot"><span>Payments · delivery</span><span>stage 10</span></div>
-</div>
-
-<!-- v-35 teams -->
+<!-- v-020 &lt;div class="k"&gt;Estimates · 1 of 8 · writ -->
 <div class="slide">
-<div class="k">The manager layer · team seams</div>
-<h1>Four teams; the ledger is a contract</h1>
-<div class="cards c4">
-<div class="cd"><h3>API and states</h3><p>The idempotency contract.</p></div>
-<div class="cd red"><h3>Ledger</h3><p>Owned centrally; a contract for everyone else.</p></div>
-<div class="cd grn"><h3>Processors</h3><p>Adapters, inquiry, routing.</p></div>
-<div class="cd amb"><h3>Reconciliation</h3><p>Finance tooling, breaks.</p></div>
+<div class="k">Estimates · 1 of 8 · write rate</div><h1>Forty thousand journal entries a second</h1><table class="bt"><tr><th>Quantity</th><th>Arithmetic</th><th>Label</th></tr><tr class=""><td>Payments at peak</td><td><b>10,000 / s</b></td><td>given</td></tr><tr class=""><td>Entries per payment</td><td>about 4: the capture legs and the fee</td><td>illustrative</td></tr><tr class=""><td>Journal writes</td><td>10,000 × 4 = <b>40,000 entries / s</b></td><td>derived</td></tr></table><div class="line a">One database primary will not take it at peak: partition the journal by account.</div>
 </div>
-<div class="line">A 3 a.m. runbook for "payments failing", with a named owner.</div>
-<div class="foot"><span>Payments · teams</span><span>stage 10</span></div>
-</div>
-
-<!-- v-36 close -->
-<div class="slide th">
-  <div class="lbl">Key line · the close</div>
-  <div class="s">Every transition commits with <em>balanced, immutable</em> entries and its event.</div>
-  <div class="sub">Idempotent by key, unknowns resolved by inquiry, reconciliation for the rest. Next: the inquiry protocol per processor; breaks as an owned workflow.</div>
-  <div class="foot"><span>Payments · the close</span><span>stage 11</span></div>
-</div>
-
-<!-- v-37 FU1 Q -->
-<div class="slide qs">
-<div class="who">Follow-up 1 · stakeholder pressure</div>
-<div class="qq">"Product wants us to approve payments offline when the processor is down. We lose sales otherwise."</div>
-<div class="hint">Price the risk; let the right owner decide.</div>
-</div>
-
-<!-- v-38 FU1 dia -->
-<div class="slide dia">
-<div class="k">Follow-up 1 · offline approval</div>
-<h1>A risk policy with a cap, or not at all</h1>
-<figure class="grow"><!--SVG:fu-offline--></figure>
-<div class="foot"><span>Payments · follow-up 1</span><span>stakeholder</span></div>
-</div>
-
-<!-- v-39 FU2 Q -->
-<div class="slide qs">
-<div class="who">Follow-up 2 · an incident</div>
-<div class="qq">"Black Friday, our main processor starts timing out. UNKNOWN climbs to fifteen percent."</div>
-<div class="hint">What do you say first?</div>
-</div>
-
-<!-- v-40 FU2 dia -->
-<div class="slide dia">
-<div class="k">Follow-up 2 · the first hour</div>
-<h1>Route around it, and drain the unknowns safely</h1>
-<figure class="grow"><!--SVG:fu-outage--></figure>
-<div class="foot"><span>Payments · follow-up 2</span><span>incident</span></div>
-</div>
-
-<!-- v-41 FU3 Q -->
-<div class="slide qs">
-<div class="who">Follow-up 3 · a migration</div>
-<div class="qq">"We're adding a second processor next quarter, for cost and resilience. Three teams. How?"</div>
-<div class="hint">The ledger shouldn't change.</div>
-</div>
-
-<!-- v-42 FU3 dia -->
-<div class="slide dia">
-<div class="k">Follow-up 3 · the plan</div>
-<h1>Contract, shadow, reconcile, ramp</h1>
-<figure class="grow"><!--SVG:fu-processor--></figure>
-<div class="foot"><span>Payments · follow-up 3</span><span>migration</span></div>
-</div>
-
-<!-- v-43 FU4 Q -->
-<div class="slide qs">
-<div class="who">Follow-up 4 · a cost question</div>
-<div class="qq">"The CFO asks why processing fees grew faster than volume this year."</div>
-<div class="hint">Slice by route.</div>
-</div>
-
-<!-- v-44 FU4 dia -->
-<div class="slide dia">
-<div class="k">Follow-up 4 · the levers</div>
-<h1>Route for cost where approval holds</h1>
-<figure class="grow"><!--SVG:fu-fees--></figure>
-<div class="foot"><span>Payments · follow-up 4</span><span>cost</span></div>
-</div>
-
-<!-- v-45 scorecard -->
+<!-- v-021 &lt;div class="k"&gt;Estimates · 2 of 8 · dail -->
 <div class="slide">
-<div class="k">Debrief</div>
-<h1>Where the round lands</h1>
-<table class="bt"><tr><th>Signal</th><th>Strong</th><th>Exceptional</th></tr>
-<tr><td>Framing</td><td>"we'll use transactions"</td><td>exactly-once doesn't exist across the boundary</td></tr>
-<tr><td>Ledger</td><td>a balance column</td><td>immutable double entry, derived balances</td></tr>
-<tr><td>Timeout</td><td>retry</td><td>UNKNOWN, inquiry, reversal, settlement file</td></tr>
-<tr><td>Idempotency</td><td>a key</td><td>same transaction; different payload is 422</td></tr>
-<tr><td>EM layer</td><td>monitoring</td><td>balance check pages, breaks owned, fees as the cost</td></tr>
-</table>
-<div class="foot"><span>Payments · scorecard</span><span>debrief</span></div>
+<div class="k">Estimates · 2 of 8 · daily volume</div><h1>Three hundred million payments a day</h1><table class="bt"><tr><th>Quantity</th><th>Arithmetic</th><th>Label</th></tr><tr class=""><td>Average rate</td><td>peak ÷ 3 ≈ <b>3,300 / s</b></td><td>illustrative</td></tr><tr class=""><td>Per day</td><td>3,300 × 86,400 ≈ <b>2.9 × 10⁸</b></td><td>derived</td></tr></table><div class="line a">This sizes the settlement files and the reconciliation job.</div>
 </div>
-
-<!-- v-46 checks -->
+<!-- v-022 &lt;div class="k"&gt;Estimates · 3 of 8 · seve -->
+<div class="slide">
+<div class="k">Estimates · 3 of 8 · seven years</div><h1>About six hundred terabytes, and it never shrinks</h1><table class="bt"><tr><th>Quantity</th><th>Arithmetic</th><th>Label</th></tr><tr class=""><td>Seconds in a year</td><td>≈ 3.15 × 10⁷</td><td>fact</td></tr><tr class=""><td>Entries in 7 years</td><td>3,300 × 3.15 × 10⁷ × 7 × 4 ≈ <b>2.9 × 10¹²</b></td><td>derived</td></tr><tr class=""><td>At ~200 B each</td><td>≈ <b>580 TB</b></td><td>illustrative</td></tr></table><div class="line a">Hot recent partitions plus a cold archive. Immutability makes archiving a copy, not a migration.</div>
+</div>
+<!-- v-023 &lt;div class="k"&gt;Estimates · 4 of 8 · the  -->
+<div class="slide dia">
+<div class="k">Estimates · 4 of 8 · the hot account</div><h1>One merchant, one balance row</h1><p class="chips">5,000 / s<i>·</i>≈ 670 / s per row lock<i>·</i>illustrative</p><figure class="grow"><!--SVG:hot--></figure>
+</div>
+<!-- v-024 &lt;div class="k"&gt;Estimates · 5 of 8 · the  -->
+<div class="slide dia">
+<div class="k">Estimates · 5 of 8 · the latency budget</div><h1>Two seconds, and the processor has most of them</h1><p class="chips">initial targets</p><figure class="grow"><!--SVG:budget--></figure>
+</div>
+<!-- v-025 &lt;div class="k"&gt;Estimates · 6 of 8 · unkn -->
+<div class="slide">
+<div class="k">Estimates · 6 of 8 · unknown outcomes</div><h1>Ten unknowns a second is a real workload</h1><table class="bt"><tr><th>Quantity</th><th>Arithmetic</th><th>Label</th></tr><tr class=""><td>Timeouts</td><td>say 0.1 % of authorisations</td><td>illustrative</td></tr><tr class=""><td>At peak</td><td>0.001 × 10,000 = <b>10 / s</b></td><td>derived</td></tr><tr class=""><td>Per hour</td><td>10 × 3,600 = <b>36,000</b></td><td>derived</td></tr></table><div class="line a">The inquiry job is a service, with throughput and rate limits at the processor.</div>
+</div>
+<!-- v-026 &lt;div class="k"&gt;Estimates · 7 of 8 · idem -->
+<div class="slide">
+<div class="k">Estimates · 7 of 8 · idempotency and reconciliation</div><h1>Two tables that are bigger than they look</h1><table class="bt"><tr><th>Quantity</th><th>Arithmetic</th><th>Label</th></tr><tr class=""><td>Idempotency keys</td><td>2.9 × 10⁸ / day × 7 days × ~300 B ≈ <b>600 GB</b></td><td>illustrative</td></tr><tr class=""><td>Settlement lines</td><td>~2.9 × 10⁸ / day</td><td>derived</td></tr><tr class=""><td>Matching time</td><td>at 1 M lines / s ≈ <b>5 min</b></td><td>illustrative</td></tr></table><div class="line a">Keys expire after seven days, said in the contract. Reconciliation is a batch join; its output is the breaks.</div>
+</div>
+<!-- v-027 &lt;div class="k"&gt;Estimates · 8 of 8 · wher -->
+<div class="slide">
+<div class="k">Estimates · 8 of 8 · where the money is</div><h1>Fees dwarf servers</h1><table class="bt"><tr><th>Quantity</th><th>Arithmetic</th><th>Label</th></tr><tr class=""><td>Processor fees</td><td>a percentage of every payment's value</td><td>fact</td></tr><tr class=""><td>One basis point</td><td>0.01 % of the yearly volume</td><td>illustrative</td></tr><tr class=""><td>Infrastructure</td><td>a database cluster, some services</td><td>illustrative</td></tr></table><div class="grade"><b class="t">Coach · what is graded here</b>A candidate who says that one basis point of better routing outweighs the whole database cluster is showing the cost judgement this round looks for.</div>
+</div>
+<!-- v-028 card Theory -->
+<div class="slide th theory">
+<div class="lbl">Chapter 3 of 9</div><div class="s">Theory</div><div class="sub">What makes this problem hard, in words that outlive any product name</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="on">Theory</span><span class="">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-029 &lt;div class="lbl"&gt;Theory · 1 of 6 · what  -->
+<div class="slide th theory">
+<div class="lbl">Theory · 1 of 6 · what it is</div><div class="s">One customer intent becomes <em>one movement</em> of money, recorded as <em>balanced, immutable</em> entries, and kept in <em>agreement</em> with the parties that actually move it.</div>
+</div>
+<!-- v-030 &lt;div class="k"&gt;Theory · 1 of 6 · what it -->
+<div class="slide theory">
+<div class="k">Theory · 1 of 6 · what it is not</div><h1>Four things it is confused with</h1><div class="cards c2"><div class="cd"><h3>The payment system is not the ledger</h3><p>One orchestrates an intent across outside parties. The other is the book of record. They fail differently.</p></div><div class="cd"><h3>A ledger is not a balance table</h3><p>A balance is a sum over entries. A number that is updated in place cannot explain itself.</p></div><div class="cd amb"><h3>Idempotency is not message de-duplication</h3><p>It is one effect per intent, with the original answer returned to every retry.</p></div><div class="cd red"><h3>Exactly-once delivery is not exactly-once effect</h3><p>Across a network we can have the second. Never the first.</p></div></div>
+</div>
+<!-- v-031 &lt;div class="k"&gt;Theory · 2 of 6 · the two -->
+<div class="slide theory">
+<div class="k">Theory · 2 of 6 · the two properties</div><h1>State safety and liveness separately</h1><div class="prop safe"><div class="lbl">Safety · must never happen</div><p><b>S1</b> One intent moves money twice.<br><b>S2</b> A journal transaction that does not balance, per currency, in integer minor units.<br><b>S3</b> History rewritten: a correction must be a new transaction.</p></div><div class="prop live"><div class="lbl">Liveness · must eventually happen</div><p><b>L1</b> Every payment leaves “unknown” for a final state: in minutes by inquiry, at the latest at settlement.<br><b>L2</b> Every difference with the outside world becomes an owned break within a day.<br><b>L3</b> Every state change reaches the merchant.</p></div>
+</div>
+<!-- v-032 &lt;div class="k"&gt;Theory · 3 of 6 · the cen -->
+<div class="slide theory">
+<div class="k">Theory · 3 of 6 · the central tension</div><h1>Speed of the answer against certainty about the truth</h1><table class="bt"><tr><th>When</th><th>What we know</th><th>Mechanism that lives there</th></tr><tr class=""><td><b>2 seconds</b></td><td>approved, declined, or nothing</td><td>idempotency key · the unknown state · answer pending</td></tr><tr class=""><td><b>minutes</b></td><td>the processor's answer to our question</td><td>the inquiry job, by our own reference</td></tr><tr class=""><td><b>next day</b></td><td>the processor's books</td><td>reconciliation against the settlement file</td></tr><tr class=""><td><b>months</b></td><td>a dispute</td><td>a new, adjusting transaction, dated now</td></tr></table><div class="line a">No mechanism replaces another. Each one closes what the earlier ones left open.</div>
+</div>
+<!-- v-033 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 1 of 7</div><h1>An idempotency key, inserted first</h1><div class="prop safe"><div class="lbl">Property it protects</div><p>S1: one intent, one effect.</p></div><div class="prop"><div class="lbl">How it works</div><p>The client sends a key. We insert it, unique per client, with a hash of the request, in the same transaction that creates the payment. The final response is stored on the same row.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>A retry or a concurrent duplicate creating a second payment; a changed retry silently accepted.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>A table with a retention window; an “in progress” answer the client must handle.</p></div>
+</div>
+<!-- v-034 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 2 of 7</div><h1>An explicit state machine with “unknown”</h1><div class="prop safe"><div class="lbl">Property it protects</div><p>S1 and L1.</p></div><div class="prop"><div class="lbl">How it works</div><p>Every payment moves through named states. A timeout or an ambiguous answer moves it to UNKNOWN, a real state with its own exits. The attempt is committed before the call goes out.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>A timeout treated as failure, which double-charges on retry; or as success, which loses money.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>More states and transitions to test. Clients see “pending”.</p></div>
+</div>
+<!-- v-035 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 3 of 7</div><h1>An immutable double-entry journal</h1><div class="prop safe"><div class="lbl">Property it protects</div><p>S2, S3, and the audit.</p></div><div class="prop"><div class="lbl">How it works</div><p>Every movement is a transaction of entries whose debits equal its credits, per currency. Entries are inserted, never updated. A balance is a projection.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>Unexplainable balances, lost cents, a hot row lock on a balance.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>Storage that grows forever. Reads need projections.</p></div>
+</div>
+<!-- v-036 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 4 of 7</div><h1>A transactional outbox</h1><div class="prop live"><div class="lbl">Property it protects</div><p>L3.</p></div><div class="prop"><div class="lbl">How it works</div><p>The event is a row written in the same transaction as the state change. A relay reads committed rows and publishes them, at least once.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>A state committed with no event, or an event for a state that rolled back.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>A relay to run. Events at least once, so consumers de-duplicate by event ID.</p></div>
+</div>
+<!-- v-037 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 5 of 7</div><h1>Inquiry and reversal by our own reference</h1><div class="prop live"><div class="lbl">Property it protects</div><p>L1, and S1 on retry.</p></div><div class="prop"><div class="lbl">How it works</div><p>Each attempt carries a reference we generate. An inquiry asks the processor for that reference's status; an unwanted approval is reversed by the same reference.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>An unknown that stays unknown; a retry the processor cannot recognise as the same attempt.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>A job per processor, rate-limited. Processors differ in what they support.</p></div>
+</div>
+<!-- v-038 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 6 of 7</div><h1>Reconciliation with expectations and owned breaks</h1><div class="prop live"><div class="lbl">Property it protects</div><p>L2, and S2 against the outside world.</p></div><div class="prop"><div class="lbl">How it works</div><p>The ledger produces what it expects each processor to settle. The raw settlement file is matched line by line. Every unmatched line is a break with a type, an owner and an age.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>Silent divergence from the counterparty's books.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>A pipeline, a finance-operations workflow, and people.</p></div>
+</div>
+<!-- v-039 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 7 of 7</div><h1>Sub-accounts or one writer for a hot account</h1><div class="prop live"><div class="lbl">Property it protects</div><p>Throughput where a check needs a current balance.</p></div><div class="prop"><div class="lbl">How it works</div><p>Split a hot account into N sub-accounts that receive writes in turn and are summed; or send the rare balance-checked operation through one writer per account.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>A merchant serialising on one row; a payout larger than the funds.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>Summing N rows; routing writes; a second place to be wrong.</p></div>
+</div>
+<!-- v-040 &lt;div class="k"&gt;Theory · 5 of 6 · the opt -->
+<div class="slide theory">
+<div class="k">Theory · 5 of 6 · the options, part one</div><h1>Three ways that look reasonable</h1><table class="bt sm mx"><tr><th>Approach</th><th>One effect per intent</th><th>Explainable</th><th>Fails when</th></tr><tr class="rej"><td>A · A balance column updated in a transaction; retries assumed safe</td><td>no</td><td>no</td><td>the first timeout and retry: a double charge; the hot merchant's row lock</td></tr><tr class="rej"><td>B · A distributed transaction (two-phase commit) across our database and the processor</td><td>would be</td><td>would be</td><td>always: the processor is not a participant in our transaction and will not hold a prepare for us</td></tr><tr class="rej"><td>C · An orchestrated saga with compensations, no ledger invariants</td><td>partly</td><td>no</td><td>a compensation that itself times out; nothing says what the books should be</td></tr></table>
+</div>
+<!-- v-041 &lt;div class="k"&gt;Theory · 5 of 6 · the opt -->
+<div class="slide theory">
+<div class="k">Theory · 5 of 6 · the options, part two</div><h1>The pick, and two honest alternatives</h1><table class="bt sm mx"><tr><th>Approach</th><th>One effect per intent</th><th>Explainable</th><th>Fails when</th></tr><tr class="pick"><td>D · State machine with unknown + idempotency key + immutable journal + outbox + inquiry + reconciliation</td><td>yes</td><td>yes</td><td>a processor with no way to query by our reference: then the settlement file is the only arbiter, a day late</td></tr><tr class="rej"><td>E · An event-sourced ledger in a log, balances in stream processors</td><td>with keys</td><td>yes</td><td>a synchronous check (refund ≤ captured, payout ≤ available) needs a current balance now</td></tr><tr class="rej"><td>F · Buy: the processor's own records, or a ledger service</td><td>yes</td><td>theirs</td><td>more than one processor, or the company must keep its own books of record</td></tr></table>
+</div>
+<!-- v-042 &lt;div class="k"&gt;Theory · 5 of 6 · the pic -->
+<div class="slide theory">
+<div class="k">Theory · 5 of 6 · the pick</div><h1>D, and what it gives up</h1><div class="cards c2"><div class="cd grn"><h3>What D buys</h3><p>Never guessing. A retry is harmless, an unknown has an exit, every balance is a sum, and the outside world is checked daily.</p></div><div class="cd red"><h3>What D gives up</h3><p>More states to test. A reconciliation team. “Pending” answers that every merchant integration must handle.</p></div></div><div class="line a">F is the right V0 for one processor. E is how projections are built inside D.</div>
+</div>
+<!-- v-043 &lt;div class="k"&gt;Theory · 6 of 6 · the fai -->
+<div class="slide theory">
+<div class="k">Theory · 6 of 6 · the failure catalogue</div><h1>What will go wrong, which becomes the challenge list</h1><table class="bt sm"><tr><th>Failure</th><th>Challenge</th></tr><tr class=""><td>A timeout, an ambiguous result, a processor down</td><td><b>1</b> · the crux, part one</td></tr><tr class=""><td>Concurrent retries; a retry with a changed amount</td><td><b>2</b></td></tr><tr class=""><td>A crash between commit and event</td><td><b>3</b></td></tr><tr class=""><td>The hot merchant</td><td><b>4</b></td></tr><tr class=""><td>Partial refunds; a chargeback months later</td><td><b>5</b></td></tr><tr class=""><td>Our books and the processor's disagree</td><td><b>6</b> · the crux, part two</td></tr><tr class=""><td>A bug posted wrong entries; money already paid out</td><td><b>7</b></td></tr><tr class=""><td>Nobody notices</td><td><b>8</b> · observability</td></tr></table><div class="line a">Floats and currencies: covered on the API slides, not a challenge.</div>
+</div>
+<!-- v-044 card API and entities -->
 <div class="slide th">
-  <div class="lbl">Debrief</div>
-  <div class="s" style="font-size:38pt">Five checks before the real round.</div>
-  <ol class="check" style="padding-left:30pt">
-    <li>"Exactly-once doesn't exist across the boundary."</li>
-    <li>Double entry, derived balances, integer minor units.</li>
-    <li>The idempotency key in the same transaction.</li>
-    <li>The timeout walk: UNKNOWN, inquiry, settlement.</li>
-    <li>Corrections are new entries, never edits.</li>
-  </ol>
-  <div class="foot"><span>Payments · mock round</span><span>end</span></div>
+<div class="lbl">Chapter 4 of 9</div><div class="s">API and entities</div><div class="sub">The contract first. It forces the semantics into the open.</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="on">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-045 &lt;div class="k"&gt;API · pay&lt;/div&gt;&lt;h1&gt;POST / -->
+<div class="slide">
+<div class="k">API · pay</div><h1>POST /v1/payments</h1><div class="tr"><span class="fr">serves FR1</span><span class="api">POST /payments</span><span class="ent">writes Idempotency · Payment · Attempt · JournalTxn</span><span class="nfr">idempotent</span></div><div class="cols2"><pre class="wire"><span class="cm">// request</span>
+POST /v1/payments
+Idempotency-Key: k-91
+{ merchantId: "m-42",
+  amount: { value: 1050,
+            currency: "EUR" },
+  methodToken: "tok_7c1…",
+  capture: "auto" }</pre><pre class="wire"><span class="cm">// response</span>
+201 { paymentId: "p-7731",
+      status: "captured" }
+
+<span class="cm">// or, honestly</span>
+202 { paymentId: "p-7731",
+      status: "pending" }
+
+<span class="cm">// same key, other body → 422
+// same key, in flight  → 409</span></pre></div>
+</div>
+<!-- v-046 &lt;div class="k"&gt;API · the payment's state -->
+<div class="slide dia">
+<div class="k">API · the payment's states</div><h1>A state machine with an exit from “unknown”</h1><p class="chips">UNKNOWN is a state<i>·</i>illegal transitions rejected</p><figure class="grow"><!--SVG:states--></figure>
+</div>
+<!-- v-047 &lt;div class="k"&gt;API · capture, void, refu -->
+<div class="slide">
+<div class="k">API · capture, void, refund</div><h1>Adjustments are new operations, never edits</h1><div class="tr"><span class="fr">serves FR1 · FR2</span><span class="api">capture · void · refunds</span><span class="ent">writes Payment · JournalTxn</span><span class="nfr">idempotent</span></div><div class="cols2"><pre class="wire"><span class="cm">// each with its own Idempotency-Key</span>
+POST /v1/payments/p-7731/capture
+     { amount: 1050 }
+POST /v1/payments/p-7731/void
+POST /v1/payments/p-7731/refunds
+     { amount: 2500 }</pre><pre class="wire"><span class="cm">// the refund limit, one statement</span>
+UPDATE payment
+ SET refunded = refunded + :amt
+ WHERE id = :p
+   AND refunded + :amt &lt;= captured
+<span class="cm">// 0 rows → 422 exceeds captured</span></pre></div>
+</div>
+<!-- v-048 &lt;div class="k"&gt;API · notify&lt;/div&gt;&lt;h1&gt;Web -->
+<div class="slide">
+<div class="k">API · notify</div><h1>Webhooks, and the poll that backs them up</h1><div class="tr"><span class="fr">serves FR3</span><span class="api">webhook · GET /payments/{id}</span><span class="ent">reads Outbox · Payment</span></div><div class="cols2"><pre class="wire"><span class="cm">// to the merchant, signed</span>
+POST https://merchant/hooks
+Signature: t=…, v1=…
+{ eventId: "e-551",
+  type: "payment.captured",
+  paymentId: "p-7731",
+  status: "captured" }</pre><pre class="wire"><span class="cm">// retried with backoff for days
+// merchants de-duplicate by eventId</span>
+
+<span class="cm">// the backstop: always correct</span>
+GET /v1/payments/p-7731
+ -> { status: "captured", … }</pre></div>
+</div>
+<!-- v-049 &lt;div class="k"&gt;API · internal calls&lt;/div -->
+<div class="slide">
+<div class="k">API · internal calls</div><h1>Inquiry, settlement import, balance</h1><div class="tr"><span class="fr">serves FR1 · FR4 · FR5</span><span class="api">Inquire · ImportSettlement · balance</span><span class="ent">Attempt · SettlementLine · Break · BalanceProjection</span></div><div class="cols2"><pre class="wire"><span class="cm">// our reference per attempt</span>
+Inquire(processor, "p-7731/1")
+ -> approved | declined | not_found
+
+<span class="cm">// the raw file is stored unchanged</span>
+ImportSettlement(file)
+GET /breaks?status=open&amp;age&gt;1d</pre><pre class="wire"><span class="cm">// balance, from the projection</span>
+GET /v1/accounts/acc-9/balance
+ -> { balance: 18204400,
+      currency: "EUR",
+      asOfEntry: 991200731 }
+
+<span class="cm">// for audit: the sum over entries
+// for the period, joined to txns</span></pre></div>
+</div>
+<!-- v-050 &lt;div class="k"&gt;Data · conceptual model&lt;/ -->
+<div class="slide dia">
+<div class="k">Data · conceptual model</div><h1>Entities and relationships, in Chen notation</h1><figure class="grow"><!--SVG:erd-chen--></figure>
+</div>
+<!-- v-051 &lt;div class="k"&gt;Data · physical model&lt;/di -->
+<div class="slide dia">
+<div class="k">Data · physical model</div><h1>Tables, keys, and what is allowed to change</h1><figure class="grow"><!--SVG:erd-physical--></figure>
+</div>
+<!-- v-052 &lt;div class="k"&gt;Data · a worked example&lt;/ -->
+<div class="slide dia">
+<div class="k">Data · a worked example</div><h1>One capture, as balanced entries</h1><p class="chips">integer minor units<i>·</i>debits = credits</p><figure class="grow"><!--SVG:entries--></figure>
+</div>
+<!-- v-053 &lt;div class="k"&gt;Data · money&lt;/div&gt;&lt;h1&gt;Thr -->
+<div class="slide">
+<div class="k">Data · money</div><h1>Three rules about amounts</h1><div class="cards c3"><div class="cd red"><h3>Never a float</h3><p>0.1 + 0.2 is not 0.3 in binary floating point. Integer minor units only.</p></div><div class="cd"><h3>A currency on every amount</h3><p>An amount without its currency is a bug waiting for the second currency.</p></div><div class="cd amb"><h3>Conversion is a transaction</h3><p>With the rate it used, versioned. Never a silent multiply.</p></div></div>
+</div>
+<!-- v-054 card High-level design -->
+<div class="slide th">
+<div class="lbl">Chapter 5 of 9</div><div class="s">High-level design</div><div class="sub">Three versions, each answering the objection to the one before</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="on">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-055 &lt;div class="k"&gt;High-level design · versi -->
+<div class="slide dia">
+<div class="k">High-level design · version 1 of 3</div><h1><span class=vtag>V1</span>The simplest thing that works</h1><p class="chips">one service<i>·</i>one database<i>·</i>a synchronous call</p><figure class="grow"><!--SVG:base-v1--></figure>
+</div>
+<!-- v-056 &lt;div class="k r"&gt;V1 · the objection&lt;/div -->
+<div class="slide">
+<div class="k r">V1 · the objection</div><h1>A timeout, a retry, and two charges</h1><table class="tl"><tr><th>10:00:00.000</th><td>p-7731 sent to the processor, 1,050</td></tr><tr><th>10:00:01.900</th><td>no answer: marked <span class="bad">failed</span></td></tr><tr><th>10:00:02.400</th><td>the processor approves it</td></tr><tr><th>10:00:05.000</th><td>the checkout retries as a new payment p-7744: approved</td></tr><tr><th>10:00:05.000</th><td><span class="bad">the customer has two holds of 1,050</span></td></tr><tr><th>next month</th><td>auditor: “why is this balance 18,204,400?” <span class="bad">no history</span></td></tr></table>
+</div>
+<!-- v-057 &lt;div class="k"&gt;High-level design · versi -->
+<div class="slide dia">
+<div class="k">High-level design · version 2 of 3</div><h1><span class=vtag>V2</span>One effect per intent, and books that prove themselves</h1><p class="chips">key inserted first<i>·</i>attempt committed before the call<i>·</i>UNKNOWN<i>·</i>journal</p><figure class="grow"><!--SVG:base-v2--></figure>
+</div>
+<!-- v-058 &lt;div class="k"&gt;V2 · the one transaction&lt; -->
+<div class="slide">
+<div class="k">V2 · the one transaction</div><h1>State, entries, outbox row and key, together</h1><pre class="code">BEGIN;
+  UPDATE payment SET state = <span class="kw">'CAPTURED'</span>, captured = 1050
+   WHERE id = <span class="kw">'p-7731'</span> AND state = <span class="kw">'AUTH_PENDING'</span>;  <span class="cm">-- legal edge only</span>
+  INSERT INTO journal_txn   (txn_id, payment_id, type) VALUES (…, <span class="kw">'capture'</span>);
+  INSERT INTO journal_entry (account, dir, amount_minor, currency)  <span class="cm">-- 3 rows</span>
+       VALUES (recv, <span class="kw">'D'</span>, 1050, …), (mpay, <span class="kw">'C'</span>, 1020, …), (fees, <span class="kw">'C'</span>, 30, …);
+  INSERT INTO outbox (payload) VALUES (<span class="kw">'payment.captured p-7731'</span>);
+  UPDATE idempotency SET status = <span class="kw">'done'</span>, response = … WHERE key = <span class="kw">'k-91'</span>;
+COMMIT;  <span class="cm">-- a deferred check rejects it unless debits = credits</span></pre><div class="line a">All or nothing. There is no moment where the state says captured and the books do not.</div>
+</div>
+<!-- v-059 &lt;div class="k"&gt;V2 · the objection&lt;/div&gt;&lt; -->
+<div class="slide">
+<div class="k">V2 · the objection</div><h1>Correct inside, and still three holes</h1><div class="cards c3"><div class="cd red"><h3>Telling others</h3><p>Merchants and other systems hear about a change by a second write after the commit. A crash in between, and they never hear.</p></div><div class="cd red"><h3>Unknowns pile up</h3><p>Nothing ends an unknown. Ten a second at peak, forever pending.</p></div><div class="cd red"><h3>The outside disagrees</h3><p>Our books can still differ from the processor's, and nobody would know.</p></div></div>
+</div>
+<!-- v-060 &lt;div class="k"&gt;High-level design · versi -->
+<div class="slide dia">
+<div class="k">High-level design · version 3 of 3</div><h1><span class=vtag>V3</span>Close every loop</h1><p class="chips">outbox → log → webhooks<i>·</i>inquiry job<i>·</i>reconciliation<i>·</i>finance ops</p><figure class="grow"><!--SVG:base-v3--></figure>
+</div>
+<!-- v-061 &lt;div class="k"&gt;V3 · the pay path&lt;/div&gt;&lt;h -->
+<div class="slide">
+<div class="k">V3 · the pay path</div><h1>Commit, call, commit again</h1><pre class="code"><span class="kw">def</span> pay(req, key):
+    row = idem.insert_or_get(req.client, key, hash(req))   <span class="cm"># unique; same txn as below</span>
+    <span class="kw">if</span> row.existing: <span class="kw">return</span> row.response <span class="kw">or</span> conflict(<span class="kw">"in progress"</span>)
+    p = db.commit(new_payment(req, state=<span class="kw">"AUTH_PENDING"</span>, attempt=1))  <span class="cm"># evidence first</span>
+    <span class="kw">try</span>:
+        r = adapter.authorise(p, ref=f<span class="kw">"{p.id}/1"</span>, deadline=1.9)
+    <span class="kw">except</span> Timeout:
+        db.commit(p.to(<span class="kw">"UNKNOWN"</span>))                      <span class="cm"># the inquiry job takes over</span>
+        <span class="kw">return</span> pending(p)
+    <span class="kw">return</span> db.commit(p.apply(r), entries(r), outbox(r), idem_done(key))</pre><div class="line a">No branch guesses. A crash anywhere leaves a row that says how far we got.</div>
+</div>
+<!-- v-062 &lt;div class="k"&gt;V3 · what it leaves open&lt; -->
+<div class="slide">
+<div class="k">V3 · what it leaves open</div><h1>The details are where it breaks</h1><div class="cards c2"><div class="cd grn"><h3>What V3 has</h3><p>Keys inserted first, an unknown state with an exit, one transaction for state and books, an outbox, inquiry, reconciliation.</p></div><div class="cd red"><h3>What it has not been tested against</h3><p>A real timeout. Three retries at once. A crash mid-way. A hot merchant. Late refunds. A statement that disagrees. A bad release. A silent decline.</p></div></div><div class="line r">Eight questions. Each fix creates the next. These are the challenges.</div>
+</div>
+<!-- v-063 &lt;div class="k"&gt;High-level design · requi -->
+<div class="slide dia">
+<div class="k">High-level design · requirement 1 · pay</div><h1>FR1: one payment, end to end</h1><div class="tr"><span class="fr">serves FR1</span><span class="api">POST /payments</span><span class="ent">writes Payment · Attempt · JournalTxn · Outbox</span><span class="nfr">&lt; 2 s or pending</span></div><figure class="grow"><!--SVG:flow-fr1--></figure>
+</div>
+<!-- v-064 &lt;div class="k"&gt;High-level design · requi -->
+<div class="slide dia">
+<div class="k">High-level design · requirement 2 · adjust</div><h1>FR2: a refund</h1><div class="tr"><span class="fr">serves FR2</span><span class="api">POST /refunds</span><span class="ent">writes Payment · JournalTxn</span><span class="nfr">≤ captured</span></div><figure class="grow"><!--SVG:flow-fr2--></figure>
+</div>
+<!-- v-065 &lt;div class="k"&gt;High-level design · requi -->
+<div class="slide dia">
+<div class="k">High-level design · requirement 3 · notify</div><h1>FR3: every change reaches the merchant</h1><div class="tr"><span class="fr">serves FR3</span><span class="api">webhook</span><span class="ent">reads Outbox</span><span class="nfr">at least once</span></div><figure class="grow"><!--SVG:flow-fr3--></figure>
+</div>
+<!-- v-066 &lt;div class="k"&gt;High-level design · requi -->
+<div class="slide dia">
+<div class="k">High-level design · requirement 4 · reconcile</div><h1>FR4: our books against theirs, every day</h1><div class="tr"><span class="fr">serves FR4</span><span class="api">ImportSettlement</span><span class="ent">writes Break</span><span class="nfr">owned within a day</span></div><figure class="grow"><!--SVG:flow-fr4--></figure>
+</div>
+<!-- v-067 &lt;div class="k"&gt;High-level design · requi -->
+<div class="slide dia">
+<div class="k">High-level design · requirement 5 · explain</div><h1>FR5: any balance, from the journal</h1><div class="tr"><span class="fr">serves FR5</span><span class="api">GET /balance</span><span class="ent">reads BalanceProjection · JournalEntry</span></div><figure class="grow"><!--SVG:flow-fr5--></figure>
+</div>
+<!-- v-068 &lt;div class="k"&gt;Design · C4 level 1&lt;/div&gt; -->
+<div class="slide dia">
+<div class="k">Design · C4 level 1</div><h1>The system in its context</h1><figure class="grow"><!--SVG:c4-context--></figure>
+</div>
+<!-- v-069 &lt;div class="k"&gt;Design · C4 level 2&lt;/div&gt; -->
+<div class="slide dia">
+<div class="k">Design · C4 level 2</div><h1>The containers</h1><figure class="grow"><!--SVG:c4-containers--></figure>
+</div>
+<!-- v-070 &lt;div class="k"&gt;Design · sequence&lt;/div&gt;&lt;h -->
+<div class="slide dia">
+<div class="k">Design · sequence</div><h1>One payment, as a sequence</h1><figure class="grow"><!--SVG:seq-pay--></figure>
+</div>
+<!-- v-071 card Bridge -->
+<div class="slide th">
+<div class="lbl">Chapter 6 of 9</div><div class="s">Bridge</div><div class="sub">It works. Where does it break first?</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="on">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-072 &lt;div class="k"&gt;Challenge map&lt;/div&gt;&lt;h1&gt;Ei -->
+<div class="slide dia">
+<div class="k">Challenge map</div><h1>Eight attack points on the same baseline</h1><p class="chips">each fix creates the next question</p><figure class="grow"><!--SVG:map--></figure>
+</div>
+<!-- v-073 card Challenges -->
+<div class="slide th">
+<div class="lbl">Chapter 7 of 9</div><div class="s">Challenges</div><div class="sub">Eight ways to break it, and what survives</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="done">Design</span><span class="on">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-074 card Challenge 1: The bank timed out -->
+<div class="slide th card">
+<div class="lbl">7.1 · Challenge 1</div><div class="s">The bank timed out</div>
+</div>
+<!-- v-075 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 1 of 8</div><div class="qq">“You call the processor. It times out. You don't know whether the customer was charged. Walk me through the next ten minutes, and the next ten days.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-076 &lt;div class="k r"&gt;Challenge 1 of 8 · the  -->
+<div class="slide dia">
+<div class="k r">Challenge 1 of 8 · the timeout</div><h1 class="q">What does a timeout mean?</h1><figure class="grow"><!--SVG:ch1-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Mark it failed and let the client retry.” Or: “Retry it ourselves until it works.”</div><div class="case"><b class="t">Why it fails</b>A timeout is not an answer. Either guess is wrong half the time, and one of the wrong halves is a double charge.</div></div>
+</div>
+<!-- v-077 &lt;div class="k r"&gt;Challenge 1 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 1 of 8 · the trace</div><h1 class="q">Two holds for one purchase</h1><table class="tl"><tr><th>10:00:00.000</th><td>attempt p-7731/1 sent, 1,050</td></tr><tr><th>10:00:01.900</th><td>client deadline: no answer</td></tr><tr><th>10:00:01.900</th><td>naive design marks it <span class="bad">failed</span></td></tr><tr><th>10:00:02.400</th><td>the processor approves p-7731/1</td></tr><tr><th>10:00:05.000</th><td>checkout retries as p-7744: approved</td></tr><tr><th>10:00:05.000</th><td><span class="bad">two holds of 1,050 on one card</span></td></tr></table><div class="hedge"><b class="t">Label the numbers</b>Illustrative. The shape is real: an approval that arrives after the deadline, and a retry that is a new payment.</div>
+</div>
+<!-- v-078 &lt;div class="k"&gt;Challenge 1 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 1 of 8 · the fix</div><h1>Unknown is a state, and an inquiry ends it</h1><figure class="grow"><!--SVG:ch1-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>The attempt is committed before the call. At the deadline: UNKNOWN, answer pending. An inquiry job asks by our reference after 5 s, 30 s, 2 min.</div><div class="whyb"><b class="t">Property</b>S1: every retry carries the same key or the same reference. L1: every unknown has a bounded way out.</div></div>
+</div>
+<!-- v-079 &lt;div class="k"&gt;Challenge 1 of 8 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 1 of 8 · sequence</div><h1>The next ten minutes</h1><figure class="grow"><!--SVG:seq-timeout--></figure>
+</div>
+<!-- v-080 &lt;div class="k"&gt;Challenge 1 of 8 · the ne -->
+<div class="slide">
+<div class="k">Challenge 1 of 8 · the next ten days</div><h1>The settlement file is the final arbiter</h1><table class="bt"><tr><th>When</th><th>What closes it</th></tr><tr class=""><td>seconds</td><td>the response, or <b>pending</b> and UNKNOWN</td></tr><tr class=""><td>minutes</td><td>the inquiry, by our reference: approved, declined, or reversed</td></tr><tr class=""><td>next day</td><td>the settlement file: anything the inquiry missed becomes a <b>break</b></td></tr><tr class=""><td>days</td><td>an adjusting transaction, and the merchant told</td></tr></table><div class="strip one"><div class="whyb"><b class="t">Why it works</b>No path creates a second movement for one intent, and no unknown can last past the next settlement file.</div></div>
+</div>
+<!-- v-081 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“The processor's inquiry endpoint is down too. Actually, the whole processor is down for an hour.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-082 &lt;div class="k"&gt;Challenge 1 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 1 of 8 · the second fix, and the honest limit</div><h1>Fail over only what definitely failed</h1><div class="cards c2"><div class="cd grn"><h3>A breaker per processor</h3><p>Stop sending new attempts to a processor that is down. New payments go to a second processor, if the contract allows.</p></div><div class="cd red"><h3>Never fail over an unknown</h3><p>An unknown sent again elsewhere is two possible charges. Unknowns wait, age, and show on a dashboard; the merchant sees pending.</p></div></div><div class="line r">Honest limit: a processor with neither inquiry nor idempotent references can only be resolved by the file, a day late. That is a reason to choose processors.</div>
+</div>
+<!-- v-083 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“A timeout is an unknown, not a failure. I commit the attempt before calling out, move the payment to unknown, answer pending, and an inquiry job asks the processor by our own reference until it knows. Retries carry the same reference, so they can't become a second charge, and the settlement file is the final arbiter.”</div>
+</div>
+<!-- v-084 card Challenge 2: Three retries at once -->
+<div class="slide th card">
+<div class="lbl">7.2 · Challenge 2</div><div class="s">Three retries at once</div>
+</div>
+<!-- v-085 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 2 of 8</div><div class="qq">“The client sends the same payment three times, concurrently, with the same idempotency key. Then once more, same key, different amount. What happens?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-086 &lt;div class="k r"&gt;Challenge 2 of 8 · conc -->
+<div class="slide dia">
+<div class="k r">Challenge 2 of 8 · concurrent retries</div><h1 class="q">Who decides which request counts?</h1><figure class="grow"><!--SVG:ch2-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“We check whether the key exists before processing.”</div><div class="case"><b class="t">Break</b>Check-then-act on three servers: each check sees nothing, each acts.</div></div>
+</div>
+<!-- v-087 &lt;div class="k r"&gt;Challenge 2 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 2 of 8 · the trace</div><h1 class="q">Three authorisations, and a changed amount</h1><table class="tl"><tr><th>10:00:00.001</th><td>R1, key k-91, 1,050, server A: SELECT → none</td></tr><tr><th>10:00:00.002</th><td>R2, key k-91, 1,050, server B: SELECT → none</td></tr><tr><th>10:00:00.003</th><td>R3, key k-91, 1,050, server C: SELECT → none</td></tr><tr><th>10:00:00.004</th><td><span class="bad">three authorisations of 1,050</span></td></tr><tr><th>10:05:00</th><td>R4, key k-91, <span class="bad">2,050</span>: return the old answer, or charge again?</td></tr></table>
+</div>
+<!-- v-088 &lt;div class="k"&gt;Challenge 2 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 2 of 8 · the fix</div><h1>Insert the key first, and let the constraint decide</h1><figure class="grow"><!--SVG:ch2-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>INSERT the key, unique per client, with a request hash, in the same transaction that creates the payment. The loser reads the row: in progress → 409; done → the stored response; different hash → 422.</div><div class="whyb"><b class="t">Property</b>S1, decided by the database's constraint: the one place every request passes.</div></div>
+</div>
+<!-- v-089 &lt;div class="k"&gt;Challenge 2 of 8 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 2 of 8 · sequence</div><h1>One wins; the others read</h1><figure class="grow"><!--SVG:seq-idem--></figure>
+</div>
+<!-- v-090 &lt;div class="k"&gt;Challenge 2 of 8 · the co -->
+<div class="slide">
+<div class="k">Challenge 2 of 8 · the code</div><h1>Insert or read, in twelve lines</h1><pre class="code"><span class="kw">def</span> insert_or_get(client, key, req_hash, create):
+    <span class="kw">with</span> db.transaction():
+        <span class="kw">try</span>:
+            db.insert(<span class="kw">"idempotency"</span>, client, key, req_hash, status=<span class="kw">"processing"</span>)
+            <span class="kw">return</span> New(create())            <span class="cm"># the payment, same transaction</span>
+        <span class="kw">except</span> UniqueViolation:
+            row = db.get(<span class="kw">"idempotency"</span>, client, key)
+    <span class="kw">if</span> row.req_hash != req_hash: <span class="kw">return</span> Error(422, <span class="kw">"key reused"</span>)
+    <span class="kw">if</span> row.status == <span class="kw">"processing"</span>: <span class="kw">return</span> Error(409, <span class="kw">"in progress"</span>)
+    <span class="kw">return</span> Stored(row.response)</pre><div class="strip one"><div class="whyb"><b class="t">Why it works</b>The result is returned, not re-executed. A changed request under an old key is a client bug, so it is reported, not hidden.</div></div>
+</div>
+<!-- v-091 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“The server that won crashes after the processor approved, but before it wrote ‘done’.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-092 &lt;div class="k"&gt;Challenge 2 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 2 of 8 · the second fix</div><h1>A stuck “processing” row is just an unknown</h1><div class="cards c2"><div class="cd grn"><h3>The rows say how far it got</h3><p>Key: processing, with the payment ID. Payment: AUTH_PENDING, with the attempt reference. That is exactly an unknown outcome.</p></div><div class="cd grn"><h3>Sweep, then inquire</h3><p>A processing row older than a minute goes to recovery: challenge one's inquiry, by reference.</p></div></div><div class="line a">Retention: keys live seven days. The contract says a retry after that is a new payment.</div>
+</div>
+<!-- v-093 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“The idempotency key is inserted first, with a unique constraint, in the same transaction that creates the payment. One request wins; the others get ‘in progress’ or the stored answer. A different body under the same key is a client bug, so I reject it instead of hiding it. And a crash in the middle is just an unknown outcome, which I already handle.”</div>
+</div>
+<!-- v-094 card Challenge 3: A crash between the ledger and the event -->
+<div class="slide th card">
+<div class="lbl">7.3 · Challenge 3</div><div class="s">A crash between the ledger and the event</div>
+</div>
+<!-- v-095 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 3 of 8</div><div class="qq">“Your service commits the payment, then crashes before telling the merchant. What state are you in?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-096 &lt;div class="k r"&gt;Challenge 3 of 8 · two  -->
+<div class="slide dia">
+<div class="k r">Challenge 3 of 8 · two writes</div><h1 class="q">Commit, then publish</h1><figure class="grow"><!--SVG:ch3-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“We publish the event right after the commit. Crashes are rare.”</div><div class="case"><b class="t">Break</b>Two writes to two systems with no shared transaction. Either order loses something.</div></div>
+</div>
+<!-- v-097 &lt;div class="k r"&gt;Challenge 3 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 3 of 8 · the trace</div><h1 class="q">Charged, and nothing shipped</h1><table class="tl"><tr><th>11:20:00.010</th><td>commit: p-8102 CAPTURED, entries written</td></tr><tr><th>11:20:00.012</th><td><span class="bad">process killed by a deploy</span>: no event</td></tr><tr><th>11:20 onward</th><td>merchant's order system waits; <span class="bad">nothing ships</span></td></tr><tr><th>reverse order</th><td>publish first, then the commit fails: <span class="bad">goods ship for an unpaid order</span></td></tr></table>
+</div>
+<!-- v-098 &lt;div class="k"&gt;Challenge 3 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 3 of 8 · the fix</div><h1>The event is a row in the same transaction</h1><figure class="grow"><!--SVG:ch3-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>Transactional outbox: the event row commits with the state and the entries. A relay reads committed rows in order and publishes them, at least once.</div><div class="whyb"><b class="t">Property</b>L3: the event exists if and only if the state committed, and delivery is retried until acknowledged.</div></div>
+</div>
+<!-- v-099 &lt;div class="k"&gt;Challenge 3 of 8 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 3 of 8 · sequence</div><h1>Nothing is lost at the crash</h1><figure class="grow"><!--SVG:seq-outbox--></figure>
+</div>
+<!-- v-100 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“The relay is twenty minutes behind. Or a merchant's endpoint is down for a day.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-101 &lt;div class="k"&gt;Challenge 3 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 3 of 8 · the second fix</div><h1>Lag is a metric; the database is the backstop</h1><div class="cards c2"><div class="cd grn"><h3>The relay</h3><p>Outbox age is a metric with an alert. The relay is partitioned by account, so one slow partition does not hold the rest.</p></div><div class="cd grn"><h3>The merchant</h3><p>Webhooks retry with backoff for days. After that, the merchant is told to reconcile with GET. Their dashboard reads our database, not the stream.</p></div></div>
+</div>
+<!-- v-102 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“I never write to two systems and hope. The event is a row in the same transaction as the state change, and a relay publishes it at least once. Consumers de-duplicate by event ID, and the merchant can always ask us for the state directly.”</div>
+</div>
+<!-- v-103 card Challenge 4: The hot merchant -->
+<div class="slide th card">
+<div class="lbl">7.4 · Challenge 4</div><div class="s">The hot merchant</div>
+</div>
+<!-- v-104 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 4 of 8</div><div class="qq">“One merchant receives five thousand payments a second. Where does that land?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-105 &lt;div class="k r"&gt;Challenge 4 of 8 · one  -->
+<div class="slide dia">
+<div class="k r">Challenge 4 of 8 · one row</div><h1 class="q">Five thousand writers, one lock</h1><figure class="grow"><!--SVG:ch4-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Update the merchant's balance in each payment's transaction.”</div><div class="case"><b class="t">Break</b>Every transaction takes the same row lock; they serialise.</div></div>
+</div>
+<!-- v-106 &lt;div class="k r"&gt;Challenge 4 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 4 of 8 · the trace</div><h1 class="q">A queue that grows by four thousand a second</h1><table class="tl"><tr><th>12:00:00</th><td>merchant-42 at 5,000 payments / s</td></tr><tr><th>12:00:00</th><td>each holds balance(merchant-42) for ~1.5 ms → <span class="bad">≈ 670 / s</span></td></tr><tr><th>12:00:01</th><td>queue + 4,330; that merchant's p99 <span class="bad">past 2 s</span></td></tr><tr><th>12:00:02</th><td>its payments time out → <span class="bad">they become UNKNOWNs</span></td></tr></table><div class="hedge"><b class="t">Label the numbers</b>The lock time is illustrative and must be measured. The ratio is the point: five thousand against hundreds.</div>
+</div>
+<!-- v-107 &lt;div class="k"&gt;Challenge 4 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 4 of 8 · the fix</div><h1>Append entries; the balance is a projection</h1><figure class="grow"><!--SVG:ch4-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>Payments only insert their own entries: no shared row. A projection updates balances seconds behind. Where a check needs a current balance: 16 sub-accounts, summed, or one writer per merchant for that rare operation.</div><div class="whyb"><b class="t">Property</b>Throughput from removing the shared row from the hot path; correctness of the rare check from serialising only that check.</div></div>
+</div>
+<!-- v-108 &lt;div class="k"&gt;Challenge 4 of 8 · the ar -->
+<div class="slide dia">
+<div class="k">Challenge 4 of 8 · the arithmetic</div><h1>Why sixteen</h1><p class="chips">16 × 670 ≈ 10,700 / s<i>·</i>illustrative</p><figure class="grow"><!--SVG:hot--></figure>
+</div>
+<!-- v-109 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“A refund needs ‘refunded is at most captured’, per payment. A payout needs ‘paid out is at most available’, right now.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-110 &lt;div class="k"&gt;Challenge 4 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 4 of 8 · the second fix, and the honest limit</div><h1>Serialise only what must be serial</h1><div class="cards c2"><div class="cd grn"><h3>Per payment: a conditional update</h3><p>One payment is never hot. <b>refunded + amount ≤ captured</b> in one statement on its row.</p></div><div class="cd grn"><h3>Per merchant: one payout writer</h3><p>Reads the sum of the sub-accounts, then posts the payout transaction. Payouts are rare next to payments.</p></div></div><div class="line r">Honest limit: the projection lag must be measured and stated to the payouts team.</div>
+</div>
+<!-- v-111 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“Five thousand updates a second to one balance row would serialise on its lock. So payments only append entries and the balance is derived. Where a check needs the balance now, like a payout, I split the account into sub-accounts or serialise just that rare operation through one writer.”</div>
+</div>
+<!-- v-112 card Challenge 5: Refunds, and a chargeback months later -->
+<div class="slide th card">
+<div class="lbl">7.5 · Challenge 5</div><div class="s">Refunds, and a chargeback months later</div>
+</div>
+<!-- v-113 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 5 of 8</div><div class="qq">“A payment was partially refunded twice. Two more refunds arrive at once. Then, three months later, a chargeback. How does the ledger stay right?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-114 &lt;div class="k r"&gt;Challenge 5 of 8 · adju -->
+<div class="slide dia">
+<div class="k r">Challenge 5 of 8 · adjustments</div><h1 class="q">Read, check, write: a race again</h1><figure class="grow"><!--SVG:ch5-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Update the payment's amount and the merchant's balance.”</div><div class="case"><b class="t">Break</b>Two refunds read the same total; a chargeback edits a closed period.</div></div>
+</div>
+<!-- v-115 &lt;div class="k r"&gt;Challenge 5 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 5 of 8 · the trace</div><h1 class="q">Twelve thousand refunded on ten thousand</h1><table class="tl"><tr><th>day 1</th><td>p-5520 captured 10,000</td></tr><tr><th>day 3, 9</th><td>refunds of 3,000 and 4,000: refunded &#8202;=&#8202; 7,000</td></tr><tr><th>day 12 +0 ms</th><td>refund 2,500 reads 7,000; 9,500 ≤ 10,000: ok</td></tr><tr><th>day 12 +2 ms</th><td>refund 2,500 reads 7,000; 9,500 ≤ 10,000: ok</td></tr><tr><th>day 12</th><td><span class="bad">12,000 refunded on a 10,000 payment</span></td></tr><tr><th>day 92</th><td>chargeback for the rest; <span class="bad">month 1 is closed and reported</span></td></tr></table>
+</div>
+<!-- v-116 &lt;div class="k"&gt;Challenge 5 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 5 of 8 · the fix</div><h1>New transactions, and a limit in one statement</h1><figure class="grow"><!--SVG:ch5-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>Each adjustment is a new journal transaction referencing the payment. The limit is one conditional update on the payment row. A chargeback posts entries dated now, to a disputes account.</div><div class="whyb"><b class="t">Property</b>S2 and S3: history is append-only, so the closed month still adds up, and a correction is visible as a correction.</div></div>
+</div>
+<!-- v-117 &lt;div class="k"&gt;Challenge 5 of 8 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 5 of 8 · sequence</div><h1>One refund wins; the month stays closed</h1><figure class="grow"><!--SVG:seq-refund--></figure>
+</div>
+<!-- v-118 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“The merchant wins the dispute, so the chargeback is reversed. Or the refund is in a different currency.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-119 &lt;div class="k"&gt;Challenge 5 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 5 of 8 · the second fix, and the honest limit</div><h1>One more transaction, and a rate that is recorded</h1><div class="cards c2"><div class="cd grn"><h3>Dispute won</h3><p>A reversal is one more transaction: from the disputes account back to the merchant. The state machine records it.</p></div><div class="cd grn"><h3>Another currency</h3><p>Amounts stay in the original currency. A conversion is its own transaction, with the rate it used, versioned.</p></div></div><div class="line r">Honest limit: who bears the loss in a dispute is a contract, not code. Finance owns those rules.</div>
+</div>
+<!-- v-120 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“Nothing is edited. A refund, a chargeback or a reversal is a new balanced transaction that references the payment and is dated when it happened, so closed months still add up. The refund limit is one conditional update on the payment row, so two concurrent refunds can't both pass.”</div>
+</div>
+<!-- v-121 card Challenge 6: 999,998 against 1,000,000 -->
+<div class="slide th card">
+<div class="lbl">7.6 · Challenge 6</div><div class="s">999,998 against 1,000,000</div>
+</div>
+<!-- v-122 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 6 of 8</div><div class="qq">“The processor's settlement statement says 999,998. Your books say 1,000,000. What now?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-123 &lt;div class="k r"&gt;Challenge 6 of 8 · the  -->
+<div class="slide dia">
+<div class="k r">Challenge 6 of 8 · the outside truth</div><h1 class="q">Who is right, and how would you know?</h1><figure class="grow"><!--SVG:ch6-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“We'd look into it. Our system is correct by construction.”</div><div class="case"><b class="t">Break</b>Correct inside is not the same as agreeing with the outside. Totals hide the cause.</div></div>
+</div>
+<!-- v-124 &lt;div class="k"&gt;Challenge 6 of 8 · the ca -->
+<div class="slide">
+<div class="k">Challenge 6 of 8 · the case</div><h1>A difference of two, made of three breaks</h1><table class="bt sm"><tr><th>Line</th><th>Ours</th><th>Theirs</th><th>Kind</th></tr><tr class=""><td>Capture booked at 23:58, settles tomorrow</td><td>1,050</td><td>—</td><td>timing: closes by itself</td></tr><tr class=""><td>An UNKNOWN we resolved as declined</td><td>—</td><td>1,050</td><td><b class="bad">real: the customer paid</b></td></tr><tr class=""><td>A fee 2 higher than the contract</td><td>30</td><td>32</td><td>real: the processor's error</td></tr><tr class=""><td><b>Net</b></td><td></td><td><b>−2</b></td><td></td></tr></table><div class="line r">The total differs by 2. The break that matters most, a real charge we think was declined, is invisible in the total.</div>
+</div>
+<!-- v-125 &lt;div class="k"&gt;Challenge 6 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 6 of 8 · the fix</div><h1>Expectations, matched line by line, every break owned</h1><figure class="grow"><!--SVG:ch6-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>Store the raw file unchanged. The ledger generates expectations by reference, net of fees. Match line by line. Every unmatched line is a break with a type, an owner and an age.</div><div class="whyb"><b class="t">Property</b>L2: every difference becomes a named, owned item. S2 holds against the outside world, not only inside our database.</div></div>
+</div>
+<!-- v-126 &lt;div class="k"&gt;Challenge 6 of 8 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 6 of 8 · sequence</div><h1>From the file to an owned break</h1><figure class="grow"><!--SVG:seq-recon--></figure>
+</div>
+<!-- v-127 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“There are forty thousand breaks this morning, not forty.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-128 &lt;div class="k"&gt;Challenge 6 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 6 of 8 · the second fix</div><h1>A spike in breaks is an incident, not a backlog</h1><div class="cards c3"><div class="cd amb"><h3>Classify first</h3><p>By type and processor. One cause usually explains thousands of lines.</p></div><div class="cd red"><h3>Protect money</h3><p>Hold payouts if the break amount crosses a threshold. Money not yet sent can still be protected.</p></div><div class="cd grn"><h3>Fix the cause</h3><p>Then the lines. Breaks by age is a dashboard with a target; finance ops is a team with tooling.</p></div></div>
+</div>
+<!-- v-129 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“Reconciliation isn't a safety net for a buggy system; it's a permanent component, because the processor's truth and ours diverge even when our code is right. I match line by line against expectations from the ledger, every difference becomes a break with an owner and an age, and a spike in breaks is treated as an incident.”</div>
+</div>
+<!-- v-130 card Challenge 7: A bug double-posted forty thousand entries -->
+<div class="slide th card">
+<div class="lbl">7.7 · Challenge 7</div><div class="s">A bug double-posted forty thousand entries</div>
+</div>
+<!-- v-131 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 7 of 8</div><div class="qq">“A bug double-posted forty thousand entries last night, and some merchants have already been paid out. What do you do?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-132 &lt;div class="k r"&gt;Challenge 7 of 8 · wron -->
+<div class="slide dia">
+<div class="k r">Challenge 7 of 8 · wrong entries</div><h1 class="q">The books are wrong, and money has moved</h1><figure class="grow"><!--SVG:ch7-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Write a script to delete the duplicates.”</div><div class="case"><b class="t">Break</b>A DELETE destroys the evidence and breaks S3. The paid-out money is not in the database at all.</div></div>
+</div>
+<!-- v-133 &lt;div class="k r"&gt;Challenge 7 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 7 of 8 · the trace</div><h1 class="q">Ninety minutes of a bad release</h1><table class="tl"><tr><th>22:10</th><td>release 2026.11.19 starts posting the fee leg twice</td></tr><tr><th>23:40</th><td>40,000 captures affected; <span class="bad">1,200 merchants’ payables too high by the fee</span></td></tr><tr><th>00:00</th><td>nightly payouts run: <span class="bad">180 of them paid the excess</span></td></tr><tr><th>07:30</th><td>reconciliation: fee breaks up sharply; incident opened</td></tr></table>
+</div>
+<!-- v-134 &lt;div class="k"&gt;Challenge 7 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 7 of 8 · the fix</div><h1>Stop, identify, reverse, recover, learn</h1><figure class="grow"><!--SVG:ch7-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>Kill the release; hold payouts for the affected merchants. Find the duplicates exactly in the immutable journal. Post one reversing transaction per duplicate, tagged with the incident.</div><div class="whyb"><b class="t">Property</b>S3 makes the correction tractable and provable: nothing was overwritten, so the duplicates can be found and reversed exactly.</div></div>
+</div>
+<!-- v-135 &lt;div class="k"&gt;Challenge 7 of 8 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 7 of 8 · sequence</div><h1>The correction, step by step</h1><figure class="grow"><!--SVG:seq-correct--></figure>
+</div>
+<!-- v-136 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“Idempotency should have stopped this. Why didn't it?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-137 &lt;div class="k"&gt;Challenge 7 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 7 of 8 · the second fix</div><h1>Idempotency guards requests, not code paths</h1><div class="cards c2"><div class="cd amb"><h3>Why it got through</h3><p>One request, one key: the bug was a second posting <b>inside</b> it, with a new transaction ID. No retry was involved.</p></div><div class="cd grn"><h3>The invariant that stops the class</h3><p>A unique constraint on <b>(payment_id, type)</b> for single-occurrence types, such as the fee. And an hourly reconciliation check.</p></div></div><div class="line a">Then a postmortem on the class: why tests and canaries let a double posting through.</div>
+</div>
+<!-- v-138 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“Stop the bleeding first: kill the release and hold payouts. Because the journal is immutable I can find the duplicates exactly and post reversing entries tagged with the incident, so the audit trail shows both. Money already paid out is a receivable and a conversation with those merchants. Then a constraint and an hourly check, so this class can't repeat silently.”</div>
+</div>
+<!-- v-139 card Challenge 8: How would you know before finance does? -->
+<div class="slide th card">
+<div class="lbl">7.8 · Challenge 8</div><div class="s">How would you know before finance does?</div>
+</div>
+<!-- v-140 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 8 of 8</div><div class="qq">“What do you watch, and what alert fires before finance notices that something is wrong?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-141 &lt;div class="k r"&gt;Challenge 8 of 8 · sile -->
+<div class="slide dia">
+<div class="k r">Challenge 8 of 8 · silence</div><h1 class="q">Green dashboards, fewer sales</h1><figure class="grow"><!--SVG:ch8-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“API error rate and latency.”</div><div class="case"><b class="t">Break</b>A decline is a successful API call. Nothing on the dashboard measures money.</div></div>
+</div>
+<!-- v-142 &lt;div class="k r"&gt;Challenge 8 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 8 of 8 · the trace</div><h1 class="q">Seven hours of quiet losses</h1><table class="tl"><tr><th>02:00</th><td>a change at one processor: <span class="bad">6 points more declines</span> for one country</td></tr><tr><th>02:00</th><td>API errors 0 %; latency normal; every check green</td></tr><tr><th>09:00</th><td>merchants report sales are down</td></tr><tr><th>09:20</th><td><span class="bad">first alert is a customer complaint</span></td></tr></table>
+</div>
+<!-- v-143 &lt;div class="k"&gt;Challenge 8 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 8 of 8 · the fix</div><h1>Watch the money and the truth</h1><figure class="grow"><!--SVG:ch8-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>Approval rate per processor, country and card type against its own baseline. UNKNOWN count and age. Outbox age. Debits minus credits = 0, checked continuously. Unreconciled amount by age. A synthetic payment per processor every minute.</div><div class="whyb"><b class="t">Property</b>The alerts measure what finance and merchants measure, a day earlier.</div></div>
+</div>
+<!-- v-144 &lt;div class="k"&gt;Challenge 8 of 8 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 8 of 8 · sequence</div><h1>The probe, end to end</h1><figure class="grow"><!--SVG:seq-probe--></figure>
+</div>
+<!-- v-145 &lt;div class="k"&gt;Challenge 8 of 8 · sympto -->
+<div class="slide">
+<div class="k">Challenge 8 of 8 · symptom pairs</div><h1>Two metrics, one conclusion</h1><table class="bt sm"><tr><th>Metric A</th><th>Metric B</th><th>Conclusion</th></tr><tr class=""><td>approvals down</td><td>latency normal</td><td>a processor or issuer change, not us</td></tr><tr class=""><td>UNKNOWN up</td><td>latency at the timeout</td><td>the processor is slow</td></tr><tr class=""><td>outbox age up</td><td>commits normal</td><td>the relay is stuck</td></tr><tr class=""><td>breaks up today</td><td>UNKNOWN up yesterday</td><td>the inquiry is not resolving</td></tr><tr class=""><td>debits − credits ≠ 0</td><td>anything</td><td>stop and page: a posting bug</td></tr></table><div class="grade"><b class="t">Coach · what is graded here</b>Reading metrics in pairs turns two numbers into one cause. It is what a runbook for “payments failing at 3 a.m.” starts from.</div>
+</div>
+<!-- v-146 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“The approval rate drops slowly: half a point a week.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-147 &lt;div class="k"&gt;Challenge 8 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 8 of 8 · the second fix</div><h1>A slow drift needs a slow comparison</h1><div class="cards c2"><div class="cd grn"><h3>Weekly, against a seasonal baseline</h3><p>Per segment: processor, country, card type, merchant category. Drift is only visible against the same week last year or a stable control.</p></div><div class="cd grn"><h3>An owner for the number</h3><p>Approval rate is a business metric with an owner in payments operations, reviewed weekly with the processor.</p></div></div>
+</div>
+<!-- v-148 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“I watch the money, not the servers: approval rate per processor and segment against its baseline, the count and age of unknown outcomes, outbox age, unreconciled amount by age, and a continuous check that the ledger sums to zero, which pages immediately. Then I read metrics in pairs to tell ‘the processor changed’ from ‘we broke’.”</div>
+</div>
+<!-- v-149 card Build cost -->
+<div class="slide th aux">
+<div class="lbl">Chapter 8 of 9</div><div class="s">Build cost</div><div class="sub">The manager layer: people, quarters, buy against build</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="done">Design</span><span class="done">Challenges</span><span class="on">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-150 &lt;div class="k"&gt;Build cost · the releases -->
+<div class="slide aux">
+<div class="k">Build cost · the releases</div><h1>V1 bought, V2 built, V3 run</h1><table class="bt sm"><tr><th>Release</th><th>Scope</th><th>People × time</th><th>Label</th></tr><tr class=""><td><b>V1</b></td><td>a processor with its hosted payment page and token vault; our orders, their records</td><td>3 engineers × 1 quarter</td><td>illustrative</td></tr><tr class=""><td><b>V2</b></td><td>idempotency, the state machine, the journal</td><td>5–6 engineers × 2 quarters</td><td>illustrative</td></tr><tr class=""><td><b>V3</b></td><td>outbox, inquiry, reconciliation, a second processor</td><td>two teams × 2–3 quarters, plus finance ops</td><td>illustrative</td></tr></table><div class="line a">V1 keeps card data out of our scope entirely. That is worth more than any of our code.</div>
+</div>
+<!-- v-151 &lt;div class="k"&gt;Build cost · the one-way  -->
+<div class="slide aux">
+<div class="k">Build cost · the one-way doors</div><h1>Two decisions that outlive everyone in the room</h1><div class="cards c2"><div class="cd red"><h3>The ledger schema</h3><p>Seven years of records and every auditor depend on it. Changing it is a migration of history.</p></div><div class="cd red"><h3>The idempotency contract</h3><p>Every merchant integration encodes it. Changing retention or semantics breaks clients you do not control.</p></div></div><div class="line a">These get the most review. Everything else can be changed in a quarter.</div>
+</div>
+<!-- v-152 &lt;div class="k"&gt;Build cost · team seams&lt;/ -->
+<div class="slide aux">
+<div class="k">Build cost · team seams</div><h1>Four teams, and one of them owns the ledger</h1><table class="bt sm"><tr><th>Team</th><th>Owns</th><th>Contract with the others</th></tr><tr class=""><td>Payments API and state machine</td><td>keys, states, the deadline</td><td>the public API and webhook schema</td></tr><tr class=""><td><b>Ledger</b></td><td>accounts, postings, projections</td><td>posting API; reviews every new transaction type</td></tr><tr class=""><td>Processor integrations</td><td>adapters, references, error taxonomy</td><td>one internal interface per processor</td></tr><tr class=""><td>Reconciliation and finance tooling</td><td>expectations, breaks, the console</td><td>break types and ageing targets</td></tr></table>
+</div>
+<!-- v-153 &lt;div class="k"&gt;Build cost · risks&lt;/div&gt;&lt; -->
+<div class="slide aux">
+<div class="k">Build cost · risks</div><h1>What would make this late or wrong</h1><div class="cards c3"><div class="cd red"><h3>An untested unknown path</h3><p>It runs rarely, so it breaks quietly. Inject timeouts in staging every day.</p></div><div class="cd amb"><h3>Reconciliation built last</h3><p>Then the first months of breaks are found by finance, by hand.</p></div><div class="cd amb"><h3>A second processor without inquiry</h3><p>Its unknowns can only be resolved a day late.</p></div></div>
+</div>
+<!-- v-154 &lt;div class="k"&gt;Build cost · cost&lt;/div&gt;&lt;h -->
+<div class="slide aux">
+<div class="k">Build cost · cost</div><h1>Fees, not servers</h1><table class="bt sm"><tr><th>Item</th><th>Size</th><th>Label</th></tr><tr class=""><td>Processor fees</td><td>a percentage of every payment's value</td><td>dominant</td></tr><tr class=""><td>Database cluster for the journal</td><td>~580 TB over seven years, hot and cold</td><td>illustrative</td></tr><tr class=""><td>People</td><td>two teams plus finance operations</td><td>illustrative</td></tr></table><div class="line a">The engineering levers on cost: routing between processors, and fewer false declines.</div>
+</div>
+<!-- v-155 card Recap -->
+<div class="slide th">
+<div class="lbl">Chapter 9 of 9</div><div class="s">Recap</div><div class="sub">One picture, five paths, the mistakes, the thesis</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="done">Design</span><span class="done">Challenges</span><span class="done">Cost · AUX</span><span class="on">Recap</span></div>
+</div>
+<!-- v-156 &lt;div class="k"&gt;Recap&lt;/div&gt;&lt;h1&gt;The whole  -->
+<div class="slide dia">
+<div class="k">Recap</div><h1>The whole design on one baseline</h1><p class="chips">key first<i>·</i>UNKNOWN<i>·</i>journal<i>·</i>outbox<i>·</i>inquiry<i>·</i>reconciliation</p><figure class="grow"><!--SVG:base-final--></figure>
+</div>
+<!-- v-157 &lt;div class="k"&gt;Recap · one sentence per  -->
+<div class="slide">
+<div class="k">Recap · one sentence per path</div><h1>Five paths</h1><table class="bt"><tr><th>Path</th><th>In one sentence</th></tr><tr class=""><td><b>Pay</b></td><td>key first, attempt committed, call by reference, one transaction for state, entries and event</td></tr><tr class=""><td><b>Adjust</b></td><td>a new transaction, dated now, with the limit in one conditional update</td></tr><tr class=""><td><b>Notify</b></td><td>an outbox row, published at least once, de-duplicated by event ID</td></tr><tr class=""><td><b>Reconcile</b></td><td>expectations from the ledger, matched line by line, every break owned</td></tr><tr class=""><td><b>Explain</b></td><td>a sum over immutable entries</td></tr></table>
+</div>
+<!-- v-158 &lt;div class="k"&gt;Recap · common mistakes i -->
+<div class="slide">
+<div class="k">Recap · common mistakes in this round</div><h1>What costs candidates the most</h1><div class="cards c2"><div class="cd red"><h3>On correctness</h3><p>“A distributed transaction with the bank.” A balance column as the truth. A timeout treated as a failure. Floats. Keys checked instead of inserted. A changed retry silently accepted.</p></div><div class="cd red"><h3>On operations</h3><p>Events published outside the transaction. History edited. No reconciliation, or reconciliation by totals. No owner for breaks. Dashboards with no money on them.</p></div></div>
+</div>
+<!-- v-159 &lt;div class="k"&gt;Recap · the four sentence -->
+<div class="slide">
+<div class="k">Recap · the four sentences</div><h1>If you have thirty seconds</h1><div class="cards c2"><div class="cd"><h3>What</h3><p>A state machine per payment, an idempotent API, an immutable double-entry journal, reconciliation.</p></div><div class="cd amb"><h3>The trade</h3><p>Pending answers and a reconciliation team, in exchange for never guessing.</p></div><div class="cd red"><h3>The risk</h3><p>The unknown path runs rarely; test it daily.</p></div><div class="cd grn"><h3>Next</h3><p>Harden inquiry per processor; make breaks an owned, aged workflow.</p></div></div>
+</div>
+<!-- v-160 &lt;div class="lbl"&gt;The thesis, again&lt;/div&gt; -->
+<div class="slide th">
+<div class="lbl">The thesis, again</div><div class="s">I can't get exactly-once across the boundary, so I get <em>one effect per intent</em>, a state for <em>not knowing</em>, and books I can <em>explain</em> and <em>reconcile</em>.</div>
 </div>
 </body></html>

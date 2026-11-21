@@ -1,830 +1,703 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
-<title>SD-08 news feed video slides v2</title>
+<title>SD-08 news feed: slides</title>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="deck.css">
 <link rel="stylesheet" href="video.css">
 </head><body>
-<!-- v3 2026-10-29 (the author's review of v2: terms, Chen ERD, wide-column, outbox/CDC, ranking API, per-path C4 → sequence → code); v2: Staff L6/L7 depth; slide numbers from video.css; class="aux" = EM layer, optional. -->
-
-<!-- 1 -->
+<!-- v-001 card Cold open -->
 <div class="slide th">
-  <div class="lbl">Mock system design round · Staff engineer, L6 / L7 · FAANG and top-tier bar</div>
-  <div class="s">The news feed:<br>how the round could go.</div>
-  <div class="sub">A billion users, a ranked home feed in two hundred milliseconds. Maximum technical depth; the EM layer is marked AUX.</div>
-  <div class="foot"><span>design-room · SD-08 · v3</span><span>interviewer · candidate · coach</span></div>
+<div class="lbl">Chapter 0 of 9</div><div class="s">Cold open</div><div class="sub">Design the home feed for a social network</div><div class="ribbon"><span class="">Requirements</span><span class="">Estimates</span><span class="">Theory</span><span class="">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
 </div>
-
-<!-- 2 -->
-<div class="slide">
-<div class="k">Before you start</div>
-<h1>What a Staff panel weighs most</h1>
-<div class="cards c3">
-<div class="cd red"><h3>Depth on the crux</h3><p>Fan-out tiers, the threshold arithmetic, timeline structures, rebuild under stampede.</p></div>
-<div class="cd"><h3>Trade-offs, justified</h3><p>Every store and transport against its rejected alternatives, with numbers.</p></div>
-<div class="cd grn"><h3>Correctness stance</h3><p>Deletes, blocks, duplicates, stable pagination: where each guarantee lives.</p></div>
-</div>
-<div class="line a">Slides marked AUX are the EM layer: say them in a manager loop; skip them in a Staff round.</div>
-<div class="foot"><span>News feed · mock round</span><span>levels: staff = L6 · principal = L7</span></div>
-</div>
-
-<!-- 3 -->
+<!-- v-002 &lt;div class="who"&gt;Interviewer · the promp -->
 <div class="slide qs">
-<div class="who">Interviewer · the prompt</div>
-<div class="qq">"Design the home feed for a social network with a billion users: the ranked list of posts a user sees when they open the app."</div>
-<div class="hint">Ask first. The tail of the follower distribution decides the architecture.</div>
+<div class="who">Interviewer · the prompt</div><div class="qq">“Design the home feed for a social network with a billion users: the ranked list of posts a user sees when they open the app.”</div><div class="pz">Pause and answer before you continue</div>
 </div>
-
-<!-- 4 -->
-<div class="slide">
-<div class="k">Clarify · minutes 0–6</div>
-<h1>Scale and shape</h1>
-<table class="bt"><tr><th>I ask</th><th>They answer</th><th>Why it matters</th></tr>
-<tr><td>Users?</td><td>1 B total, 500 M daily</td><td>read rate, timeline storage</td></tr>
-<tr><td>Read to write?</td><td>reads ~100× posts</td><td>optimise reads, pay on write</td></tr>
-<tr><td>Followers per user?</td><td>average ~200, <b>max 100 M+</b></td><td>the tail decides the design</td></tr>
-</table>
-<div class="line">Asking about the maximum, not the average, is the seniority signal.</div>
-<div class="foot"><span>News feed · clarify</span><span>stage 1</span></div>
-</div>
-
-<!-- 5 -->
-<div class="slide">
-<div class="k">Clarify · minutes 0–6</div>
-<h1>Latency, ranking, freshness</h1>
-<table class="bt"><tr><th>I ask</th><th>They answer</th><th>Why it matters</th></tr>
-<tr><td>Latency?</td><td>p99 under 200 ms</td><td>ranking and hydration fit inside it</td></tr>
-<tr><td>Ranked?</td><td>yes; a scoring service exists</td><td>ranking is a stage, not the problem</td></tr>
-<tr><td>Freshness?</td><td>seconds for close follows</td><td>async fan-out is fine</td></tr>
-<tr><td>Depth?</td><td>first ~50, then pages</td><td>bounded timelines</td></tr>
-</table>
-<div class="foot"><span>News feed · clarify</span><span>stage 1</span></div>
-</div>
-
-<!-- 6 -->
-<div class="slide">
-<div class="k">Clarify · the question to ask</div>
-<h1>"Which is worse: seeing a post twice, or missing one?"</h1>
-<div class="cards c2">
-<div class="cd grn"><h3>In scope</h3><p>Publish, build and serve the feed, pagination, follow and unfollow, deletes and blocks.</p></div>
-<div class="cd amb"><h3>Out, said aloud</h3><p>The ranking model, ads, media upload, search, notifications.</p></div>
-</div>
-<div class="line">Usually: dedup on read, tolerate a rare miss.</div>
-<div class="foot"><span>News feed · scope</span><span>stage 1</span></div>
-</div>
-
-<!-- 7 -->
-<div class="slide">
-<div class="k">Five terms used all round · defined once</div>
-<h1>The vocabulary of a feed</h1>
-<table class="bt sm"><tr><th>Term</th><th>What it means</th><th>Here</th></tr>
-<tr><td><b>Fan-out</b> on write · push</td><td>when a post is made, copy its ID into every follower's timeline</td><td>normal authors</td></tr>
-<tr><td><b>Fan-in</b> on read · pull</td><td>when a feed is opened, gather recent posts from everyone followed</td><td>celebrities</td></tr>
-<tr><td><b>Timeline</b></td><td>a per-user, precomputed list of post IDs, newest first</td><td>Redis sorted set</td></tr>
-<tr><td><b>Hydration</b></td><td>turning post IDs into full posts with one multi-get</td><td>top 50 per open</td></tr>
-<tr><td><b>The tail</b></td><td>the few accounts at the extreme end of a distribution</td><td>100 M followers</td></tr>
-</table>
-<div class="foot"><span>News feed · terms</span><span>stage 1</span></div>
-</div>
-
-<!-- 8 -->
+<!-- v-003 &lt;div class="k"&gt;Why it is harder than it  -->
 <div class="slide dia">
-<div class="k">Terms · push against pull</div>
-<h1>Push pays when posting; pull pays when reading</h1>
-<figure class="grow"><!--SVG:push-pull--></figure>
-<div class="foot"><span>News feed · terms</span><span>stage 1</span></div>
+<div class="k">Why it is harder than it looks</div><h1>A few accounts carry most of the write cost</h1><p class="chips">median ~200 followers<i>·</i>the largest: 110 million<i>·</i>one post, one insert per follower</p><figure class="grow"><!--SVG:tail--></figure>
 </div>
-
-<!-- 9 -->
-<div class="slide dia">
-<div class="k">Terms · "the tail decides the design"</div>
-<h1>A few accounts carry most of the write cost</h1>
-<figure class="grow"><!--SVG:tail--></figure>
-<div class="foot"><span>News feed · the tail</span><span>stage 1</span></div>
+<!-- v-004 &lt;div class="k"&gt;Before the design&lt;/div&gt;&lt;h -->
+<div class="slide">
+<div class="k">Before the design</div><h1>What this question grades</h1><table class="bt sm sig"><tr><th>Axis</th><th>Weak signal</th><th>Strong signal</th></tr><tr class=""><td><b>Requirements</b></td><td>“Posts from friends, sorted by time”</td><td>Asks the follower distribution and finds the tail; asks “twice or never: which is worse?”; numbers on freshness and latency</td></tr><tr class=""><td><b>Correctness</b></td><td>Copies of posts treated as the truth</td><td>IDs only, hydrated from the source; filters on read; idempotent inserts; a stable cursor</td></tr><tr class=""><td><b>Trade-offs</b></td><td>Picks push or pull and defends it</td><td>The hybrid with a threshold derived from arithmetic, and what it costs</td></tr><tr class=""><td><b>Depth</b></td><td>Stops at “add a cache”</td><td>Crossing the threshold with no backfill; rebuild under a stampede; ranking under a deadline</td></tr><tr class=""><td><b>Operations</b></td><td>Uptime of the feed API</td><td>Freshness as an SLI from synthetic accounts; quality metrics; the memory bill and its lever</td></tr></table><div class="grade"><b class="t">Coach · what is graded here</b>The word “hybrid” earns nothing on its own. The line, the arithmetic behind it and the crossing rules do.</div>
 </div>
-
-<!-- 10 -->
+<!-- v-005 &lt;div class="lbl"&gt;The thesis&lt;/div&gt;&lt;div cl -->
 <div class="slide th">
-  <div class="lbl">Key line · land it by minute twelve</div>
-  <div class="s">Push for most accounts. <em>Pull for celebrities.</em></div>
-  <div class="sub">Neither fan-out on write nor fan-out on read works alone. The answer is a hybrid with a stated threshold.</div>
-  <div class="foot"><span>News feed · the thesis</span><span>key line</span></div>
+<div class="lbl">The thesis</div><div class="s">Push IDs for ordinary accounts, <em>pull</em> the celebrities, say <em>where the line is</em> and why, and keep every correctness rule <em>on the read path</em>.</div>
 </div>
-
-<!-- 11 -->
+<!-- v-006 &lt;div class="k"&gt;The order I will follow&lt;/ -->
 <div class="slide">
-<div class="k">Non-functional targets</div>
-<h1>Four numbers to design against</h1>
-<div class="tiles">
-<div class="tile"><b>200 ms</b><span>feed load, p99</span></div>
-<div class="tile blue"><b>5 s</b><span>post visible to followers, p95</span></div>
-<div class="tile blue"><b>99.95%</b><span>read availability</span></div>
-<div class="tile"><b>seconds</b><span>deleted or blocked content gone</span></div>
+<div class="k">The order I will follow</div><h1>Scope, numbers, theory, a simple design, then I break it</h1><div class="ribbon" style="margin-top:14pt"><span>Requirements</span><span>Estimates</span><span>Theory</span><span>API + data</span><span>Design</span><span>Challenges</span><span>Cost · AUX</span><span>Recap</span></div><div class="cards c3" style="margin-top:18pt"><div class="cd"><h3>First</h3><p>Requirements and scope. Numbers. A short theory chapter.</p></div><div class="cd grn"><h3>Then</h3><p>API and data. A design in three versions, each answering the objection to the one before.</p></div><div class="cd red"><h3>Most of the time</h3><p>Eight challenges that break it. A build cost. A recap.</p></div></div>
 </div>
-<div class="foot"><span>News feed · targets</span><span>stage 1</span></div>
-</div>
-
-<!-- 12 -->
-<div class="slide">
-<div class="k">Estimation · minutes 6–11 · show the arithmetic</div>
-<h1>Reads, writes and fan-out</h1>
-<table class="bt sm"><tr><th>Quantity</th><th>Arithmetic</th><th>Result</th><th>Consequence</th></tr>
-<tr><td>Feed reads</td><td class="calc">500 M DAU × 5 opens ÷ 86,400 s; × 3 peak</td><td><b>~29 k/s · ~75 k/s</b></td><td>served from caches</td></tr>
-<tr><td>Posts</td><td class="calc">500 M × 0.1 per day ÷ 86,400 s</td><td><b>~600/s</b></td><td>writes are small…</td></tr>
-<tr><td>Fan-out</td><td class="calc">600 posts/s × 200 followers</td><td><b>~120 k inserts/s</b></td><td>…but multiplied 200×</td></tr>
-<tr><td>Active only</td><td class="calc">skip followers idle 30+ days (≈ half)</td><td><b>~60 k inserts/s</b></td><td>the biggest cost lever</td></tr>
-</table>
-<div class="foot"><span>News feed · estimation</span><span>stage 2</span></div>
-</div>
-
-<!-- 13 -->
-<div class="slide">
-<div class="k">Estimation · the tail and the memory</div>
-<h1>The celebrity, and why IDs, not bodies</h1>
-<table class="bt sm"><tr><th>Quantity</th><th>Arithmetic</th><th>Result</th></tr>
-<tr><td>One celebrity post</td><td class="calc">1 post × 100 M followers ÷ 1 M inserts/s</td><td><b>100 M writes · ~100 s</b></td></tr>
-<tr><td>Timeline payload</td><td class="calc">500 M users × 500 entries × 16 B</td><td><b>~4 TB</b> · ~12 TB × 3 replicas</td></tr>
-<tr><td>Bodies instead</td><td class="calc">500 M × 500 × ~1 KB</td><td><b>~250 TB</b>: 60× more</td></tr>
-<tr><td>Hydration</td><td class="calc">75 k opens/s × 50 posts × ~1 KB</td><td><b>~3.75 GB/s</b> from the post cache</td></tr>
-<tr><td>Latency budget</td><td class="calc">5 + 5 + ≤ 80 + 20 ms</td><td><b>~110 ms p50</b>, &lt; 200 p99</td></tr>
-</table>
-<div class="foot"><span>News feed · estimation</span><span>stage 2</span></div>
-</div>
-
-<!-- 14 -->
+<!-- v-007 card Requirements and scope -->
 <div class="slide th">
-  <div class="lbl">Estimation · the number that matters</div>
-  <div class="s">One celebrity post: <em>a hundred million writes</em>.</div>
-  <div class="sub">About a hundred seconds even at a million inserts a second. And celebrities post often. Pure fan-out on write is dead.</div>
-  <div class="foot"><span>News feed · estimation</span><span>key number</span></div>
+<div class="lbl">Chapter 1 of 9</div><div class="s">Requirements and scope</div><div class="sub">Ask first. Cut on purpose. Put numbers on it.</div><div class="ribbon"><span class="on">Requirements</span><span class="">Estimates</span><span class="">Theory</span><span class="">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
 </div>
-
-<!-- 15 -->
-<div class="slide dia">
-<div class="k">Estimation · where the load lands</div>
-<h1>Each layer, with the formula that sizes it</h1>
-<figure class="grow"><!--SVG:load-funnel--></figure>
-<div class="foot"><span>News feed · load funnel</span><span>stage 2</span></div>
-</div>
-
-<!-- 16 -->
-<div class="slide">
-<div class="k">API · minutes 11–17</div>
-<h1>Four calls</h1>
-<pre class="big">POST   /v1/posts  {text, mediaIds[], idempotencyKey}   → {postId}
-GET    /v1/feed?cursor=…&amp;limit=50                       → {items[], nextCursor}
-POST   /v1/follows/{userId}     DELETE /v1/follows/{userId}
-DELETE /v1/posts/{postId}</pre>
-<div class="foot"><span>News feed · API</span><span>stage 3</span></div>
-</div>
-
-<!-- 17 -->
-<div class="slide">
-<div class="k">API · publishing · request and response</div>
-<h1>The post is written once; everything else is derived</h1>
-<div class="cols2">
-<pre class="wire">POST /v1/posts
-Idempotency-Key: 9c1f…
-{ "text": "Kickoff at 8!",
-  "mediaIds": [77120031],
-  "visibility": "FOLLOWERS" }
-
-201 Created
-{ "postId": "1790551203384426496",
-  "createdAt": "2026-10-29T10:00:00Z" }</pre>
-<pre class="wire">PostCreated (Kafka, key = authorId)
-{ "eventId": "e-55a1",
-  "postId": 1790551203384426496,
-  "authorId": 48213,
-  "authorTier": "NORMAL",   // or MID, CELEB
-  "ts": 1792130400000 }
-
--- one transaction: posts row + outbox row</pre>
-</div>
-<div class="line">A retried tap with the same key returns the same postId: never two posts.</div>
-<div class="foot"><span>News feed · API · publish</span><span>stage 3</span></div>
-</div>
-
-<!-- 18 -->
-<div class="slide">
-<div class="k">API · reading the feed · request and response</div>
-<h1>A cursor encodes where you stopped, not how far you got</h1>
-<div class="cols2">
-<pre class="wire">GET /v1/feed?limit=50&amp;cursor=eyJzIjo…
-
-200 OK
-{ "items": [
-   { "postId": "1790551203384426496",
-     "author": {"id": 48213, "name": "…"},
-     "text": "Kickoff at 8!",
-     "media": ["https://cdn…/77120031.jpg"],
-     "rankScore": 0.913,
-     "createdAt": "2026-10-29T10:00:00Z" },
-   … 49 more ],
-  "nextCursor": "eyJzIjowLjQx…",
-  "ranking": "MODEL" }   // or RECENCY fallback</pre>
-<pre class="wire">nextCursor, decoded (base64 JSON, HMAC-signed)
-{ "s":  0.4117,          // score of last item
-  "id": 1790549…,        // tie-break: postId
-  "v":  3,               // ranking version
-  "gen": 1792130400 }    // candidate snapshot
-
-offset pagination: new posts at the top
-shift page 2 → skips and repeats</pre>
-</div>
-<div class="foot"><span>News feed · API · feed</span><span>stage 3</span></div>
-</div>
-
-<!-- 19 -->
-<div class="slide">
-<div class="k">API · pagination</div>
-<h1>A cursor, not an offset</h1>
-<div class="cards c2">
-<div class="cd red"><h3>Offset</h3><p>New posts arrive at the top; page two skips or repeats items.</p></div>
-<div class="cd grn"><h3>Cursor: (score, postId)</h3><p>The last item seen. Stable while the feed moves.</p></div>
-</div>
-<div class="foot"><span>News feed · API</span><span>stage 3</span></div>
-</div>
-
-<!-- 20 -->
-<div class="slide">
-<div class="k">API · the ranking service we call · request and response</div>
-<h1>We send IDs and a deadline; ranking returns scores</h1>
-<div class="cols2">
-<pre class="wire">POST /rank/v2/score      (internal RPC)
-X-Deadline-Ms: 80
-{ "viewerId": 7731,
-  "surface": "HOME_FEED",
-  "candidates": [
-    { "postId": 1790551203384426496,
-      "authorId": 48213,
-      "createdAt": 1792130400000,
-      "source": "TIMELINE" },  // or CELEB
-    … 199 more ],
-  "limit": 50 }</pre>
-<pre class="wire">200 OK
-{ "scored": [
-    { "postId": 1790551203384426496,
-      "score": 0.913 },
-    … 49 more ],
-  "modelVersion": "feed-v41",
-  "partial": false }
-
-<span class="cm">ranking reads its own features</span>
-<span class="cm">(engagement, affinity) by ID;</span>
-<span class="cm">we never send post bodies.</span></pre>
-</div>
-<div class="line">Deadline exceeded: we sort by time and say so in the response, "ranking": "RECENCY".</div>
-<div class="foot"><span>News feed · API · ranking</span><span>stage 3</span></div>
-</div>
-
-<!-- 21 -->
-<div class="slide dia">
-<div class="k">Data model · conceptual · Chen notation</div>
-<h1>Users author posts, follow and block users; timelines are derived</h1>
-<figure class="grow"><!--SVG:erd-chen--></figure>
-<div class="foot"><span>News feed · data · conceptual ERD</span><span>stage 3</span></div>
-</div>
-
-<!-- 22 -->
-<div class="slide dia">
-<div class="k">Data model · physical · tables</div>
-<h1>The same model as tables: keys, indexes, partitioning</h1>
-<figure class="grow"><!--SVG:erd--></figure>
-<div class="foot"><span>News feed · data · ERD</span><span>stage 3</span></div>
-</div>
-
-<!-- 23 -->
-<div class="slide dia">
-<div class="k">Data model · what "wide-column" means</div>
-<h1>A partition per author, rows sorted by time inside it</h1>
-<figure class="grow"><!--SVG:wide-column--></figure>
-<div class="foot"><span>News feed · data · wide-column</span><span>stage 3</span></div>
-</div>
-
-<!-- 24 -->
-<div class="slide dia">
-<div class="k">Data model · the cache tier · how keys point at each other</div>
-<h1>Six Redis keys; a member of one names another</h1>
-<figure class="grow"><!--SVG:redis-keys--></figure>
-<div class="foot"><span>News feed · data · Redis</span><span>stage 3</span></div>
-</div>
-
-<!-- 25 -->
-<div class="slide dia">
-<div class="k">Data model · the cache tier · where each key comes from</div>
-<h1>Four writers, each driven by an event or a read</h1>
-<figure class="grow"><!--SVG:redis-writers--></figure>
-<div class="foot"><span>News feed · data · Redis writers</span><span>stage 3</span></div>
-</div>
-
-<!-- 26 -->
-<div class="slide">
-<div class="k">Data model · the summary</div>
-<h1>Six stores, one job each</h1>
-<table class="bt sm"><tr><th>Store</th><th>Holds</th><th>Technology</th><th>Lose it?</th></tr>
-<tr><td><b>Posts</b></td><td>source of truth, Snowflake ID</td><td>wide-column, by post_id</td><td>never: replicated</td></tr>
-<tr><td><b>Author index</b></td><td>(author, time) → post IDs</td><td>wide-column, by author</td><td>rebuild from posts</td></tr>
-<tr><td><b>Social graph</b></td><td>followers and followees</td><td>another team's service</td><td>theirs</td></tr>
-<tr><td><b>Timelines</b></td><td>~500 (postId, authorId) per user</td><td>Redis ZSET, by user</td><td>rebuild by pull</td></tr>
-<tr><td><b>Celebrity lists</b></td><td>last ~100 IDs per author</td><td>Redis LIST, replicated</td><td>rebuild from index</td></tr>
-<tr><td><b>Post cache</b></td><td>hydrated posts</td><td>Redis HASH</td><td>refill on miss</td></tr>
-</table>
-<div class="foot"><span>News feed · data</span><span>stage 3</span></div>
-</div>
-
-<!-- 27 -->
-<div class="slide">
-<div class="k">Technology · timelines · selected against the alternatives</div>
-<h1>An in-memory sorted set per user</h1>
-<table class="bt sm"><tr><th>Option</th><th>Verdict</th><th>Why</th></tr>
-<tr><td><b>Redis-class ZSET</b>, by user</td><td><b>chosen</b></td><td>bounded, read in one call, ZADD idempotent; loss costs latency, not data</td></tr>
-<tr><td>Cassandra wide row per user</td><td>rejected</td><td>disk reads and compaction on a 75 k/s hot path; tombstones from trimming</td></tr>
-<tr><td>Memcached blob per user</td><td>rejected</td><td>read-modify-write of a 500-entry blob on every insert: races, no ordering</td></tr>
-<tr><td>No timeline (pure pull)</td><td>phase 1 only</td><td>merging ~200 author indexes per open breaks 200 ms at scale</td></tr>
-</table>
-<div class="foot"><span>News feed · technology</span><span>stage 5</span></div>
-</div>
-
-<!-- 28 -->
-<div class="slide">
-<div class="k">Technology · posts and the author index · selected against the alternatives</div>
-<h1>A sharded store keyed by a time-sortable ID</h1>
-<table class="bt sm"><tr><th>Option</th><th>Verdict</th><th>Why</th></tr>
-<tr><td><b>Wide-column</b> (Cassandra / Bigtable)</td><td><b>chosen</b></td><td>append-heavy, (author, time) range scans for pull and rebuild, linear scale</td></tr>
-<tr><td>Sharded MySQL / PostgreSQL</td><td>viable</td><td>works with an author index table; resharding is the operational cost</td></tr>
-<tr><td>DynamoDB</td><td>viable</td><td>same model managed; hot authors need write sharding of the partition key</td></tr>
-<tr><td>One relational DB</td><td>rejected</td><td>600 posts/s is fine, but ~50 PB of history and 3.75 GB/s hydration are not</td></tr>
-</table>
-<div class="foot"><span>News feed · technology</span><span>stage 5</span></div>
-</div>
-
-<!-- 29 -->
-<div class="slide">
-<div class="k">Technology · fan-out transport · selected against the alternatives</div>
-<h1>Outbox → partitioned log → workers</h1>
-<table class="bt sm"><tr><th>Option</th><th>Verdict</th><th>Why</th></tr>
-<tr><td><b>Kafka, key = authorId</b></td><td><b>chosen</b></td><td>absorbs bursts, replayable for rebuilds, many consumers (search, notifications)</td></tr>
-<tr><td>Synchronous fan-out in the post call</td><td>rejected</td><td>a 2,000-follower post would take seconds; one slow shard fails the post</td></tr>
-<tr><td>SQS-style queue</td><td>rejected</td><td>no replay, no second consumer group without copying</td></tr>
-<tr><td>Dual write post + publish</td><td>rejected</td><td>a crash between them loses the event: followers never see the post</td></tr>
-</table>
-<div class="foot"><span>News feed · technology</span><span>stage 5</span></div>
-</div>
-
-<!-- 30 -->
-<div class="slide dia">
-<div class="k">Architecture · C4 level 1 · system context</div>
-<h1>Authors write, readers open, ranking and the graph are someone else's</h1>
-<figure class="grow"><!--SVG:c4-context--></figure>
-<div class="foot"><span>News feed · C4 context</span><span>stage 4</span></div>
-</div>
-
-<!-- 31 -->
-<div class="slide dia">
-<div class="k">Architecture · C4 level 2 · the write path</div>
-<h1>Post, outbox, log, fan-out into bounded timelines</h1>
-<figure class="grow"><!--SVG:c4-containers-write--></figure>
-<div class="foot"><span>News feed · containers</span><span>stage 4</span></div>
-</div>
-
-<!-- 32 -->
-<div class="slide">
-<div class="k">Write path · two patterns, used together</div>
-<h1>Outbox decides what to publish; CDC carries it out</h1>
-<div class="cards c2">
-<div class="cd red"><h3>Transactional outbox</h3><p>The event is a row in an <b>outbox</b> table, written in the same transaction as the post. Both commit, or neither.</p></div>
-<div class="cd grn"><h3>CDC · change data capture</h3><p>A connector tails the database's commit log and publishes each new outbox row to Kafka. No polling, no second write.</p></div>
-</div>
-<div class="line">Either alone works small: outbox with a polling relay, or CDC on the posts table, which leaks its schema to every consumer.</div>
-<div class="foot"><span>News feed · outbox and CDC</span><span>stage 4</span></div>
-</div>
-
-<!-- 33 -->
-<div class="slide dia">
-<div class="k">Sequence · publishing the event</div>
-<h1>One transaction; the commit log carries the event out</h1>
-<figure class="grow"><!--SVG:seq-outbox--></figure>
-<div class="foot"><span>News feed · outbox · CDC</span><span>stage 4</span></div>
-</div>
-
-<!-- 34 -->
-<div class="slide dia">
-<div class="k">Sequence · a post by a normal author</div>
-<h1>One transaction, then asynchronous fan-out</h1>
-<figure class="grow"><!--SVG:seq-publish--></figure>
-<div class="foot"><span>News feed · write path</span><span>stage 4</span></div>
-</div>
-
-<!-- 35 -->
-<div class="slide dia">
-<div class="k">Write path · the fan-out worker routes on authorTier</div>
-<h1>The event says which tier; the worker picks the branch</h1>
-<figure class="grow"><!--SVG:fanout-routing--></figure>
-<div class="foot"><span>News feed · fan-out routing</span><span>stage 4</span></div>
-</div>
-
-<!-- 36 -->
-<div class="slide">
-<div class="k r">Write path · code 1 of 2 · route the event</div>
-<h1>One branch per tier, commit the offset last</h1>
-<pre class="code"><span class="kw">def</span> on_post_created(event):
-    <span class="cm"># authorTier was stamped into the event by the post service</span>
-    <span class="kw">if</span> event.author_tier == CELEB:
-        <span class="cm"># one write; readers merge this list at read time</span>
-        redis.lpush(f"celeb:{event.author_id}", event.post_id)
-        redis.ltrim(f"celeb:{event.author_id}", 0, 99)
-    <span class="kw">else</span>:
-        push_to_followers(event)
-
-    <span class="cm"># only after every write succeeded: at-least-once</span>
-    kafka.commit(event.offset)</pre>
-<div class="foot"><span>News feed · fan-out worker</span><span>stage 4</span></div>
-</div>
-
-<!-- 37 -->
-<div class="slide">
-<div class="k r">Write path · code 2 of 2 · push to followers</div>
-<h1>A page of a thousand followers, one round trip</h1>
-<pre class="code"><span class="kw">def</span> push_to_followers(event):
-    <span class="cm"># MID authors reach only followers active today</span>
-    since = today() <span class="kw">if</span> event.author_tier == MID <span class="kw">else</span> today() - 30
-
-    <span class="kw">for</span> page <span class="kw">in</span> graph.followers(event.author_id, page_size=1000):
-        active = [f <span class="kw">for</span> f <span class="kw">in</span> page <span class="kw">if</span> last_seen(f) >= since]
-
-        <span class="cm"># all writes for the page in one round trip; keep newest 500</span>
-        <span class="kw">with</span> redis.pipeline() <span class="kw">as</span> p:
-            <span class="kw">for</span> f <span class="kw">in</span> active:
-                p.zadd(f"timeline:{f}", {event.member: event.ts})
-                p.zremrangebyrank(f"timeline:{f}", 0, -501)</pre>
-<div class="line">Re-delivered event? ZADD of an existing member is a no-op.</div>
-<div class="foot"><span>News feed · fan-out worker</span><span>stage 4</span></div>
-</div>
-
-<!-- 38 -->
-<div class="slide dia">
-<div class="k">Architecture · C4 level 2 · the read path</div>
-<h1>Timeline plus celebrities, ranked, hydrated</h1>
-<figure class="grow"><!--SVG:c4-containers-read--></figure>
-<div class="foot"><span>News feed · containers</span><span>stage 4</span></div>
-</div>
-
-<!-- 39 -->
-<div class="slide dia">
-<div class="k">Sequence · opening the feed</div>
-<h1>Merge, rank inside a deadline, hydrate</h1>
-<figure class="grow"><!--SVG:seq-read--></figure>
-<div class="foot"><span>News feed · read path</span><span>stage 4</span></div>
-</div>
-
-<!-- 40 -->
-<div class="slide">
-<div class="k r">Read path · code 1 of 2 · gather candidates</div>
-<h1>Timeline, plus the celebrities this reader follows</h1>
-<pre class="code"><span class="kw">def</span> gather_candidates(user, cursor):
-    ids = redis.zrevrange(f"timeline:{user}", 0, 499)
-    <span class="kw">if</span> ids <span class="kw">is</span> None:
-        ids = rebuild_by_pull(user)        <span class="cm"># deep dive three</span>
-
-    <span class="cm"># 5–20 lists, one round trip</span>
-    celebs = redis.smembers(f"celebsFollowed:{user}")
-    ids += pipelined(redis.lrange(f"celeb:{a}", 0, 99) <span class="kw">for</span> a <span class="kw">in</span> celebs)
-
-    <span class="cm"># blocks and unfollows, enforced here</span>
-    hidden = redis.smembers(f"hide:{user}")
-    ids = [i <span class="kw">for</span> i <span class="kw">in</span> unique(ids) <span class="kw">if</span> i.author <span class="kw">not in</span> hidden]
-    <span class="kw">return</span> newest(ids, 200, older_than=cursor)</pre>
-<div class="foot"><span>News feed · feed service</span><span>stage 4</span></div>
-</div>
-
-<!-- 41 -->
-<div class="slide">
-<div class="k r">Read path · code 2 of 2 · rank and hydrate</div>
-<h1>Rank inside a deadline; drop what was deleted</h1>
-<pre class="code"><span class="kw">def</span> feed(user, cursor):
-    candidates = gather_candidates(user, cursor)
-    <span class="cm"># degrade, never fail</span>
-    <span class="kw">try</span>:
-        ranked = ranking.score(user, candidates, deadline_ms=80)
-    <span class="kw">except</span> Timeout:
-        ranked = sorted_by_time(candidates)
-
-    <span class="cm"># hydration: 50 IDs → 50 posts, one multi-get</span>
-    top = ranked[:50]
-    posts = redis.mget([f"post:{c.post_id}" <span class="kw">for</span> c <span class="kw">in</span> top])
-    posts = [p <span class="kw">for</span> p <span class="kw">in</span> posts <span class="kw">if</span> p <span class="kw">and not</span> p.deleted]
-
-    <span class="kw">return</span> posts, encode_cursor(top[-1])</pre>
-<div class="foot"><span>News feed · feed service</span><span>stage 4</span></div>
-</div>
-
-<!-- 42 -->
-<div class="slide">
-<div class="k">The latency budget</div>
-<h1>~110 ms at the median, under 200 at p99</h1>
-<div class="tiles">
-<div class="tile blue"><b>~5 ms</b><span>timeline read</span></div>
-<div class="tile blue"><b>~5 ms</b><span>celebrity merge</span></div>
-<div class="tile"><b>≤ 80 ms</b><span>ranking, hard deadline</span></div>
-<div class="tile blue"><b>~20 ms</b><span>hydrate the top 50</span></div>
-</div>
-<div class="line">If ranking is late, serve recency order. Degrade, don't fail.</div>
-<div class="foot"><span>News feed · budget</span><span>stage 4</span></div>
-</div>
-
-<!-- 43 -->
+<!-- v-008 &lt;div class="who"&gt;Clarifying question 1 o -->
 <div class="slide qs">
-<div class="who">Interviewer · deep dive one</div>
-<div class="qq">"Someone with a hundred million followers posts. Walk me through it."</div>
-<div class="hint">The crux. Name the threshold and the crossing.</div>
+<div class="who">Clarifying question 1 of 8</div><div class="qq">How many users, and how many open the app?</div><div class="ans">1 billion users, 500 million daily active.</div>
 </div>
-
-<!-- 44 -->
-<div class="slide dia">
-<div class="k">Deep dive one · the threshold</div>
-<h1>Three tiers of author</h1>
-<figure class="grow"><!--SVG:fanout-tiers--></figure>
-<div class="foot"><span>News feed · celebrity</span><span>stage 6</span></div>
-</div>
-
-<!-- 45 -->
-<div class="slide dia">
-<div class="k">Sequence · the celebrity post</div>
-<h1>One write on publish, a small merge on read</h1>
-<figure class="grow"><!--SVG:seq-celebrity--></figure>
-<div class="foot"><span>News feed · celebrity</span><span>stage 6</span></div>
-</div>
-
-<!-- 46 -->
-<div class="slide">
-<div class="k r">Deep dive one · why the line is near 10 k–100 k followers</div>
-<h1>Fan-out lag grows with followers; pull cost grows with celebrities followed</h1>
-<table class="bt sm"><tr><th>Followers F</th><th>Push: inserts and lag at 1 M/s</th><th>Pull: cost per reader open</th></tr>
-<tr><td>2,000</td><td class="calc">2 k inserts · 2 ms</td><td class="calc">+1 list read (~0.3 ms pipelined)</td></tr>
-<tr><td>10,000</td><td class="calc">10 k · 10 ms</td><td class="calc">same</td></tr>
-<tr><td>100,000</td><td class="calc">100 k · 100 ms, per post</td><td class="calc">same</td></tr>
-<tr><td>10,000,000</td><td class="calc">10 M · 10 s, and it bursts the workers</td><td class="calc">same</td></tr>
-<tr><td>100,000,000</td><td class="calc">100 M · 100 s per post</td><td class="calc">same: pull wins outright</td></tr>
-</table>
-<div class="line">Push cost scales with F; pull cost is flat per celebrity. The threshold is a config value, measured, not guessed.</div>
-<div class="foot"><span>News feed · celebrity</span><span>stage 6</span></div>
-</div>
-
-<!-- 47 -->
-<div class="slide">
-<div class="k">Deep dive one · crossing the threshold</div>
-<h1>No backfill either way</h1>
-<div class="cards c2">
-<div class="cd red"><h3>Grows past it</h3><p>Mark celebrity. New posts stop fanning out; old entries age out.</p></div>
-<div class="cd grn"><h3>Falls below it</h3><p>Resume fan-out. The read-time merge covers the gap.</p></div>
-</div>
-<div class="foot"><span>News feed · celebrity</span><span>stage 6</span></div>
-</div>
-
-<!-- 48 -->
-<div class="slide th">
-  <div class="lbl">Key line · picking the threshold</div>
-  <div class="s">Where one post's fan-out cost exceeds the <em>extra read cost</em> across its followers.</div>
-  <div class="sub">Start at ten thousand, measure, make it a config value.</div>
-  <div class="foot"><span>News feed · celebrity</span><span>key line</span></div>
-</div>
-
-<!-- 49 -->
-<div class="slide">
-<div class="k">Deep dive · what's in a timeline row</div>
-<h1>Small, bounded, rebuildable</h1>
-<div class="tiles" style="--n:3">
-<div class="tile blue"><b>16–24 B</b><span>(postId, authorId, ts)</span></div>
-<div class="tile blue"><b>~500</b><span>entries; nobody scrolls further from cache</span></div>
-<div class="tile"><b>1 write</b><span>to edit or delete: bodies live once</span></div>
-</div>
-<div class="line">Deeper pages pull from followees' author indexes: slower, rare.</div>
-<div class="foot"><span>News feed · timelines</span><span>stage 6</span></div>
-</div>
-
-<!-- 50 -->
+<!-- v-009 &lt;div class="who"&gt;Clarifying question 2 o -->
 <div class="slide qs">
-<div class="who">Interviewer · deep dive two</div>
-<div class="qq">"A user deletes a post, or blocks someone. That ID is in millions of timelines. Now what?"</div>
-<div class="hint">Don't chase the copies.</div>
+<div class="who">Clarifying question 2 of 8</div><div class="qq">Read to write?</div><div class="ans">Feed reads are about 100 times post writes.</div>
 </div>
-
-<!-- 51 -->
-<div class="slide dia">
-<div class="k">Sequence · delete and block</div>
-<h1>Filter at read time</h1>
-<figure class="grow"><!--SVG:seq-delete--></figure>
-<div class="foot"><span>News feed · deletes</span><span>stage 6</span></div>
-</div>
-
-<!-- 52 -->
-<div class="slide th">
-  <div class="lbl">Key line · deletes and blocks</div>
-  <div class="s">Correctness lives on the <em>read path</em>. Cleanup is cosmetic.</div>
-  <div class="foot"><span>News feed · deletes</span><span>key line</span></div>
-</div>
-
-<!-- 53 -->
-<div class="slide dia">
-<div class="k">Deep dive three · a timeline shard is lost</div>
-<h1>Rebuild by pull, coalesced and rate-limited</h1>
-<figure class="grow"><!--SVG:seq-rebuild--></figure>
-<div class="foot"><span>News feed · rebuild</span><span>stage 6</span></div>
-</div>
-
-<!-- 54 -->
-<div class="slide dia">
-<div class="k">C4 level 3 · inside the feed service</div>
-<h1>Assemble, filter, rank under a deadline, hydrate</h1>
-<figure class="grow"><!--SVG:c4-component-feed--></figure>
-<div class="foot"><span>News feed · component</span><span>stage 6</span></div>
-</div>
-
-<!-- 55 -->
+<!-- v-010 &lt;div class="who"&gt;Clarifying question 3 o -->
 <div class="slide qs">
-<div class="who">Interviewer · a requirement added mid-round</div>
-<div class="qq">"Product wants a 'catch up on the last 48 hours' view, in chronological order."</div>
-<div class="hint">State the delta, and what stays untouched.</div>
+<div class="who">Clarifying question 3 of 8</div><div class="qq">How many accounts does a user follow, and how is it distributed?</div><div class="ans">Average about 200. On the other side: some accounts have over 100 million followers.</div>
 </div>
-
-<!-- 56 -->
+<!-- v-011 &lt;div class="who"&gt;Clarifying question 4 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 4 of 8</div><div class="qq">Latency, and ranked or chronological?</div><div class="ans">p99 under 200 ms for the first page. Ranked; a scoring service exists, treat it as a black box.</div>
+</div>
+<!-- v-012 &lt;div class="who"&gt;Clarifying question 5 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 5 of 8</div><div class="qq">How fresh?</div><div class="ans">Seconds for close follows; a minute is tolerable generally.</div>
+</div>
+<!-- v-013 &lt;div class="who"&gt;Clarifying question 6 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 6 of 8</div><div class="qq">How deep?</div><div class="ans">The first 50 posts on open, paginated after.</div>
+</div>
+<!-- v-014 &lt;div class="who"&gt;Clarifying question 7 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 7 of 8</div><div class="qq">Content?</div><div class="ans">Text and images. Video is out of scope.</div>
+</div>
+<!-- v-015 &lt;div class="who"&gt;Clarifying question 8 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 8 of 8</div><div class="qq">Which is worse: seeing a post twice, or missing one?</div><div class="ans">Missing a close friend's post is worse. A duplicate on screen is a bug.</div>
+</div>
+<!-- v-016 &lt;div class="k"&gt;Requirements · functional -->
+<div class="slide">
+<div class="k">Requirements · functional</div><h1>Four things the system must do</h1><div class="cards c2"><div class="cd"><h3>FR1 · Publish</h3><p>A post with text and images, visible to the author's followers.</p></div><div class="cd"><h3>FR2 · Read</h3><p>The ranked home feed: the first 50, then paginated with a stable cursor.</p></div><div class="cd amb"><h3>FR3 · Follow</h3><p>Follow and unfollow, with effect on the feed.</p></div><div class="cd red"><h3>FR4 · Remove</h3><p>Delete a post, block an account, change a post's audience: gone from every feed within seconds.</p></div></div>
+</div>
+<!-- v-017 &lt;div class="k"&gt;Requirements · non-functi -->
+<div class="slide">
+<div class="k">Requirements · non-functional</div><h1>The numbers, and what each is for</h1><p class="chips">all initial targets, not measurements</p><div class="tiles" style="--n:4"><div class="tile"><b>200 ms</b><span>feed p99, first page</span></div><div class="tile blue"><b>5 s</b><span>post visible to active followers, p95</span></div><div class="tile"><b>99.95 %</b><span>read availability</span></div><div class="tile red"><b>5 s</b><span>deleted or blocked content gone</span></div></div><div class="line g">And a post is never lost: the source of truth is durable; every feed may be rebuilt from it.</div>
+</div>
+<!-- v-018 &lt;div class="k"&gt;Scope&lt;/div&gt;&lt;h1&gt;In, and ou -->
+<div class="slide">
+<div class="k">Scope</div><h1>In, and out on purpose</h1><div class="cards c2"><div class="cd grn"><h3>In</h3><p>Publish. Build and serve the feed. Pagination. Follow effects. Deletes, blocks and audience. Ranking integration under a budget.</p></div><div class="cd red"><h3>Out, on purpose</h3><p>The ranking model. Ads. Media upload and transcoding. Search. Notifications (SD-12). The graph service internals (SD-14). Like and comment counters.</p></div></div><div class="grade"><b class="t">Coach · what is graded here</b>An explicit out list is a strong signal. Going deep on the ranking model is a rabbit hole the interviewer will redirect.</div>
+</div>
+<!-- v-019 &lt;div class="lbl"&gt;The core&lt;/div&gt;&lt;div clas -->
+<div class="slide th">
+<div class="lbl">The core</div><div class="s">Four things: a <em>source of truth</em> for posts, a <em>per-reader view</em> built by push and pull, a <em>read path</em> inside 200 ms, and a <em>rebuild path</em>.</div>
+</div>
+<!-- v-020 card Estimates -->
+<div class="slide th">
+<div class="lbl">Chapter 2 of 9</div><div class="s">Estimates</div><div class="sub">Every number with its arithmetic, a label, and the decision it drives</div><div class="ribbon"><span class="done">Requirements</span><span class="on">Estimates</span><span class="">Theory</span><span class="">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-021 &lt;div class="k"&gt;Estimates · reads&lt;/div&gt;&lt;h -->
+<div class="slide">
+<div class="k">Estimates · reads</div><h1>Ninety thousand feed opens a second at peak</h1><p class="chips">given → derived</p><div class="fxone"><span class="katex"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mfrac><mrow><mn>500</mn><mtext> </mtext><mtext>M</mtext><mo>×</mo><mn>5</mn><mtext> opens</mtext></mrow><mrow><mn>86</mn><mo separator="true" lspace="0em" rspace="0em">,</mo><mn>400</mn><mtext> s</mtext></mrow></mfrac><mo>≈</mo><mn>29</mn><mo separator="true" lspace="0em" rspace="0em">,</mo><mn>000</mn><mi mathvariant="normal">/</mi><mtext>s</mtext><mspace width="1em"/><mo>×</mo><mn>3</mn><mtext> peak</mtext><mo>≈</mo><mn>90</mn><mo separator="true" lspace="0em" rspace="0em">,</mo><mn>000</mn><mi mathvariant="normal">/</mi><mtext>s</mtext></mrow><annotation encoding="application/x-tex">\frac{500\,\text{M} \times 5\ \text{opens}}{86{,}400\ \text{s}} \approx 29{,}000/\text{s} \quad\times 3\ \text{peak} \approx 90{,}000/\text{s}</annotation></semantics></math></span></div><div class="strip one"><div class="whyb"><b class="t">Decision</b>Served from memory. A database query per feed open is out from the start.</div></div>
+</div>
+<!-- v-022 &lt;div class="k"&gt;Estimates · the cost of p -->
+<div class="slide">
+<div class="k">Estimates · the cost of pure pull</div><h1>Eighteen million reads a second</h1><p class="chips">derived</p><div class="fxone"><span class="katex"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>90</mn><mo separator="true" lspace="0em" rspace="0em">,</mo><mn>000</mn><mtext> opens/s</mtext><mo>×</mo><mn>200</mn><mtext> followees</mtext><mo>=</mo><mn>18</mn><mtext> million author-index reads/s</mtext></mrow><annotation encoding="application/x-tex">90{,}000\ \text{opens/s} \times 200\ \text{followees} = 18\ \text{million author-index reads/s}</annotation></semantics></math></span></div><div class="strip "><div class="case"><b class="t">Consequence</b>Computing every feed at read time, by merging 200 authors' recent posts, is too expensive at this scale.</div><div class="fixb"><b class="t">But</b>At one percent of this scale it is fine. It is the honest first version.</div></div>
+</div>
+<!-- v-023 &lt;div class="k"&gt;Estimates · writes and fa -->
+<div class="slide">
+<div class="k">Estimates · writes and fan-out</div><h1>Six hundred posts a second become a hundred and twenty thousand inserts</h1><p class="chips">illustrative → derived</p><div class="fxone"><span class="katex"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mfrac><mrow><mn>500</mn><mtext> </mtext><mtext>M</mtext><mo>×</mo><mn>0.1</mn></mrow><mrow><mn>86</mn><mo separator="true" lspace="0em" rspace="0em">,</mo><mn>400</mn></mrow></mfrac><mo>≈</mo><mn>580</mn><mtext> posts/s</mtext><mspace width="2em"/><mn>580</mn><mo>×</mo><mn>200</mn><mo>≈</mo><mn>120</mn><mo separator="true" lspace="0em" rspace="0em">,</mo><mn>000</mn><mtext> inserts/s</mtext></mrow><annotation encoding="application/x-tex">\frac{500\,\text{M} \times 0.1}{86{,}400} \approx 580\ \text{posts/s} \qquad 580 \times 200 \approx 120{,}000\ \text{inserts/s}</annotation></semantics></math></span></div><div class="strip one"><div class="whyb"><b class="t">Decision</b>Pushing post IDs into followers' lists multiplies writes by 200. Affordable for ordinary authors: a cluster handles it.</div></div>
+</div>
+<!-- v-024 &lt;div class="k"&gt;Estimates · the cheapest  -->
+<div class="slide">
+<div class="k">Estimates · the cheapest win</div><h1>Skip followers who never read</h1><p class="chips">illustrative · to be measured</p><div class="fxone"><span class="katex"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>120</mn><mo separator="true" lspace="0em" rspace="0em">,</mo><mn>000</mn><mo>×</mo><mstyle displaystyle="false" scriptlevel="0"><mfrac><mn>1</mn><mn>2</mn></mfrac></mstyle><mtext> (followers active in 30 days)</mtext><mo>≈</mo><mn>60</mn><mo separator="true" lspace="0em" rspace="0em">,</mo><mn>000</mn><mtext> inserts/s</mtext></mrow><annotation encoding="application/x-tex">120{,}000 \times \tfrac{1}{2}\ \text{(followers active in 30 days)} \approx 60{,}000\ \text{inserts/s}</annotation></semantics></math></span></div><div class="strip one"><div class="whyb"><b class="t">Decision</b>Fan out only to followers active in the last 30 days. A returning user's feed is rebuilt by pull on their first open.</div></div>
+</div>
+<!-- v-025 &lt;div class="k"&gt;Estimates · the number th -->
+<div class="slide">
+<div class="k">Estimates · the number that matters</div><h1>One celebrity post</h1><p class="chips">derived</p><div class="fxone"><span class="katex"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>1.1</mn><mo>×</mo><mn>1</mn><msup><mn>0</mn><mn>8</mn></msup><mtext> followers</mtext><mo>÷</mo><mn>120</mn><mo separator="true" lspace="0em" rspace="0em">,</mo><mn>000</mn><mtext> inserts/s</mtext><mo>≈</mo><mn>900</mn><mtext> s</mtext><mo>≈</mo><mn>15</mn><mtext> min</mtext></mrow><annotation encoding="application/x-tex">1.1 \times 10^{8}\ \text{followers} \div 120{,}000\ \text{inserts/s} \approx 900\ \text{s} \approx 15\ \text{min}</annotation></semantics></math></span></div><div class="strip "><div class="case"><b class="t">Consequence</b>One post holds the whole fan-out fleet for a quarter of an hour, and everyone else's posts wait behind it.</div><div class="fixb"><b class="t">Decision</b>Pure push dies here. Celebrities are pulled at read time.</div></div>
+</div>
+<!-- v-026 &lt;div class="k"&gt;Estimates · where the lin -->
+<div class="slide">
+<div class="k">Estimates · where the line goes</div><h1>Both sides of the threshold</h1><table class="bt sm"><tr><th>Side</th><th>Arithmetic</th><th>What it says</th></tr><tr class=""><td>Write</td><td>10,000 followers ≈ 0.08 s of the fleet; 1 M followers ≈ 8 s</td><td>above ~10⁵, one post alone misses the 5 s freshness target</td></tr><tr class=""><td>Read</td><td>each pulled author ≈ 0.5 ms; 20 of them ≈ 10 ms</td><td>the average reader must pull only a handful of authors</td></tr><tr class=""><td>Result</td><td>push below ~10⁴–10⁵ followers, pull above</td><td>a config value, tuned with data</td></tr></table><div class="hedge"><b class="t">Label the numbers</b>Illustrative. The shape matters: both sides of the line have a cost, and the line sits where both are acceptable.</div>
+</div>
+<!-- v-027 &lt;div class="k"&gt;Estimates · memory&lt;/div&gt;&lt; -->
 <div class="slide dia">
-<div class="k">Mid-round · the delta</div>
-<h1>Don't distort the cache; go to the source of truth</h1>
-<figure class="grow"><!--SVG:midround-48h--></figure>
-<div class="foot"><span>News feed · mid-round</span><span>stage 7</span></div>
+<div class="k">Estimates · memory</div><h1>Store IDs, not bodies</h1><p class="chips">500 M × 500 × 16 B = 4 TB<i>·</i>× 3 replicas = 12 TB<i>·</i>bodies: ~250 TB</p><figure class="grow"><!--SVG:memory--></figure>
 </div>
-
-<!-- 57 -->
+<!-- v-028 &lt;div class="k"&gt;Estimates · the read budg -->
+<div class="slide dia">
+<div class="k">Estimates · the read budget</div><h1>Two hundred milliseconds, spent on purpose</h1><figure class="grow"><!--SVG:budget--></figure>
+</div>
+<!-- v-029 &lt;div class="k"&gt;Estimates · a lost shard&lt; -->
 <div class="slide">
-<div class="k">Failure modes · minutes 45–50</div>
-<h1>What breaks, and the response</h1>
-<table class="bt"><tr><th>Failure</th><th>Response</th></tr>
-<tr><td><b>Fan-out lag</b></td><td>priority lanes for close friends; alert on lag</td></tr>
-<tr><td><b>Timeline shard lost</b></td><td>pull-rebuild, coalesced, rate-limited</td></tr>
-<tr><td><b>Ranking slow or down</b></td><td>recency fallback inside the deadline</td></tr>
-<tr><td><b>Post-cache stampede</b></td><td>warm caches; shed low-ranked hydration</td></tr>
-<tr><td><b>Viral celebrity</b></td><td>replicate the hot list; client caching</td></tr>
-</table>
-<div class="foot"><span>News feed · failures</span><span>stage 8</span></div>
+<div class="k">Estimates · a lost shard</div><h1>Rebuilds after losing one cache shard</h1><p class="chips">illustrative</p><div class="fxone"><span class="katex"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mfrac><mrow><mn>5</mn><mtext> </mtext><mtext>M users</mtext><mo>×</mo><mn>20</mn><mi mathvariant="normal">%</mi></mrow><mrow><mn>600</mn><mtext> s</mtext></mrow></mfrac><mo>≈</mo><mn>1</mn><mo separator="true" lspace="0em" rspace="0em">,</mo><mn>700</mn><mtext> rebuilds/s</mtext><mo>×</mo><mn>200</mn><mo>≈</mo><mn>340</mn><mo separator="true" lspace="0em" rspace="0em">,</mo><mn>000</mn><mtext> reads/s</mtext></mrow><annotation encoding="application/x-tex">\frac{5\,\text{M users} \times 20\%}{600\ \text{s}} \approx 1{,}700\ \text{rebuilds/s} \times 200 \approx 340{,}000\ \text{reads/s}</annotation></semantics></math></span></div><div class="strip one"><div class="whyb"><b class="t">Decision</b>A rebuild path needs coalescing, a rate limit and a degraded mode. Challenge five.</div></div>
 </div>
-
-<!-- 58 -->
+<!-- v-030 &lt;div class="k"&gt;Estimates · summary&lt;/div&gt; -->
 <div class="slide">
-<div class="k">SLOs and observability</div>
-<h1>Measure freshness, not just uptime</h1>
-<div class="cards c3">
-<div class="cd"><h3>Load</h3><p>Feed success under 200 ms.</p></div>
-<div class="cd red"><h3>Freshness</h3><p>p95 post-to-visible, from synthetic accounts that post and read.</p></div>
-<div class="cd amb"><h3>Silent quality</h3><p>Ranking fallback rate, empty-feed rate, engagement per session.</p></div>
+<div class="k">Estimates · summary</div><h1>Each number, and the decision it drove</h1><table class="bt sm"><tr><th>Number</th><th>Decision</th></tr><tr class=""><td>90,000 opens/s</td><td>serve from memory</td></tr><tr class=""><td>18 M reads/s for pure pull</td><td>precompute for most readers; pull is the MVP and the rebuild path</td></tr><tr class=""><td>120,000 → 60,000 inserts/s</td><td>push IDs to active followers only</td></tr><tr class=""><td>One post, 110 M followers ≈ 15 min</td><td>pull celebrities</td></tr><tr class=""><td>Line at ~10⁴–10⁵ followers</td><td>a config value, measured</td></tr><tr class=""><td>4 TB of IDs against 250 TB of bodies</td><td>IDs in the view; hydrate from one cache</td></tr><tr class=""><td>80 of 200 ms for ranking</td><td>a deadline and a fallback</td></tr></table><div class="grade"><b class="t">Coach · what is graded here</b>A number that never changes a decision is decoration. Each row here ends in a design choice.</div>
 </div>
-<div class="foot"><span>News feed · SLOs</span><span>stage 9</span></div>
+<!-- v-031 card Theory -->
+<div class="slide th theory">
+<div class="lbl">Chapter 3 of 9</div><div class="s">Theory</div><div class="sub">What makes this problem hard, in words that outlive any product name</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="on">Theory</span><span class="">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
 </div>
-
-<!-- 59 -->
+<!-- v-032 &lt;div class="lbl"&gt;Theory · 1 of 6 · what  -->
+<div class="slide th theory">
+<div class="lbl">Theory · 1 of 6 · what it is</div><div class="s">A <em>materialised view</em> per reader: a bounded, ranked list of recent <em>post IDs</em>, part precomputed, part fetched, <em>filtered</em> and hydrated within the budget.</div>
+</div>
+<!-- v-033 &lt;div class="k"&gt;Theory · 1 of 6 · what it -->
+<div class="slide theory">
+<div class="k">Theory · 1 of 6 · what it is not</div><h1>Four things it is confused with</h1><div class="cards c2"><div class="cd"><h3>Not the source of truth</h3><p>Posts are. The view may be wrong for seconds, and can be thrown away and rebuilt.</p></div><div class="cd"><h3>Not a chat inbox</h3><p>An inbox may never lose a message. A feed may leave out an old post, and that is acceptable.</p></div><div class="cd amb"><h3>Not search</h3><p>It answers one query shape: recent, followed, ranked. Another shape needs another path.</p></div><div class="cd red"><h3>Not the ranking model</h3><p>Ranking is a stage with a budget, owned elsewhere.</p></div></div>
+</div>
+<!-- v-034 &lt;div class="k"&gt;Theory · 2 of 6 · the two -->
+<div class="slide theory">
+<div class="k">Theory · 2 of 6 · the two properties</div><h1>State safety and liveness separately</h1><div class="prop safe"><div class="lbl">Safety · must never happen</div><p><b>S1</b> A viewer sees content they must not see (deleted, from a blocked account, outside its audience) for longer than 5 s.<br><b>S2</b> A post is lost: the source of truth is durable even if every view is lost.</p></div><div class="prop live"><div class="lbl">Liveness · must eventually happen</div><p><b>L1</b> A post reaches its active followers' feeds within 5 s, p95.<br><b>L2</b> Every feed open answers within 200 ms, degraded if it must.<br><b>L3</b> A lost or skipped timeline is rebuilt on its next open.</p></div>
+</div>
+<!-- v-035 &lt;div class="k"&gt;Theory · 3 of 6 · the cen -->
+<div class="slide dia theory">
+<div class="k">Theory · 3 of 6 · the central tension</div><h1>Write amplification against read cost</h1><figure class="grow"><!--SVG:tension--></figure>
+</div>
+<!-- v-036 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 1 of 7</div><h1>Fan-out on write into bounded ID lists</h1><div class="prop live"><div class="lbl">Property it protects</div><p>L1 and L2: fresh, and one read per open.</p></div><div class="prop"><div class="lbl">How it works</div><p>On each post, insert (post ID, author, time) into each active follower's sorted list, trimmed to 500. Keyed by post ID, so a repeat is a no-op.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>A feed open that touches 200 authors; duplicate entries when an event is delivered twice.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>120,000 inserts a second, a memory tier, and amplification on big authors.</p></div>
+</div>
+<!-- v-037 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 2 of 7</div><h1>Fan-out on read from author indexes</h1><div class="prop live"><div class="lbl">Property it protects</div><p>L2 for celebrities, and L3: rebuild.</p></div><div class="prop"><div class="lbl">How it works</div><p>At read time, read each pulled author's recent post IDs from a per-author index, and merge. The same path rebuilds a lost timeline and answers catch-up.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>A hundred million writes for one post; a lost view staying lost.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>A merge per read. The author indexes must be fast, and protected from a stampede.</p></div>
+</div>
+<!-- v-038 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 3 of 7</div><h1>A threshold, with transition rules and active-only targeting</h1><div class="prop live"><div class="lbl">Property it protects</div><p>L1, and cost.</p></div><div class="prop"><div class="lbl">How it works</div><p>Each author has a tier: push below the line, pull above it, push to recently active followers in the middle. The line has hysteresis, and crossing it needs no backfill.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>Pure push's celebrity, pure pull's read cost, and writes to users who never read.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>A tier per author to maintain, and a number to tune and defend.</p></div>
+</div>
+<!-- v-039 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 4 of 7</div><h1>IDs in the view, hydration through a post cache</h1><div class="prop safe"><div class="lbl">Property it protects</div><p>S1 (one place to delete), and memory.</p></div><div class="prop"><div class="lbl">How it works</div><p>The view holds IDs only. The read path multi-gets the top 50 bodies from a post cache backed by the posts store.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>250 TB of copies; an edit or delete chasing millions of entries.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>A multi-get per page, and a post cache that becomes critical.</p></div>
+</div>
+<!-- v-040 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 5 of 7</div><h1>A visibility filter on the read path</h1><div class="prop safe"><div class="lbl">Property it protects</div><p>S1.</p></div><div class="prop"><div class="lbl">How it works</div><p>Every page drops posts that are deleted or out of audience at hydration, and authors in the reader's block, mute and unfollow set at merge.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>A deleted or blocked post surviving in a precomputed copy.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>A small per-reader set read on every open.</p></div>
+</div>
+<!-- v-041 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 6 of 7</div><h1>Ranking under a deadline, with a fallback</h1><div class="prop live"><div class="lbl">Property it protects</div><p>L2.</p></div><div class="prop"><div class="lbl">How it works</div><p>Call ranking with a hard deadline. On a miss, order by recency and close ties, or reuse the session's last ranking, and count it.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>A slow model making the whole feed slow or failing.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>Lower quality while degraded, which must be measured and owned.</p></div>
+</div>
+<!-- v-042 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 7 of 7</div><h1>Log-based fan-out with priority lanes</h1><div class="prop live"><div class="lbl">Property it protects</div><p>L1 under bursts.</p></div><div class="prop"><div class="lbl">How it works</div><p>The post and its event commit together (an outbox); a log keyed by author feeds the workers; close ties are fanned out first; the offset is committed last.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>A burst delaying close friends; fan-out work lost in a crash.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>A log and workers to run; lag becomes an SLI.</p></div>
+</div>
+<!-- v-043 &lt;div class="k"&gt;Theory · 5 of 6 · the opt -->
+<div class="slide theory">
+<div class="k">Theory · 5 of 6 · the options matrix</div><h1>Six approaches, one pick</h1><table class="bt sm mx"><tr><th>Approach</th><th>Read at 90,000/s</th><th>Write per post</th><th>Celebrity</th><th>Fails when</th></tr><tr class="rej"><td>A · Pull with a database join at read time</td><td>18 M reads/s</td><td>1</td><td>fine</td><td>any real scale</td></tr><tr class="rej"><td>B · Pull with a per-reader result cache</td><td>1 read, a merge on a miss</td><td>1</td><td>fine</td><td>freshness, and the miss rate at peak</td></tr><tr class="rej"><td>C · Pure push of IDs</td><td>1 read</td><td>followers</td><td>10⁸ inserts</td><td>the first celebrity post</td></tr><tr class="rej"><td>D · Pure push of bodies</td><td>1 read, no hydration</td><td>followers × 1 KB</td><td>10⁸ copies</td><td>250 TB; every edit and delete</td></tr><tr class="pick"><td>E · Hybrid: push IDs to active followers, pull celebrities, hydrate, filter on read</td><td>1 read + a small merge</td><td>≤ 10⁴–10⁵</td><td>pulled</td><td>a threshold set wrong and never measured; a power reader</td></tr><tr class="rej"><td>F · Buy a managed activity-feed service</td><td>theirs</td><td>theirs</td><td>theirs</td><td>our ranking and privacy rules; cost at a billion users</td></tr></table>
+</div>
+<!-- v-044 &lt;div class="k"&gt;Theory · 5 of 6 · the pic -->
+<div class="slide theory">
+<div class="k">Theory · 5 of 6 · the pick, and what it gives up</div><h1>E, after B, with the line measured</h1><div class="cards c2"><div class="cd grn"><h3>What the pick buys</h3><p>A feed open that costs one memory read and a small merge. Writes bounded per post. Deletes that are one write. A view that can be rebuilt.</p></div><div class="cd red"><h3>What it gives up</h3><p>Strict freshness: seconds of eventual consistency. Simplicity: two paths, a tier per author, and a number to defend.</p></div></div><div class="line a">When is B enough? Until the merge on a cache miss breaks the 200 ms budget at peak. Measure it, then move.</div>
+</div>
+<!-- v-045 &lt;div class="k"&gt;Theory · 6 of 6 · the fai -->
+<div class="slide theory">
+<div class="k">Theory · 6 of 6 · the failure catalogue</div><h1>What will go wrong</h1><table class="bt sm"><tr><th>#</th><th>Failure</th><th>Becomes</th></tr><tr class=""><td>F1</td><td>The celebrity post; a burst of ordinary posts</td><td><b>Challenge 1</b></td></tr><tr class=""><td>F2</td><td>An account crossing the line; the mid tier; the power reader</td><td><b>Challenge 2</b></td></tr><tr class=""><td>F3</td><td>Delete, block, unfollow, audience change</td><td><b>Challenge 3</b></td></tr><tr class=""><td>F4</td><td>Duplicates; a feed that moves while you scroll</td><td><b>Challenge 4</b></td></tr><tr class=""><td>F5</td><td>A timeline shard lost; the rebuild stampede</td><td><b>Challenge 5</b></td></tr><tr class=""><td>F6</td><td>The ranker is slow</td><td><b>Challenge 6</b></td></tr><tr class=""><td>F7</td><td>A query the view was not built for</td><td><b>Challenge 7</b></td></tr><tr class=""><td>F8</td><td>The feed works, but got worse</td><td><b>Challenge 8</b></td></tr></table>
+</div>
+<!-- v-046 &lt;div class="k"&gt;Theory · what each mechan -->
+<div class="slide theory">
+<div class="k">Theory · what each mechanism serves</div><h1>Safety or liveness, never unnamed</h1><table class="bt sm"><tr><th>Mechanism</th><th>Serves</th><th>Where it returns</th></tr><tr class=""><td>M1 Fan-out on write, bounded IDs</td><td>L1, L2</td><td>challenges 1 and 4</td></tr><tr class=""><td>M2 Fan-out on read</td><td>L2, L3</td><td>challenges 1, 5 and 7</td></tr><tr class=""><td>M3 Threshold and tiers</td><td>L1, cost</td><td>challenge 2</td></tr><tr class=""><td>M4 IDs and hydration</td><td><b>S1</b>, memory</td><td>challenge 3</td></tr><tr class=""><td>M5 Visibility filter</td><td><b>S1</b></td><td>challenge 3</td></tr><tr class=""><td>M6 Ranking deadline</td><td>L2</td><td>challenge 6</td></tr><tr class=""><td>M7 Log with priority lanes</td><td>L1</td><td>challenges 1 and 8</td></tr></table><div class="grade"><b class="t">Coach · what is graded here</b>Every mechanism names the property it protects. A mechanism with no stated property is decoration.</div>
+</div>
+<!-- v-047 card API and entities -->
+<div class="slide th">
+<div class="lbl">Chapter 4 of 9</div><div class="s">API and entities</div><div class="sub">Each call tagged with the requirement it serves and what it touches</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="on">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-048 &lt;div class="k"&gt;API · the calls&lt;/div&gt;&lt;h1&gt; -->
 <div class="slide">
-<div class="k">Cost · with the arithmetic</div>
-<h1>Two items dominate; one lever halves the first</h1>
-<table class="bt sm"><tr><th>Item</th><th>Arithmetic</th><th>Result</th></tr>
-<tr><td>Timeline RAM</td><td class="calc">4 TB payload × 3 replicas (+ ZSET overhead)</td><td><b>~12 TB+</b></td></tr>
-<tr><td>Fan-out writes</td><td class="calc">120 k/s × 86,400</td><td><b>~10 B inserts/day</b></td></tr>
-<tr><td>Skip inactive</td><td class="calc">≈ half of followers idle 30+ days</td><td><b>~½ of the writes</b></td></tr>
-<tr><td>Raise the threshold</td><td class="calc">fewer, larger accounts fan out</td><td>second lever</td></tr>
-</table>
-<div class="foot"><span>News feed · cost</span><span>stage 9</span></div>
+<div class="k">API · the calls</div><h1>Five calls, each traced to a requirement</h1><table class="bt sm"><tr><th>Call</th><th>Serves</th><th>Reads / writes</th><th>Notes</th></tr><tr class=""><td><code>POST /v1/posts</code> + idempotency key</td><td>FR1</td><td>writes Post, AuthorIndex, Outbox</td><td>post and event in one transaction</td></tr><tr class=""><td><code>GET /v1/feed?cursor&amp;limit=50</code></td><td>FR2</td><td>reads Timeline, CelebrityRecent, Blocks, PostCache</td><td>cursor, never an offset</td></tr><tr class=""><td><code>POST</code> / <code>DELETE /v1/follows/{id}</code></td><td>FR3</td><td>writes Follow</td><td>no backfill on follow</td></tr><tr class=""><td><code>DELETE /v1/posts/{id}</code> · <code>POST /v1/blocks/{id}</code></td><td>FR4</td><td>writes Post.status, Blocks</td><td>invalidation event</td></tr><tr class=""><td>internal <code>Rank(viewer, ids, deadlineMs)</code></td><td>FR2</td><td>none</td><td>IDs and a deadline in, scores out</td></tr></table>
 </div>
+<!-- v-049 &lt;div class="k"&gt;API · publishing&lt;/div&gt;&lt;h1 -->
+<div class="slide">
+<div class="k">API · publishing</div><h1>The post is written once; everything else is derived</h1><pre class="code hl" data-lang="http"><span class="hljs-keyword">POST</span> <span class="hljs-string">/v1/posts</span> <span class="hljs-meta">HTTP/1.1</span>
+<span class="hljs-attribute">Idempotency-Key</span><span class="hljs-punctuation">: </span>7c1e9f4a-2b
+<span class="hljs-attribute">Content-Type</span><span class="hljs-punctuation">: </span>application/json
 
-<!-- 60 -->
-<div class="slide aux dia">
-<div class="k">The manager layer · how you'd build it</div>
-<h1>Sequenced by measured load</h1>
-<figure class="grow"><!--SVG:em-phases--></figure>
-<div class="foot"><span>News feed · delivery</span><span>stage 10</span></div>
+<span class="language-css">{&quot;<span class="hljs-selector-tag">text</span>&quot;: <span class="hljs-string">&quot;Launch day&quot;</span>, <span class="hljs-string">&quot;mediaIds&quot;</span>: [<span class="hljs-string">&quot;m_88&quot;</span>], <span class="hljs-string">&quot;audience&quot;</span>: <span class="hljs-string">&quot;followers&quot;</span>}
+
+HTTP/<span class="hljs-number">1.1</span> <span class="hljs-number">201</span> Created
+{&quot;postId&quot;: <span class="hljs-string">&quot;1860371549216768000&quot;</span>}</span></pre><div class="strip one"><div class="whyb"><b class="t">Why it matters</b>The post ID is time-sortable, so timelines can order by ID alone. A retry with the same key returns the same post.</div></div>
 </div>
+<!-- v-050 &lt;div class="k"&gt;API · reading&lt;/div&gt;&lt;h1&gt;Fi -->
+<div class="slide">
+<div class="k">API · reading</div><h1>Fifty hydrated items and a cursor</h1><pre class="code hl" data-lang="http"><span class="hljs-keyword">GET</span> <span class="hljs-string">/v1/feed?limit=50&amp;cursor=eyJzIjowLjgyLCJwIjo1MX0</span> <span class="hljs-meta">HTTP/1.1</span>
 
-<!-- 61 -->
+<span class="language-prolog"><span class="hljs-symbol">HTTP</span>/<span class="hljs-number">1.1</span> <span class="hljs-number">200</span> <span class="hljs-symbol">OK</span>
+{<span class="hljs-string">&quot;items&quot;</span>: [{<span class="hljs-string">&quot;postId&quot;</span>: <span class="hljs-string">&quot;1860371549216768000&quot;</span>, <span class="hljs-string">&quot;author&quot;</span>: <span class="hljs-string">&quot;@ana&quot;</span>,
+            <span class="hljs-string">&quot;text&quot;</span>: <span class="hljs-string">&quot;Launch day&quot;</span>, <span class="hljs-string">&quot;media&quot;</span>: [<span class="hljs-string">&quot;https://cdn/m_88.jpg&quot;</span>]}],
+ <span class="hljs-string">&quot;nextCursor&quot;</span>: <span class="hljs-string">&quot;eyJzIjowLjc3LCJwIjo5Mn0&quot;</span>, <span class="hljs-string">&quot;fallback&quot;</span>: false}</span></pre><div class="strip "><div class="whyb"><b class="t">The cursor</b>It encodes the score and post ID of the last item shown. The next page starts strictly after it, whatever arrived above.</div><div class="fixb"><b class="t">The flag</b>fallback = true tells the client, and the metrics, that ranking missed its deadline.</div></div>
+</div>
+<!-- v-051 &lt;div class="k"&gt;Data · conceptual&lt;/div&gt;&lt;h -->
+<div class="slide dia">
+<div class="k">Data · conceptual</div><h1>Users author posts, follow and block users; timelines are derived</h1><figure class="grow"><!--SVG:erd-chen--></figure>
+</div>
+<!-- v-052 &lt;div class="k"&gt;Data · physical&lt;/div&gt;&lt;h1&gt; -->
+<div class="slide dia">
+<div class="k">Data · physical</div><h1>Three stores of truth, three caches derived from them</h1><figure class="grow"><!--SVG:erd-physical--></figure>
+</div>
+<!-- v-053 &lt;div class="k"&gt;Data · six stores, one jo -->
+<div class="slide">
+<div class="k">Data · six stores, one job each</div><h1>Which store owns what</h1><table class="bt sm"><tr><th>Store</th><th>Key</th><th>Holds</th><th>Truth or derived?</th></tr><tr class=""><td>Posts</td><td>post_id</td><td>the post</td><td><b>truth</b></td></tr><tr class=""><td>Author index</td><td>(author_id, time desc)</td><td>post IDs by author</td><td><b>truth</b> (secondary index)</td></tr><tr class=""><td>Graph</td><td>user_id, both directions</td><td>follows, blocks, counts</td><td><b>truth</b> (another service)</td></tr><tr class=""><td>Timeline cache</td><td>viewer</td><td>≤ 500 post IDs</td><td>derived, rebuildable</td></tr><tr class=""><td>Celebrity recent</td><td>author</td><td>last 100 post IDs</td><td>derived, rebuildable</td></tr><tr class=""><td>Post cache</td><td>post_id</td><td>hydrated post</td><td>derived, invalidated</td></tr></table><div class="grade"><b class="t">Coach · what is graded here</b>Saying which stores are truth and which are derived, before any failure question, is a strong signal: it is the recovery plan.</div>
+</div>
+<!-- v-054 card High-level design -->
+<div class="slide th">
+<div class="lbl">Chapter 5 of 9</div><div class="s">High-level design</div><div class="sub">Three versions, each answering the objection to the one before</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="on">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-055 &lt;div class="k"&gt;High-level design · versi -->
+<div class="slide dia">
+<div class="k">High-level design · version 1 of 3</div><h1><span class=vtag>V1</span>The simplest thing that works</h1><p class="chips">pull on every open<i>·</i>right at 1 % of this scale</p><figure class="grow"><!--SVG:base-v1--></figure>
+</div>
+<!-- v-056 &lt;div class="k"&gt;V1 · the objection&lt;/div&gt;&lt; -->
+<div class="slide">
+<div class="k">V1 · the objection</div><h1>Eighteen million reads a second, and a minute of staleness</h1><div class="cards c2"><div class="cd red"><h3>Read cost</h3><p>90,000 opens/s × 200 authors = 18 M author-index reads/s whenever the result cache misses.</p></div><div class="cd amb"><h3>Freshness</h3><p>A cached result is up to a minute old. A close friend's post waits for the cache to expire.</p></div></div><div class="line r">The read must be one memory lookup, not a 200-way merge.</div>
+</div>
+<!-- v-057 &lt;div class="k"&gt;High-level design · versi -->
+<div class="slide dia">
+<div class="k">High-level design · version 2 of 3</div><h1><span class=vtag>V2</span>Push: precompute every reader's timeline</h1><p class="chips">outbox → log → fan-out<i>·</i>IDs, not bodies<i>·</i>post cache</p><figure class="grow"><!--SVG:base-v2--></figure>
+</div>
+<!-- v-058 &lt;div class="k"&gt;V2 · the technology, agai -->
+<div class="slide">
+<div class="k">V2 · the technology, against the alternatives</div><h1>Each box, chosen against its rivals</h1><table class="bt sm"><tr><th>Box</th><th>Choice</th><th>Rejected</th><th>Because</th></tr><tr class=""><td>Timelines</td><td>in-memory sorted set per viewer</td><td>a database table; a wide-column row</td><td>read-dominated, bounded, rebuildable: memory is the right price</td></tr><tr class=""><td>Posts + author index</td><td>sharded store, time-sortable keys; wide-column author index</td><td>one relational primary</td><td>write volume and a per-author range scan</td></tr><tr class=""><td>Transport</td><td>outbox → partitioned log → workers</td><td>the post service calling fan-out directly</td><td>no dual write; replayable; many consumers</td></tr><tr class=""><td>Graph</td><td>a service with cached adjacency</td><td>joins in the posts store</td><td>both directions queried constantly; another team's contract</td></tr></table>
+</div>
+<!-- v-059 &lt;div class="k"&gt;V2 · the fan-out worker&lt;/ -->
+<div class="slide">
+<div class="k">V2 · the fan-out worker</div><h1>One branch per tier; commit the offset last</h1><pre class="code hl" data-lang="python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">on_post_created</span>(<span class="hljs-params">evt</span>):
+    <span class="hljs-keyword">if</span> evt.tier == <span class="hljs-string">&quot;pull&quot;</span>:                 <span class="hljs-comment"># celebrity: one write</span>
+        celeb_recent.lpush(evt.author, evt.post_id, trim=<span class="hljs-number">100</span>)
+    <span class="hljs-keyword">else</span>:
+        <span class="hljs-keyword">for</span> page <span class="hljs-keyword">in</span> graph.followers(evt.author, page_size=<span class="hljs-number">1000</span>):
+            active = [f <span class="hljs-keyword">for</span> f <span class="hljs-keyword">in</span> page <span class="hljs-keyword">if</span> last_seen(f) &gt; now() - DAYS_30]
+            <span class="hljs-keyword">if</span> evt.tier == <span class="hljs-string">&quot;mid&quot;</span>:
+                active = [f <span class="hljs-keyword">for</span> f <span class="hljs-keyword">in</span> active <span class="hljs-keyword">if</span> last_seen(f) &gt; now() - DAYS_1]
+            timelines.add_many(active, evt.post_id, trim=<span class="hljs-number">500</span>)
+    log.commit(evt.offset)                  <span class="hljs-comment"># last: re-deliver, never lose</span></pre>
+</div>
+<!-- v-060 &lt;div class="k"&gt;V2 · the objection&lt;/div&gt;&lt; -->
+<div class="slide">
+<div class="k">V2 · the objection</div><h1>One celebrity, half the writes wasted, and copies of deleted posts</h1><div class="cards c3"><div class="cd red"><h3>The celebrity</h3><p>One post with 110 M followers holds the fleet for 15 minutes.</p></div><div class="cd amb"><h3>Inactive followers</h3><p>About half the inserts go to users who will not open the app this month.</p></div><div class="cd red"><h3>Copies</h3><p>A deleted post sits in millions of timelines.</p></div></div><div class="line r">The tail of authors decides the design, and correctness cannot live in copies.</div>
+</div>
+<!-- v-061 &lt;div class="k"&gt;High-level design · versi -->
+<div class="slide dia">
+<div class="k">High-level design · version 3 of 3</div><h1><span class=vtag>V3</span>The hybrid, correct on the read path</h1><p class="chips">tier per author<i>·</i>active-only fan-out<i>·</i>filter on read<i>·</i>ranking deadline</p><figure class="grow"><!--SVG:base-v3--></figure>
+</div>
+<!-- v-062 &lt;div class="k"&gt;Flow · FR1 publish, an or -->
+<div class="slide dia">
+<div class="k">Flow · FR1 publish, an ordinary author</div><h1>Numbered: one transaction, one event, IDs into timelines</h1><figure class="grow"><!--SVG:flow-fr1--></figure>
+</div>
+<!-- v-063 &lt;div class="k"&gt;Flow · FR1 publish, a cel -->
+<div class="slide dia">
+<div class="k">Flow · FR1 publish, a celebrity</div><h1>The same event, one write, no fan-out</h1><figure class="grow"><!--SVG:flow-fr1c--></figure>
+</div>
+<!-- v-064 &lt;div class="k"&gt;Sequence · publish&lt;/div&gt;&lt; -->
+<div class="slide dia">
+<div class="k">Sequence · publish</div><h1>One transaction, then asynchronous fan-out</h1><figure class="grow"><!--SVG:seq-publish--></figure>
+</div>
+<!-- v-065 &lt;div class="k"&gt;Flow · FR2 read&lt;/div&gt;&lt;h1&gt; -->
+<div class="slide dia">
+<div class="k">Flow · FR2 read</div><h1>Timeline, celebrities, blocks, rank, hydrate</h1><figure class="grow"><!--SVG:flow-fr2--></figure>
+</div>
+<!-- v-066 &lt;div class="k"&gt;V3 · the read path, in co -->
+<div class="slide">
+<div class="k">V3 · the read path, in code</div><h1>Gather, filter, rank inside a deadline, hydrate</h1><pre class="code hl" data-lang="python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">get_feed</span>(<span class="hljs-params">viewer, cursor, limit=<span class="hljs-number">50</span></span>):
+    ids = timelines.get(viewer)                           <span class="hljs-comment"># ~500 IDs, ~5 ms</span>
+    <span class="hljs-keyword">for</span> author <span class="hljs-keyword">in</span> graph.followed_celebrities(viewer):     <span class="hljs-comment"># a handful</span>
+        ids += celeb_recent.get(author)
+    blocked = blocks.get(viewer)
+    cand = dedupe(i <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> ids <span class="hljs-keyword">if</span> i.author <span class="hljs-keyword">not</span> <span class="hljs-keyword">in</span> blocked)
+    cand = top_by_time(cand, <span class="hljs-number">200</span>)
+    scores = ranking.score(viewer, cand, deadline_ms=<span class="hljs-number">80</span>) <span class="hljs-keyword">or</span> fallback(cand)
+    page = after(cursor, <span class="hljs-built_in">sorted</span>(cand, key=scores.get, reverse=<span class="hljs-literal">True</span>), scores)[:limit]
+    posts = [p <span class="hljs-keyword">for</span> p <span class="hljs-keyword">in</span> post_cache.multi_get(page) <span class="hljs-keyword">if</span> visible(p, viewer)]
+    <span class="hljs-keyword">return</span> posts, make_cursor(page[-<span class="hljs-number">1</span>], scores)</pre>
+</div>
+<!-- v-067 &lt;div class="k"&gt;Sequence · read&lt;/div&gt;&lt;h1&gt; -->
+<div class="slide dia">
+<div class="k">Sequence · read</div><h1>Merge, rank inside a deadline, hydrate</h1><figure class="grow"><!--SVG:seq-read--></figure>
+</div>
+<!-- v-068 &lt;div class="k"&gt;Flow · FR3 follow&lt;/div&gt;&lt;h -->
+<div class="slide dia">
+<div class="k">Flow · FR3 follow</div><h1>One edge, and no backfill</h1><figure class="grow"><!--SVG:flow-fr3--></figure>
+</div>
+<!-- v-069 &lt;div class="k"&gt;Flow · FR4 remove&lt;/div&gt;&lt;h -->
+<div class="slide dia">
+<div class="k">Flow · FR4 remove</div><h1>A delete is one write, enforced on every page</h1><figure class="grow"><!--SVG:flow-fr4--></figure>
+</div>
+<!-- v-070 &lt;div class="k"&gt;Architecture · C4 context -->
+<div class="slide dia">
+<div class="k">Architecture · C4 context</div><h1>Authors write, readers open; ranking and the graph belong to others</h1><figure class="grow"><!--SVG:c4-context--></figure>
+</div>
+<!-- v-071 &lt;div class="k"&gt;Architecture · C4 contain -->
+<div class="slide dia">
+<div class="k">Architecture · C4 containers</div><h1>The write path across the top, the read path below</h1><figure class="grow"><!--SVG:c4-containers--></figure>
+</div>
+<!-- v-072 &lt;div class="k"&gt;Design · the latency budg -->
+<div class="slide dia">
+<div class="k">Design · the latency budget</div><h1>Where the 200 ms go</h1><figure class="grow"><!--SVG:budget--></figure>
+</div>
+<!-- v-073 &lt;div class="k"&gt;Design · what V3 still ow -->
+<div class="slide">
+<div class="k">Design · what V3 still owes</div><h1>It works. The details are the challenges</h1><table class="bt sm"><tr><th>Open question</th><th>Challenge</th></tr><tr class=""><td>What exactly happens on a celebrity post?</td><td>1</td></tr><tr class=""><td>Where is the line, and who crosses it?</td><td>2</td></tr><tr class=""><td>How does a deleted or blocked post disappear?</td><td>3</td></tr><tr class=""><td>Twice or never: duplicates and pagination</td><td>4</td></tr><tr class=""><td>A timeline shard is lost</td><td>5</td></tr><tr class=""><td>Ranking misses its deadline</td><td>6</td></tr><tr class=""><td>A query the view was not built for</td><td>7</td></tr><tr class=""><td>How would we know it got worse?</td><td>8</td></tr></table>
+</div>
+<!-- v-074 card Bridge -->
+<div class="slide th">
+<div class="lbl">Chapter 6 of 9</div><div class="s">Bridge</div><div class="sub">It works. Where does it break first?</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="on">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-075 &lt;div class="k"&gt;Challenge map&lt;/div&gt;&lt;h1&gt;Ei -->
+<div class="slide dia">
+<div class="k">Challenge map</div><h1>Eight attack points on the same baseline</h1><p class="chips">each fix creates the next question</p><figure class="grow"><!--SVG:map--></figure>
+</div>
+<!-- v-076 card Challenges -->
+<div class="slide th">
+<div class="lbl">Chapter 7 of 9</div><div class="s">Challenges</div><div class="sub">Eight ways to break it, and what survives</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="done">Design</span><span class="on">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-077 card Challenge 1: The celebrity post -->
+<div class="slide th card">
+<div class="lbl">7.1 · Challenge 1</div><div class="s">The celebrity post</div>
+</div>
+<!-- v-078 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 1 of 8</div><div class="qq">“Someone with a hundred million followers posts. Walk me through it.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-079 &lt;div class="k r"&gt;Challenge 1 of 8 · the  -->
+<div class="slide dia">
+<div class="k r">Challenge 1 of 8 · the celebrity post</div><h1 class="q">What does one post cost?</h1><figure class="grow"><!--SVG:ch1-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“The fan-out workers push it to every follower. We add more workers.”</div><div class="case"><b class="t">Break</b>The fan-out fleet and the log partition: one author's post blocks everyone else's.</div></div>
+</div>
+<!-- v-080 &lt;div class="k r"&gt;Challenge 1 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 1 of 8 · the trace</div><h1 class="q">Fifteen minutes for one post</h1><table class="tl"><tr><th>20:00:00</th><td>@star (110 M followers) posts</td></tr><tr><th>20:00:00</th><td>110 M inserts at the fleet's 120,000 a second &#8202;=&#8202; <span class="bad">about 15 minutes</span></td></tr><tr><th>20:00:30</th><td>@ana posts to her 300 friends; her event waits behind @star's</td></tr><tr><th>20:14:10</th><td><span class="bad">@ana's close friends see her post 14 minutes late</span></td></tr><tr><th>20:31:00</th><td>@star posts again: the next quarter of an hour is gone</td></tr></table><div class="hedge"><b class="t">Label the numbers</b>Illustrative. Even at ten times the fleet capacity, one post costs ninety seconds of all of it.</div>
+</div>
+<!-- v-081 &lt;div class="k"&gt;Challenge 1 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 1 of 8 · the fix</div><h1>Don't fan out celebrities: pull them at read time</h1><figure class="grow"><!--SVG:ch1-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>The event carries the author's tier. Above the threshold the worker writes one entry to the author's recent list. Readers merge the few celebrities they follow.</div><div class="whyb"><b class="t">Property</b>L1 for everyone else: the log is no longer held by one author. L2 for readers: a few extra cache reads, budgeted.</div></div>
+</div>
+<!-- v-082 &lt;div class="k"&gt;Challenge 1 of 8 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 1 of 8 · sequence</div><h1>One write on publish, a small merge on read</h1><figure class="grow"><!--SVG:seq-celebrity--></figure>
+</div>
+<!-- v-083 &lt;div class="k"&gt;Challenge 1 of 8 · why it -->
+<div class="slide">
+<div class="k">Challenge 1 of 8 · why it works</div><h1>The cost moved to where it is small</h1><table class="bt sm"><tr><th></th><th>Push the celebrity</th><th>Pull the celebrity</th></tr><tr class=""><td>Per post</td><td>110 M inserts, ~15 min of the fleet</td><td>1 write</td></tr><tr class=""><td>Per open</td><td>nothing extra</td><td>1 cache read per followed celebrity, ~0.5 ms</td></tr><tr class=""><td>Who pays</td><td>every other author, in delay</td><td>the reader, inside the budget</td></tr></table><div class="strip one"><div class="whyb"><b class="t">Why</b>Pull costs a small read multiplied by opens; push costs a write multiplied by followers. For the tail, the read is far cheaper. The hot lists are replicated to many cache nodes.</div></div>
+</div>
+<!-- v-084 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“New Year's Eve: ten times the normal posting rate, all ordinary accounts, for ten minutes.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-085 &lt;div class="k"&gt;Challenge 1 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 1 of 8 · the second fix, and the honest limit</div><h1>Priority lanes, and a pull that covers lag</h1><div class="cards c3"><div class="cd grn"><h3>Priority lanes</h3><p>Fan out to close-tie followers first (an interaction score), the rest after. Close friends keep their seconds.</p></div><div class="cd"><h3>Spread the burst</h3><p>The log is keyed by author, so a burst of many authors spreads across partitions and workers.</p></div><div class="cd amb"><h3>Pull covers lag</h3><p>Lag is a metric per lane. While the general lane is behind, the read merge can pull recent posts of a reader's top ties.</p></div></div><div class="line r">Honest limit: for ten minutes, the “a minute generally” target may slip. Close ties keep their seconds.</div>
+</div>
+<!-- v-086 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“One celebrity post would be a hundred million writes, minutes of fan-out that block everyone else. So above a follower threshold I don't fan out at all: the post goes into a small recent-posts list for that author, and each reader merges the few celebrities they follow at read time. That costs a few milliseconds per open, which I've budgeted.”</div>
+</div>
+<!-- v-087 card Challenge 2: Where is the line, and who crosses it? -->
+<div class="slide th card">
+<div class="lbl">7.2 · Challenge 2</div><div class="s">Where is the line, and who crosses it?</div>
+</div>
+<!-- v-088 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 2 of 8</div><div class="qq">“Where exactly is the threshold, and what happens to an account that crosses it?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-089 &lt;div class="k r"&gt;Challenge 2 of 8 · the  -->
+<div class="slide dia">
+<div class="k r">Challenge 2 of 8 · the line</div><h1 class="q">A number nobody can justify</h1><figure class="grow"><!--SVG:ch2-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“A million followers.”</div><div class="case"><b class="t">Break</b>The tier decision: a fixed number with no arithmetic, and no rule for crossing it.</div></div>
+</div>
+<!-- v-090 &lt;div class="k r"&gt;Challenge 2 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 2 of 8 · the trace</div><h1 class="q">Three ways a fixed number fails</h1><table class="tl"><tr><th>at 1 M</th><td>one post &#8202;=&#8202; 10⁶ inserts ≈ <span class="bad">8 s of the whole fleet</span>: past the 5 s target on its own</td></tr><tr><th>Mon</th><td>@newstar has 9,000 followers: tier push</td></tr><tr><th>Tue</th><td>@newstar has 2 M: 200 posts already pushed; <span class="bad">which tier now, and what about those?</span></td></tr><tr><th>reader</th><td>follows 5,000 accounts, 300 celebrities: <span class="bad">300 lists &times; 0.5 ms &#8202;=&#8202; 150 ms</span></td></tr></table><div class="hedge"><b class="t">Label the numbers</b>Illustrative. A line too high breaks writes; too low breaks the reader who follows many pulled authors.</div>
+</div>
+<!-- v-091 &lt;div class="k"&gt;Challenge 2 of 8 · the fi -->
+<div class="slide">
+<div class="k">Challenge 2 of 8 · the fix</div><h1>Three tiers, from both sides of the arithmetic</h1><table class="bt sm"><tr><th>Tier</th><th>Followers</th><th>Fan-out</th><th>Why</th></tr><tr class=""><td>Push</td><td>under ~10 k</td><td>every follower active in 30 days</td><td>cheap per post; fresh</td></tr><tr class=""><td>Mid</td><td>~10 k – 100 k</td><td>only followers active in the last day</td><td>cuts the cost by an order of magnitude</td></tr><tr class=""><td>Pull</td><td>over ~100 k</td><td>none: one write to the recent list</td><td>a post alone would miss the freshness target</td></tr></table><div class="strip one"><div class="fixb"><b class="t">Mechanism</b>Write side: one post's fan-out must finish well inside 5 s on a fair share of the fleet. Read side: the average reader pulls fewer than ~20 authors. Start at 10 k, measure, tune. A config value.</div></div>
+</div>
+<!-- v-092 &lt;div class="k"&gt;Challenge 2 of 8 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 2 of 8 · sequence</div><h1>Crossing the line needs no backfill</h1><figure class="grow"><!--SVG:seq-tier--></figure>
+</div>
+<!-- v-093 &lt;div class="k"&gt;Challenge 2 of 8 · why it -->
+<div class="slide dia">
+<div class="k">Challenge 2 of 8 · why it works</div><h1>The read merge covers every transition</h1><figure class="grow"><!--SVG:ch2-fix--></figure><div class="strip one"><div class="whyb"><b class="t">Property</b>L1 and L2 both hold at the line because it sits where each side's cost is acceptable. The transition needs no backfill because the merge reads the recent list either way.</div></div>
+</div>
+<!-- v-094 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“The power reader: three hundred celebrities on every open.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-095 &lt;div class="k"&gt;Challenge 2 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 2 of 8 · the second fix, and the honest limit</div><h1>Treat the tail of readers like the tail of authors</h1><div class="cards c2"><div class="cd grn"><h3>Precompute their merge</h3><p>For readers above ~50 pulled authors, a background job merges their celebrity lists every few minutes into their timeline. Their open is one read again.</p></div><div class="cd"><h3>Cap the live merge</h3><p>At read time, merge only the top 50 celebrities by interaction. The rest arrive with the next background merge.</p></div></div><div class="line r">Honest limit: for those readers, celebrity posts may be a few minutes late. Say it.</div>
+</div>
+<!-- v-096 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“I set the line from both sides: one post's fan-out must finish inside the freshness target, and the average reader should pull only a handful of authors. That puts it around ten thousand followers, as a config value I'd tune with data. Crossing it needs no backfill because the read merge covers recent posts, and the rare reader who follows hundreds of celebrities gets their merge precomputed.”</div>
+</div>
+<!-- v-097 card Challenge 3: Delete, block, unfollow -->
+<div class="slide th card">
+<div class="lbl">7.3 · Challenge 3</div><div class="s">Delete, block, unfollow</div>
+</div>
+<!-- v-098 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 3 of 8</div><div class="qq">“A user deletes a post, or blocks someone. That post ID is already in millions of timelines. How does it disappear?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-099 &lt;div class="k r"&gt;Challenge 3 of 8 · copi -->
+<div class="slide dia">
+<div class="k r">Challenge 3 of 8 · copies</div><h1 class="q">Correctness stored in copies</h1><figure class="grow"><!--SVG:ch3-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Fan out a delete to every timeline that has the ID.”</div><div class="case"><b class="t">Break</b>The timelines: millions of copies, and a delete that races the insert.</div></div>
+</div>
+<!-- v-100 &lt;div class="k r"&gt;Challenge 3 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 3 of 8 · the trace</div><h1 class="q">The delete loses the race</h1><table class="tl"><tr><th>21:00:00</th><td>@ana posts to 3 M followers; fan-out starts</td></tr><tr><th>21:00:40</th><td>she deletes it (wrong photo); a delete fan-out starts</td></tr><tr><th>21:00:41</th><td>followers whose insert lands after the delete <span class="bad">keep the post</span></td></tr><tr><th>21:05:00</th><td>@ben blocks @cal; <span class="bad">500 of @cal's posts stay in @ben's timeline</span></td></tr></table><div class="hedge"><b class="t">Property at risk</b>S1: a viewer must not see deleted or blocked content for longer than 5 s.</div>
+</div>
+<!-- v-101 &lt;div class="k"&gt;Challenge 3 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 3 of 8 · the fix</div><h1>Correctness on the read path; cleanup is cosmetic</h1><figure class="grow"><!--SVG:ch3-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>Hydration reads each post through the post cache, invalidated on delete, and drops anything deleted or out of audience. The merge drops authors in the reader's block, mute and unfollow set.</div><div class="whyb"><b class="t">Property</b>S1 is decided at one place, the post's own row, read on every page. The bound is the invalidation time: seconds.</div></div>
+</div>
+<!-- v-102 &lt;div class="k"&gt;Challenge 3 of 8 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 3 of 8 · sequence</div><h1>One write, filtered on every page</h1><figure class="grow"><!--SVG:seq-delete--></figure>
+</div>
+<!-- v-103 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“The post-cache invalidation event is lost.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-104 &lt;div class="k"&gt;Challenge 3 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 3 of 8 · the second fix, and the honest limit</div><h1>A lifetime as the backstop, and a short list checked first</h1><div class="cards c2"><div class="cd grn"><h3>A bounded lifetime</h3><p>Post-cache entries live at most 5 minutes. A lost event costs at most one lifetime, not forever.</p></div><div class="cd grn"><h3>Recently removed</h3><p>Deletes and audience changes also write a small recently-removed set, checked at hydration for one hour. That keeps the 5 s bound with the event lost.</p></div></div><div class="line r">Honest limit: a post already rendered on a phone stays until the next refresh.</div>
+</div>
+<!-- v-105 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“Fanned-out IDs are copies, so I don't trust them. Every page is hydrated from the post itself and filtered by the reader's block and unfollow set, so a delete is one write that takes effect within seconds everywhere. Cleaning the IDs out of timelines is a background job, and it's cosmetic.”</div>
+</div>
+<!-- v-106 card Challenge 4: Twice, or never -->
+<div class="slide th card">
+<div class="lbl">7.4 · Challenge 4</div><div class="s">Twice, or never</div>
+</div>
+<!-- v-107 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 4 of 8</div><div class="qq">“You said a duplicate on screen is a bug and a missed close-friend post is worse. Where do each come from in your design?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-108 &lt;div class="k r"&gt;Challenge 4 of 8 · dupl -->
+<div class="slide dia">
+<div class="k r">Challenge 4 of 8 · duplicates and gaps</div><h1 class="q">Where twice and never come from</h1><figure class="grow"><!--SVG:ch4-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“The log delivers exactly once.”</div><div class="case"><b class="t">Break</b>The insert into the timeline, and the page boundary on the way back to the reader.</div></div>
+</div>
+<!-- v-109 &lt;div class="k r"&gt;Challenge 4 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 4 of 8 · the trace</div><h1 class="q">A re-delivered event, and an offset that moves</h1><table class="tl"><tr><th>W3</th><td>inserts p9 into 1,000 timelines, <span class="bad">crashes before committing the offset</span></td></tr><tr><th>W7</th><td>re-reads the event: inserts p9 again. In a plain list, <span class="bad">p9 twice</span></td></tr><tr><th>page 1</th><td>reader gets items 0–49 with ?offset=0</td></tr><tr><th>+12</th><td>twelve new posts arrive at the top</td></tr><tr><th>page 2</th><td>?offset=50 returns old items 38–87: <span class="bad">12 repeated, 12 never shown</span></td></tr></table>
+</div>
+<!-- v-110 &lt;div class="k"&gt;Challenge 4 of 8 · the fi -->
+<div class="slide">
+<div class="k">Challenge 4 of 8 · the fix</div><h1>A set keyed by post ID, and a cursor</h1><pre class="code hl" data-lang="python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">make_cursor</span>(<span class="hljs-params">last_id, scores</span>):
+    <span class="hljs-keyword">return</span> encode({<span class="hljs-string">&quot;s&quot;</span>: scores[last_id], <span class="hljs-string">&quot;p&quot;</span>: last_id})
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">after</span>(<span class="hljs-params">cursor, ranked, scores</span>):
+    <span class="hljs-keyword">if</span> cursor <span class="hljs-keyword">is</span> <span class="hljs-literal">None</span>:
+        <span class="hljs-keyword">return</span> ranked
+    c = decode(cursor)
+    <span class="hljs-comment"># strictly after the last item shown, whatever arrived above it</span>
+    <span class="hljs-keyword">return</span> [i <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> ranked <span class="hljs-keyword">if</span> (scores[i], i) &lt; (c[<span class="hljs-string">&quot;s&quot;</span>], c[<span class="hljs-string">&quot;p&quot;</span>])]</pre><div class="strip one"><div class="whyb"><b class="t">Property</b>A re-delivered insert into a set keyed by post ID changes nothing: duplicates are impossible by data structure. Gaps are bounded by fan-out lag, which is measured.</div></div>
+</div>
+<!-- v-111 &lt;div class="k"&gt;Challenge 4 of 8 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 4 of 8 · sequence</div><h1>Re-delivery is a no-op; the next page starts after the last item</h1><figure class="grow"><!--SVG:seq-dedupe--></figure>
+</div>
+<!-- v-112 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“Ranking reorders between page one and page two.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-113 &lt;div class="k"&gt;Challenge 4 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 4 of 8 · the second fix, and the honest limit</div><h1>Keep the session's ranked list</h1><div class="cards c2"><div class="cd grn"><h3>A session snapshot</h3><p>The first page's ranked candidates (a few hundred IDs) are kept for the session with a short lifetime. Later pages walk that list; they do not re-rank.</p></div><div class="cd"><h3>New posts</h3><p>Appear on pull-to-refresh, which starts a new session and a new ranking.</p></div></div><div class="line a">Honest limit: a post that arrives mid-scroll waits for a refresh. That is the expected behaviour, not a bug.</div>
+</div>
+<!-- v-114 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“Fan-out is at-least-once, so inserts are idempotent: the timeline is keyed by post ID. Pagination uses a cursor holding the last item's score and ID, never an offset, and the ranked list for a session is kept so page two doesn't reshuffle page one.”</div>
+</div>
+<!-- v-115 card Challenge 5: A timeline shard is gone -->
+<div class="slide th card">
+<div class="lbl">7.5 · Challenge 5</div><div class="s">A timeline shard is gone</div>
+</div>
+<!-- v-116 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 5 of 8</div><div class="qq">“A timeline cache shard is lost. One user in a hundred opens to an empty feed. What do they see, and how do you recover?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-117 &lt;div class="k r"&gt;Challenge 5 of 8 · a lo -->
+<div class="slide dia">
+<div class="k r">Challenge 5 of 8 · a lost shard</div><h1 class="q">An empty timeline, and a recovery that can spread</h1><figure class="grow"><!--SVG:ch5-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Restore it from a backup.”</div><div class="case"><b class="t">Break</b>The timeline shard, then the author indexes everyone's celebrity merge depends on.</div></div>
+</div>
+<!-- v-118 &lt;div class="k r"&gt;Challenge 5 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 5 of 8 · the trace</div><h1 class="q">The recovery becomes the outage</h1><table class="tl"><tr><th>20:00</th><td>a shard with 5 M users' timelines is lost</td></tr><tr><th>20:00</th><td>20 % open within 10 min: 1,700 rebuilds/s &times; 200 author reads &#8202;=&#8202; <span class="bad">340,000 reads/s</span></td></tr><tr><th>20:02</th><td>author-index p99 goes from 5 ms to <span class="bad">400 ms</span></td></tr><tr><th>20:03</th><td>every reader's celebrity merge waits on the same store: <span class="bad">feed p99 breaks for everyone</span></td></tr></table><div class="hedge"><b class="t">Label the numbers</b>Illustrative. The shape: a derived store lost, and its rebuild aimed at a store sized for something else.</div>
+</div>
+<!-- v-119 &lt;div class="k"&gt;Challenge 5 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 5 of 8 · the fix</div><h1>Rebuild by pull, coalesced, rate-limited, degraded beyond the limit</h1><figure class="grow"><!--SVG:ch5-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>A miss triggers a rebuild through the pull path, written back to the cache. One rebuild in flight per user. A global rebuild rate limit. Over it: a degraded feed now, a rebuild later.</div><div class="whyb"><b class="t">Property</b>L3 for the lost users, L2 for everyone else. The blast radius is set by the rate limit, not by how many users open.</div></div>
+</div>
+<!-- v-120 &lt;div class="k"&gt;Challenge 5 of 8 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 5 of 8 · sequence</div><h1>A token for each rebuild; a degraded feed without one</h1><figure class="grow"><!--SVG:seq-rebuild--></figure>
+</div>
+<!-- v-121 &lt;div class="k"&gt;Challenge 5 of 8 · why it -->
+<div class="slide dia">
+<div class="k">Challenge 5 of 8 · why it works</div><h1>The limit decides the blast radius</h1><figure class="grow"><!--SVG:rebuild-wave--></figure>
+</div>
+<!-- v-122 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“It's not a shard. It's the whole timeline cluster in one region.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-123 &lt;div class="k"&gt;Challenge 5 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 5 of 8 · the second fix, and the honest limit</div><h1>Another region's copy, or degraded for everyone</h1><div class="cards c3"><div class="cd grn"><h3>Cross-region replica</h3><p>Serve that region's reads from another region's timeline replica, seconds stale, while it warms.</p></div><div class="cd amb"><h3>Degraded mode</h3><p>If there is no replica: the degraded feed for everyone, served instantly.</p></div><div class="cd"><h3>Warm by activity</h3><p>Rebuild at the rate limit, most active users first.</p></div></div><div class="line r">Honest limit: a cold region takes hours to warm fully. That is a stated recovery time, and the case for replicas.</div>
+</div>
+<!-- v-124 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“A timeline is a derived view, so losing it is a latency problem, not data loss. The first open rebuilds it by pull, with coalescing per user and a rate limit, and anyone over the limit gets a degraded but instant feed. The rate limit is what stops one lost shard from overloading the author index for everyone.”</div>
+</div>
+<!-- v-125 card Challenge 6: The ranker takes 300 ms -->
+<div class="slide th card">
+<div class="lbl">7.6 · Challenge 6</div><div class="s">The ranker takes 300 ms</div>
+</div>
+<!-- v-126 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 6 of 8</div><div class="qq">“Ranking has 80 ms of your budget. Today it takes 300. What's your plan? And the ranking team wants 120 ms for a better model.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-127 &lt;div class="k r"&gt;Challenge 6 of 8 · a sl -->
+<div class="slide dia">
+<div class="k r">Challenge 6 of 8 · a slow dependency</div><h1 class="q">The feed waits for a component it does not own</h1><figure class="grow"><!--SVG:ch6-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Wait for it. Quality matters.”</div><div class="case"><b class="t">Break</b>The call to ranking: the feed's latency becomes ranking's latency.</div></div>
+</div>
+<!-- v-128 &lt;div class="k r"&gt;Challenge 6 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 6 of 8 · the trace</div><h1 class="q">A model push breaks the feed</h1><table class="tl"><tr><th>14:00</th><td>ranking ships a new model; its p99 goes from 70 ms to <span class="bad">300 ms</span></td></tr><tr><th>14:00</th><td>feed p99 goes from 160 ms to <span class="bad">420 ms</span></td></tr><tr><th>14:30</th><td>open rate down; nothing in the feed service changed</td></tr><tr><th>ask</th><td>the next model lifts engagement, at <span class="bad">120 ms p99</span></td></tr></table>
+</div>
+<!-- v-129 &lt;div class="k"&gt;Challenge 6 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 6 of 8 · the fix</div><h1>A hard deadline, and a fallback that is counted</h1><figure class="grow"><!--SVG:ch6-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>Call ranking with deadline 80 ms. On a miss: recency plus close ties, or the session's last ranking. Late scores are dropped and counted; the response says fallback.</div><div class="whyb"><b class="t">Property</b>L2: the feed's latency no longer depends on a component it does not own. Quality loss is bounded and visible.</div></div>
+</div>
+<!-- v-130 &lt;div class="k"&gt;Challenge 6 of 8 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 6 of 8 · sequence</div><h1>Eighty milliseconds, then the fallback</h1><figure class="grow"><!--SVG:seq-rank--></figure>
+</div>
+<!-- v-131 &lt;div class="k"&gt;Challenge 6 of 8 · the 12 -->
+<div class="slide">
+<div class="k">Challenge 6 of 8 · the 120 ms request</div><h1>Find the budget; don't move the user's deadline</h1><table class="bt sm"><tr><th>Option</th><th>What it costs</th></tr><tr class=""><td>Pre-rank on app background or prefetch, so the slow model runs before the open</td><td>compute on opens that never happen</td></tr><tr class=""><td>Rank the first 20 fast, the rest asynchronously</td><td>a two-stage ranking contract</td></tr><tr class=""><td>Give 120 ms if hydration and lookups shrink by 40 ms</td><td>work in the feed team first</td></tr><tr class=""><td>Say yes and move the p99 to 240 ms</td><td>every user pays, for a model gain on some</td></tr></table><div class="grade"><b class="t">Coach · what is graded here</b>Negotiating a budget with another team, with options and their costs, is the Staff signal here.</div>
+</div>
+<!-- v-132 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“The fallback rate is thirty percent for a week, and nobody noticed.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-133 &lt;div class="k"&gt;Challenge 6 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 6 of 8 · the second fix</div><h1>The fallback rate has an owner</h1><div class="cards c2"><div class="cd grn"><h3>An SLI with an owner</h3><p>Fallback rate is ranking's SLI, with an error budget: say under 1 % of opens. Ranking is paged on it, not the feed team.</p></div><div class="cd grn"><h3>Automatic rollback</h3><p>A model push that breaks the fallback budget on its canary is rolled back by the deploy system.</p></div></div><div class="line a">That is a metric about quality, not uptime. Challenge eight is about exactly that.</div>
+</div>
+<!-- v-134 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“Ranking gets a hard deadline inside the two hundred milliseconds, and if it misses, I rank by recency and close ties, so the feed degrades instead of failing. For a slower model, I'd find the budget by pre-ranking before the open, not by moving the user's deadline. And the fallback rate is a number someone owns.”</div>
+</div>
+<!-- v-135 card Challenge 7: Catch up on the last 48 hours -->
+<div class="slide th card">
+<div class="lbl">7.7 · Challenge 7</div><div class="s">Catch up on the last 48 hours</div>
+</div>
+<!-- v-136 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 7 of 8</div><div class="qq">“Product adds ‘catch up’: a chronological view of everything from the last 48 hours, for any user. What changes?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-137 &lt;div class="k r"&gt;Challenge 7 of 8 · a ne -->
+<div class="slide dia">
+<div class="k r">Challenge 7 of 8 · a new query</div><h1 class="q">The view does not hold the answer</h1><figure class="grow"><!--SVG:ch7-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Make the timelines longer and order them by time.”</div><div class="case"><b class="t">Break</b>The timeline: bounded, ranked, missing celebrities and inactive users.</div></div>
+</div>
+<!-- v-138 &lt;div class="k"&gt;Challenge 7 of 8 · the ca -->
+<div class="slide">
+<div class="k">Challenge 7 of 8 · the case</div><h1>Why the view can't answer it</h1><table class="bt sm"><tr><th>Needed for catch-up</th><th>What the timeline has</th></tr><tr class=""><td>every post from followees in 48 h: maybe 2,000</td><td>at most 500 IDs</td></tr><tr class=""><td>time order</td><td>ranked order</td></tr><tr class=""><td>celebrities' posts</td><td>none: they are pulled</td></tr><tr class=""><td>a returning user's posts</td><td>nothing: inactive users were skipped</td></tr></table>
+</div>
+<!-- v-139 &lt;div class="k"&gt;Challenge 7 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 7 of 8 · the fix</div><h1>Go to the source of truth, not into the cache</h1><figure class="grow"><!--SVG:ch7-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>Catch-up merges the followees' author indexes for the window, the same pull path as the rebuild, in time order, filtered by the same visibility rules, cached per user for minutes.</div><div class="whyb"><b class="t">Why it works</b>The ranked view keeps its bounds and its cost. The new query costs what it costs, once per use, where its data lives.</div></div>
+</div>
+<!-- v-140 &lt;div class="k"&gt;Challenge 7 of 8 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 7 of 8 · sequence</div><h1>Cached result, or the rebuild path</h1><figure class="grow"><!--SVG:seq-catchup--></figure>
+</div>
+<!-- v-141 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“It becomes the most used screen.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-142 &lt;div class="k"&gt;Challenge 7 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 7 of 8 · the second fix</div><h1>Then it earns its own view, with a price said first</h1><div class="cards c2"><div class="cd grn"><h3>A second view</h3><p>A per-user chronological list maintained by the same fan-out: IDs only, a 48 h lifetime. Celebrities merged at read as before.</p></div><div class="cd amb"><h3>Its price</h3><p>About doubles timeline memory for the users who use it. Measure the read load on the author indexes first.</p></div></div><div class="line g">The design absorbed the requirement with a new consumer of the same event, not a rebuild.</div>
+</div>
+<!-- v-143 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“I wouldn't distort the ranked timeline for a query it wasn't designed for. Catch-up reads the source of truth, the followees' author indexes for the window, through the same path I use for rebuilds, and caches the result for minutes. If it becomes popular, it gets its own small view, and I'd say what that costs first.”</div>
+</div>
+<!-- v-144 card Challenge 8: How would you know the feed got worse? -->
+<div class="slide th card">
+<div class="lbl">7.8 · Challenge 8</div><div class="s">How would you know the feed got worse?</div>
+</div>
+<!-- v-145 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 8 of 8</div><div class="qq">“The feed is up and fast. How would you know it had silently got worse?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-146 &lt;div class="k r"&gt;Challenge 8 of 8 · gree -->
+<div class="slide dia">
+<div class="k r">Challenge 8 of 8 · green dashboards</div><h1 class="q">Green boxes, a worse product</h1><figure class="grow"><!--SVG:ch8-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Error rate and latency.”</div><div class="case"><b class="t">Break</b>The monitoring: it watches boxes, not the promise to the user.</div></div>
+</div>
+<!-- v-147 &lt;div class="k r"&gt;Challenge 8 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 8 of 8 · the trace</div><h1 class="q">A routing bug nobody sees</h1><table class="tl"><tr><th>Mon 10:00</th><td>a tier-job change marks <span class="bad">30 % of mid-tier authors as pull</span> by mistake</td></tr><tr><th>Mon 10:00</th><td>no errors; latency unchanged</td></tr><tr><th>Mon 10:00</th><td>their posts reach followers only through the merge, which lists only true celebrities: <span class="bad">never shown</span></td></tr><tr><th>Mon–Sun</th><td>engagement per session drifts down 2 %</td></tr><tr><th>Mon +7</th><td>a product manager asks why</td></tr></table>
+</div>
+<!-- v-148 &lt;div class="k"&gt;Challenge 8 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 8 of 8 · the fix</div><h1>Measure the promise: post-to-visible time, per tier</h1><figure class="grow"><!--SVG:ch8-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>Synthetic authors in every tier post every minute; synthetic followers open the feed and time the post's arrival. That is the freshness SLI, per tier: p95 under 5 s.</div><div class="whyb"><b class="t">Why it works</b>The probe walks the real path end to end, so a routing mistake shows in one tier within minutes.</div></div>
+</div>
+<!-- v-149 &lt;div class="k"&gt;Challenge 8 of 8 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 8 of 8 · sequence</div><h1>Post, deliver, look, time it</h1><figure class="grow"><!--SVG:seq-probe--></figure>
+</div>
+<!-- v-150 &lt;div class="k"&gt;Challenge 8 of 8 · sympto -->
+<div class="slide">
+<div class="k">Challenge 8 of 8 · symptom pairs</div><h1>Two metrics, one conclusion</h1><table class="bt sm"><tr><th>When you see</th><th>And</th><th>It means</th></tr><tr class=""><td>fan-out lag up</td><td>post rate flat</td><td>workers slow or stuck, not more traffic</td></tr><tr class=""><td>freshness bad for one tier</td><td>lag flat</td><td>a routing bug: this case</td></tr><tr class=""><td>ranking fallback up</td><td>ranking p99 normal</td><td>the deadline is misconfigured</td></tr><tr class=""><td>author-index reads up</td><td>timeline hit rate down</td><td>a rebuild wave: a lost shard</td></tr><tr class=""><td>engagement down</td><td>fallback, freshness, empty-feed rate all normal</td><td>a ranking model change; ranking's to own</td></tr></table><div class="strip one"><div class="whyb"><b class="t">Quality, not uptime</b>Empty-feed rate, fallback rate, share of items from close ties, engagement per session against its seasonal baseline.</div></div>
+</div>
+<!-- v-151 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“Finance says the timeline tier's memory bill doubled while users grew ten percent.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-152 &lt;div class="k"&gt;Challenge 8 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 8 of 8 · the second fix</div><h1>Cost is observable too</h1><table class="bt sm"><tr><th>Measure</th><th>What usually drifted</th><th>Lever</th></tr><tr class=""><td>memory per active user</td><td>the timeline bound crept up</td><td>500 → 300 entries saves 40 %</td></tr><tr class=""><td>share of inserts to inactive users</td><td>the active cut-off was widened</td><td>back to 30 days: about half the writes</td></tr><tr class=""><td>entries per timeline</td><td>the mid tier pushes to everyone</td><td>restore active-in-a-day for the mid tier</td></tr></table><div class="line a">Find what grew, then pull the lever. Don't buy a bigger cluster first.</div>
+</div>
+<!-- v-153 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“I measure the promise, not the servers: synthetic accounts in every tier post and read every minute, so I know post-to-visible time per tier. Then quality signals, empty feeds, ranking fallbacks, engagement against its baseline, catch the feed that works but got worse. And I read metrics in pairs to find the cause.”</div>
+</div>
+<!-- v-154 card Build cost -->
+<div class="slide th aux">
+<div class="lbl">Chapter 8 of 9</div><div class="s">Build cost</div><div class="sub">Who builds it, in what order, and what it costs. The manager layer.</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="done">Design</span><span class="done">Challenges</span><span class="on">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-155 &lt;div class="k"&gt;Build cost · sequence by  -->
 <div class="slide aux">
-<div class="k">The manager layer · team seams</div>
-<h1>Three teams along the data</h1>
-<div class="cards c3">
-<div class="cd"><h3>Publish and graph</h3><p>Posts, the outbox, follow edges.</p></div>
-<div class="cd red"><h3>Fan-out and timelines</h3><p>Workers, the timeline tier, the threshold. Owns freshness on-call.</p></div>
-<div class="cd grn"><h3>Feed serving</h3><p>Merge, filter, the ranking integration, the budget.</p></div>
+<div class="k">Build cost · sequence by measured load</div><h1>MVP first, then push, then the hybrid</h1><table class="bt sm"><tr><th>Phase</th><th>Scope</th><th>People</th><th>Time</th></tr><tr class=""><td>MVP · V1</td><td>pull with a per-reader cache; posts, author index, graph integration, ranking call</td><td>4 engineers</td><td>1 quarter</td></tr><tr class=""><td>Push · V2</td><td>outbox, log, fan-out workers, timelines, post cache</td><td>two teams</td><td>1 quarter</td></tr><tr class=""><td>Hybrid · V3</td><td>tiers, celebrity lists, filter on read, deadline, rebuild path, probes</td><td>2–3 teams</td><td>2 quarters</td></tr></table><div class="hedge"><b class="t">Label the numbers</b>Illustrative staffing. The order is the point: each phase starts when the measured load of the one before demands it.</div>
 </div>
-<div class="line">Contracts: the post-created event and the timeline schema.</div>
-<div class="foot"><span>News feed · teams</span><span>stage 10</span></div>
+<!-- v-156 &lt;div class="k"&gt;Build cost · the migratio -->
+<div class="slide aux">
+<div class="k">Build cost · the migration</div><h1>Pull to push, two teams, one quarter, no downtime</h1><table class="bt sm"><tr><th>Weeks</th><th>Step</th></tr><tr class=""><td>1–4</td><td>build fan-out and timelines beside the pull path; nothing reads them</td></tr><tr class=""><td>5–8</td><td>shadow: write timelines, keep serving pull, compare both feeds per user</td></tr><tr class=""><td>9–11</td><td>switch by cohort: 1 %, 10 %, 50 %, all; roll back by cohort</td></tr><tr class=""><td>12–13</td><td>pull stays as the rebuild and catch-up path; remove the per-reader cache</td></tr></table>
 </div>
-
-<!-- 62 -->
+<!-- v-157 &lt;div class="k"&gt;Build cost · team seams&lt;/ -->
+<div class="slide aux">
+<div class="k">Build cost · team seams</div><h1>Three teams along the data</h1><div class="cards c3"><div class="cd"><h3>Publish and graph</h3><p>Post service, posts store, author index, the event. Contract: the post-created event schema.</p></div><div class="cd grn"><h3>Fan-out and timelines</h3><p>Workers, tiers, timelines, celebrity lists, rebuild. Contract: the timeline entry format.</p></div><div class="cd amb"><h3>Feed serving</h3><p>Read path, filter, cursor, ranking integration. Contract: the Rank call with its deadline.</p></div></div><div class="line a">On-call is on freshness and feed latency; ranking's fallback rate pages ranking.</div>
+</div>
+<!-- v-158 &lt;div class="k"&gt;Build cost · money&lt;/div&gt;&lt; -->
+<div class="slide aux">
+<div class="k">Build cost · money</div><h1>Two lines dominate; one lever halves the first</h1><table class="bt sm"><tr><th>Item</th><th>Arithmetic</th><th>Lever</th></tr><tr class=""><td>Timeline memory</td><td>4 TB × 3 replicas ≈ 12 TB of RAM</td><td>skip inactive users; the bound; the threshold</td></tr><tr class=""><td>Fan-out writes</td><td>~120,000 → ~60,000 inserts/s</td><td>active-only targeting</td></tr><tr class=""><td>Post cache</td><td>hot posts, a few TB</td><td>hit rate</td></tr><tr class=""><td>Everything else</td><td>small next to these</td><td>—</td></tr></table><div class="hedge"><b class="t">Top risks</b>The threshold set once and never measured. Rebuild never load-tested. Ranking's budget renegotiated every release instead of owned.</div>
+</div>
+<!-- v-159 card Recap -->
 <div class="slide th">
-  <div class="lbl">Key line · the close</div>
-  <div class="s">I traded strict freshness for <em>seconds</em> of eventual consistency.</div>
-  <div class="sub">Hybrid fan-out, IDs not bodies, deletes on the read path. Next: tune the threshold with data, stop fanning out to inactive users.</div>
-  <div class="foot"><span>News feed · the close</span><span>stage 11</span></div>
+<div class="lbl">Chapter 9 of 9</div><div class="s">Recap</div><div class="sub">One picture, one sentence per path, the mistakes, the thesis</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="done">Design</span><span class="done">Challenges</span><span class="done">Cost · AUX</span><span class="on">Recap</span></div>
 </div>
-
-<!-- 63 -->
-<div class="slide qs">
-<div class="who">Follow-up 1 · stakeholder pressure</div>
-<div class="qq">"The ranking team has a new model that lifts engagement. It needs three hundred milliseconds. They want it in the feed next sprint."</div>
-<div class="hint">Whose decision is the budget? What do you bring?</div>
-</div>
-
-<!-- 64 -->
+<!-- v-160 &lt;div class="k"&gt;Recap · the final design&lt; -->
 <div class="slide dia">
-<div class="k">Follow-up 1 · the options</div>
-<h1>Four ways to answer, one of them is "yes"</h1>
-<figure class="grow"><!--SVG:fu-ranking--></figure>
-<div class="foot"><span>News feed · follow-up 1</span><span>stakeholder</span></div>
+<div class="k">Recap · the final design</div><h1>Everything on one baseline</h1><figure class="grow"><!--SVG:base-final--></figure>
 </div>
-
-<!-- 65 -->
-<div class="slide qs">
-<div class="who">Follow-up 2 · an incident</div>
-<div class="qq">"Sunday, eight in the evening. A timeline cache cluster is lost. One user in five opens an empty feed."</div>
-<div class="hint">Detect, contain, recover, learn.</div>
-</div>
-
-<!-- 66 -->
-<div class="slide dia">
-<div class="k">Follow-up 2 · the first hour</div>
-<h1>Contain the stampede before you fix the shard</h1>
-<figure class="grow"><!--SVG:fu-incident--></figure>
-<div class="foot"><span>News feed · follow-up 2</span><span>incident</span></div>
-</div>
-
-<!-- 67 -->
-<div class="slide qs">
-<div class="who">Follow-up 3 · a migration</div>
-<div class="qq">"Today the feed is pure pull, and it's getting slow. Two teams, one quarter, no downtime. Get us to the hybrid."</div>
-<div class="hint">Shadow, compare, ramp. Every step reversible.</div>
-</div>
-
-<!-- 68 -->
-<div class="slide dia">
-<div class="k">Follow-up 3 · thirteen weeks</div>
-<h1>Run both, compare, then switch</h1>
-<figure class="grow"><!--SVG:fu-migration--></figure>
-<div class="foot"><span>News feed · follow-up 3</span><span>migration</span></div>
-</div>
-
-<!-- 69 -->
-<div class="slide qs">
-<div class="who">Follow-up 4 · a cost spike</div>
-<div class="qq">"Finance says the timeline tier's memory bill doubled this year, and users grew twenty percent."</div>
-<div class="hint">Slice before you guess.</div>
-</div>
-
-<!-- 70 -->
-<div class="slide dia">
-<div class="k">Follow-up 4 · the levers</div>
-<h1>Find what grew, then pull the biggest lever</h1>
-<figure class="grow"><!--SVG:fu-cost--></figure>
-<div class="foot"><span>News feed · follow-up 4</span><span>cost</span></div>
-</div>
-
-<!-- 71 -->
-<div class="slide qs">
-<div class="who">Follow-up 5 · the tail of readers, technical</div>
-<div class="qq">"Some users follow five thousand accounts, three hundred of them celebrities. Their feed is slow."</div>
-<div class="hint">The hybrid's own weak spot.</div>
-</div>
-
-<!-- 72 -->
-<div class="slide dia">
-<div class="k">Follow-up 5 · the answer</div>
-<h1>Treat the tail of readers like the tail of authors</h1>
-<figure class="grow"><!--SVG:fu-power-reader--></figure>
-<div class="foot"><span>News feed · follow-up 5</span><span>power reader</span></div>
-</div>
-
-<!-- 73 -->
+<!-- v-161 &lt;div class="k"&gt;Recap · one sentence per  -->
 <div class="slide">
-<div class="k">Debrief</div>
-<h1>Where the round lands at Staff</h1>
-<table class="bt sm"><tr><th>Signal</th><th>Senior</th><th>Staff / L6–L7</th></tr>
-<tr><td>Framing</td><td>asks read:write</td><td>asks for the max follower count; 100 M writes, said with the arithmetic</td></tr>
-<tr><td>Fan-out</td><td>push or pull</td><td>three tiers, the lag table, crossing, active-only, the power reader</td></tr>
-<tr><td>Data</td><td>"a timeline cache"</td><td>ZSET layout, IDs not bodies sized, Snowflake IDs, ERD</td></tr>
-<tr><td>API</td><td>endpoints</td><td>wire formats; a signed score+id cursor, not an offset</td></tr>
-<tr><td>Correctness</td><td>delete from timelines</td><td>filter on read; idempotent ZADD; ranking deadline</td></tr>
-</table>
-<div class="foot"><span>News feed · scorecard</span><span>debrief</span></div>
+<div class="k">Recap · one sentence per path</div><h1>Four paths</h1><table class="bt sm"><tr><th>Path</th><th>In one sentence</th></tr><tr class=""><td>Publish</td><td>One transaction and an event; push IDs to active followers, or one write for a celebrity.</td></tr><tr class=""><td>Read</td><td>One timeline and a few celebrity lists; filter; rank under a deadline; hydrate fifty; a cursor.</td></tr><tr class=""><td>Remove</td><td>One write to the post; enforced on every page; cleanup later.</td></tr><tr class=""><td>Rebuild</td><td>Pull, coalesced, rate-limited; degraded if over the limit.</td></tr></table>
 </div>
-
-<!-- 74 -->
+<!-- v-162 &lt;div class="k"&gt;Recap · common mistakes i -->
+<div class="slide">
+<div class="k">Recap · common mistakes in this round</div><h1>What costs points</h1><div class="cards c2"><div class="cd red"><h3>Design</h3><p>Picking push or pull and defending it. Bodies in timelines. No number on the threshold. Strong consistency for a feed.</p></div><div class="cd red"><h3>Correctness</h3><p>Chasing deletes into copies. An offset for pagination. “Exactly once” fan-out.</p></div><div class="cd amb"><h3>Operations</h3><p>Ranking with no deadline. No plan for a lost shard. Watching uptime, not freshness.</p></div><div class="cd amb"><h3>Focus</h3><p>Going deep on the ranking model. Never asking about the follower distribution.</p></div></div>
+</div>
+<!-- v-163 &lt;div class="k"&gt;Recap · the challenges&lt;/d -->
+<div class="slide">
+<div class="k">Recap · the challenges</div><h1>Eight questions, eight answers</h1><table class="bt sm"><tr><th>Challenge</th><th>The answer in a phrase</th></tr><tr class=""><td>1 The celebrity post</td><td>pull it; one write</td></tr><tr class=""><td>2 The line</td><td>both sides of the arithmetic; no backfill</td></tr><tr class=""><td>3 Delete and block</td><td>filter on read; cleanup is cosmetic</td></tr><tr class=""><td>4 Twice or never</td><td>idempotent inserts; a cursor; a session list</td></tr><tr class=""><td>5 A lost shard</td><td>rebuild by pull; coalesce; limit; degrade</td></tr><tr class=""><td>6 A slow ranker</td><td>a deadline, a fallback, an owner</td></tr><tr class=""><td>7 Catch-up</td><td>the source of truth, not the cache</td></tr><tr class=""><td>8 Got worse?</td><td>synthetic probes per tier; symptom pairs</td></tr></table>
+</div>
+<!-- v-164 &lt;div class="lbl"&gt;The close&lt;/div&gt;&lt;div cla -->
 <div class="slide th">
-  <div class="lbl">Debrief</div>
-  <div class="s" style="font-size:38pt">Six checks before the real round.</div>
-  <ol class="check" style="padding-left:30pt">
-    <li>Ask for the maximum follower count.</li>
-    <li>Every number as a calculation: 100 M writes, 4 TB vs 250 TB.</li>
-    <li>Wire formats: the post, the feed page, the cursor.</li>
-    <li>Every store and transport against its alternatives.</li>
-    <li>Deletes on the read path; ranking inside a deadline.</li>
-    <li>The EM layer only when the loop asks for it.</li>
-  </ol>
-  <div class="foot"><span>News feed · mock round</span><span>end</span></div>
+<div class="lbl">The close</div><div class="s">Push IDs for most, <em>pull</em> the few, a line set by <em>arithmetic</em>. Correctness on the <em>read path</em>. Every degraded mode has a <em>fallback and a metric</em>.</div>
 </div>
 </body></html>

@@ -155,7 +155,28 @@ def cycle():
     return svg(W, H, b)
 
 
-FIGS = {"p13-no-breaker": no_breaker, "p13-breaker": breaker, "p13-shared-pool": shared_pool, "p13-cells": cells,
+
+# ---------------------------------------------------------------- p13-retry-amp  (three layers of three attempts)
+def retry_amp():
+    W, H = 1600, 620
+    tiers = [("User", 1, GREY), ("Front end", 3, BLUE), ("Service", 9, AMBER), ("Database", 27, RED)]
+    b = [title(40, 50, "Each layer makes up to 3 attempts when the layer below fails")]
+    for i, (name, n, col) in enumerate(tiers):
+        x = 70 + i * 390
+        b.append(text(x + 130, 120, name, 26, INK, "middle", 800))
+        cols = 9 if n == 27 else n
+        rows = (n + cols - 1) // cols
+        for k in range(n):
+            cx = x + 130 + (k % cols - (cols - 1) / 2) * 30
+            cy = 250 + (k // cols - (rows - 1) / 2) * 34
+            b.append(rect(cx - 12, cy - 14, 24, 28, FILL[col], col, 2, 4))
+        b.append(text(x + 130, 400, f"{n} attempt" + ("s" if n > 1 else ""), 30, col, "middle", 800))
+        if i: b.append(text(x - 65, 258, "× 3", 28, MUTED, "middle", 800))
+    b.append(text(800, 500, "A database at 2× its capacity, with every layer retrying, can face **27×** its normal load.", 24, INK, "middle"))
+    b.append(text(800, 555, "The retries arrive exactly when it can least absorb them.", 22, MUTED, "middle"))
+    return svg(W, H, b)
+
+FIGS = {"p13-retry-amp": retry_amp, "p13-no-breaker": no_breaker, "p13-breaker": breaker, "p13-shared-pool": shared_pool, "p13-cells": cells,
         "p13-static": static, "p13-metastable": metastable, "p13-cycle": cycle}
 
 if __name__ == "__main__":

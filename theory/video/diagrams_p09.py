@@ -145,7 +145,28 @@ def penetration():
     return svg(W, H, b)
 
 
-FIGS = {"p9-hit-curve": hit_curve, "p9-ttl-sync": ttl_sync, "p9-lost-invalidation": lost_invalidation,
+
+# ---------------------------------------------------------------- p9-derived  (one system of record, many derived views)
+def derived():
+    W, H = 1600, 700
+    b = []
+    b.append(cyl(60, 250, 260, 170, ["System of record", "the database"], BLUE))
+    b.append(box(420, 285, 250, 100, ["Change log", "every commit, in order"], AMBER))
+    b.append(arrow(322, 335, 418, 335, colour=INK, w=3))
+    outs = [("Cache invalidator", "delete changed keys", 60), ("Search index", "rebuilt by replay", 205),
+            ("Warehouse", "analytics, hours later", 350), ("Feature store", "for ranking and ML", 495)]
+    for name, sub, y in outs:
+        b.append(box(960, y, 330, 105, [name, sub], GREEN))
+        b.append(arrow(672, 335, 958, y + 52, colour=GREEN, w=2.5))
+    b.append(text(1460, 130, "derived:", 22, GREEN, "middle", 800))
+    b.append(mtext(1460, 170, ["can be thrown", "away and", "recomputed", "from the log"], 22, GREEN, "middle", 600))
+    b.append(text(190, 470, "the only copy that", 21, BLUE, "middle", 700))
+    b.append(text(190, 498, "is ever written to", 21, BLUE, "middle", 700))
+    b.append(line(60, 640, 1540, 640, "#d0d7de", 2))
+    b.append(text(800, 680, "Derived data is **never written back** to the source. Each view states its lag.", 24, INK, "middle"))
+    return svg(W, H, b)
+
+FIGS = {"p9-derived": derived, "p9-hit-curve": hit_curve, "p9-ttl-sync": ttl_sync, "p9-lost-invalidation": lost_invalidation,
         "p9-stale-set": stale_set, "p9-lease": lease, "p9-tiers": tiers, "p9-penetration": penetration}
 
 if __name__ == "__main__":

@@ -261,7 +261,32 @@ def checkpoint():
     return svg(W, H, b)
 
 
-FIGS = {"p10-queue-log": queue_log, "p10-segments": segments, "p10-isr": isr, "p10-group": group,
+
+# ---------------------------------------------------------------- p10-mapreduce  (a batch job: map, shuffle, reduce)
+def mapreduce():
+    W, H = 1600, 700
+    b = [text(40, 45, "Page views per URL, from yesterday's 2 TB of logs", 26, INK, "start", 700)]
+    cols = [(60, "Input", "files, never changed", GREY), (420, "Map", "emit (url, 1)", BLUE), (800, "Shuffle", "sort and group by key", AMBER), (1180, "Reduce", "sum per url", GREEN)]
+    for x, head, sub, col in cols:
+        b.append(text(x + 140, 110, head, 26, col, "middle", 800)); b.append(text(x + 140, 142, sub, 21, MUTED, "middle"))
+    ys = [190, 320, 450]
+    for i, y in enumerate(ys):
+        b.append(box(60, y, 280, 90, [f"log part {i + 1}"], GREY, size=22))
+        b.append(box(420, y, 280, 90, [f"map task {i + 1}"], BLUE, size=22))
+        b.append(arrow(342, y + 45, 418, y + 45, colour=MUTED, w=2.5))
+    keys = ["/home", "/cart", "/search"]
+    for j, y in enumerate(ys):
+        b.append(box(800, y, 280, 90, [f"key {keys[j]}"], AMBER, size=22))
+        b.append(box(1180, y, 280, 90, [f"{keys[j]} → " + ["412,031", "98,770", "1,204,556"][j]], GREEN, size=22))
+        b.append(arrow(1082, y + 45, 1178, y + 45, colour=MUTED, w=2.5))
+    for i, y1 in enumerate(ys):
+        for j, y2 in enumerate(ys):
+            b.append(line(702, y1 + 45, 798, y2 + 45, AMBER, 1.8))
+    b.append(text(800, 600, "Every value for one key meets on one machine. The shuffle is the expensive, network-heavy step.", 23, INK, "middle"))
+    b.append(text(800, 650, "Output goes to **new** files; a bug is fixed by fixing the code and running again.", 23, INK, "middle"))
+    return svg(W, H, b)
+
+FIGS = {"p10-mapreduce": mapreduce, "p10-queue-log": queue_log, "p10-segments": segments, "p10-isr": isr, "p10-group": group,
         "p10-sink-txn": sink_txn, "p10-reorder": reorder, "p10-poison": poison, "p10-lag": lag,
         "p10-fanout": fanout, "p10-watermark": watermark, "p10-checkpoint": checkpoint}
 

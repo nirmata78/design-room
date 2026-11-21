@@ -1,0 +1,44 @@
+{
+  "mp4": "loan-servicing-reference.mp4",
+  "teaser_chapter": null,
+  "thumbnail": {
+    "kicker": "Staff reference solution",
+    "title": "It settled.<br><em>Then it came back.</em>",
+    "sub": "Loan servicing: a ledger that is never edited, UNKNOWN and RETURNED as states, the rail as the limit.",
+    "id": "design-room · SD-95"
+  },
+  "youtube": {
+    "title": "Loan Servicing System Design (BNPL): Ledger, Collections Scheduler, Returns | Staff Reference",
+    "playlist": "System design reference solutions · design-room (create it once, reuse it)",
+    "tags": ["system design", "system design interview", "fintech system design", "loan servicing", "bnpl", "double entry ledger", "payment scheduler", "ach returns", "reconciliation", "idempotency", "staff engineer", "software architecture"],
+    "description_top": [
+      "600,000 repayments are due on the 1st. It sounds like a thundering herd; it is 42 a second. The hard parts of loan servicing are elsewhere: a card charge that times out, a bank debit that settles and comes back 40 days later, a refund that changes the schedule of a live loan, and a month-end where the ledger says $400 more than the bank. A full reference solution at the Staff bar (L6/L7): theory, a three-version design, eight challenges that break it, and the build cost. {DURATION} minutes, {SLIDES} numbered slides, with an interviewer, a candidate and a coach.",
+      "The thesis: throughput is never the problem here; correctness over months is. An immutable double-entry ledger, a payment state machine that admits unknown and returned, a scheduler bounded by the payment rail rather than the database, and a daily three-way reconciliation.",
+      "IN THIS VIDEO\n• Estimates as arithmetic: 42 a second on the busy day, a 22-minute card window under a 100/s contract, $90M on one morning\n• Theory: safety and liveness, seven mechanisms, an options matrix (including why a message broker solves the wrong problem)\n• Eight challenges: the processor timed out, the morning of the 1st, a debit that settled and came back, a refund mid-loan, a payoff with a debit in flight, $400 more than the bank, the card processor down on the 1st, and how you would know\n• The build cost and team seams (marked AUX, the manager layer)",
+      "HOW TO USE IT\nRun the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first. Slides badged AUX are the manager layer: skip them in a Staff round."
+    ],
+    "description_bottom": [
+      "LINKS\nWritten reference design: https://github.com/nirmata78/design-room/blob/main/solutions/SD-95-loan-servicing/SD-95_Loan_Servicing_Reference_Design.md\nRun this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room\nAll videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md",
+      "ABOUT THIS VIDEO\nThis is a scripted walkthrough, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script, diagrams and the written design were produced with Claude Code. Numbers are back-of-the-envelope estimates for the exercise, labelled as given, illustrative or initial targets, not any company's real figures, and this is not any company's actual design. Bank-debit return rules were checked against public rule summaries in November 2026. Not legal, accounting or compliance advice. The technical content has not been reviewed by a person.",
+      "#SystemDesign #Fintech #SoftwareEngineering"
+    ]
+  },
+  "linkedin": {
+    "post": [
+      "Your bank debit settled on the 2nd. On the 3rd it came back. \"Settled means paid\" is where loan servicing designs break.",
+      "I've published a {DURATION}-minute reference solution for the loan servicing question (instalment loans, BNPL-style) at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on {SLIDES} numbered slides.",
+      "The idea that unlocks it: throughput is never the problem here. 600,000 collections on the 1st is 42 a second. The limits are the processor's contract and the bank's cut-off, and the hard part is correctness over months.",
+      "What it goes into:\n→ A timeout is UNKNOWN: query by the same key, never resend with a new one\n→ A return is a state and a reversal, and retry rules are policy\n→ A refund is a transaction plus a new schedule version\n→ Reconcile line by line, three ways; never by totals",
+      "Best on a second pass: pause after each question and answer it first.",
+      "▶ {YOUTUBE_URL}",
+      "It's a scripted walkthrough with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator.",
+      "What's the strangest month-end break you've chased?",
+      "#SystemDesign #Fintech #SoftwareEngineering"
+    ],
+    "first_comment": "Written reference design, stage by stage: https://github.com/nirmata78/design-room/blob/main/solutions/SD-95-loan-servicing/SD-95_Loan_Servicing_Reference_Design.md\n\nRun this round yourself, with an AI interviewer that won't help you: https://github.com/nirmata78/design-room",
+    "document": {
+      "pdf": "../../SD-95_Loan_Servicing_Reference_Design.pdf",
+      "title": "Instalment loan servicing: a Staff-level reference design"
+    }
+  }
+}

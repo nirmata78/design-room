@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 860" width="1600" height="860">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<rect x="30" y="40" width="470" height="313" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
+<path d="M30,48 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v38 h-470 z" fill="#c8341f"/>
+<text x="44" y="71.28" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="23.1" font-weight="700" fill="#fff">application</text>
+<rect x="44" y="93.6" width="34.1" height="22.8" rx="3" fill="#fdecea" stroke="#c8341f" stroke-width="0.8"/>
+<text x="61.0" y="111.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#c8341f">PK</text>
+<text x="85.1" y="111.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328" font-weight="700">id</text>
+<text x="486" y="111.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
+<rect x="31" y="124" width="468" height="38" fill="#f6f8fa"/>
+<rect x="44" y="131.6" width="34.1" height="22.8" rx="3" fill="#fdf3e1" stroke="#a86a12" stroke-width="0.8"/>
+<text x="61.0" y="149.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#a86a12">IX</text>
+<text x="85.1" y="149.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">merchant_id</text>
+<text x="486" y="149.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
+<text x="85.1" y="187.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">applicant_tok</text>
+<text x="486" y="187.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
+<rect x="31" y="200" width="468" height="38" fill="#f6f8fa"/>
+<text x="85.1" y="225.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">amount_cents</text>
+<text x="486" y="225.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">int</text>
+<text x="85.1" y="263.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">status</text>
+<text x="486" y="263.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
+<rect x="31" y="276" width="468" height="38" fill="#f6f8fa"/>
+<text x="85.1" y="301.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">version</text>
+<text x="486" y="301.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">int</text>
+<text x="44" y="337.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17.2" font-style="italic" fill="#57606a">the state machine; optimistic version</text>
+<rect x="570" y="40" width="470" height="275" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
+<path d="M570,48 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v38 h-470 z" fill="#1168bd"/>
+<text x="584" y="71.28" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="23.1" font-weight="700" fill="#fff">decision</text>
+<rect x="584" y="93.6" width="34.1" height="22.8" rx="3" fill="#fdecea" stroke="#c8341f" stroke-width="0.8"/>
+<text x="601.0" y="111.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#c8341f">PK</text>
+<text x="625.1" y="111.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328" font-weight="700">application_id</text>
+<text x="1026" y="111.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
+<rect x="571" y="124" width="468" height="38" fill="#f6f8fa"/>
+<text x="625.1" y="149.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">outcome</text>
+<text x="1026" y="149.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
+<text x="625.1" y="187.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">reasons</text>
+<text x="1026" y="187.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text[]</text>
+<rect x="571" y="200" width="468" height="38" fill="#f6f8fa"/>
+<text x="625.1" y="225.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">model_v · policy_v · pricing_v</text>
+<text x="1026" y="225.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
+<text x="625.1" y="263.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">record_uri</text>
+<text x="1026" y="263.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
+<text x="584" y="299.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17.2" font-style="italic" fill="#57606a">written once, never updated</text>
+<rect x="1110" y="40" width="460" height="275" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
+<path d="M1110,48 a8,8 0 0 1 8,-8 h444 a8,8 0 0 1 8,8 v38 h-460 z" fill="#1168bd"/>
+<text x="1124" y="71.28" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="23.1" font-weight="700" fill="#fff">loan</text>
+<rect x="1124" y="93.6" width="34.1" height="22.8" rx="3" fill="#fdecea" stroke="#c8341f" stroke-width="0.8"/>
+<text x="1141.0" y="111.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#c8341f">PK</text>
+<text x="1165.1" y="111.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328" font-weight="700">id</text>
+<text x="1556" y="111.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
+<rect x="1111" y="124" width="458" height="38" fill="#f6f8fa"/>
+<rect x="1124" y="131.6" width="34.1" height="22.8" rx="3" fill="#eef1f4" stroke="#57606a" stroke-width="0.8"/>
+<text x="1141.0" y="149.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#57606a">UQ</text>
+<text x="1165.1" y="149.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">application_id</text>
+<text x="1556" y="149.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
+<text x="1165.1" y="187.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">offer_id</text>
+<text x="1556" y="187.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
+<rect x="1111" y="200" width="458" height="38" fill="#f6f8fa"/>
+<text x="1165.1" y="225.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">disclosure_v</text>
+<text x="1556" y="225.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
+<text x="1165.1" y="263.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">terms</text>
+<text x="1556" y="263.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">jsonb</text>
+<text x="1124" y="299.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17.2" font-style="italic" fill="#57606a">UNIQUE(application_id): one loan</text>
+<rect x="30" y="480" width="470" height="237" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
+<path d="M30,488 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v38 h-470 z" fill="#8c8c8c"/>
+<text x="44" y="511.28" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="23.1" font-weight="700" fill="#fff">outbox</text>
+<rect x="44" y="533.6" width="34.1" height="22.8" rx="3" fill="#fdecea" stroke="#c8341f" stroke-width="0.8"/>
+<text x="61.0" y="551.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#c8341f">PK</text>
+<text x="85.1" y="551.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328" font-weight="700">event_id</text>
+<text x="486" y="551.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
+<rect x="31" y="564" width="468" height="38" fill="#f6f8fa"/>
+<text x="85.1" y="589.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">type</text>
+<text x="486" y="589.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
+<text x="85.1" y="627.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">payload</text>
+<text x="486" y="627.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">jsonb</text>
+<rect x="31" y="640" width="468" height="38" fill="#f6f8fa"/>
+<text x="85.1" y="665.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">published_at</text>
+<text x="486" y="665.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">ts</text>
+<text x="44" y="701.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17.2" font-style="italic" fill="#57606a">same commit as the loan</text>
+<rect x="570" y="480" width="470" height="237" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
+<path d="M570,488 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v38 h-470 z" fill="#1168bd"/>
+<text x="584" y="511.28" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="23.1" font-weight="700" fill="#fff">vendor_call</text>
+<rect x="584" y="533.6" width="34.1" height="22.8" rx="3" fill="#fdecea" stroke="#c8341f" stroke-width="0.8"/>
+<text x="601.0" y="551.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#c8341f">PK</text>
+<text x="625.1" y="551.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328" font-weight="700">application_id</text>
+<text x="1026" y="551.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
+<rect x="571" y="564" width="468" height="38" fill="#f6f8fa"/>
+<rect x="584" y="571.6" width="34.1" height="22.8" rx="3" fill="#fdecea" stroke="#c8341f" stroke-width="0.8"/>
+<text x="601.0" y="589.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#c8341f">PK</text>
+<text x="625.1" y="589.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328" font-weight="700">vendor · seq</text>
+<text x="1026" y="589.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
+<text x="625.1" y="627.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">outcome</text>
+<text x="1026" y="627.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
+<rect x="571" y="640" width="468" height="38" fill="#f6f8fa"/>
+<text x="625.1" y="665.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">cost_cents · ms</text>
+<text x="1026" y="665.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">int</text>
+<text x="584" y="701.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17.2" font-style="italic" fill="#57606a">every paid call, with its cost</text>
+<rect x="1110" y="480" width="460" height="199" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
+<path d="M1110,488 a8,8 0 0 1 8,-8 h444 a8,8 0 0 1 8,8 v38 h-460 z" fill="#1f2328"/>
+<text x="1124" y="511.28" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="23.1" font-weight="700" fill="#fff">vault (separate)</text>
+<rect x="1124" y="533.6" width="34.1" height="22.8" rx="3" fill="#fdecea" stroke="#c8341f" stroke-width="0.8"/>
+<text x="1141.0" y="551.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#c8341f">PK</text>
+<text x="1165.1" y="551.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328" font-weight="700">token</text>
+<text x="1556" y="551.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
+<rect x="1111" y="564" width="458" height="38" fill="#f6f8fa"/>
+<text x="1165.1" y="589.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">ssn · dob · address</text>
+<text x="1556" y="589.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">enc</text>
+<text x="1165.1" y="627.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">key_id</text>
+<text x="1556" y="627.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
+<text x="1124" y="663.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17.2" font-style="italic" fill="#57606a">only the vault and adapters</text>
+<path d="M570.0,122.5 L500.0,133.9" fill="none" stroke="#5b6672" stroke-width="1.8"/>
+<circle cx="570.0" cy="122.5" r="4" fill="#5b6672"/>
+<text x="552.1" y="119.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="19.8" font-weight="700" fill="#c8341f">1</text>
+<circle cx="500.0" cy="133.9" r="4" fill="#5b6672"/>
+<text x="517.9" y="151.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="19.8" font-weight="700" fill="#c8341f">1</text>
+<path d="M1110.0,122.5 L1040.0,122.5" fill="none" stroke="#5b6672" stroke-width="1.8"/>
+<circle cx="1110.0" cy="122.5" r="4" fill="#5b6672"/>
+<text x="1094.0" y="117.2" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="19.8" font-weight="700" fill="#c8341f">0..1</text>
+<circle cx="1040.0" cy="122.5" r="4" fill="#5b6672"/>
+<text x="1056.0" y="143.2" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="19.8" font-weight="700" fill="#c8341f">1</text>
+<rect x="30" y="800" width="1540" height="47.0" rx="6" fill="#fdf3e1" stroke="#a86a12" stroke-width="1.2"/>
+<text x="44" y="826.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="20.9" fill="#1f2328">The record body (report by reference, feature vector, missing calls) lives in encrypted object storage under record_uri.</text>
+</svg>

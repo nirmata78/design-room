@@ -5,6 +5,7 @@
 N: Part eight, transactions. Two requests touch the same data at the same time, and one of them is wrong afterwards. That is the whole subject. This part shows each kind of wrongness as a short trace, names the cheapest mechanism that rules it out, and then crosses the boundary of one database, where the tools become two-phase commit, sagas and reservations.
 
 ## 8.0 Why this part decides rounds
+N: First, a story about two doctors, two correct transactions, and a broken rule.
 
 = panel trap | The opening story | Two doctors both go off call. Each checked first.
 A hospital rule: at least one doctor must be on call. Alice and Bob are both on call, and both feel unwell.
@@ -12,11 +13,13 @@ Each opens the app at the same moment. Each transaction checks: "is anyone else 
 Both transactions were correct on their own. Now nobody is on call. The database raised no error.
 N: A hospital rule says at least one doctor must be on call. Alice and Bob are both on call, and both feel unwell. They open the app at the same moment. Each transaction checks whether anyone else is on call, and sees one other. Each sets itself off call, and commits. Both transactions were correct on their own, and now nobody is on call, and the database raised no error. This is write skew, from chapter seven of Designing Data-Intensive Applications, and most databases allow it by default.
 
-= panel note | Assumed reading | What this part does not repeat
-*Designing Data-Intensive Applications*, chapter 7.
-The chapter's taxonomy of isolation levels and the history of their names stay there. This part does the traces and the choices.
-Part 2 of this course: idempotency and exactly-once, with the deduplication sequence. Part 7: multi-version storage.
-N: Chapter seven of Designing Data-Intensive Applications is assumed, along with two earlier sections of this course: idempotency from part two, and multi-version storage from part seven. The taxonomy of isolation level names stays in the book. Here we do the traces, and the choices.
+= cards c4 | TXN-01 · From the ground up | Four promises of a transaction, in plain words
+Atomic :: All or nothing. A transfer debits one account **and** credits the other, or does neither.
+Consistent :: Your rules still hold afterwards: no negative balance, one doctor on call. Mostly **your** code's job.
+Isolated :: Transactions running at the same time behave **as if** they ran one after another.
+Durable :: Once it says committed, a crash cannot undo it: the log was fsynced.
+> The weak point in practice is **isolation**: the full promise is expensive, so databases ship weaker defaults.
+N: From the ground up, the four promises a transaction makes. Atomic: all or nothing. A transfer debits one account and credits the other, or does neither. Consistent: your rules still hold afterwards, no negative balance, at least one doctor on call. That one is mostly your code's job. Isolated: transactions running at the same time behave as if they ran one after another. And durable: once committed, a crash cannot undo it. In practice the weak point is isolation. The full promise is expensive, so most databases ship with a weaker default, and the opening story is what slips through.
 
 = list | Map of the part | Two halves
 - **Inside one database**: the anomalies, optimistic control, pessimistic locks, snapshot reads
@@ -25,6 +28,7 @@ N: Chapter seven of Designing Data-Intensive Applications is assumed, along with
 N: Two halves. Inside one database: the anomalies, and the optimistic and pessimistic ways to prevent them, plus snapshot reads. Across databases and services: two-phase commit and sagas. And three patterns that make retries safe and keep you from selling the last unit twice.
 
 ## 8.1 Isolation levels and anomalies
+N: We start with the anomalies themselves, each one as a single interleaving.
 
 = dia | TXN-01 · Tier A · The failure | Lost update: two read-modify-writes on one counter
 @ TXN-01
@@ -65,23 +69,23 @@ V: I name the anomaly my design must rule out, then the cheapest mechanism that 
 N: The probe: fix the doctors. Option one: lock the rows the decision reads. Select the on-call doctors for this shift for update. Both transactions try to lock the same rows, the second waits, then re-reads, sees only one doctor, and refuses. Option two: run at serializable, and one of the two aborts, and its retry refuses. Option three, where the database can express it, a constraint it checks itself. Any of the three is a strong answer. Saying use transactions is not.
 
 ## 8.2 Optimistic concurrency and conditional writes
+N: Next, optimistic control: write only if nothing changed since you read.
 
 = dia | TXN-02 · Tier A · The failure | Two editors, one document, the second save wins silently
 @ TXN-02
 p8-two-editors
 N: Two people edit the same document. Both load version seven. Ana saves her change. Ben, still looking at version seven, saves his, and it overwrites Ana's without either of them knowing. A lock held while someone edits for twenty minutes would be absurd. The right tool assumes conflicts are rare, lets both work, and checks at the moment of the write.
 
-= code | TXN-02 · Tier A · The mechanism | Write only if nothing changed since you read
-read:
-    SELECT body, version FROM docs WHERE id = 42;          -- version 7
+= code sql | TXN-02 · Tier A · The mechanism | Write only if nothing changed since you read
+-- read, remembering the version
+SELECT body, version FROM docs WHERE id = 42;            -- version 7
 
-write:
-    UPDATE docs SET body = :new, version = 8
-     WHERE id = 42 AND version = 7;
-    -- 1 row changed: success
-    -- 0 rows changed: someone else wrote first; re-read, merge or ask, retry
-
-on the wire: ETag "7" with If-Match, answered by 412 Precondition Failed (part 11)
+-- write only if it is still version 7
+UPDATE docs SET body = :new, version = 8
+ WHERE id = 42 AND version = 7;
+-- 1 row changed: success
+-- 0 rows changed: someone wrote first; re-read, merge or ask, then retry
+-- on the wire: ETag "7" with If-Match, answered by 412 (part 11)
 N: The mechanism: read the row with its version. Write with a condition: update only where the version is still seven, and set it to eight. If one row changed, you won. If zero rows changed, someone else wrote first, and you re-read, merge or ask the user, and retry. Ben's save now fails, and his editor shows him Ana's change. The same check appears on the wire as an entity tag with an if-match header, answered by precondition failed, which part eleven covers.
 
 = panel key | TXN-02 · Tier A · One level down | The check and the write are one atomic step
@@ -90,19 +94,12 @@ Every store has a form of it: a conditional `UPDATE`, a compare-and-swap, a cond
 The version must change on **every** write, including writes from other paths, such as a batch job.
 N: One level down. The condition must be checked by the store, in the same operation as the write. Read the version, then write in a second call, and the race is back between the two. Every store offers some form of it: a conditional update, a compare and swap, a conditional put, or a transaction that compares a revision, as in part four. And the version must change on every write, including writes from a batch job that someone wrote without knowing about the check.
 
-= code | TXN-02 · Tier A · The alternative and the price | 100 buyers, the last unit, and the retry arithmetic
-optimistic, read stock then conditional write:
-    100 read stock = 1; 1 wins; 99 retry, see 0, give up   ->  about 200 attempts
-
-optimistic, 100 buyers decrementing 100 units, read-modify-write:
-    each round only one of the contenders wins
-    100 + 99 + ... + 1  = 5,050 attempts                    ->  quadratic
-
-pessimistic lock per unit row:
-    100 waits in a line, at 2 ms each                       ->  200 ms for the last
-
-one atomic statement:  UPDATE stock SET n = n - 1 WHERE id = 9 AND n > 0
-    no retries, no application lock; the row lock is held for microseconds
+= table | TXN-02 · Tier A · The alternative and the price | 100 buyers, the last unit, and the retry arithmetic
+Approach | Cost | Why
+Optimistic, the last unit | about 200 attempts | 1 wins; 99 retry, see 0, give up
+Optimistic, 100 buyers for 100 units | **5,050 attempts**: quadratic | each round only one contender wins: \(100 + 99 + \dots + 1\)
+A row lock | 200 ms for the last buyer | 100 in a line, 2 ms each
+One atomic statement | no retries at all | `UPDATE stock SET n = n - 1 WHERE id = 9 AND n > 0`
 N: The arithmetic of contention. A hundred buyers want the last unit. Optimistically, a hundred read one, one wins, ninety-nine retry, see zero and give up: about two hundred attempts, fine. But a hundred buyers decrementing a hundred units by read, modify, write, each round lets only one of the contenders win, so the total is five thousand and fifty attempts. Quadratic. A pessimistic lock makes them queue, two hundred milliseconds for the last. Best of all is one atomic statement: decrement where stock is above zero. No retries, and the row lock is held for microseconds.
 
 = th | TXN-02 · the line to say | Optimistic control writes only if the version is unchanged, atomically. It is cheap when conflicts are rare, and quadratic when they are not.
@@ -110,8 +107,9 @@ V: Optimistic concurrency writes on condition that the version has not changed, 
 [pause: 0.8]
 
 ## 8.3 Pessimistic locking
+N: Next, pessimistic control: lock first, then decide.
 
-= code | TXN-03 · Tier A · The mechanism | Lock what you read, before you decide
+= code sql | TXN-03 · Tier A · The mechanism | Lock what you read, before you decide
 @ TXN-03
 BEGIN;
 SELECT balance FROM accounts WHERE id = 7 FOR UPDATE;   -- row lock until commit
@@ -119,7 +117,7 @@ SELECT balance FROM accounts WHERE id = 7 FOR UPDATE;   -- row lock until commit
 UPDATE accounts SET balance = balance - 30 WHERE id = 7;
 COMMIT;
 
-a queue in a table, many workers, no two on the same job:
+-- a queue in a table: many workers, never two on the same job
 SELECT id FROM jobs WHERE state = 'ready'
  ORDER BY id LIMIT 10 FOR UPDATE SKIP LOCKED;
 N: Pessimistic locking takes the lock before deciding. Select the account row for update, and it is locked until commit. Any other transaction that wants the same row waits. Decide, update, commit. It is right when conflicts are frequent, or a retry is expensive. And one variant is worth knowing: select for update skip locked. Many workers take the next ten ready jobs, and each skips rows another worker has locked, so a plain table becomes a work queue with no two workers on the same job.
@@ -148,6 +146,7 @@ V: Pessimistic locking locks the rows a decision reads, until commit. I lock in 
 [pause: 0.8]
 
 ## 8.4 Snapshot reads
+N: Next, snapshot reads: a consistent view of the data, with no locks at all.
 
 = panel key | TXN-04 · Tier B · The mechanism | A read-only transaction at one timestamp, without locks
 @ TXN-04
@@ -167,6 +166,13 @@ V: Read-only work runs as a snapshot read at one timestamp: consistent across ev
 [pause: 0.8]
 
 ## 8.5 Two-phase commit
+N: Now we cross the boundary of one database. Two-phase commit.
+
+= cards c2 | TXN-05 · From the ground up | Two-phase commit, as booking a trip
+Phase one: hold :: A travel agent asks the airline and the hotel: *can you hold this seat and this room?* Each puts a firm hold in its own system and says **yes**, or says no.
+Phase two: decide :: Only if both said yes, the agent writes "confirmed" in its own records, then tells both to confirm. If either said no, both holds are released.
+> The risk sits in between: a hotel that said yes must keep the room until it hears the decision, however long the agent is gone.
+N: From the ground up, two-phase commit, as booking a trip. In phase one, a travel agent asks the airline and the hotel: can you hold this seat and this room? Each puts a firm hold in its own system and says yes, or says no. In phase two, only if both said yes, the agent writes confirmed in its own records, and then tells both to confirm. If either said no, both holds are released. The risk sits in the middle. A hotel that said yes has to keep the room until it hears the decision, however long the agent is gone.
 
 = dia | TXN-05 · Tier A · The failure | Money leaves one shard and never arrives at the other
 @ TXN-05
@@ -194,6 +200,7 @@ V: Two-phase commit has participants prepare durably and vote, and the coordinat
 [pause: 0.8]
 
 ## 8.6 Two-phase commit over consensus groups
+N: Next, two-phase commit made safe against a dead coordinator, by running it over consensus groups.
 
 = dia | TXN-06 · Tier B · The mechanism | Every participant and the coordinator is a replicated group
 @ TXN-06
@@ -210,6 +217,7 @@ V: Running two-phase commit where every participant and the coordinator is a con
 [pause: 0.8]
 
 ## 8.7 Sagas
+N: Next, sagas: atomic steps across services, with compensations instead of a shared transaction.
 
 = dia | TXN-08 · Tier A · The failure | Three services, no shared transaction, and a failure halfway
 @ TXN-08
@@ -239,24 +247,26 @@ V: Across services I use a saga: a sequence of local steps, each with an idempot
 [pause: 0.8]
 
 ## 8.8 Idempotency keys and dedup tables
+N: Next, idempotency keys: making a retry safe, even a double-click.
 
 = dia | TXN-09 · Tier A · The failure | The double-click: the second request arrives during the first
 @ TXN-09
 p8-double-click
 N: Part two introduced the idempotency key. Here is the case that breaks a naive version. A user double-clicks pay. Two requests with the same key arrive fifty milliseconds apart. The first checks the key table, finds nothing, and starts charging the card, which takes two seconds. The second checks the key table, also finds nothing, because the first has not finished, and starts charging too. A check, then act, done in two steps, is a race. The dedup has to claim the key before doing the work.
 
-= code | TXN-09 · Tier A · The mechanism | Claim the key first, then do the work, then store the response
+= code sql | TXN-09 · Tier A · The mechanism | Claim the key first, then do the work, then store the response
 CREATE TABLE idempotency (
-  key          text PRIMARY KEY,         -- client-chosen, per user or account
-  request_hash text NOT NULL,            -- same key, different body: reject
-  state        text NOT NULL,            -- 'in_progress' | 'done'
-  response     jsonb,                    -- replayed verbatim
-  expires_at   timestamptz NOT NULL      -- e.g. 24 hours
+  key          text PRIMARY KEY,       -- client-chosen, per user or account
+  request_hash text NOT NULL,          -- same key, different body: reject
+  state        text NOT NULL,          -- 'in_progress' or 'done'
+  response     jsonb,                  -- replayed verbatim on a retry
+  expires_at   timestamptz NOT NULL    -- for example, 24 hours
 );
-
-1. INSERT key, hash, 'in_progress'      -- unique key: only one request wins
-2. do the effect; in the SAME transaction where possible:
-   UPDATE ... SET state = 'done', response = :resp
+-- 1. claim: the primary key lets exactly one request win
+INSERT INTO idempotency (key, request_hash, state, expires_at)
+VALUES (:key, :hash, 'in_progress', now() + interval '24 hours');
+-- 2. do the effect and, in the same transaction, record the answer
+UPDATE idempotency SET state = 'done', response = :resp WHERE key = :key;
 N: The mechanism is a table with the key as its primary key, a hash of the request body, a state, the stored response, and an expiry. Step one: insert the key with state in progress. The primary key guarantees only one request can win this insert. Step two: perform the effect, and in the same transaction where possible, mark the key done and store the response. If the effect is in the same database, effect and key commit together, and the key can never say done without the effect.
 
 = panel key | TXN-09 · Tier A · One level down | The four cases a second request can meet
@@ -278,6 +288,7 @@ V: An idempotency key is claimed with a unique insert before any work starts, so
 [pause: 0.8]
 
 ## 8.9 The reservation pattern
+N: Next, reservations: how not to sell the last seat twice.
 
 = dia | TXN-10 · Tier A · The failure | Charge first or reserve first, and both are wrong without a hold
 @ TXN-10
@@ -306,6 +317,7 @@ V: For anything scarce across two systems I use a reservation. A conditional wri
 [pause: 0.8]
 
 ## 8.10 Escrow and split counters
+N: Next, escrow: a global limit, spent locally on many shards.
 
 = dia | TXN-12 · Tier B · The mechanism | A budget split into per-shard allowances
 @ TXN-12
@@ -323,6 +335,7 @@ V: For a hot global limit I use escrow: the budget is split into allowances that
 [pause: 0.8]
 
 ## 8.11 Recap
+N: Time to gather the whole part onto one page.
 
 = list | Recap | What to be able to explain without notes
 - The four anomalies **as traces**, and what the default level permits
@@ -335,6 +348,7 @@ V: For a hot global limit I use escrow: the budget is split into allowances that
 N: Without notes: the four anomalies as traces, and what your database's default actually permits. Optimistic writes and their retry arithmetic. Locks, with ordering and timeouts. Two-phase commit and its blocking case. Sagas and the pending state. The idempotency key claimed before the work, and the four cases a duplicate can meet. Reservations with their refund path, and escrow.
 
 ## 8.12 Probe drills
+N: Now the drills. Pause after each question, answer it aloud, then compare.
 
 = probe | The user double-clicks Pay. The second request arrives during the first.
 - Both carry the **same idempotency key**
@@ -367,6 +381,7 @@ C: For a rule like at least one doctor on call, the anomaly is write skew: two t
 C: The participants are in doubt. They promised to commit if told to, so they cannot abort, and they do not know the decision, so they cannot commit. They hold their locks until the coordinator recovers and tells them. Everything touching those rows waits. The fix is to make the coordinator a consensus group, so a new leader reads the decision from the replicated log and completes it.
 
 ## 8.13 Where this shows up
+N: Finally, where transactions show up in the design problems.
 
 = table | Where this shows up | What each design problem takes from this part
 Problem | Takes

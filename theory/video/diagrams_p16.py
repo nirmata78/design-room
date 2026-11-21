@@ -66,7 +66,30 @@ def migration():
     return svg(W, H, b)
 
 
-FIGS = {"p16-migration": migration}
+
+# ---------------------------------------------------------------- p16-cost  (unit cost, and the biggest lever)
+def cost():
+    W, H = 1600, 640
+    X0, X1 = 60, 1540
+    parts = [("Storage", 45, "3 replicas × 400 TB", BLUE), ("Compute", 35, "25% average utilisation", AMBER), ("Network", 15, "zones, regions", GREY), ("", 5, "", GREY)]
+    b = [title(60, 50, "$180,000 a month for 900 million requests = $0.20 per 1,000 requests")]
+    x = X0
+    for name, pct, sub, col in parts:
+        w = (X1 - X0) * pct / 100
+        b.append(rect(x, 110, w, 120, FILL[col], col, 3, 6))
+        if name:
+            b.append(text(x + w / 2, 160, f"{name} {pct}%", 26, INK, "middle", 800))
+            b.append(text(x + w / 2, 200, sub, 21, MUTED, "middle"))
+        else:
+            b.append(text(x + w / 2, 178, "5%", 21, MUTED, "middle"))
+        x += w
+    b.append(text(60, 320, "The levers, with numbers", 24, INK, "start", 800))
+    b.append(box(60, 350, 700, 120, ["Compute: utilisation 25% → 50%", "halves a third of the bill"], AMBER, size=24))
+    b.append(box(840, 350, 700, 120, ["Storage: cold data to erasure coding", "3× → 1.5× on most bytes (part 7)"], BLUE, size=24))
+    b.append(text(800, 550, "Name the biggest line, then the lever that moves it, and what it spends: headroom, or repair time.", 23, INK, "middle"))
+    return svg(W, H, b)
+
+FIGS = {"p16-cost": cost, "p16-migration": migration}
 
 if __name__ == "__main__":
     save(FIGS, set(sys.argv[1:]) or None)

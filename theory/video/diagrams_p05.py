@@ -240,7 +240,51 @@ def seed():
     return svg(W, H, b)
 
 
-FIGS = {"p5-async-tail": async_tail, "p5-lag-curve": lag_curve, "p5-dual-write": dual_write, "p5-outbox": outbox,
+
+# ---------------------------------------------------------------- p5-catchup  (replaces a text block: catch up or rebuild)
+def catchup():
+    W, H = 1600, 640
+    PX = 1150 / 16.5            # pixels per hour
+    X0 = 330
+    def X(h): return X0 + h * PX
+    b = [title(40, 50, "A replica two days behind: 864 million writes to apply")]
+    b.append(text(40, 185, "Catch up", 26, INK, "start", 800))
+    b.append(text(X0, 252, "replay 20,000 a second, while 5,000 a second still arrive", 21, MUTED))
+    b.append(bar(X(0), 150, X(16) - X(0), 70, "net 15,000 a second → about 16 hours", AMBER, 24, INK))
+    b.append(text(40, 385, "Rebuild", 26, INK, "start", 800))
+    b.append(text(X0, 452, "copy a 2 TB snapshot at 200 MB a second", 21, MUTED))
+    b.append(bar(X(0), 350, X(2.8) - X(0), 70, "2.8 h", GREEN, 24))
+    b.append(hatchbar(X(2.8), 350, X(3.4) - X(2.8), 70, "hatch", GREEN))
+    b.append(text(X(3.4) + 16, 395, "then replay only what arrived during the copy", 22, GREEN, "start", 700))
+    AY = 520
+    b.append(line(X(0), AY, X(16.5), AY, MUTED, 2, arrow=True))
+    for h in (0, 4, 8, 12, 16):
+        b.append(line(X(h), AY - 8, X(h), AY + 8, MUTED, 2)); b.append(text(X(h), AY + 34, f"{h} h", 21, MUTED, "middle"))
+    b.append(text(40, 610, "Catch-up is possible at all only if the leader still holds **two days of log**.", 23, INK))
+    return svg(W, H, b)
+
+
+# ---------------------------------------------------------------- p5-failover  (five steps, as a flow)
+def failover():
+    W, H = 1600, 560
+    steps = [("1 · Detect", ["3 missed heartbeats", "× 10 s = 30 s", "set against false alarms"], BLUE),
+             ("2 · Choose", ["the follower with the", "highest applied position", "(semi-sync: the acker)"], BLUE),
+             ("3 · Fence", ["revoke the lease, raise", "the epoch, or cut power:", "**not one more write**"], RED),
+             ("4 · Repoint", ["registry, proxy or", "virtual IP; stale client", "caches are the slow part"], BLUE),
+             ("5 · Reconcile", ["the old leader's tail is", "**saved**, compared, and", "replayed or reported"], GREEN)]
+    b = []
+    for i, (head, sub, col) in enumerate(steps):
+        x = 30 + i * 314
+        b.append(rect(x, 120, 284, 230, FILL[col], col, 3, 14))
+        b.append(text(x + 142, 172, head, 27, col, "middle", 800))
+        b.append(mtext(x + 142, 240, sub, 22, INK, "middle", 400, 1.45))
+        if i: b.append(line(x - 28, 270, x - 4, 270, MUTED, 3, arrow=True))
+    b.append(text(40, 70, "When the leader fails", 26, INK, "start", 700))
+    b.append(text(800, 450, "Leave out step 3 and a leader that was only **partitioned** keeps taking writes: split brain.", 24, RED, "middle"))
+    b.append(text(800, 505, "A timeout cannot tell dead from cut off. Only fencing makes the difference harmless.", 22, MUTED, "middle"))
+    return svg(W, H, b)
+
+FIGS = {"p5-catchup": catchup, "p5-failover": failover, "p5-async-tail": async_tail, "p5-lag-curve": lag_curve, "p5-dual-write": dual_write, "p5-outbox": outbox,
         "p5-multi-leader": multi_leader, "p5-sloppy": sloppy, "p5-merkle": merkle, "p5-tombstone": tombstone,
         "p5-seed": seed}
 

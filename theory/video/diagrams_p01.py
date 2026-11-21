@@ -219,8 +219,68 @@ def fanout():
     b.append(text(nx + 30, ny + 180, "at least one slow: 63%", 28, RED, "start", 800))
     return svg(W, H, b)
 
+
+# ---------------------------------------------------------------- new figures, drawn with the shared dg helpers
+import dg as G
+
+
+def storage_chain():
+    """The storage chain as bars to scale: logical → raw → with index → provisioned → nodes."""
+    W, H = 1600, 760
+    steps = [("logical", 73, "100 GB a day × 730 days", G.BLUE), ("× 3 replicas", 219, "raw", G.BLUE),
+             ("× 1.1 index", 241, "and metadata", G.BLUE), ("÷ 0.7 free space", 344, "provisioned", G.RED)]
+    B, PX, BW = 600, 1.45, 210
+    b = [G.title(40, 50, "From one day of records to a number of machines")]
+    for i, (lab, tb, sub, col) in enumerate(steps):
+        x = 90 + i * 300; h = tb * PX
+        b.append(G.bar(x, B - h, BW, h, "", col))
+        b.append(G.text(x + BW / 2, B - h - 18, f"**{tb} TB**", 28, col, "middle"))
+        b.append(G.text(x + BW / 2, B + 40, lab, 23, G.INK, "middle", 700))
+        b.append(G.text(x + BW / 2, B + 72, sub, 21, G.MUTED, "middle"))
+        if i: b.append(G.line(x - 82, B - 30, x - 8, B - 30, G.MUTED, 2.5, arrow=True))
+    b.append(G.line(60, B, 1260, B, G.MUTED, 2))
+    b.append(G.line(1240, B - 250, 1318, B - 250, G.MUTED, 2.5, arrow=True))
+    b.append(G.text(1279, B - 270, "÷ 8 TB", 21, G.MUTED, "middle", 700))
+    b.append(G.box(1330, B - 330, 230, 160, ["43 nodes", "8 TB usable each"], G.RED, size=24))
+    b.append(G.bracket(90, 90 + 3 * 300 + BW, 700, "almost 5× between the logical size and what you provision", G.RED, up=False, size=23))
+    return G.svg(W, H, b)
+
+
+def percentiles():
+    """A latency histogram with a long tail; median, average and p99 marked."""
+    import math, random
+    W, H = 1600, 720
+    L, R, B, T = 110, 1540, 560, 90
+    def X(ms): return L + (R - L) * ms / 200
+    # a log-normal-ish shape, drawn as bars of 5 ms
+    def dens(ms):
+        if ms <= 0: return 0
+        mu, sg = math.log(22), 0.45
+        return math.exp(-(math.log(ms) - mu) ** 2 / (2 * sg * sg)) / ms
+    vals = [dens(m + 2.5) for m in range(0, 200, 5)]
+    vals = [v + (0.0009 if 60 < i * 5 < 190 else 0) for i, v in enumerate(vals)]
+    top = max(vals)
+    b = []
+    for i, v in enumerate(vals):
+        h = (B - T) * v / top
+        b.append(G.rect(X(i * 5) + 2, B - h, X(5) - X(0) - 4, h, G.FILL[G.BLUE], G.BLUE, 1.5, 3))
+    b.append(G.line(L, B, R, B, G.MUTED, 2, arrow=True))
+    for ms in (0, 50, 100, 150, 200):
+        b.append(G.line(X(ms), B - 6, X(ms), B + 6, G.MUTED, 2)); b.append(G.text(X(ms), B + 34, f"{ms} ms", 21, G.MUTED, "middle"))
+    b.append(G.text(L, 52, "1,000 requests to one service, by how long each took", 24, G.INK, "start", 700))
+    for ms, lab, col, y in ((22, "median · p50 · 22 ms", G.GREEN, 140), (34, "average · 34 ms", G.AMBER, 210), (150, "p99 · 150 ms", G.RED, 140)):
+        b.append(G.line(X(ms), T + 10, X(ms), B, col, 3.5, "10 7"))
+        lx = X(ms) + 12 if ms > 100 else X(62)
+        if ms < 100: b.append(G.line(X(ms), y - 8, lx - 10, y - 8, col, 2))
+        b.append(G.text(lx, y, lab, 23, col, "start", 800, True))
+    b.append(G.text(X(110), 420, "the long tail: few requests, very slow", 22, G.MUTED, "middle", 700, True))
+    b.append(G.text(L, 640, "Half the requests beat the median. 99 in 100 beat p99. The average describes **no actual request**.", 23, G.INK))
+    return G.svg(W, H, b)
+
+
 FIGS = {"p1-load-curve": load_curve, "p1-latency-ladder": latency_ladder, "p1-series-parallel": series_parallel,
-        "p1-utilisation-curve": utilisation_curve, "p1-fanout": fanout}
+        "p1-utilisation-curve": utilisation_curve, "p1-fanout": fanout,
+        "p1-storage-chain": storage_chain, "p1-percentiles": percentiles}
 
 def main():
     OUT.mkdir(exist_ok=True)

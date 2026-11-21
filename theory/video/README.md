@@ -5,31 +5,31 @@ far enough to survive three "why?" in a row. Every part is one source file with 
 together. `course.py` compiles it, renders the slides, voices it with Kokoro, and builds a 1080p MP4
 with burned captions and chapters.
 
-The videos are not in the repository. They are built into `~/Movies/SD-Building-Blocks-course/`
-and stay there; they are not copied to Google Drive or anywhere else.
+The videos are not committed. They are built into `theory/video/out/` (gitignored) inside the repository
+and stay there; never `~/Movies`, Google Drive or anywhere else.
 
 ## The parts
 
 | Part | Title | Length | Chapters | Concepts |
 |---|---|---|---|---|
-| 1 | Estimation that changes the design | 27:23 | 15 | 11 |
-| 2 | Consistency, time and failure | 31:55 | 19 | 15 |
-| 3 | Consensus | 20:12 | 14 | 8 |
-| 4 | Coordination services | 23:19 | 11 | 6 |
-| 5 | Replication | 32:16 | 18 | 14 |
-| 6 | Partitioning and placement | 26:48 | 15 | 11 |
-| 7 | Storage engines and blob storage | 32:40 | 19 | 15 |
-| 8 | Transactions and concurrency control | 28:04 | 14 | 10 |
-| 9 | Caching | 27:13 | 15 | 11 |
-| 10 | Logs, queues, streams and sketches | 35:04 | 21 | 17 |
-| 11 | Networking, the edge and API contracts | 35:15 | 20 | 16 |
-| 12 | Rate limiting and overload control | 21:52 | 13 | 9 |
-| 13 | Reliability patterns | 30:25 | 18 | 14 |
-| 14 | Observability and time-series storage | 22:17 | 15 | 11 |
-| 15 | Scheduling and control planes | 20:38 | 13 | 9 |
-| 16 | Security, operating and evolving systems, the manager layer | 34:10 | 22 | 18 |
-| 17 | The building blocks | 15:35 | 11 | 22 |
-| | **Full course** (`SD-Full-Course.mp4`, 273 chapters) | **7:45:15** | | **217** |
+| 1 | Estimation that changes the design | 38:36 | 15 | 11 |
+| 2 | Consistency, time and failure | 48:15 | 19 | 15 |
+| 3 | Consensus | 27:11 | 14 | 8 |
+| 4 | Coordination services | 28:14 | 11 | 6 |
+| 5 | Replication | 41:10 | 18 | 14 |
+| 6 | Partitioning and placement | 32:58 | 15 | 11 |
+| 7 | Storage engines and blob storage | 42:46 | 19 | 15 |
+| 8 | Transactions and concurrency control | 33:16 | 14 | 10 |
+| 9 | Caching | 33:42 | 15 | 11 |
+| 10 | Logs, queues, streams and sketches | 45:17 | 21 | 17 |
+| 11 | Networking, the edge and API contracts | 42:26 | 20 | 16 |
+| 12 | Rate limiting and overload control | 27:03 | 13 | 9 |
+| 13 | Reliability patterns | 36:40 | 18 | 14 |
+| 14 | Observability and time-series storage | 26:50 | 15 | 11 |
+| 15 | Scheduling and control planes | 25:39 | 13 | 9 |
+| 16 | Security, operating and evolving systems, the manager layer | 41:47 | 22 | 18 |
+| 17 | The building blocks | 18:27 | 11 | 22 |
+| | **Full course** (`SD-Full-Course.mp4`, 273 chapters) | **9:50:25** | | **217** |
 
 `INDEX.md` lists every concept with its part, section and timestamp. Task videos cite those rows
 instead of teaching a concept again.
@@ -50,6 +50,26 @@ instead of teaching a concept again.
 | `companion/SD-Building-Blocks-Companion.md` | The written companion, extracted from the sources by `course.py companion`; `build-sd-booklet.sh` turns it into a PDF (the PDF is gitignored) |
 | `tests/` | `test_course.py`, the sample part `sample.txt` and its golden output |
 | `INDEX.md` | Generated: concept → part → section → timestamp |
+
+## Source format
+
+One file per part, `src/chNN.txt`. Lines are read top to bottom.
+
+| Line | Meaning |
+|---|---|
+| `#! title:` / `#! short:` | Part title; the short form goes in the footer |
+| `## n.m Title` | A section: a title card with pauses around it. The next line must be one `N:` sentence saying what the section is about; it is spoken and printed on the card (the builder lints a missing one) |
+| `= type flags \| kicker \| title \| …` | A slide. Types: `th` (a line to remember), `cards c2/c3/c4`, `tiles`, `list`, `table` (`sm` for small), `dia` (first body line names an SVG), `panel trap\|key\|watch\|note\|now`, `math`, `code <lang>`, `probe`, `cmd`, `shot`. Flags `new`, `aux`, `r` (red kicker) |
+| kicker `… · From the ground up` | A foundation slide (green kicker): the idea in plain words, with an everyday example, before the interview-depth slides |
+| `= math` body | Rows `$$ LaTeX $$ :: what it means` (KaTeX → MathML via `tex.js`), at most four, plus `~ lead` lines. Inline `\( … \)` LaTeX works in any slide text |
+| `= code <lang>` | Real code only, highlighted by `hl.js` (`sql http python json yaml go proto bash java ts ini`). Lines under ~70 characters, at most ~14. Arithmetic goes on a `math` slide, comparisons in a `table`, flows, budgets and timelines in a `dia` |
+| `@ ID` | The concept this slide homes (`concepts.tsv`) |
+| `> text` | The slide's bottom line; on a staged slide it fades in about 60% through the narration |
+| `+++` | Hide the body lines below it until a `[reveal]` line in the narration |
+| `N:` `V:` `I:` `C:` `E:` | Narrator, the line to say (slower), interviewer, candidate, aside. No symbols in speech; under ~100 words a line |
+| `[pause: S]` | Silence of S seconds. Pauses between slides, around title cards and after reveals are added by the builder (`PACE`, `PAUSE_AFTER`, `PAUSE_BEFORE` in `course.py`), and `build_cached.py` adds short beats between sentences |
+
+KaTeX and highlight.js live outside the repository: `(cd ~/.cache/sd-course/node && npm install katex@0.16.11 highlight.js@11.10.0)`.
 
 ## Commands
 

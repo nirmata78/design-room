@@ -5,6 +5,7 @@
 N: Part seven goes inside one node. Every store you draw as a box is, underneath, a write-ahead log, an on-disk structure, and a cache. When an interviewer says open that box, this is what they want to see: what is on disk before you say yes, what one read costs, and where the bytes go when a rack dies.
 
 ## 7.0 Why this part decides rounds
+N: First, a story about the word written, and what it really meant.
 
 = panel trap | The opening story | "Durable", acknowledged before the log reached the disk
 A service acknowledges each write after `write()` returns. The data is in the operating system's page cache, not on the disk.
@@ -12,10 +13,12 @@ A power cut. Ten seconds of acknowledged writes are gone, on every replica in th
 Nothing in the code was wrong except the meaning of the word "written".
 N: A service acknowledges each write as soon as the write call returns. But at that point the data is in the operating system's page cache, in memory, not on the disk. Then a power cut. Ten seconds of acknowledged writes vanish, on every replica in that rack at once, because they all made the same mistake. Nothing in the code was wrong except the meaning of the word written. This part starts from that word.
 
-= panel note | Assumed reading | What this part does not repeat
-*Designing Data-Intensive Applications*, chapter 3.
-The chapter's build-up from an append-only file, and the basics of B-trees, stay in the chapter. This part goes to the trace, the arithmetic and the failure cases.
-N: Chapter three of Designing Data-Intensive Applications is assumed. Its build-up from an append-only file and its B-tree basics stay in the book. This part does the full write and read trace through an LSM tree, the arithmetic of memory and amplification, and then blob storage.
+= cards c3 | STO-01 · From the ground up | The simplest database, and its two problems
+Append to a file :: Every write adds a line: `key, value`. Writing is as fast as the disk can stream. A newer line for the same key wins.
+Problem one: reads :: Finding a key means scanning the whole file, newest line first. Fine at a megabyte, hopeless at a terabyte.
+Problem two: space :: Old values for a key are never removed, so the file grows for ever.
+> Every engine in this part is an answer to those two problems: an **index** for the reads, and **compaction** or **in-place pages** for the space.
+N: From the ground up, the simplest possible database. Every write appends one line to a file: a key and a value. Writing is as fast as the disk can stream, and a newer line for a key wins. It has two problems. Reads: finding a key means scanning the whole file, which is fine at a megabyte and hopeless at a terabyte. And space: old values are never removed, so the file grows for ever. Every engine in this part answers those two problems, with an index for the reads, and either compaction or pages updated in place for the space. As always, green slides start from nothing.
 
 = list | Map of the part | Two halves
 - **The engine**: write-ahead log and fsync, B-trees, LSM trees and their read path, Bloom filters, skip lists, MVCC
@@ -24,6 +27,7 @@ N: Chapter three of Designing Data-Intensive Applications is assumed. Its build-
 N: Two halves. First the engine: the log and fsync, B-trees, LSM trees with their read path, the Bloom filters and skip lists inside them, and multi-version storage. Then the choices you make on top: the data model and the indexes. Then blob storage: layout, erasure codes, integrity, repair, garbage and backups.
 
 ## 7.1 Write-ahead log and fsync
+N: We start where every write starts: the log, and the call that makes it durable.
 
 = dia | STO-01 · Tier A · The failure | Where a write actually is, at each moment
 @ STO-01
@@ -37,15 +41,11 @@ After a crash, **replay the log** from the last checkpoint: every acknowledged c
 The log is sequential: one append, one sync. Random page writes happen later, in the background, in bulk.
 N: The mechanism is simple. Every change is appended to a write-ahead log, and the log is synced before the write is acknowledged. The real structure, B-tree pages or sorted tables, is updated in memory and written back later. After a crash, replay the log from the last checkpoint, and every acknowledged change is recovered. The log is sequential, so durability costs one append and one sync, and the expensive random writes happen later, in the background.
 
-= code | STO-01 · Tier A · One level down | Group commit: what one fsync costs, and what batching buys
-fsync on network block storage     about 1 ms
-fsync on NVMe with power-loss protection   about 0.05 ms
-
-one write per fsync, 1 ms:          1,000 writes a second
-group commit: every writer waiting in the same 1 ms
-    shares one fsync
-    with 100 waiting:               100,000 writes a second
-    cost: each write waits up to one fsync interval
+= math | STO-01 · Tier A · One level down | Group commit: what one fsync costs, and what batching buys
+~ An fsync takes about 1 ms on cloud block storage, about 0.05 ms on local NVMe with power-loss protection.
+$$ 1\ \text{ms per fsync} \Rightarrow 1{,}000\ \text{writes/s} $$ :: one write per fsync: the ceiling
+$$ 100\ \text{waiting} \times 1{,}000/\text{s} = 10^{5}\ \text{writes/s} $$ :: **group commit**: everyone waiting in the same millisecond shares one fsync
+~ The price: each write waits up to one more fsync interval.
 N: One level down: the arithmetic. On network block storage in a cloud, one fsync takes about a millisecond. On local NVMe with power-loss protection, about fifty microseconds. If each write does its own sync at one millisecond, the ceiling is a thousand writes a second. Group commit fixes that. Every writer that arrives while a sync is in progress waits, and the next sync covers all of them. With a hundred writers waiting, one sync commits a hundred writes, a hundred thousand a second, and each write waits at most about one more sync.
 
 = table | STO-01 · Tier A · The alternative and the price | How much durability, at what cost
@@ -66,6 +66,13 @@ Ask what the device guarantees. Test it: pull the power under load, and count wh
 N: The probe: your disk reports fsync in ten microseconds. Then something is lying, a drive cache with no power-loss protection, or a virtual disk that acknowledges from memory. Ask what the device actually guarantees, and test it the hard way: cut the power under load, and count what survives.
 
 ## 7.2 B-tree engines
+N: Next, the B-tree, the structure behind most relational databases.
+
+= panel key | STO-02 · From the ground up | A B-tree, as a phone book with tabbed sections
+The data lives in fixed-size **pages**, typically 8 or 16 KB. Each page holds sorted keys.
+An inner page holds keys and pointers to child pages: "A to F, go left; G to M, go here". A lookup follows one pointer per level.
+With about 500 pointers per page, four levels reach \(500^{4} \approx 6 \times 10^{10}\) keys. The top levels sit in memory, so a lookup is one or two disk reads.
+N: From the ground up, the B-tree. The data lives in fixed-size pages, usually eight or sixteen kilobytes, and each page holds keys in sorted order. An inner page is like the tabs on a phone book. It holds keys and pointers to child pages: A to F, go left, G to M, go here. A lookup follows one pointer per level. With about five hundred pointers per page, four levels reach tens of billions of keys. The top levels stay in memory, so finding any key costs one or two disk reads.
 
 = dia | STO-02 · Tier B · The mechanism | Update a page in place, log it first
 @ STO-02
@@ -83,6 +90,7 @@ V: A B-tree keeps sorted pages and updates them in place, with the change logged
 [pause: 0.8]
 
 ## 7.3 Skip lists
+N: Next, the skip list, the small structure inside many write buffers.
 
 = dia | DS-07 · Tier B · The mechanism | A sorted linked list with express lanes
 @ DS-07
@@ -100,6 +108,13 @@ V: A skip list is a sorted linked list with randomly chosen express lanes. Searc
 [pause: 0.8]
 
 ## 7.4 LSM-tree engines
+N: Next, the LSM tree, followed as one write from the log to the disk.
+
+= cards c3 | STO-03 · From the ground up | An LSM tree, as a notebook and sorted binders
+The notebook :: New writes go into a small sorted list in memory, the **memtable**, and to the log for safety. Instant.
+Sorted binders :: When the notebook is full, write it to disk in one go as a sorted, never-changed file: an **SSTable**.
+Tidying :: In the background, merge binders into bigger ones, keeping only the newest value per key: **compaction**.
+N: From the ground up, the log-structured merge tree, or LSM tree. Picture a notebook and some binders. New writes go into a small sorted list in memory, the memtable, and to the log for safety. That is instant. When the notebook is full, it is written to disk in one go, as a sorted file that is never changed again. And in the background, binders are merged into bigger ones, keeping only the newest value for each key. That tidying is compaction. Writes are always sequential. The price is the tidying.
 
 = dia | STO-03 · Tier A · The failure | A B-tree at a hundred thousand random writes a second
 @ STO-03
@@ -126,14 +141,11 @@ Space amplification | Low: about 1.1 | Up to **2**: old and new copies during a 
 Use for | Read-heavy, space-sensitive | Write-heavy, with spare disk
 N: Compaction has two main styles, judged by three amplifications. Levelled compaction keeps one sorted run per level, so a read checks one table per level and old versions disappear quickly, with about ten percent extra space. The price is write amplification: each byte is rewritten ten to thirty times as it moves down. Size-tiered compaction merges similar-sized tables, rewriting each byte fewer times, at the price of several tables to check per read, and up to double the space during a merge.
 
-= code | STO-03 · Tier A · One level down | What write amplification does to the disk
-application writes      5 MB a second
-levelled compaction     x 20 write amplification
-device writes           100 MB a second  = about 8.6 TB a day
-
-a 4 TB SSD rated for 3 drive-writes a day   = 12 TB a day
-    -> 70% of its endurance budget, every day
-and compaction reads and writes compete with foreground reads: p99 rises
+= math | STO-03 · Tier A · One level down | What write amplification does to the disk
+$$ 5\ \text{MB/s} \times 20 = 100\ \text{MB/s} \approx 8.6\ \text{TB/day} $$ :: device writes, with levelled compaction
+$$ 4\ \text{TB} \times 3 = 12\ \text{TB/day} $$ :: what a 4 TB drive rated for three drive-writes a day can take
+$$ 8.6 / 12 \approx 70\% $$ :: of the drive's endurance, spent by compaction alone
+~ And compaction's reads and writes share the device with foreground reads: **p99 rises**.
 N: Put a number on it. The application writes five megabytes a second. With a write amplification of twenty, the device writes a hundred megabytes a second, about eight point six terabytes a day. A four terabyte drive rated for three full writes a day can take twelve terabytes a day, so compaction alone uses seventy percent of its endurance. And those compaction reads and writes share the device with foreground reads, which is why tail latency rises when compaction runs.
 
 = th | STO-03 · the line to say | An LSM tree logs, buffers in a sorted memtable, flushes immutable sorted tables and compacts them, trading write amplification for sequential I/O.
@@ -147,22 +159,19 @@ If compaction cannot keep up at all, the engine **stalls writes**. The real fix 
 N: The probe: p99 read latency spikes during compaction. What do you throttle, and what do you give up? Throttle compaction to a byte rate, and accept more tables per read and more space while it lags. Give compaction a lower priority on the device. But if compaction cannot keep up at all, tables pile up at level zero and the engine stalls writes on purpose. Then the fix is more capacity, or a compaction style that suits this workload.
 
 ## 7.5 The LSM read path
+N: Next, the LSM read path, and the memory it needs to stay fast.
 
 = dia | STO-04 · Tier B · The mechanism | A point read, newest first
 @ STO-04
 p7-lsm-read
 N: A point read checks the newest data first, and stops at the first match. Follow the picture. One: the memtable, in memory. Two: the frozen memtable being flushed, if any. Three: each table at level zero, newest first, because they overlap. Four: at each lower level, exactly one table can hold the key, found from the table boundaries. For each table, check its Bloom filter first. If the filter says no, skip it. If maybe, binary-search the sparse index, and read one block, from the block cache if it is there, from disk if not.
 
-= code | STO-04 · Tier B · One level down | The worst-case point read, and the RAM to make it cheap
-levels: L0 (4 tables), L1 to L5 (one table each)  = 9 tables to check
-Bloom filter, 10 bits per key: false positive about 1%
-    expected wasted disk reads for a missing key: 9 x 0.01 = 0.09
-    a present key: one real read
-
-1 PB of 1 KB records = 10^12 records, on 500 nodes = 2 TB each
-filters:  2 x 10^9 keys x 10 bits   = 2.5 GB per node
-index:    2 TB / 16 KB blocks x 32 B = 4 GB per node
-cluster:  about 3.2 TB of RAM to keep every read at one disk read
+= math | STO-04 · Tier B · One level down | The worst-case point read, and the RAM to make it cheap
+~ Up to 9 tables to check: 4 at level 0, one at each of levels 1 to 5. 1 PB of 1 KB records on 500 nodes is 2 TB each.
+$$ 9 \times 0.01 = 0.09 $$ :: wasted disk reads for a missing key, with 1% false positives per filter
+$$ 2 \times 10^{9} \times 10\ \text{bits} = 2.5\ \text{GB} $$ :: Bloom filters per node
+$$ \tfrac{2\ \text{TB}}{16\ \text{KB}} \times 32\ \text{B} = 4\ \text{GB} $$ :: sparse index per node: one entry per block
+$$ 500 \times 6.5\ \text{GB} \approx 3.2\ \text{TB} $$ :: RAM across the cluster to keep every read at one disk read
 N: The numbers. With four tables at level zero and one per level below, a read checks up to nine tables. With ten bits per key, each filter wrongly says maybe about one time in a hundred, so a missing key costs about nine hundredths of a wasted read, and a present key one real read. Now the probe: index a petabyte of one kilobyte records. That is a trillion records. On five hundred nodes, two terabytes each: two and a half gigabytes of filters and four of index per node. About three terabytes of memory across the cluster.
 
 = th | STO-04 · the line to say | A point read checks memtable, then tables newest first, skipping most by Bloom filter: about one disk read, if filters and index fit in memory.
@@ -170,22 +179,18 @@ V: An LSM point read goes from the memtable down through the tables, newest firs
 [pause: 0.8]
 
 ## 7.6 Bloom and cuckoo filters
+N: Next, Bloom filters: answering no, for certain, from a few bits.
 
 = dia | DS-01 · Tier A · The failure | Looking for a key that is not there
 @ DS-01
 p7-bloom
 N: Most lookups in an LSM tree are for keys that are not in a given table, and without help, each of those is a wasted disk read. A Bloom filter answers definitely not, or maybe, using a little memory. It is a bit array of m bits and k hash functions. To add a key, hash it k times and set those k bits. In the picture, k is three. To test a key, check its k bits. If any bit is zero, the key was never added. If all are one, it was probably added, or other keys happened to set the same bits.
 
-= code | DS-01 · Tier A · The mechanism | Sizing from the formula
-false positive rate   p = (1 - e^(-k n / m))^k
-best k                = (m / n) x ln 2
-
-bits per key (m / n)   best k   false positives
-     5                  3        about 9%
-    10                  7        about 0.8%
-    15                 10        about 0.07%
-
-each extra 5 bits per key: about ten times fewer false positives
+= math | DS-01 · Tier A · The mechanism | Sizing from the formula
+$$ p = \left(1 - e^{-kn/m}\right)^{k} $$ :: false-positive rate: \(m\) bits, \(n\) keys, \(k\) hash functions
+$$ k_{\text{best}} = \tfrac{m}{n} \ln 2 $$ :: the best number of hashes
+$$ \tfrac{m}{n} = 10,\ k = 7 \Rightarrow p \approx 0.8\% $$ :: ten bits a key; five bits give about 9%, fifteen about 0.07%
+~ Each extra five bits per key: about **ten times fewer** false positives.
 N: Sizing comes from one formula. The false positive rate depends on bits per key and the number of hash functions, and the best number of hashes is bits per key times the natural log of two. In practice, remember the table. Five bits per key gives about nine percent false positives. Ten bits per key, with seven hashes, about one percent. Fifteen bits, about seven in ten thousand. Every extra five bits per key buys about ten times fewer false positives.
 
 = panel key | DS-01 · Tier A · One level down | What a Bloom filter cannot do
@@ -207,6 +212,7 @@ V: A Bloom filter answers definitely not, or maybe. With about ten bits per key 
 [pause: 0.8]
 
 ## 7.7 Multi-version storage
+N: Next, keeping several versions of each row, so readers never block writers.
 
 = dia | STO-05 · Tier B · The mechanism | Every write adds a version; a reader picks by its snapshot
 @ STO-05
@@ -224,6 +230,45 @@ V: With multi-version storage, every write adds a version stamped with its times
 [pause: 0.8]
 
 ## 7.8 Choosing a data model
+N: Next, choosing a data model: tables, documents, graphs, and how to decide.
+
+= cards c3 | STO-14 · From the ground up | Three shapes of data
+Tables :: Rows with the same columns. An order row **refers** to a customer row by its ID; a query **joins** them back together.
+Documents :: One self-contained tree, stored and read whole: a profile with its jobs, schools and settings nested inside.
+Graphs :: Things and the links between them: people who know people, cities joined by roads. Questions follow links.
+N: From the ground up, data comes in three shapes. Tables: rows that all have the same columns. An order row refers to a customer row by the customer's identifier, and a query joins them back together. Documents: one self-contained tree, stored and read whole, like a profile with its jobs, schools and settings nested inside. And graphs: things, and the links between them. People who know people. Cities joined by roads. The questions you ask a graph follow links.
+
+= code json | STO-14 · From the ground up | One profile as a document
+{
+  "user_id": 251,
+  "name": "Ana Silva",
+  "jobs": [
+    { "title": "Staff Engineer", "company_id": 17, "from": "2023" },
+    { "title": "Senior Engineer", "company_id": 9,  "from": "2019" }
+  ],
+  "settings": { "language": "pt", "theme": "dark" }
+}
+N: Here is a profile as a document. Everything about one user sits in one place: the name, the list of jobs, the settings. The application reads it in one request and gets the whole tree, with no join. That is the document model's strength. A one-to-many tree, read whole. But look at company identifier seventeen. The company itself is not inside the document. Many people work there, so it lives somewhere else, and that is where the document model starts to strain.
+
+= panel watch | STO-14 · From the ground up | Where documents strain, and tables shine: many-to-many
+A company has **many** employees, and a person has **many** employers. The company's name and logo must exist **once**, not copied into every profile.
+So the document holds an ID, and the application looks the company up: a join, done in code, one request per company.
+Tables do this in the engine. Graphs do it as a first-class idea. Choose the shape by **which relationships dominate**.
+N: The strain is many-to-many. A company has many employees, and a person has many employers. The company's name and logo should exist once, not copied into every profile, or a rename has to touch millions of documents. So the document keeps only an identifier, and the application looks the company up, which is a join done in application code. Tables do that join inside the engine. Graphs make relationships the central idea. So choose the shape by which relationships dominate your data.
+
+= code sql | STO-14 · From the ground up | Say what you want, not how: friends of friends
+SELECT DISTINCT f2.friend_id
+  FROM friendships f1
+  JOIN friendships f2 ON f2.user_id = f1.friend_id
+ WHERE f1.user_id = 42
+   AND f2.friend_id <> 42;
+N: One more idea from the ground up: a declarative query. This asks for the friends of user forty-two's friends. It says what is wanted, not how to find it. The database's planner decides which index to use and in which order to join, and it can choose differently next year when the data has grown. In a graph language, the same question is a single path pattern: a person, a knows edge, two hops. Either way, the query names the result and the engine finds the route.
+
+= panel now | STO-14 · Since 2024 | The shapes have converged
+**PostgreSQL** stores and indexes JSON documents (JSONB) next to tables, so one store often covers both shapes.
+**Vector search**, for finding items by similarity of embeddings, is built into many stores (pgvector, and most cloud databases) since 2023–24.
+**GQL**, the first ISO standard graph query language, was published in April 2024.
+E: Since 2024, the shapes have converged. PostgreSQL stores and indexes JSON documents next to its tables, so one store often covers both shapes. Vector search, finding items by the similarity of their embeddings, is built into many stores, including PostgreSQL through pg vector and most cloud databases. And GQL, the first international standard for graph queries, was published in April 2024. The questions in a round have not changed. Which relationships dominate, and which queries must be fast.
 
 = table | STO-14 · Tier A · The failure | A model chosen by habit
 @ STO-14
@@ -260,6 +305,7 @@ V: I choose the data model from the access patterns, each written down with its 
 [pause: 0.8]
 
 ## 7.9 Indexing basics
+N: Next, indexes. What a composite index serves, and what every index costs.
 
 = table | STO-15 · Tier A · The failure | Three queries, one index on (customer, created_at)
 @ STO-15
@@ -275,15 +321,14 @@ N: One composite index, on customer then created at, and three queries. The firs
 **Covering index**: include the columns the query returns, so it never reads the table row. One read instead of 20.
 N: Three kinds to know. Primary-key order: many engines store rows sorted by their primary key, so a key range is one sequential read. A composite index on a, b and c serves a prefix: a, or a and b, or all three, and ordering by b within one a. Not b alone. And a covering index includes the columns the query returns, so the query never reads the table at all. Twenty rows become one index range instead of twenty random lookups.
 
-= code | STO-15 · Tier A · One level down | Every index is a write
-one order insert:
-    the table row                   1 write
-    index (customer, created_at)    1 write
-    index (status)                  1 write
-    index (merchant, created_at)    1 write
-    -> 4 writes, 4 log records, 4 times the pages to cache
-
-10,000 inserts a second  ->  40,000 index and row writes a second
+= table | STO-15 · Tier A · One level down | Every index is a write
+One order insert writes | Writes
+The table row | 1
+Index on (customer, created_at) | 1
+Index on (status) | 1
+Index on (merchant, created_at) | 1
+**Total**: 4 writes, 4 log records, 4 structures competing for memory | **4**
+> 10,000 inserts a second become **40,000 writes a second**.
 N: One level down: every index is a write. One order insert writes the row, and one entry in each of three indexes: four writes, four log records, and four structures competing for memory. At ten thousand orders a second that is forty thousand writes a second. So an index has to earn its place: a query that needs it, at a rate that matters. An index nobody uses is pure cost on the write path.
 
 = panel watch | STO-15 · Tier A · The alternative and the price | Index, denormalise, or derive
@@ -297,6 +342,7 @@ V: A composite index serves queries on a prefix of its columns, in order, and a 
 [pause: 0.8]
 
 ## 7.10 Blob layout
+N: Now the second half, blob storage. We start with its layout.
 
 = dia | STO-08 · Tier B · The mechanism | Metadata in one place, immutable chunks in another
 @ STO-08
@@ -314,22 +360,19 @@ V: A blob store is two systems: a strongly consistent metadata store mapping nam
 [pause: 0.8]
 
 ## 7.11 Erasure coding
+N: Next, erasure coding: durability for half the space, paid for at repair time.
 
 = dia | STO-09 · Tier B · The mechanism | Reed–Solomon (6, 3): six data fragments, three parity, any six rebuild the rest
 @ STO-09
 p7-rs63
 N: Three full replicas cost three times the space. Erasure coding gets the same or better durability for less. With Reed-Solomon six and three, a stripe of data is cut into six fragments, and three parity fragments are computed from them. The nine fragments go to nine different racks. Any six of the nine are enough to rebuild the stripe. So it survives the loss of any three, at one and a half times the space instead of three.
 
-= code | STO-09 · Tier B · One level down | The price is paid at repair time
-                 space    survives    to rebuild one lost fragment, read
-3 replicas       3.0 x     2 losses   1 fragment
-RS (6, 3)        1.5 x     3 losses   6 fragments
-LRC (12, 2, 2)   1.33 x    3 losses   6 fragments (local group)  instead of 12
-
-a rack holding 1 PB of fragments dies:
-    replicas: read about 1 PB to repair
-    RS (6, 3): read about 6 PB
-    at 125 GB a second of cluster repair bandwidth: 13 hours
+= table | STO-09 · Tier B · One level down | The price is paid at repair time
+Scheme | Space | Survives | To rebuild one lost fragment, read
+3 replicas | 3.0× | 2 losses | 1 fragment
+Reed–Solomon (6, 3) | 1.5× | 3 losses | 6 fragments
+LRC (12, 2, 2) | 1.33× | 3 losses | 6, from its local group, instead of 12
+> A rack with 1 PB of fragments dies: replicas read about **1 PB** to repair, RS (6, 3) about **6 PB**, 13 hours at 125 GB/s.
 N: The price is paid at repair. Rebuilding one lost replica reads one copy. Rebuilding one lost Reed-Solomon fragment reads six. So if a rack holding a petabyte of fragments dies, replication reads about a petabyte to repair, and Reed-Solomon six and three reads about six. At a hundred and twenty-five gigabytes a second of repair bandwidth, that is thirteen hours. Local reconstruction codes, used in Azure storage, add a parity per local group, so most single repairs read six fragments instead of twelve, at one point three three times the space.
 
 = th | STO-09 · the line to say | Reed–Solomon (6, 3) survives three losses at 1.5 times the space, and a repair reads six fragments to rebuild one.
@@ -337,6 +380,7 @@ V: Erasure coding with Reed-Solomon six and three stores one and a half times th
 [pause: 0.8]
 
 ## 7.12 Integrity
+N: Next, integrity. How a store notices that a byte has quietly changed.
 
 = panel key | STO-10 · Tier B · The mechanism | Checksums end to end, and a scrubber that reads everything
 @ STO-10
@@ -355,6 +399,7 @@ V: I protect integrity end to end: a checksum computed by the client, verified a
 [pause: 0.8]
 
 ## 7.13 Repair and reconstruction
+N: Next, repair. The hour after a rack dies, in order of risk.
 
 = table | STO-11 · Tier B · The mechanism | A rack dies: the next hour, in order of risk
 @ STO-11
@@ -375,6 +420,7 @@ V: Repair is prioritised by how close each stripe is to data loss. Stripes one f
 [pause: 0.8]
 
 ## 7.14 Garbage collection of orphans
+N: Next, garbage. Chunks that nothing points to, and when it is safe to delete them.
 
 = dia | STO-13 · Tier B · The mechanism | Chunks with no metadata row, and a grace period
 @ STO-13
@@ -391,6 +437,7 @@ V: Orphaned chunks are found by comparing what the chunk servers hold with what 
 [pause: 0.8]
 
 ## 7.15 Backups and snapshots
+N: Next, backups, and the only thing that proves one works.
 
 = table | STO-16 · Tier B · The mechanism | Full, incremental, and the log for a point in time
 @ STO-16
@@ -411,6 +458,7 @@ V: Backups are a full snapshot, incrementals, and an archived log for point-in-t
 [pause: 0.8]
 
 ## 7.16 Recap
+N: Time to gather the whole part onto one page.
 
 = list | Recap | What to be able to explain without notes
 - What **fsync** means, and **group commit** in numbers
@@ -424,6 +472,7 @@ V: Backups are a full snapshot, incrementals, and an archived log for point-in-t
 N: Without notes: what fsync means and what group commit buys. The LSM write and read paths as a trace. Bloom filter sizing. Write amplification and its effect on drives and tail latency. The memory to index a petabyte. Choosing the model and the indexes from access patterns. Reed-Solomon six and three. And integrity, repair by risk, orphans and tested restores.
 
 ## 7.17 Probe drills
+N: Now the drills. Pause after each question, answer it aloud, then compare.
 
 = probe | p99 read latency spikes during compaction. What do you throttle?
 - **Compaction I/O**, to a rate, with lower device priority
@@ -456,6 +505,7 @@ C: The metadata row is removed at once, so the object is invisible immediately. 
 C: I would ask where the write is at that moment. Two tenths of a millisecond is plausible for an fsync on local NVMe with power-loss protection, and implausible on network block storage, where a sync is about a millisecond. And durable against what? One node's power loss, or a rack, or a zone? That decides whether one local sync is enough or I need a quorum.
 
 ## 7.18 Where this shows up
+N: Finally, where storage engines show up in the design problems.
 
 = table | Where this shows up | What each design problem takes from this part
 Problem | Takes

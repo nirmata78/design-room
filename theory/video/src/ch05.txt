@@ -5,6 +5,7 @@
 N: Part five, replication. Part three gave us one way to keep copies identical, a consensus log. Most data in the world is not replicated that way. It is copied from a leader to followers, asynchronously, or between several leaders, or with no leader at all. Every one of those choices decides what you lose on failover, and that is the question this part teaches you to answer with a number.
 
 ## 5.0 Why this part decides rounds
+N: First, a failover that was fast, and still lost data.
 
 = panel trap | The opening story | The follower that was one second behind
 A database primary fails at peak. Automation promotes a follower within thirty seconds. Everyone is pleased.
@@ -12,11 +13,11 @@ The follower was **one second** behind. At five thousand writes a second, five t
 Worse: some of them had already been copied into a cache and a search index, which now hold data the database never had.
 N: A database primary fails at peak. Automation promotes a follower within thirty seconds, and everyone is pleased. But the follower was one second behind. At five thousand writes a second, five thousand writes that users were told had succeeded are gone. Worse, some had already been copied into a cache and a search index, which now hold data the database has never heard of. Failover was fast, and it lost data, and it made the copies disagree. This part is about deciding, in advance, which of those you accept.
 
-= panel note | Assumed reading | What this part does not repeat
-*Designing Data-Intensive Applications*, chapter 5, **whole**.
-Part 2 of this course: session guarantees on the consistency ladder, quorums, last-writer-wins and version vectors. Part 3: consensus.
-The chapter's survey of topologies and the history of conflict resolution stay in the chapter. This part goes to failover, the outbox, repair and the numbers.
-N: Chapter five of Designing Data-Intensive Applications is assumed, the whole chapter. So are three sections of part two: the session guarantees on the consistency ladder, quorums, and last writer wins with version vectors. The chapter's survey of topologies stays in the chapter. Here we go to the things an interviewer pushes on: failover step by step, the outbox, repair, and the numbers.
+= cards c3 | REP-01 · From the ground up | Three shapes of replication, as everyday arrangements
+One leader :: A shared document where only the editor types; everyone else gets copies. Simple, and the editor is a bottleneck and a single point of failure.
+Many leaders :: Your calendar on a phone and a laptop, both offline. Each accepts changes; they reconcile later, sometimes with a conflict.
+No leader :: Ask several friends the time and take the most common answer. Any of them can answer; you must combine what they say.
+N: From the ground up. Copies of data are kept in one of three arrangements. One leader: like a shared document where only one editor types, and everyone else receives copies. Simple, and the editor is a bottleneck and a single point of failure. Many leaders: like your calendar on a phone and a laptop, both offline. Each accepts changes, and they reconcile later, sometimes with a conflict. No leader: like asking several friends the time and going with the most common answer. As in every part, green slides start from nothing, and blue slides go to interview depth.
 
 = list | Map of the part | Five groups of ideas
 - **One leader**: sync and async, failover, primary–backup leases, log shipping
@@ -27,6 +28,7 @@ N: Chapter five of Designing Data-Intensive Applications is assumed, the whole c
 N: Five groups. One leader, with failover, leases and log shipping. Lag, measured in time. Getting changes out of a database safely, with change data capture and the outbox. Many leaders, and no leader, with conflicts, repair, Merkle trees and tombstones. And finally regions and disasters.
 
 ## 5.1 Single-leader replication
+N: We start with the most common shape: one leader, and followers that copy it.
 
 = dia | REP-01 · Tier A · The failure | Asynchronous replication loses the tail on failover
 @ REP-01
@@ -40,12 +42,8 @@ Semi-synchronous | Its disk **and one** follower's receipt | Nothing, if that fo
 Synchronous to all | Every follower | Nothing | The slowest follower; one down blocks writes
 N: There are three acknowledgement modes. Asynchronous: the leader answers after its own disk, and failover loses whatever has not shipped. Semi-synchronous: the leader waits for its own disk and one follower's receipt, so at least one follower has every acknowledged write, and failover loses nothing, provided that is the follower you promote. It adds one round trip to the nearest follower. Synchronous to all followers loses nothing and is held hostage by the slowest one. If any follower is down, writes stop. That is why almost no one runs it.
 
-= panel key | REP-01 · Tier A · One level down | Failover, step by step
-**1. Detect.** Missed heartbeats: 3 × 10 s = 30 s, set against false failovers.
-**2. Choose.** The follower with the **highest applied log position**; with semi-sync, the one that holds every acknowledged write.
-**3. Fence the old leader.** Revoke its lease, raise the epoch the storage checks, or cut its power. It must not accept one more write.
-**4. Repoint clients.** Through the registry, a proxy or a virtual IP. Caches of the old address are the slow part.
-**5. Reconcile.** The old leader's unshipped tail is **saved, not discarded**: compared, replayed where safe, reported where not.
+= dia | REP-01 · Tier A · One level down | Failover, step by step
+p5-failover
 N: Failover, step by step. Detect: missed heartbeats, perhaps three times ten seconds, chosen to avoid false alarms. Choose: the follower with the highest applied log position. Fence the old leader: revoke its lease, raise the epoch that storage checks, or cut its power, so it cannot accept one more write. Repoint clients, through the registry, a proxy or a virtual address. And reconcile. The old leader's unshipped tail is saved, not thrown away. It is compared with the new leader, replayed where that is safe, and reported to a human where it is not.
 
 = panel trap | REP-01 · Tier A · Split brain | The old leader comes back and accepts writes
@@ -67,6 +65,7 @@ V: With asynchronous replication, failover loses whatever was not yet shipped, s
 [pause: 0.8]
 
 ## 5.2 Primary–backup with leases
+N: Next, a lighter shape: a primary named by a lease, with version numbers to expose stale copies.
 
 = panel key | REP-06 · Tier B · The mechanism | A lease names the primary; a version number exposes stale copies
 @ REP-06
@@ -85,6 +84,13 @@ V: Primary and backup with leases: the master grants one replica a time-bounded 
 [pause: 0.8]
 
 ## 5.3 Log shipping
+N: Next, what exactly travels from the leader to a follower, and why it matters.
+
+= panel key | REP-07 · From the ground up | The write-ahead log, the database's diary
+Before a database changes its data files, it **appends a description of the change to a log** and makes the log durable with an fsync.
+After a crash, it replays the log, and every acknowledged change is back. The data files can be written lazily, in big efficient batches.
+The same log, sent over the network, is what a follower replays. Replication is crash recovery on another machine.
+N: From the ground up, the write-ahead log. Before a database changes its data files, it appends a description of the change to a log, and makes the log durable. Only then does it answer. After a crash, it replays the log, and every acknowledged change is back, so the data files themselves can be written lazily, in big efficient batches. Now send that same log over the network to another machine, and let it replay too. That is a follower. Replication is crash recovery, running continuously, somewhere else.
 
 = table | REP-07 · Tier B · The mechanism | What is shipped decides what the follower can be
 @ REP-07
@@ -104,6 +110,7 @@ V: Physical log shipping gives a byte-identical follower on the same version. A 
 [pause: 0.8]
 
 ## 5.4 Replication lag
+N: Next, replication lag. How far behind a follower is, measured honestly.
 
 = dia | REP-10 · Tier A · The failure | Lag is usually milliseconds, and sometimes minutes
 @ REP-10
@@ -135,6 +142,14 @@ V: I measure replication lag in seconds, with a heartbeat row, and I treat it as
 [pause: 0.8]
 
 ## 5.5 Change data capture and the outbox
+N: Next, getting changes out of a database safely, to caches, indexes and other services.
+
+= cards c3 | REP-08 · From the ground up | Change data capture: the database as a stream of changes
+The source :: The database's own log already lists every committed change, in order: *row 42 inserted*, *row 42 price 10 → 12*.
+The stream :: A reader turns that log into a stream of events that other systems subscribe to.
+The consumers :: A search index, a cache, a warehouse, another service. Each stays up to date, and can be **rebuilt** by replaying.
+> The database stays the one place of truth. Everything else is derived from it, and can be thrown away and recomputed.
+N: From the ground up, change data capture. A database's own log already lists every committed change, in order. Row forty-two inserted. Row forty-two, price ten, now twelve. A reader turns that log into a stream of events, and other systems subscribe: a search index, a cache, a data warehouse, another service. Each one stays up to date, and if it is ever lost or corrupted, it can be rebuilt by replaying the stream. The database stays the one place of truth. Everything else is derived from it.
 
 = dia | REP-08 · Tier A · The failure | Two writes, two systems, no atomicity
 @ REP-08
@@ -164,6 +179,14 @@ V: I never write to the database and the log as two separate steps. The event go
 [pause: 0.8]
 
 ## 5.6 Multi-leader replication
+N: Next, several leaders at once, and the conflicts they create.
+
+= cards c3 | REP-02 · From the ground up | Where several leaders appear in everyday systems
+Several datacentres :: Each region takes writes locally, so a user in Sydney does not wait for Virginia.
+Offline devices :: Every phone in an offline-first app is a leader for its own edits, and syncs later.
+Shared editing :: Two people typing in one document at once. Each keystroke is accepted locally first.
+> Since about 2023, **local-first** apps sync devices with CRDT libraries such as Automerge and Yjs: the many-leader case, made routine.
+N: From the ground up, where several leaders appear. Several datacentres, each taking writes locally, so a user in Sydney does not wait for Virginia. Offline devices: every phone in an offline-first app is a leader for its own edits, and syncs when it reconnects. And shared editing: two people typing in one document, each keystroke accepted locally first. In recent years, local-first apps sync devices with CRDT libraries such as Automerge and Yjs, which this part reaches in a moment. The many-leader case has become routine.
 
 = dia | REP-02 · Tier B · The mechanism | Each region accepts writes; conflicts appear after the fact
 @ REP-02
@@ -181,6 +204,7 @@ V: Multi-leader replication gives local writes in every region and keeps working
 [pause: 0.8]
 
 ## 5.7 Conflict resolution
+N: Next, three ways to resolve a conflict, judged by what each one loses.
 
 = table | REP-09 · Tier B · The mechanism | Three ways to resolve, by what they lose
 @ REP-09
@@ -202,6 +226,7 @@ V: For conflicts I choose by what I can afford to lose. Last writer wins is acce
 [pause: 0.8]
 
 ## 5.8 Leaderless replication
+N: Next, no leader at all: the Dynamo style.
 
 = dia | REP-03 · Tier B · The mechanism | Write to N, wait for W; read from N, wait for R
 @ REP-03
@@ -218,6 +243,7 @@ V: In a leaderless store every replica takes writes. I wait for W of N on writes
 [pause: 0.8]
 
 ## 5.9 Read repair and anti-entropy
+N: Next, how leaderless replicas converge after they miss a write.
 
 = table | REP-04 · Tier B · The mechanism | Two ways replicas converge after missing a write
 @ REP-04
@@ -236,21 +262,24 @@ V: Replicas converge two ways: read repair fixes keys as they are read, and back
 [pause: 0.8]
 
 ## 5.10 Merkle trees
+N: Next, Merkle trees: comparing two huge replicas by exchanging a few kilobytes.
+
+= panel key | DS-04 · From the ground up | A hash, as a fingerprint of data
+A hash function turns any amount of data into a short fixed-size number, for example 32 bytes.
+The same input always gives the same hash. **Change one byte** of the input, and the hash changes completely.
+So two machines can check that a gigabyte matches by exchanging 32 bytes. Different hashes mean different data, for certain; equal hashes mean equal data, with overwhelming probability.
+N: From the ground up, a hash. A hash function turns any amount of data into a short number of fixed size, for example thirty-two bytes. The same input always gives the same hash. Change a single byte of the input, and the hash changes completely. So two machines can check that a gigabyte of data matches by exchanging just thirty-two bytes. If the hashes differ, the data differs, for certain. If they are equal, the data is equal, with overwhelming probability. A Merkle tree is built from exactly this.
 
 = dia | DS-04 · Tier B · The mechanism | Compare two replicas by comparing hashes, and descend only where they differ
 @ DS-04
 p5-merkle
 N: A Merkle tree makes anti-entropy cheap. Split the key range into buckets. Each leaf holds the hash of the keys and versions in its bucket. Each parent holds the hash of its children's hashes, up to one root hash. Two replicas compare roots. Equal roots mean identical data, with one message. If the roots differ, compare the children, and descend only into the child that differs. In the picture, the replicas differ in one key. The comparison walks down one path, and only that one bucket's keys are exchanged.
 
-= code | DS-04 · Tier B · One level down | The numbers for a billion keys
-keys                        10^9
-tree with fan-out 16, depth 5:   16^5  = 1,048,576 leaves
-keys per leaf               about 950
-
-one differing key, one comparison:
-    5 levels x 16 hashes x 32 bytes     = 2.5 KB of hashes
-    + one leaf's key list: 950 x 40 B  = 38 KB
-compare by full scan instead:  10^9 x 40 B  = 40 GB
+= math | DS-04 · Tier B · One level down | The numbers for a billion keys
+$$ 16^{5} \approx 10^{6}\ \text{leaves} $$ :: fan-out 16, depth 5: about 950 of the \(10^{9}\) keys per leaf
+$$ 5 \times 16 \times 32\ \text{B} \approx 2.5\ \text{KB} $$ :: hashes exchanged to find one differing key
+$$ 950 \times 40\ \text{B} \approx 38\ \text{KB} $$ :: then one leaf's key list
+$$ 10^{9} \times 40\ \text{B} = 40\ \text{GB} $$ :: a full comparison instead
 N: The numbers, for a billion keys. A tree with a fan-out of sixteen and a depth of five has about a million leaves, so about nine hundred and fifty keys in each. To find one differing key, exchange sixteen hashes of thirty-two bytes at each of five levels, two and a half kilobytes, then one leaf's key list, about thirty-eight kilobytes. A full comparison would move forty gigabytes. The catch is keeping the tree current: every write changes one leaf and the hashes above it, so many stores rebuild the tree in the background before a repair instead.
 
 = th | DS-04 · the line to say | A Merkle tree compares replicas root first and descends only into differing ranges: kilobytes instead of a full scan.
@@ -258,6 +287,7 @@ V: For anti-entropy I keep a Merkle tree per key range: hashes of buckets, then 
 [pause: 0.8]
 
 ## 5.11 Tombstones
+N: Next, deletes. Why a deleted value can come back from the dead.
 
 = dia | REP-14 · Tier B · The mechanism | A deleted value comes back from a replica that was away
 @ REP-14
@@ -274,6 +304,7 @@ V: A delete is a tombstone, kept for a grace period longer than the longest outa
 [pause: 0.8]
 
 ## 5.12 Geo topologies
+N: Next, regions. The three questions every multi-region design must answer in advance.
 
 = table | REP-11 · Tier A · The failure | One design, three regions, and the question nobody asked
 @ REP-11
@@ -309,28 +340,34 @@ V: For multiple regions I decide three things in advance: where each type of dat
 [pause: 0.8]
 
 ## 5.13 Snapshot plus log catch-up
+N: Next, how a new replica starts: a snapshot, then the log.
 
 = dia | REP-12 · Tier B · The mechanism | A new replica copies a snapshot, then replays the log from the snapshot's position
 @ REP-12
 p5-seed
 N: How does a new replica start? It cannot replay the log from the beginning of time. The leader takes a consistent snapshot, and records the log position the snapshot corresponds to, here position nine hundred. The new replica copies the snapshot, loads it, and then asks for the log from position nine hundred and one onwards, and replays until it has caught up. The one requirement is that the leader still retains the log back to nine hundred. If it has discarded it, the snapshot is useless, and you start again.
 
-= code | REP-12 · Tier B · One level down | A replica two days behind: catch up, or rebuild?
-backlog: 2 days x 5,000 writes a second    = 864 million writes
-replay at 20,000 a second, while 5,000 a second still arrive
-    net progress 15,000 a second  ->  57,600 s  = about 16 hours
-
-rebuild: a 2 TB snapshot at 200 MB a second  = 10,000 s  = about 2.8 hours
-    then replay only what arrived during the copy
-
-and catch-up only works if the log is still retained back 2 days
-N: The probe: a replica is two days behind, catch up or rebuild? Two days at five thousand writes a second is eight hundred and sixty-four million writes. Replaying at twenty thousand a second, while five thousand a second keep arriving, the replica gains fifteen thousand a second, so it needs about sixteen hours. A fresh snapshot of two terabytes at two hundred megabytes a second takes under three hours, plus a short replay. Rebuild. And catching up was only possible at all if the leader had kept two days of log.
+= dia | REP-12 · Tier B · One level down | A replica two days behind: catch up, or rebuild?
+p5-catchup
+N: The probe: a replica is two days behind, catch up or rebuild? The picture compares the two. Two days at five thousand writes a second is eight hundred and sixty-four million writes. Replaying at twenty thousand a second, while five thousand a second keep arriving, the replica gains fifteen thousand a second, so it needs about sixteen hours. A fresh snapshot of two terabytes at two hundred megabytes a second takes under three hours, plus a short replay. Rebuild. And catching up was only possible at all if the leader had kept two days of log.
 
 = th | REP-12 · the line to say | Seed from a snapshot at a log position, replay from there. Past a point, rebuild is faster than catch-up.
 V: A new or lagging replica loads a snapshot taken at a known log position and replays from there, which needs the log retained back that far. I compare replay time, which is backlog over replay rate minus arrival rate, with rebuild time, and past a point the rebuild wins.
 [pause: 0.8]
 
 ## 5.14 RPO, RTO and failover orchestration
+N: Next, disasters: how much data and how much time you are willing to lose, and who decides.
+
+= cards c2 | REP-13 · From the ground up | Two questions, with a phone backup
+How much can I lose? :: Your phone backs up every night at 2 a.m. It dies at 6 p.m. Everything since 2 a.m. is gone: **up to a day of data**. That is the recovery **point**.
+How long until I am back? :: Buying a new phone and restoring takes an evening. That is the recovery **time**.
+> Every system has both numbers, whether anyone chose them or not.
+N: From the ground up, with a phone. Your phone backs up every night at two in the morning. It dies at six in the evening. Everything since two in the morning is gone. Up to a day of data. That is the recovery point: how much data, measured in time, you can lose. Buying a new phone and restoring takes an evening. That is the recovery time: how long until you are working again. Every system has both numbers, whether anyone chose them or not. The job is to choose them.
+
+= panel trap | REP-13 · From the ground up | Replication is not a backup
+A replica copies **every** change within seconds, including a mistaken `DELETE`, a bad migration, or corruption from a bug.
+Protection against mistakes needs copies from the past: **point-in-time backups** and log archives, kept somewhere a bad change cannot reach, and **restored regularly** to prove they work.
+N: And one trap that belongs at the ground floor. Replication is not a backup. A replica copies every change within seconds, and that includes a mistaken delete, a bad migration, or corruption from a bug. All your replicas faithfully hold the damage. Protection against mistakes needs copies from the past: point-in-time backups and log archives, kept where a bad change cannot reach them. And they must be restored regularly, because a backup that has never been restored is a hope, not a backup.
 
 = panel trap | REP-13 · Tier A · The failure | A regional failover nobody had the authority to start
 @ REP-13
@@ -366,6 +403,7 @@ V: I agree the recovery point and recovery time with the business before the inc
 [pause: 0.8]
 
 ## 5.15 Recap
+N: Time to gather the whole part onto one page.
 
 = list | Recap | What to be able to explain without notes
 - What **async, semi-sync and sync** each lose on failover
@@ -378,6 +416,7 @@ V: I agree the recovery point and recovery time with the business before the inc
 N: Without notes: what each acknowledgement mode loses. Failover in five steps, including fencing. Lag in seconds, and the log position that fixes reading your own writes. The dual write race, the outbox, and why consumers still deduplicate. Homing an entity, and the three ways to resolve a conflict. Merkle tree repair in numbers, and tombstones. And the topology chosen per type of data, with RPO, RTO and who decides.
 
 ## 5.16 Probe drills
+N: Now the drills. Pause after each question, answer it aloud, then compare.
 
 = probe | The same key is updated in two regions within 100 ms. Which write survives?
 - With **last writer wins**: the higher timestamp; the other is lost **silently**
@@ -416,6 +455,7 @@ C: If the far region serves the read from a follower, they may not see their own
 C: With asynchronous replication, I lost the lag at that moment, times the write rate. One second at five thousand writes a second is five thousand acknowledged writes. Plus a subtler loss: anything that reached a cache or an index from the old leader but never reached the new one. I save the old leader's unshipped tail, compare it with the new leader, replay what is safe, and report the rest.
 
 ## 5.17 Where this shows up
+N: Finally, where replication shows up in the design problems.
 
 = table | Where this shows up | What each design problem takes from this part
 Problem | Takes

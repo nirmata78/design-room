@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 800" width="1600" height="800">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<rect x="30" y="40" width="520" height="313" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
+<path d="M30,48 a8,8 0 0 1 8,-8 h504 a8,8 0 0 1 8,8 v38 h-520 z" fill="#c8341f"/>
+<text x="44" y="71.28" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="23.1" font-weight="700" fill="#fff">link</text>
+<rect x="44" y="93.6" width="34.1" height="22.8" rx="3" fill="#fdecea" stroke="#c8341f" stroke-width="0.8"/>
+<text x="61.0" y="111.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#c8341f">PK</text>
+<text x="85.1" y="111.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328" font-weight="700">code</text>
+<text x="536" y="111.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">char(7)</text>
+<rect x="31" y="124" width="518" height="38" fill="#f6f8fa"/>
+<text x="85.1" y="149.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">long_url</text>
+<text x="536" y="149.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
+<rect x="44" y="169.6" width="34.1" height="22.8" rx="3" fill="#fdf3e1" stroke="#a86a12" stroke-width="0.8"/>
+<text x="61.0" y="187.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#a86a12">IX</text>
+<text x="85.1" y="187.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">owner_id</text>
+<text x="536" y="187.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">bigint</text>
+<rect x="31" y="200" width="518" height="38" fill="#f6f8fa"/>
+<text x="85.1" y="225.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">created_at</text>
+<text x="536" y="225.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">ts</text>
+<text x="85.1" y="263.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">expires_at</text>
+<text x="536" y="263.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">ts</text>
+<rect x="31" y="276" width="518" height="38" fill="#f6f8fa"/>
+<text x="85.1" y="301.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">status</text>
+<text x="536" y="301.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
+<text x="44" y="337.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17.2" font-style="italic" fill="#57606a">12 B rows in ten years; sharded by code</text>
+<rect x="690" y="40" width="420" height="199" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
+<path d="M690,48 a8,8 0 0 1 8,-8 h404 a8,8 0 0 1 8,8 v38 h-420 z" fill="#1168bd"/>
+<text x="704" y="71.28" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="23.1" font-weight="700" fill="#fff">link_by_owner</text>
+<rect x="704" y="93.6" width="34.1" height="22.8" rx="3" fill="#fdecea" stroke="#c8341f" stroke-width="0.8"/>
+<text x="721.0" y="111.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#c8341f">PK</text>
+<text x="745.1" y="111.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328" font-weight="700">owner_id</text>
+<text x="1096" y="111.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">bigint</text>
+<rect x="691" y="124" width="418" height="38" fill="#f6f8fa"/>
+<rect x="704" y="131.6" width="34.1" height="22.8" rx="3" fill="#fdecea" stroke="#c8341f" stroke-width="0.8"/>
+<text x="721.0" y="149.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#c8341f">PK</text>
+<text x="745.1" y="149.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328" font-weight="700">created_at</text>
+<text x="1096" y="149.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">ts</text>
+<text x="745.1" y="187.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">code</text>
+<text x="1096" y="187.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">char(7)</text>
+<text x="704" y="223.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17.2" font-style="italic" fill="#57606a">the owner&#x27;s dashboard; never on the hot path</text>
+<rect x="1250" y="40" width="330" height="237" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
+<path d="M1250,48 a8,8 0 0 1 8,-8 h314 a8,8 0 0 1 8,8 v38 h-330 z" fill="#8c8c8c"/>
+<text x="1264" y="71.28" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="23.1" font-weight="700" fill="#fff">range_lease</text>
+<rect x="1264" y="93.6" width="34.1" height="22.8" rx="3" fill="#fdecea" stroke="#c8341f" stroke-width="0.8"/>
+<text x="1281.0" y="111.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#c8341f">PK</text>
+<text x="1305.1" y="111.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328" font-weight="700">server_id</text>
+<text x="1566" y="111.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
+<rect x="1251" y="124" width="328" height="38" fill="#f6f8fa"/>
+<text x="1305.1" y="149.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">start</text>
+<text x="1566" y="149.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">bigint</text>
+<text x="1305.1" y="187.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">end</text>
+<text x="1566" y="187.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">bigint</text>
+<rect x="1251" y="200" width="328" height="38" fill="#f6f8fa"/>
+<text x="1305.1" y="225.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">leased_at</text>
+<text x="1566" y="225.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">ts</text>
+<text x="1264" y="261.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17.2" font-style="italic" fill="#57606a">consensus store; 0.4 leases a second</text>
+<rect x="30" y="470" width="520" height="237" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
+<path d="M30,478 a8,8 0 0 1 8,-8 h504 a8,8 0 0 1 8,8 v38 h-520 z" fill="#1168bd"/>
+<text x="44" y="501.28" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="23.1" font-weight="700" fill="#fff">daily_count</text>
+<rect x="44" y="523.6" width="34.1" height="22.8" rx="3" fill="#fdecea" stroke="#c8341f" stroke-width="0.8"/>
+<text x="61.0" y="541.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#c8341f">PK</text>
+<text x="85.1" y="541.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328" font-weight="700">code</text>
+<text x="536" y="541.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">char(7)</text>
+<rect x="31" y="554" width="518" height="38" fill="#f6f8fa"/>
+<rect x="44" y="561.6" width="34.1" height="22.8" rx="3" fill="#fdecea" stroke="#c8341f" stroke-width="0.8"/>
+<text x="61.0" y="579.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#c8341f">PK</text>
+<text x="85.1" y="579.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328" font-weight="700">day</text>
+<text x="536" y="579.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">date</text>
+<rect x="44" y="599.6" width="34.1" height="22.8" rx="3" fill="#fdecea" stroke="#c8341f" stroke-width="0.8"/>
+<text x="61.0" y="617.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#c8341f">PK</text>
+<text x="85.1" y="617.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328" font-weight="700">country</text>
+<text x="536" y="617.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">char(2)</text>
+<rect x="31" y="630" width="518" height="38" fill="#f6f8fa"/>
+<text x="85.1" y="655.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">n</text>
+<text x="536" y="655.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">bigint</text>
+<text x="44" y="691.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17.2" font-style="italic" fill="#57606a">written by the aggregator; read by the owner</text>
+<rect x="690" y="470" width="520" height="199" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
+<path d="M690,478 a8,8 0 0 1 8,-8 h504 a8,8 0 0 1 8,8 v38 h-520 z" fill="#1f2328"/>
+<text x="704" y="501.28" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="23.1" font-weight="700" fill="#fff">in the redirect server (memory)</text>
+<text x="745.1" y="541.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">lru: code → url, status</text>
+<text x="1196" y="541.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">map</text>
+<rect x="691" y="554" width="518" height="38" fill="#f6f8fa"/>
+<text x="745.1" y="579.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">ttl</text>
+<text x="1196" y="579.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">30–60 s</text>
+<text x="745.1" y="617.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">in_flight</text>
+<text x="1196" y="617.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">map</text>
+<text x="704" y="653.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17.2" font-style="italic" fill="#57606a">single flight: one lookup per code per server</text>
+<path d="M690.0,139.5 L550.0,133.9" fill="none" stroke="#5b6672" stroke-width="1.8"/>
+<circle cx="690.0" cy="139.5" r="4" fill="#5b6672"/>
+<text x="674.5" y="133.6" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="19.8" font-weight="700" fill="#c8341f">N</text>
+<circle cx="550.0" cy="133.9" r="4" fill="#5b6672"/>
+<text x="565.5" y="155.2" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="19.8" font-weight="700" fill="#c8341f">1</text>
+<rect x="586.5" y="102.4" width="67.0" height="31.9" rx="4" fill="#ffffff"/>
+<text x="620.0" y="126.6" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.0" fill="#1f2328">code</text>
+<rect x="1250" y="330" width="330" height="75.2" rx="6" fill="#fdf3e1" stroke="#a86a12" stroke-width="1.2"/>
+<text x="1264" y="356.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="20.9" fill="#1f2328">A URL hash is not a key: one</text>
+<text x="1264" y="384.3" font-family="Inter, Helvetica, Arial, sans-serif" font-size="20.9" fill="#1f2328">URL may have many links.</text>
+<rect x="30" y="745" width="1540" height="47.0" rx="6" fill="#fdf3e1" stroke="#a86a12" stroke-width="1.2"/>
+<text x="44" y="771.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="20.9" fill="#1f2328">Clicks are a log partitioned by code, then counts per minute and per day. The link row is never updated by a click.</text>
+</svg>

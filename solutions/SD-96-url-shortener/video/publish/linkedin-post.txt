@@ -1,0 +1,21 @@
+Everyone has drawn the URL shortener. The grade is on what happens after the diagram.
+
+I've published a 71-minute reference solution for the URL shortener question, at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on 153 numbered slides.
+
+The idea that unlocks it: the redirect is the product. It is one memory read, and counting, takedowns and the edge all live beside it, each with a number on how late it may be.
+
+What it goes into:
+→ Why base-62 of a counter is still a counter, and a keyed shuffle that keeps codes unique
+→ One link at 40,000 clicks a second: a hot key, not a load problem
+→ 301 or 302 as a product decision
+→ A phishing link dead everywhere in five minutes, as a sum of cache lifetimes
+
+Best on a second pass: pause after each question and answer it first.
+
+▶ [YouTube link: rerun publish_kit.py with --youtube-url]
+
+It's a scripted walkthrough with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator.
+
+301 or 302 for a short link: which would you ship, and who should decide?
+
+#SystemDesign #SoftwareEngineering #DistributedSystems

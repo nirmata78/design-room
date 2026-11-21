@@ -1,0 +1,807 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>SD-94 denylist system: slides</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="deck.css">
+<link rel="stylesheet" href="video.css">
+</head><body>
+<!-- v-001 card Cold open -->
+<div class="slide th">
+<div class="lbl">Chapter 0 of 9</div><div class="s">Cold open</div><div class="sub">Design a distributed denylist system</div><div class="ribbon"><span class="">Requirements</span><span class="">Estimates</span><span class="">Theory</span><span class="">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-002 &lt;div class="who"&gt;Interviewer · the promp -->
+<div class="slide qs">
+<div class="who">Interviewer · the prompt</div><div class="qq">“Design a distributed system that stops requests from banned sources, such as IP addresses, from being served on every one of our servers.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-003 &lt;div class="k"&gt;Why it is harder than it  -->
+<div class="slide">
+<div class="k">Why it is harder than it looks</div><h1>The same pipe delivers a ban and a mistake</h1><p class="chips">100,000 nodes<i>·</i>18 s to reach all<i>·</i>one typo</p><figure class="grow"><!--SVG:badpush--></figure>
+</div>
+<!-- v-004 &lt;div class="k"&gt;Before the design&lt;/div&gt;&lt;h -->
+<div class="slide">
+<div class="k">Before the design</div><h1>What this question grades</h1><table class="bt sm sig"><tr><th>Axis</th><th>Weak signal</th><th>Strong signal</th></tr><tr class=""><td><b>Requirements</b></td><td>A table of addresses and a cache</td><td>Asks how fast a ban must land, what a wrong block costs, who owns the failure policy</td></tr><tr class=""><td><b>Correctness</b></td><td>“Eventually consistent”, no number</td><td>States the staleness bound, versions every update, handles out-of-order changes</td></tr><tr class=""><td><b>Trade-offs</b></td><td>Names a product</td><td>Options with the failure that rules each out; checks the edge provider's own feature first</td></tr><tr class=""><td><b>Depth</b></td><td>Stops at “push the list to the nodes”</td><td>Delta window against snapshot size, why a rollback is a new version, why a filter hit needs a check</td></tr><tr class=""><td><b>Operations</b></td><td>Watches CPU</td><td>Propagation lag as the SLI, a synthetic banned probe, staged pushes, two owners with a contract</td></tr></table><div class="grade"><b class="t">Coach · what is graded here</b>Two ways to be wrong run through this question: a ban that is missing, and a block that should not exist. Keep both in view.</div>
+</div>
+<!-- v-005 &lt;div class="lbl"&gt;The thesis&lt;/div&gt;&lt;div cl -->
+<div class="slide th">
+<div class="lbl">The thesis</div><div class="s">The check must be <em>local</em> and the list cannot be. The design is the distance between them: a <em>version</em>, a stated <em>bound</em>, and the discipline of a <em>release</em>.</div>
+</div>
+<!-- v-006 &lt;div class="k"&gt;The order I will follow&lt;/ -->
+<div class="slide">
+<div class="k">The order I will follow</div><h1>Scope, numbers, theory, a simple design, then I break it</h1><div class="ribbon" style="margin-top:14pt"><span>Requirements</span><span>Estimates</span><span>Theory</span><span>API + data</span><span>Design</span><span>Challenges</span><span>Cost · AUX</span><span>Recap</span></div><div class="cards c3" style="margin-top:18pt"><div class="cd"><h3>First</h3><p>Requirements and scope. Numbers. A short theory chapter.</p></div><div class="cd grn"><h3>Then</h3><p>API and data. A high-level design in three versions, each answering the one before.</p></div><div class="cd red"><h3>Most of the time</h3><p>Seven challenges that break the design. A build cost. A recap.</p></div></div>
+</div>
+<!-- v-007 card Requirements and scope -->
+<div class="slide th">
+<div class="lbl">Chapter 1 of 9</div><div class="s">Requirements and scope</div><div class="sub">Ask first. Cut on purpose. Put numbers on it.</div><div class="ribbon"><span class="on">Requirements</span><span class="">Estimates</span><span class="">Theory</span><span class="">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-008 &lt;div class="who"&gt;Clarifying question 1 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 1 of 6</div><div class="qq">Who owns the list, and who calls the check?</div><div class="ans">A policy team, security and legal, owns the content. The platform team owns the mechanism. The check runs on every serving node: about 100,000 nodes in 20 regions.</div>
+</div>
+<!-- v-009 &lt;div class="who"&gt;Clarifying question 2 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 2 of 6</div><div class="qq">What is banned?</div><div class="ans">Addresses first: single IPv4 and IPv6 addresses and ranges. A second key type, a user id, will come. Do not design it out.</div>
+</div>
+<!-- v-010 &lt;div class="who"&gt;Clarifying question 3 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 3 of 6</div><div class="qq">How big, and how fast does it change?</div><div class="ans">10 million entries today, perhaps 100 million later. About 5 changes a second, 50 in a burst. 1 million requests a second at peak across the fleet.</div>
+</div>
+<!-- v-011 &lt;div class="who"&gt;Clarifying question 4 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 4 of 6</div><div class="qq">How fast must a ban take effect?</div><div class="ans">Within 30 seconds for 99.9 % of nodes. Removals follow the same rule.</div>
+</div>
+<!-- v-012 &lt;div class="who"&gt;Clarifying question 5 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 5 of 6</div><div class="qq">What if a node cannot get updates?</div><div class="ans">That is yours to propose. I will decide who signs it.</div>
+</div>
+<!-- v-013 &lt;div class="who"&gt;Clarifying question 6 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 6 of 6</div><div class="qq">Where does the list come from?</div><div class="ans">Mostly an internal tool. One list is mirrored from an external authority that publishes a daily bulk file. A variant has only a slow lookup API.</div>
+</div>
+<!-- v-014 &lt;div class="k"&gt;Requirements · functional -->
+<div class="slide">
+<div class="k">Requirements · functional</div><h1>Five things the system must do</h1><div class="cards c3"><div class="cd"><h3>FR1 · Publish</h3><p>Add or remove a key or range, with a reason, a source and an optional expiry. Validated. Audited.</p></div><div class="cd"><h3>FR2 · Distribute</h3><p>Every change reaches every node within the bound. A node that was offline catches up on its own.</p></div><div class="cd amb"><h3>FR3 · Enforce</h3><p>A verdict for each request, inside the request path, in microseconds.</p></div><div class="cd"><h3>FR4 · Inspect and explain</h3><p>Which version each node runs, and how old. Why was this key denied or served on that day.</p></div><div class="cd grn"><h3>FR5 · Roll back and stop</h3><p>Halt a rollout, kill a list, revert. An emergency fast path. Audited.</p></div></div>
+</div>
+<!-- v-015 &lt;div class="k"&gt;Requirements · non-functi -->
+<div class="slide">
+<div class="k">Requirements · non-functional</div><h1>The numbers, and what each is for</h1><p class="chips">all initial targets, not measurements</p><div class="tiles" style="--n:4"><div class="tile"><b>&lt; 10 µs</b><span>check p99, in process, no network call</span></div><div class="tile blue"><b>30 s</b><span>for 99.9 % of nodes: about 100 nodes may be late</span></div><div class="tile blue"><b>0</b><span>network calls on the request path</span></div><div class="tile"><b>1 version</b><span>on every decision, for audit</span></div></div>
+</div>
+<!-- v-016 &lt;div class="k"&gt;Requirements · behaviour&lt; -->
+<div class="slide">
+<div class="k">Requirements · behaviour</div><h1>Three promises that are not numbers</h1><div class="cards c3"><div class="cd red"><h3>Keep enforcing</h3><p>A node holds its last known list through any outage of the distribution plane. Stale is not open.</p></div><div class="cd amb"><h3>The bound is signed</h3><p>Each list has a maximum age and an action when it is exceeded, chosen by the owner.</p></div><div class="cd"><h3>A bad push is caught by the pipeline</h3><p>Not by customers, and not by whoever happens to be on call.</p></div></div>
+</div>
+<!-- v-017 &lt;div class="k"&gt;Requirements · polling, s -->
+<div class="slide">
+<div class="k">Requirements · polling, stated once</div><h1>A poll asks for the manifest. It does not download the list.</h1><div class="cards c3"><div class="cd"><h3>Every 10 s</h3><p>A node asks the <b>manifest</b>: about 100 bytes with the current version, the delta window and a checksum.</p></div><div class="cd grn"><h3>If behind, inside the window</h3><p>It fetches <b>deltas</b>: the changes between its version and now.</p></div><div class="cd amb"><h3>Snapshot only to bootstrap</h3><p>Or after falling outside the window, or when a check fails. Never on a routine poll.</p></div></div><div class="line a">“Pull every ten seconds” never means “download the file every ten seconds”.</div>
+</div>
+<!-- v-018 &lt;div class="k"&gt;Requirements · scope&lt;/div -->
+<div class="slide">
+<div class="k">Requirements · scope</div><h1>In scope, out of scope</h1><p class="chips">addresses and ranges<i>·</i>allowlist<i>·</i>regional layers<i>·</i>audit</p><div class="scope2"><div class="in"><h3>In scope</h3><ul><li>Single addresses and ranges, IPv4 and IPv6</li><li>A second key type as an extension</li><li>An allowlist of ranges never blocked</li><li>Internal and mirrored sources</li><li>Staged rollout, audit, operator console</li></ul></div><div class="out"><h3>Out of scope, on purpose</h3><ul><li>Detecting abuse: a model or rules engine (SD-43)</li><li>Rate limiting (SD-25)</li><li>Absorbing a volumetric attack: scrubbing upstream</li><li>Content rules inside requests: a web firewall</li><li>An appeals product: an owner and a workflow</li></ul></div></div>
+</div>
+<!-- v-019 &lt;div class="k"&gt;Requirements · say it alo -->
+<div class="slide">
+<div class="k">Requirements · say it aloud</div><h1>An address is not a person</h1><div class="cards c2"><div class="cd red"><h3>Shared and carrier-grade addresses</h3><p>One address can hold thousands of legitimate users. A single wrong range blocks all of them.</p></div><div class="cd grn"><h3>Why it shapes the design</h3><p>An allowlist that always wins. Removals as carefully handled as adds. A softer action than a hard block where it fits.</p></div></div>
+</div>
+<!-- v-020 &lt;div class="lbl"&gt;The core&lt;/div&gt;&lt;div clas -->
+<div class="slide th">
+<div class="lbl">The core</div><div class="s">The core is four things: a <em>versioned list</em>, a <em>distribution path</em> that can be verified, a <em>local check</em>, and a <em>release discipline</em>.</div>
+</div>
+<!-- v-021 card Estimates -->
+<div class="slide th">
+<div class="lbl">Chapter 2 of 9</div><div class="s">Estimates</div><div class="sub">Every number is arithmetic, with a label. Each one changes a decision.</div><div class="ribbon"><span class="done">Requirements</span><span class="on">Estimates</span><span class="">Theory</span><span class="">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-022 &lt;div class="k"&gt;Estimates · 1 of 10 · why -->
+<div class="slide">
+<div class="k">Estimates · 1 of 10 · why local</div><h1>A remote check on every request</h1><table class="bt"><tr><th>Quantity</th><th>Arithmetic</th><th>Label</th></tr><tr class=""><td>Rate per node</td><td>1,000,000 / s ÷ 100,000 nodes = <b>10 / s</b></td><td>given</td></tr><tr class=""><td>A remote check</td><td>~1 ms of network added to every request; <b>1 M lookups / s</b> on one service</td><td>illustrative</td></tr><tr class=""><td>Availability</td><td>99.99 % × 99.99 % ≈ <b>99.98 %</b></td><td>derived</td></tr></table><div class="line a">The reason to stay local is latency and independence, not throughput.</div>
+</div>
+<!-- v-023 &lt;div class="k"&gt;Estimates · 2 of 10 · mem -->
+<div class="slide dia">
+<div class="k">Estimates · 2 of 10 · memory</div><h1>Does the list fit on a node?</h1><p class="chips">budget 512 MB per node<i>·</i>derived</p><figure class="grow"><!--SVG:sizes--></figure>
+</div>
+<!-- v-024 &lt;div class="k"&gt;Estimates · 3 of 10 · one -->
+<div class="slide">
+<div class="k">Estimates · 3 of 10 · one lookup</div><h1>The check is cheap</h1><table class="bt"><tr><th>Quantity</th><th>Arithmetic</th><th>Label</th></tr><tr class=""><td>Sorted array of 10 M</td><td>log₂(10⁷) ≈ 24 comparisons ≈ <b>0.3 to 1 µs</b> with cache misses</td><td>illustrative, to be measured</td></tr><tr class=""><td>Prefix trie</td><td>up to 32 steps for IPv4 and 128 for IPv6, but typically a handful of cache lines</td><td>illustrative</td></tr><tr class=""><td>The budget</td><td>p99 under 10 µs</td><td>initial target</td></tr></table><div class="line a">The check fits its budget with room to spare. The risk is elsewhere.</div>
+</div>
+<!-- v-025 &lt;div class="k"&gt;Estimates · 4 of 10 · cha -->
+<div class="slide">
+<div class="k">Estimates · 4 of 10 · change volume</div><h1>Deltas are tiny, so catch-up is cheap</h1><table class="bt"><tr><th>Quantity</th><th>Arithmetic</th><th>Label</th></tr><tr class=""><td>Delta rate</td><td>50 / s × 30 B ≈ <b>1.5 KB / s</b></td><td>illustrative</td></tr><tr class=""><td>Two hours offline</td><td>7,200 s × 50 × 30 B ≈ <b>11 MB</b> of deltas, against a 40 MB snapshot</td><td>illustrative</td></tr><tr class=""><td>Break-even</td><td>40 MB ÷ 30 B ≈ 1.33 M changes ≈ <b>7.4 h</b> at the burst rate</td><td>derived</td></tr><tr class=""><td>Retention</td><td>keep <b>24 h</b>: 86,400 × 50 × 30 B ≈ 130 MB</td><td>illustrative</td></tr></table>
+</div>
+<!-- v-026 &lt;div class="k"&gt;Estimates · 5 of 10 · fan -->
+<div class="slide dia">
+<div class="k">Estimates · 5 of 10 · fan-out</div><h1>Four terabytes, or eight hundred megabytes</h1><p class="chips">derived</p><figure class="grow"><!--SVG:fanout--></figure>
+</div>
+<!-- v-027 &lt;div class="k"&gt;Estimates · 6 of 10 · pol -->
+<div class="slide">
+<div class="k">Estimates · 6 of 10 · polling</div><h1>Ten thousand polls a second is cheap</h1><table class="bt"><tr><th>Quantity</th><th>Arithmetic</th><th>Label</th></tr><tr class=""><td>Poll rate</td><td>100,000 nodes ÷ 10 s = <b>10,000 manifest polls / s</b></td><td>derived</td></tr><tr class=""><td>Bytes</td><td>~100 B each ≈ <b>1 MB / s</b> across the fleet</td><td>illustrative</td></tr><tr class=""><td>Per zone relay</td><td>500 ÷ 10 s = <b>50 polls / s</b></td><td>derived</td></tr><tr class=""><td>What a poll fetches</td><td>the manifest only. Deltas when behind inside the window. A snapshot to bootstrap or beyond the window</td><td>design choice</td></tr></table>
+</div>
+<!-- v-028 &lt;div class="k"&gt;Estimates · 7 of 10 · pro -->
+<div class="slide dia">
+<div class="k">Estimates · 7 of 10 · propagation</div><h1>Does a ban land inside thirty seconds?</h1><p class="chips">pull-only worst case: 18 s<i>·</i>initial target</p><figure class="grow"><!--SVG:budget--></figure>
+</div>
+<!-- v-029 &lt;div class="k"&gt;Estimates · 8 of 10 · a s -->
+<div class="slide">
+<div class="k">Estimates · 8 of 10 · a slow external source</div><h1>Two hundred times over budget</h1><table class="bt"><tr><th>Quantity</th><th>Arithmetic</th><th>Label</th></tr><tr class=""><td>New addresses</td><td>20,000 first-seen / s at peak</td><td>illustrative</td></tr><tr class=""><td>API budget</td><td>100 calls / s → <b>200× over</b></td><td>given in the variant</td></tr><tr class=""><td>Coverage a day</td><td>100 × 86,400 = 8.6 M lookups ÷ ~50 M distinct addresses = <b>17 %</b></td><td>illustrative</td></tr></table><div class="line r">A lookup API cannot be the path, and cannot cover everything. Ask for a bulk list.</div>
+</div>
+<!-- v-030 &lt;div class="k"&gt;Estimates · 9 of 10 · bla -->
+<div class="slide">
+<div class="k">Estimates · 9 of 10 · blast radius</div><h1>How much damage can one push do?</h1><table class="bt"><tr><th>Quantity</th><th>Arithmetic</th><th>Label</th></tr><tr class=""><td>All nodes apply</td><td>within ~18 s of publish</td><td>derived</td></tr><tr class=""><td>A bad range</td><td>blocks 8 % of requests; visible in one 10 s metrics window</td><td>illustrative</td></tr><tr class=""><td>On a canary</td><td>5 % of nodes = 5,000. Staged: 5 % → 25 % → 100 %, 5 min bake each ≈ <b>10 min</b> planned</td><td>illustrative</td></tr></table><div class="line a">The same speed that helps a ban hurts a mistake. A planned push can be slower than an urgent one.</div>
+</div>
+<!-- v-031 &lt;div class="k"&gt;Estimates · 10 of 10 · th -->
+<div class="slide">
+<div class="k">Estimates · 10 of 10 · the SLO as a budget</div><h1>A hundred nodes may be late</h1><table class="bt"><tr><th>Quantity</th><th>Arithmetic</th><th>Label</th></tr><tr class=""><td>The target</td><td>99.9 % of 100,000 nodes within 30 s</td><td>initial target</td></tr><tr class=""><td>Allowed late</td><td>0.1 % = <b>100 nodes</b>, each listed with its age</td><td>derived</td></tr><tr class=""><td>The SLI</td><td>share of nodes on the current version, per region</td><td>design choice</td></tr></table><div class="grade"><b class="t">Coach · what is graded here</b>Stating the SLO as a budget of late nodes, and listing them, turns an abstract target into something a person can be paged on.</div>
+</div>
+<!-- v-032 card Theory -->
+<div class="slide th theory">
+<div class="lbl">Chapter 3 of 9</div><div class="s">Theory</div><div class="sub">What makes this problem hard, in words that outlive any product name</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="on">Theory</span><span class="">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-033 &lt;div class="lbl"&gt;Theory · 1 of 6 · what  -->
+<div class="slide th theory">
+<div class="lbl">Theory · 1 of 6 · what it is</div><div class="s">A <em>versioned</em> set of banned keys, copied to every node, checked <em>without a network call</em>, changed under a <em>release discipline</em>.</div>
+</div>
+<!-- v-034 &lt;div class="k"&gt;Theory · 1 of 6 · what it -->
+<div class="slide theory">
+<div class="k">Theory · 1 of 6 · what it is not</div><h1>Four things it is confused with</h1><div class="cards c2"><div class="cd"><h3>Not a rate limiter</h3><p>No counters, no window. The verdict depends on the key alone.</p></div><div class="cd"><h3>Not a cache</h3><p>A cache may be wrong by design and refills on a miss. A denylist must hold the whole set.</p></div><div class="cd amb"><h3>Not a feature-flag service</h3><p>Same push mechanics. But a wrong flag changes behaviour, and a wrong block drops a customer.</p></div><div class="cd red"><h3>Not a firewall</h3><p>It decides on identity, not on content.</p></div></div>
+</div>
+<!-- v-035 &lt;div class="k"&gt;Theory · 2 of 6 · the two -->
+<div class="slide theory">
+<div class="k">Theory · 2 of 6 · the two properties</div><h1>State safety and liveness separately</h1><div class="prop safe"><div class="lbl">Safety · must never happen</div><p><b>S1</b> A banned key is served by a node whose list is newer than that ban plus the bound.<br><b>S2</b> An allowlisted or legitimate key is denied because a bad, partial or mis-merged list was applied.</p></div><div class="prop live"><div class="lbl">Liveness · must eventually happen</div><p><b>L1</b> Every node applies every published version.<br><b>L2</b> 99.9 % of nodes do so within 30 s.<br><b>L3</b> A node that cannot update is detected, reported and handled by the stale policy.</p></div><div class="whyb"><b class="t">Why two safety properties</b>A denylist can be wrong in both directions. Most designs defend S1 and forget S2.</div>
+</div>
+<!-- v-036 &lt;div class="k"&gt;Theory · 3 of 6 · the cen -->
+<div class="slide dia theory">
+<div class="k">Theory · 3 of 6 · the central tension</div><h1>Freshness against blast radius</h1><figure class="grow"><!--SVG:tension--></figure>
+</div>
+<!-- v-037 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 1 of 7</div><h1>An in-process check on a compact structure</h1><div class="prop live"><div class="lbl">Property it protects</div><p>Latency and independence.</p></div><div class="prop"><div class="lbl">How it works</div><p>A sorted array or hash set for single keys, a prefix trie for ranges, held in the server's memory. The request never leaves the process.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>A network call on every request, and the list service becoming part of every request's availability.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>The whole set in RAM on every node. Staleness becomes a design parameter instead of a non-issue.</p></div>
+</div>
+<!-- v-038 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 2 of 7</div><h1>Versioned snapshots and deltas, with checksums</h1><div class="prop safe"><div class="lbl">Property it protects</div><p>Convergence and integrity: S1, S2, L1.</p></div><div class="prop"><div class="lbl">How it works</div><p>One writer assigns a strictly increasing version. Each version has a snapshot and a delta from the previous one. Each checksum covers its content and the checksum before it.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>A node unable to say what it holds, partial or corrupt state, out-of-order application, a full download per change.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>A compile step, a delta log to retain, and two artifact kinds to store.</p></div>
+</div>
+<!-- v-039 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 3 of 7</div><h1>A relay tree, push plus a pull backstop</h1><div class="prop live"><div class="lbl">Property it protects</div><p>Propagation speed and resilience: L1, L2.</p></div><div class="prop"><div class="lbl">How it works</div><p>Origin, regional relays, zone relays, nodes. A push says a version exists. A ten-second manifest poll is the backstop. Artifacts are immutable and cacheable.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>Origin overload, and a missed push leaving a node behind forever.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>More hops add latency. Two paths to build, operate and test.</p></div>
+</div>
+<!-- v-040 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 4 of 7</div><h1>Atomic swap and a last known good copy on disk</h1><div class="prop safe"><div class="lbl">Property it protects</div><p>Safety of the node's serving state: S2.</p></div><div class="prop"><div class="lbl">How it works</div><p>Build the new structure beside the old, verify, swap one pointer. Write the verified snapshot and version to disk.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>A half-applied list, an empty list after a restart, a crash during an update.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>Two copies in memory briefly. A startup path that must work with no network at all.</p></div>
+</div>
+<!-- v-041 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 5 of 7</div><h1>Release discipline: gates, a kill flag, rollback</h1><div class="prop safe"><div class="lbl">Property it protects</div><p>Safety against bad content: S2.</p></div><div class="prop"><div class="lbl">How it works</div><p>Limits and an allowlist at ingest. Stages gated automatically on block rate. A flag in the manifest nodes honour within one poll. A rollback publishes the old content as a higher version.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>One mistaken rule reaching the whole fleet at once.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>Minutes of delay for a routine push. An emergency fast path with fewer gates. A gate that must be trusted.</p></div>
+</div>
+<!-- v-042 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 6 of 7</div><h1>A staleness bound with an explicit action</h1><div class="prop live"><div class="lbl">Property it protects</div><p>Liveness made visible: L3.</p></div><div class="prop"><div class="lbl">How it works</div><p>Each list has a maximum age and an action when exceeded, signed by its owner: alert, or drain the node, with a cap.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>Silent drift: every node quietly serving an old list for days.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>A policy someone must sign. Capacity lost when nodes drain.</p></div>
+</div>
+<!-- v-043 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 7 of 7</div><h1>A filter in front, an exact check behind; allow beats deny</h1><div class="prop safe"><div class="lbl">Property it protects</div><p>Correct verdicts at scale: S2.</p></div><div class="prop"><div class="lbl">How it works</div><p>A compact filter answers “definitely not listed”. A maybe is confirmed by an exact tier. An allowlist range overrides any deny.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>A false positive blocking a real user. A wrong range overriding a protected one.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>A second tier for confirmation. Precedence rules to explain and to test.</p></div>
+</div>
+<!-- v-044 &lt;div class="k"&gt;Theory · 5 of 6 · the opt -->
+<div class="slide theory">
+<div class="k">Theory · 5 of 6 · the options, part one</div><h1>Three ways that look cheap</h1><table class="bt sm mx"><tr><th>Approach</th><th>Latency</th><th>Independent of the list service?</th><th>Fails when</th></tr><tr class="rej"><td>A · A central lookup per request: a shared cache or database on the path</td><td>~1 ms</td><td>no</td><td>the store is down, or 1 M lookups a second arrive; every request pays the trip</td></tr><tr class="rej"><td>B · Each node downloads the whole list on a timer</td><td>µs</td><td>yes</td><td>100,000 full downloads (4 TB); a partial or corrupt file; one bad file reaches everyone; no versions</td></tr><tr class="rej"><td>C · A push-only stream of changes: pub/sub</td><td>µs</td><td>yes</td><td>a node misses messages with no way to catch up; ordering and duplicates; no integrity check</td></tr></table>
+</div>
+<!-- v-045 &lt;div class="k"&gt;Theory · 5 of 6 · the opt -->
+<div class="slide theory">
+<div class="k">Theory · 5 of 6 · the options matrix</div><h1>Six approaches, one pick</h1><table class="bt sm mx"><tr><th>Approach</th><th>Latency</th><th>Freshness</th><th>Independent?</th><th>Ops</th><th>Fails when</th></tr><tr class="rej"><td>A · Central lookup per request</td><td>~1 ms</td><td>instant</td><td>no</td><td>low</td><td>store down; 1 M lookups/s</td></tr><tr class="rej"><td>B · Whole list on a timer</td><td>µs</td><td>interval</td><td>yes</td><td>very low</td><td>4 TB; corrupt file; no versions</td></tr><tr class="rej"><td>C · Push-only stream</td><td>µs</td><td>seconds</td><td>yes</td><td>medium</td><td>missed message, no catch-up</td></tr><tr class="pick"><td>D · Versioned snapshots + deltas, relay tree, push + pull, local check, staged rollout</td><td>µs</td><td>seconds to ~18 s</td><td>yes</td><td>medium to high</td><td>set no longer fits; a wrong rule that validates</td></tr><tr class="rej"><td>E · Local filter + remote check on a hit</td><td>µs miss, ~1 ms hit</td><td>as D</td><td>partly</td><td>high</td><td>high hit rate (an attack); tier down</td></tr><tr class="rej"><td>F · The edge provider's own IP-set feature</td><td>µs</td><td>provider-defined</td><td>yes</td><td>very low</td><td>entry limits; key types; layers; audit; unmeasurable propagation</td></tr></table>
+</div>
+<!-- v-046 &lt;div class="k"&gt;Theory · 5 of 6 · the pic -->
+<div class="slide theory">
+<div class="k">Theory · 5 of 6 · the pick, and what it gives up</div><h1>D, with F checked first and E held in reserve</h1><div class="cards c2"><div class="cd grn"><h3>What the pick buys</h3><p>Auditable verdicts, layered rules, extra key types, a propagation number I can measure, and a design that needs nothing from the request path.</p></div><div class="cd red"><h3>What it gives up</h3><p>Instant effect: a bounded delay instead. Memory on every node. And a distribution plane to build and run.</p></div></div><div class="line a">Check F first: if the provider's feature fits the limits, buy it and build only the audit.</div>
+</div>
+<!-- v-047 &lt;div class="k"&gt;Theory · 5 of 6 · row F,  -->
+<div class="slide theory">
+<div class="k">Theory · 5 of 6 · row F, honestly</div><h1>Is the provider's feature enough?</h1><div class="cards c3"><div class="cd grn"><h3>Ask these</h3><p>Entry limit against our 10 M. IPv6 and ranges. How fast a change lands, and can we measure it. A second key type.</p></div><div class="cd amb"><h3>Often missing</h3><p>Per-decision audit with a version. Layered regional rules. A staged rollout we control. An allowlist that always wins.</p></div><div class="cd"><h3>The honest answer</h3><p>If every answer fits, buy. Build only the rule store, the audit and the gates around it.</p></div></div>
+</div>
+<!-- v-048 &lt;div class="k"&gt;Theory · 6 of 6 · the fai -->
+<div class="slide theory">
+<div class="k">Theory · 6 of 6 · the failure catalogue, part one</div><h1>What will go wrong</h1><table class="bt sm"><tr><th>#</th><th>Failure</th><th>Becomes</th></tr><tr class=""><td>F1</td><td>A node is offline or behind; an update is corrupt or truncated</td><td><b>Challenge 1</b></td></tr><tr class=""><td>F2</td><td>Add and remove arrive out of order or twice; ranges overlap</td><td><b>Challenge 2</b></td></tr><tr class=""><td>F3</td><td>A bad rule: a too-wide range, a typo, a wrong merge</td><td><b>Challenge 3</b></td></tr><tr class=""><td>F4</td><td>The distribution plane is down, or a node is partitioned</td><td><b>Challenge 4</b></td></tr></table>
+</div>
+<!-- v-049 &lt;div class="k"&gt;Theory · 6 of 6 · the fai -->
+<div class="slide theory">
+<div class="k">Theory · 6 of 6 · the failure catalogue, part two</div><h1>What will go wrong, continued</h1><table class="bt sm"><tr><th>#</th><th>Failure</th><th>Becomes</th></tr><tr class=""><td>F5</td><td>The list outgrows a node; IPv6; a filter's false positive; a hit storm</td><td><b>Challenge 5</b></td></tr><tr class=""><td>F6</td><td>The source is a slow, rate-limited authority; a new /16 against cached verdicts</td><td><b>Challenge 6</b></td></tr><tr class=""><td>F7</td><td>Nobody notices a ban that did not land, or a block that should not exist</td><td><b>Challenge 7</b></td></tr><tr class=""><td>F8</td><td>An operator mistake in the console</td><td>two-person approval and audit, on the API slides</td></tr><tr class=""><td>F9</td><td>A restart with no network</td><td>last known good on disk, in the flows</td></tr></table>
+</div>
+<!-- v-050 &lt;div class="k"&gt;Theory · what each mechan -->
+<div class="slide theory">
+<div class="k">Theory · what each mechanism serves</div><h1>Safety or liveness, never both unnamed</h1><table class="bt sm"><tr><th>Mechanism</th><th>Serves</th><th>Where it returns</th></tr><tr class=""><td>M1 In-process check</td><td>latency, independence</td><td>flows, challenge 5</td></tr><tr class=""><td>M2 Versions + checksums</td><td><b>S1, S2, L1</b></td><td>challenges 1 and 2</td></tr><tr class=""><td>M3 Relay tree, push + pull</td><td>L1, L2</td><td>challenges 1 and 7</td></tr><tr class=""><td>M4 Atomic swap, last known good</td><td>S2</td><td>challenges 1 and 4</td></tr><tr class=""><td>M5 Release discipline</td><td><b>S2</b></td><td>challenge 3</td></tr><tr class=""><td>M6 Staleness bound</td><td>L3</td><td>challenge 4</td></tr><tr class=""><td>M7 Filter + exact + allow wins</td><td>S2</td><td>challenges 5 and 6</td></tr></table><div class="grade"><b class="t">Coach · what is graded here</b>Every mechanism must name the property it protects. A mechanism with no stated property is decoration.</div>
+</div>
+<!-- v-051 card API and entities -->
+<div class="slide th">
+<div class="lbl">Chapter 4 of 9</div><div class="s">API and entities</div><div class="sub">The contract first. It forces the semantics into the open.</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="on">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-052 &lt;div class="k"&gt;API · publish&lt;/div&gt;&lt;h1&gt;Pu -->
+<div class="slide">
+<div class="k">API · publish</div><h1>PublishChange</h1><div class="tr"><span class="fr">serves FR1</span><span class="api">PublishChange</span><span class="ent">writes ChangeSet · Rule</span><span class="nfr">idempotent</span></div><div class="cols2"><pre class="wire"><span class="cm">// request</span>
+PublishChange {
+  list: "abuse",
+  ops: [{ op: "add",
+          key: "203.0.113.0/28",
+          kind: "range",
+          action: "deny",
+          reason: "ticket 7712",
+          source: "policy-tool",
+          expiresAt: "2026-12-01" }],
+  idempotencyKey: "c4f9…"
+}</pre><pre class="wire"><span class="cm">// response</span>
+{ changeSetId: "cs-90113",
+  version: 8361004,
+  stage: 0 }
+
+<span class="cm">// a retry with the same key returns
+// the SAME version, never a second one
+// large or wide changes wait for a
+// second approver</span></pre></div>
+</div>
+<!-- v-053 &lt;div class="k"&gt;API · distribution&lt;/div&gt;&lt; -->
+<div class="slide">
+<div class="k">API · distribution</div><h1>Manifest, delta, snapshot</h1><div class="tr"><span class="fr">serves FR2</span><span class="api">manifest · delta · snapshot</span><span class="ent">reads Version</span><span class="nfr">immutable, cacheable</span></div><div class="cols2"><pre class="wire"><span class="cm">// the 10 s poll: about 100 bytes</span>
+GET /manifest?list=abuse&amp;have=8361000
+
+<span class="cm">// the artifacts: immutable, content-addressed</span>
+GET /delta?list=abuse&amp;from=8361000
+GET /snapshot/8361004</pre><pre class="wire"><span class="cm">// manifest response</span>
+{ current: 8361004,
+  minDelta: 8274600,   <span class="cm">// window start</span>
+  deltaRef: "d/8361000-8361004",
+  snapshotRef: "s/8361004",
+  checksum: "9ab3…",
+  killed: false }      <span class="cm">// the kill flag</span></pre></div>
+</div>
+<!-- v-054 &lt;div class="k"&gt;API · the check&lt;/div&gt;&lt;h1&gt; -->
+<div class="slide">
+<div class="k">API · the check</div><h1>Check is not a network call</h1><div class="tr"><span class="fr">serves FR3</span><span class="api">Check(key)</span><span class="ent">reads the node's structure</span><span class="nfr">&lt; 10 µs</span></div><div class="cols2"><pre class="wire"><span class="cm">// in process, on the request path</span>
+verdict = agent.check(sourceAddress)
+
+<span class="cm">// returns</span>
+{ verdict: DENY | ALLOW | CHALLENGE,
+  ruleId: 4411,
+  version: 8361004 }</pre><pre class="wire"><span class="cm">// order of evaluation</span>
+1. normalise (canonical CIDR, v6 forms)
+2. allowlist ranges: if match, ALLOW
+3. exact key
+4. longest-prefix range
+5. default ALLOW
+
+<span class="cm">// the version in the verdict is what
+// makes the decision log auditable</span></pre></div>
+</div>
+<!-- v-055 &lt;div class="k"&gt;API · fleet state and aud -->
+<div class="slide">
+<div class="k">API · fleet state and audit</div><h1>ReportApplied and Explain</h1><div class="tr"><span class="fr">serves FR4</span><span class="api">ReportApplied · Explain</span><span class="ent">writes NodeState · reads DecisionSample</span></div><div class="cols2"><pre class="wire"><span class="cm">// sent with each poll</span>
+ReportApplied {
+  node: "z7-0412",
+  list: "abuse",
+  version: 8361004,
+  ageMs: 1800
+}</pre><pre class="wire"><span class="cm">// for audit</span>
+Explain { key: "203.0.113.9",
+          at: "2026-11-03T14:05Z" }
+ -> { verdict: DENY,
+      ruleId: 4411,
+      version: 8360990,
+      source: "policy-tool" }</pre></div>
+</div>
+<!-- v-056 &lt;div class="k"&gt;API · rollout control&lt;/di -->
+<div class="slide">
+<div class="k">API · rollout control</div><h1>Rollout, Halt, Rollback, KillSwitch</h1><div class="tr"><span class="fr">serves FR5</span><span class="api">Rollout · Halt · Rollback · KillSwitch</span><span class="ent">writes Version stage · Audit</span></div><div class="cols2"><pre class="wire"><span class="cm">// stages: 5 % → 25 % → 100 %</span>
+Rollout { version: 8361004, stage: 1 }
+Halt    { version: 8361004, reason: "gate" }
+
+<span class="cm">// a rollback is a NEW, HIGHER version</span>
+Rollback { to: 8360990 }
+ -> publishes that content as 8361005</pre><pre class="wire"><span class="cm">// the kill flag lives in the manifest</span>
+KillSwitch { list: "abuse", on: true }
+
+<span class="cm">// every call is audited, two-person
+// approved above a size, and alerting
+// versions never move backwards</span></pre></div><div class="line r">A rollback that reuses a version number would make a node ignore it. Versions only go forward.</div>
+</div>
+<!-- v-057 &lt;div class="k"&gt;Data · conceptual model&lt;/ -->
+<div class="slide dia">
+<div class="k">Data · conceptual model</div><h1>Entities and relationships, in Chen notation</h1><figure class="grow"><!--SVG:erd-chen--></figure>
+</div>
+<!-- v-058 &lt;div class="k"&gt;Data · physical model&lt;/di -->
+<div class="slide dia">
+<div class="k">Data · physical model</div><h1>What is stored, and where</h1><figure class="grow"><!--SVG:erd-physical--></figure>
+</div>
+<!-- v-059 &lt;div class="k"&gt;Data · the apply step&lt;/di -->
+<div class="slide">
+<div class="k">Data · the apply step</div><h1>Applying a delta is a merge, not an overwrite</h1><pre class="code"><span class="cm">// runs on every node, for each change in a delta</span>
+<span class="kw">apply</span>(change c):
+  cur = state[c.key]              <span class="cm">// last version that touched this key</span>
+  <span class="kw">if</span> c.version &lt;= cur.version: <span class="kw">return</span>   <span class="cm">// late, duplicate: no-op</span>
+  state[c.key] = { c.version, c.op, c.action }
+
+<span class="cm">// then build the structure beside the old one,
+// verify the checksum chain, swap one pointer</span></pre><div class="grade"><b class="t">Coach · what is graded here</b>Naming the per-key version unprompted is a depth signal: arrival order is not intent order. The merge is idempotent and order-independent.</div>
+</div>
+<!-- v-060 &lt;div class="k"&gt;Data · the version chain&lt; -->
+<div class="slide dia">
+<div class="k">Data · the version chain</div><h1>A checksum that covers the one before</h1><figure class="grow"><!--SVG:chain--></figure>
+</div>
+<!-- v-061 card High-level design -->
+<div class="slide th">
+<div class="lbl">Chapter 5 of 9</div><div class="s">High-level design</div><div class="sub">Simple first. Each version answers the objection to the one before.</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="on">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-062 &lt;div class="k"&gt;High-level design · versi -->
+<div class="slide dia">
+<div class="k">High-level design · version 1 of 3</div><h1><span class=vtag>V1</span>The simplest thing that works</h1><p class="chips">one list file<i>·</i>every node downloads it<i>·</i>swap and check locally</p><figure class="grow"><!--SVG:base-v1--></figure>
+</div>
+<!-- v-063 &lt;div class="k r"&gt;V1 · the objection&lt;/div -->
+<div class="slide">
+<div class="k r">V1 · the objection</div><h1>A hundred thousand full downloads, and no way to verify any of them</h1><table class="tl"><tr><th>every minute</th><td>100,000 nodes &times; 40 MB &#8202;=&#8202; <span class="bad">4 TB</span> from one place</td></tr><tr><th>14:02:11</th><td>a node is reading a file that is still being written</td></tr><tr><th>14:02:12</th><td><span class="bad">it loads half a list, with no way to know</span></td></tr><tr><th>14:03:00</th><td>a bad file is published: <span class="bad">every node loads it</span></td></tr><tr><th>next day</th><td>auditor: "what was in force at 14:02?" <span class="bad">no version, no answer</span></td></tr></table><div class="hedge"><b class="t">Also</b>No catch-up story, no staleness bound, nothing to tell a node what it holds.</div>
+</div>
+<!-- v-064 &lt;div class="k"&gt;High-level design · versi -->
+<div class="slide dia">
+<div class="k">High-level design · version 2 of 3</div><h1><span class=vtag>V2</span>Versions, a rule store, and a relay tree</h1><p class="chips">one version order<i>·</i>snapshots + deltas<i>·</i>relay tree<i>·</i>push + 10 s manifest poll</p><figure class="grow"><!--SVG:base-v2--></figure>
+</div>
+<!-- v-065 &lt;div class="k"&gt;V2 · how the three arrows -->
+<div class="slide">
+<div class="k">V2 · how the three arrows between a relay and a node work</div><h1>Poll, push, delta</h1><div class="cards c3"><div class="cd"><h3>Poll · every 10 s</h3><p>The node asks the manifest with its version. About 100 bytes. The backstop that always works.</p></div><div class="cd amb"><h3>Push · optional</h3><p>The relay says “version N exists”. The node then does the same manifest step at once. It carries no data.</p></div><div class="cd grn"><h3>Delta · when behind</h3><p>Small, immutable, verified, applied. A snapshot only to bootstrap or beyond the window.</p></div></div><div class="line a">Push shortens the wait. Poll guarantees arrival. The node's logic is the same for both.</div>
+</div>
+<!-- v-066 &lt;div class="k"&gt;V2 · the objection&lt;/div&gt;&lt; -->
+<div class="slide">
+<div class="k">V2 · the objection</div><h1>One bad version reaches everyone in eighteen seconds</h1><div class="cards c2"><div class="cd red"><h3>Nothing checks the content</h3><p>A typo is as fast as a ban. The pipeline cannot tell them apart.</p></div><div class="cd amb"><h3>Nobody decided what stale means</h3><p>A node that cannot update does something, and nobody chose it.</p></div></div><div class="line a">The distribution is correct. The release discipline is missing. That is version three.</div>
+</div>
+<!-- v-067 &lt;div class="k"&gt;High-level design · versi -->
+<div class="slide dia">
+<div class="k">High-level design · version 3 of 3</div><h1><span class=vtag>V3</span>Safe enforcement: a controller, gates, and a stated policy</h1><p class="chips">atomic swap<i>·</i>last known good<i>·</i>staged rollout<i>·</i>staleness bound</p><figure class="grow"><!--SVG:base-v3--></figure>
+</div>
+<!-- v-068 &lt;div class="k"&gt;V3 · what the node does&lt;/ -->
+<div class="slide">
+<div class="k">V3 · what the node does</div><h1>One loop, with a safe failure at every step</h1><pre class="code"><span class="cm">// every ~10 s, with jitter</span>
+m = manifest(have = version)                     <span class="cm">// ~100 bytes</span>
+<span class="kw">if</span> m.killed: enterKillMode()                   <span class="cm">// honoured in one poll</span>
+<span class="kw">if</span> m.current == version: <span class="kw">return</span>              <span class="cm">// the common case: nothing</span>
+art = (version &gt;= m.minDelta) ? delta(version) : snapshot(m.current)
+<span class="kw">if</span> !verifyChain(art, m.checksum): discard(); report(apply_failed); <span class="kw">return</span>
+new = buildBeside(current, art)                  <span class="cm">// old list still serving</span>
+swap(new); persist(new); report(applied, age = 0)</pre><div class="line a">Every branch ends serving a good list. A failure never leaves the node worse off.</div>
+</div>
+<!-- v-069 &lt;div class="k"&gt;V3 · what it leaves open&lt; -->
+<div class="slide">
+<div class="k">V3 · what it leaves open</div><h1>The details are where it breaks</h1><div class="cards c2"><div class="cd red"><h3>What V3 has</h3><p>One version order, verified distribution, atomic apply, a controller with gates, a stated stale policy.</p></div><div class="cd red"><h3>What it has not been tested against</h3><p>A node two hours behind. Changes out of order. A plausible but wrong rule. No control plane. A list that does not fit. A slow authority. A silent failure.</p></div></div><div class="line r">Seven questions. Each fix creates the next. These are the challenges.</div>
+</div>
+<!-- v-070 &lt;div class="k"&gt;High-level design · requi -->
+<div class="slide dia">
+<div class="k">High-level design · requirement 1 · publish</div><h1>FR1: a change becomes a version</h1><div class="tr"><span class="fr">serves FR1</span><span class="api">PublishChange</span><span class="ent">writes ChangeSet · Rule</span><span class="nfr">idempotent</span></div><figure class="grow"><!--SVG:flow-fr1--></figure>
+</div>
+<!-- v-071 &lt;div class="k"&gt;High-level design · requi -->
+<div class="slide dia">
+<div class="k">High-level design · requirement 2 · distribute</div><h1>FR2: from the origin to every node</h1><div class="tr"><span class="fr">serves FR2</span><span class="api">manifest · delta · snapshot</span><span class="ent">reads Version</span><span class="nfr">30 s for 99.9 %</span></div><figure class="grow"><!--SVG:flow-fr2--></figure>
+</div>
+<!-- v-072 &lt;div class="k"&gt;High-level design · requi -->
+<div class="slide dia">
+<div class="k">High-level design · requirement 3 · enforce</div><h1>FR3: every request, in microseconds</h1><div class="tr"><span class="fr">serves FR3</span><span class="api">Check(key)</span><span class="ent">reads the node's structure</span><span class="nfr">&lt; 10 µs</span></div><figure class="grow"><!--SVG:flow-fr3--></figure>
+</div>
+<!-- v-073 &lt;div class="k"&gt;High-level design · requi -->
+<div class="slide dia">
+<div class="k">High-level design · requirement 4 · inspect and explain</div><h1>FR4: what is every node running, and why was X denied</h1><div class="tr"><span class="fr">serves FR4</span><span class="api">ReportApplied · Explain</span><span class="ent">writes NodeState</span><span class="nfr">late nodes listed</span></div><figure class="grow"><!--SVG:flow-fr4--></figure>
+</div>
+<!-- v-074 &lt;div class="k"&gt;High-level design · requi -->
+<div class="slide dia">
+<div class="k">High-level design · requirement 5 · roll back and stop</div><h1>FR5: halt, kill, or revert</h1><div class="tr"><span class="fr">serves FR5</span><span class="api">Halt · Rollback · KillSwitch</span><span class="ent">writes Version stage · Audit</span><span class="nfr">audited</span></div><figure class="grow"><!--SVG:flow-fr5--></figure>
+</div>
+<!-- v-075 &lt;div class="k"&gt;Design · C4 level 1&lt;/div&gt; -->
+<div class="slide dia">
+<div class="k">Design · C4 level 1</div><h1>The system in its context</h1><figure class="grow"><!--SVG:c4-context--></figure>
+</div>
+<!-- v-076 &lt;div class="k"&gt;Design · C4 level 2&lt;/div&gt; -->
+<div class="slide dia">
+<div class="k">Design · C4 level 2</div><h1>The containers</h1><figure class="grow"><!--SVG:c4-containers--></figure>
+</div>
+<!-- v-077 &lt;div class="k"&gt;Design · sequence · publi -->
+<div class="slide dia">
+<div class="k">Design · sequence · publish</div><h1>From operator to a compiled version</h1><figure class="grow"><!--SVG:seq-publish--></figure>
+</div>
+<!-- v-078 &lt;div class="k"&gt;Design · sequence · distr -->
+<div class="slide dia">
+<div class="k">Design · sequence · distribute and apply</div><h1>Push, manifest, delta, verify, swap</h1><figure class="grow"><!--SVG:seq-distribute--></figure>
+</div>
+<!-- v-079 &lt;div class="k"&gt;Design · sequence · enfor -->
+<div class="slide dia">
+<div class="k">Design · sequence · enforce</div><h1>One request, one verdict</h1><figure class="grow"><!--SVG:seq-enforce--></figure>
+</div>
+<!-- v-080 &lt;div class="k"&gt;Design · sequence · rollb -->
+<div class="slide dia">
+<div class="k">Design · sequence · rollback</div><h1>Gate trips, halt, a new higher version</h1><figure class="grow"><!--SVG:seq-rollback--></figure>
+</div>
+<!-- v-081 &lt;div class="k"&gt;Design · what the serving -->
+<div class="slide">
+<div class="k">Design · what the serving code looks like</div><h1>The whole pattern, from the serving side</h1><pre class="code"><span class="cm">// at server start</span>
+agent = DenyAgent.start(lists = ["abuse", "legal"])
+
+<span class="cm">// on every request, in process</span>
+v = agent.check(request.sourceAddress)
+<span class="kw">switch</span> v.verdict {
+  DENY:      <span class="kw">return</span> refuse(403, v.ruleId)
+  CHALLENGE: <span class="kw">return</span> challenge()
+  ALLOW:     <span class="kw">return</span> next()
+}
+log.sample(v)                                       <span class="cm">// carries the version</span>
+
+<span class="cm">// and the health endpoint the balancer reads</span>
+health = { listAge: agent.ageMs(), ok: agent.age &lt; bound }</pre>
+</div>
+<!-- v-082 &lt;div class="k"&gt;Design · layered rules, i -->
+<div class="slide">
+<div class="k">Design · layered rules, in one slide</div><h1>Global and regional lists, one pipeline</h1><div class="cards c3"><div class="cd"><h3>One list per layer</h3><p>A global list and a regional list, each with its own versions.</p></div><div class="cd amb"><h3>The node holds both</h3><p>A node reads the global list and its own region's list. Precedence is fixed: allow beats deny; a more specific range beats a wider one.</p></div><div class="cd grn"><h3>Same pipe</h3><p>The same compiler, relays and gates. Only the artifact name and the audience differ.</p></div></div>
+</div>
+<!-- v-083 card Bridge -->
+<div class="slide th">
+<div class="lbl">Chapter 6 of 9</div><div class="s">Bridge</div><div class="sub">It works. Where does it break first?</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="on">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-084 &lt;div class="k"&gt;Challenge map&lt;/div&gt;&lt;h1&gt;Se -->
+<div class="slide dia">
+<div class="k">Challenge map</div><h1>Seven attack points on the same baseline</h1><p class="chips">each fix creates the next question</p><figure class="grow"><!--SVG:map--></figure>
+</div>
+<!-- v-085 card Challenges -->
+<div class="slide th">
+<div class="lbl">Chapter 7 of 9</div><div class="s">Challenges</div><div class="sub">Seven ways to break it, and what survives</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="done">Design</span><span class="on">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-086 card Challenge 1: The node that was offline -->
+<div class="slide th card">
+<div class="lbl">7.1 · Challenge 1</div><div class="s">The node that was offline</div>
+</div>
+<!-- v-087 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 1 of 7</div><div class="qq">“A node was offline for two hours. How does it catch up? And how do you know all one hundred thousand nodes run version N?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-088 &lt;div class="k r"&gt;Challenge 1 of 7 · the  -->
+<div class="slide dia">
+<div class="k r">Challenge 1 of 7 · the node that was offline</div><h1 class="q">What should the node fetch, and is it whole?</h1><figure class="grow"><!--SVG:ch1-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“On reconnect it downloads the whole list again, and we check each node's file.”</div><div class="case"><b class="t">Why it fails</b>Nothing tells the node what it needs, and nothing proves what arrived is complete.</div></div>
+</div>
+<!-- v-089 &lt;div class="k r"&gt;Challenge 1 of 7 · the  -->
+<div class="slide">
+<div class="k r">Challenge 1 of 7 · the trace</div><h1 class="q">A node two hours behind, in numbers</h1><table class="tl"><tr><th>02:00</th><td>node z7-0412 applies version 8,000,000. Then it loses its uplink</td></tr><tr><th>04:00</th><td>the list is at 8,360,000: <span class="bad">360,000 changes missed</span> ≈ 11 MB of deltas</td></tr><tr><th>04:01</th><td>50 nodes in the zone reconnect together: 50 &times; 40 MB &#8202;=&#8202; <span class="bad">2 GB from one relay</span></td></tr><tr><th>04:01</th><td>a power cut mid-download leaves <span class="bad">a truncated file the node would load</span></td></tr></table><div class="hedge"><b class="t">Label the numbers</b>Illustrative. The shape matters: a small difference, a large naive transfer, and no integrity check.</div>
+</div>
+<!-- v-090 &lt;div class="k"&gt;Challenge 1 of 7 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 1 of 7 · the fix</div><h1>A manifest, a delta window, a snapshot fallback</h1><figure class="grow"><!--SVG:ch1-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>The node sends the version it has. The manifest says: take the delta, or take the snapshot. Every artifact is verified against a chained checksum before anything is applied.</div><div class="whyb"><b class="t">Property</b>Convergence (L1) and integrity (S2): a node can always reach the present, and never serves a state it has not verified.</div></div>
+</div>
+<!-- v-091 &lt;div class="k"&gt;Challenge 1 of 7 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 1 of 7 · sequence</div><h1>Reconnect, manifest, delta, verify, swap</h1><figure class="grow"><!--SVG:seq-ch1-catchup--></figure>
+</div>
+<!-- v-092 &lt;div class="k"&gt;Challenge 1 of 7 · the de -->
+<div class="slide">
+<div class="k">Challenge 1 of 7 · the decision, as code</div><h1>Three branches, each safe</h1><pre class="code">m = manifest(have = v)
+<span class="kw">if</span> m.current == v:            <span class="kw">return</span>                 <span class="cm">// up to date</span>
+<span class="kw">if</span> v &gt;= m.minDelta:            art = delta(v)         <span class="cm">// recent: small</span>
+<span class="kw">else</span>:                          art = snapshot(m.current)  <span class="cm">// too old</span>
+<span class="kw">if</span> !verifyChain(art):         discard(); art = snapshot(m.current)
+<span class="kw">if</span> !verifyChain(art):         keepLastGood(); report(apply_failed)</pre><div class="strip one"><div class="whyb"><b class="t">Why it works</b>A node can always reach the current version: by a small delta if it is recent, by a snapshot if it is not. It verifies before it applies. The fleet answer to “is everyone on N” is the reported version, not a hope.</div></div>
+</div>
+<!-- v-093 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“The delta window is twenty-four hours and the node was down for three days. Or the checksum fails again on the snapshot.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-094 &lt;div class="k"&gt;Challenge 1 of 7 · the se -->
+<div class="slide">
+<div class="k">Challenge 1 of 7 · the second fix, and the honest limit</div><h1>Beyond the window, take a snapshot. If that fails, stop and say so</h1><div class="cards c2"><div class="cd grn"><h3>Beyond the window</h3><p>The manifest points to the snapshot, whatever the node's age. The zone relay caches it: fifty nodes cost one origin fetch.</p></div><div class="cd amb"><h3>A checksum that keeps failing</h3><p>A corrupt artifact at the origin. The node keeps its last known good, reports <b>apply_failed</b>, and the control plane halts that version.</p></div></div><div class="line r">A node that can reach nothing keeps an old list. That is challenge four.</div>
+</div>
+<!-- v-095 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“Every version has a number and a checksum chained to the one before. A node says what it has, and the manifest says whether a small delta or a full snapshot gets it to the present. It verifies before it applies and swaps atomically, so it never serves a half-built list. And I know the fleet is converged because every node reports the version it runs.”</div>
+</div>
+<!-- v-096 card Challenge 2: Order, duplicates, overlap -->
+<div class="slide th card">
+<div class="lbl">7.2 · Challenge 2</div><div class="s">Order, duplicates, overlap</div>
+</div>
+<!-- v-097 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 2 of 7</div><div class="qq">“An add and a remove for the same key arrive in the wrong order. Or the same delta arrives twice. And an operator adds a slash-sixteen and allows a slash-twenty-six inside it.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-098 &lt;div class="k r"&gt;Challenge 2 of 7 · orde -->
+<div class="slide dia">
+<div class="k r">Challenge 2 of 7 · order and overlap</div><h1 class="q">What does the node believe?</h1><figure class="grow"><!--SVG:ch2-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Apply changes in the order they arrive. The network is mostly in order.”</div><div class="case"><b class="t">Break</b>The node's apply step treats arrival order as intent order.</div></div>
+</div>
+<!-- v-099 &lt;div class="k r"&gt;Challenge 2 of 7 · the  -->
+<div class="slide">
+<div class="k r">Challenge 2 of 7 · the trace</div><h1 class="q">The key ends up banned, and the last intent was to remove it</h1><table class="tl"><tr><th>v100</th><td>add 203.0.113.9 (a mistake)</td></tr><tr><th>v101</th><td>remove 203.0.113.9 (the correction)</td></tr><tr><th>node</th><td>receives <span class="bad">v101 then v100</span> by two paths</td></tr><tr><th>node</th><td>applies in arrival order: remove, then add. <span class="bad">Final state: banned</span></td></tr><tr><th>also</th><td>v101 arrives twice: harmless here, wrong for a counter</td></tr></table><div class="hedge"><b class="t">Overlap</b>v90 deny 198.51.0.0/16 · v97 allow 198.51.100.64/26 (a partner). Verdict for 198.51.100.70? A node that stops at the first range it finds says deny.</div>
+</div>
+<!-- v-100 &lt;div class="k"&gt;Challenge 2 of 7 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 2 of 7 · the fix</div><h1>One total order, and a version on every key</h1><figure class="grow"><!--SVG:ch2-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>The rule store assigns one version order. Each key remembers the version of its last change. A change applies only if its version is higher.</div><div class="whyb"><b class="t">Property</b>Convergence to the intended state: S1, S2, L1. The result depends on the set of changes, not on their order or count.</div></div>
+</div>
+<!-- v-101 &lt;div class="k"&gt;Challenge 2 of 7 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 2 of 7 · sequence</div><h1>Late and duplicate changes are ignored</h1><figure class="grow"><!--SVG:seq-ch2-merge--></figure>
+</div>
+<!-- v-102 &lt;div class="k"&gt;Challenge 2 of 7 · preced -->
+<div class="slide">
+<div class="k">Challenge 2 of 7 · precedence, as rules</div><h1>Ranges resolve by longest prefix. Allow beats deny.</h1><table class="bt sm"><tr><th>Situation</th><th>Rule</th><th>Why</th></tr><tr class=""><td>A key matches an exact entry and a range</td><td>the <b>exact</b> entry decides</td><td>more specific</td></tr><tr class=""><td>Two ranges match</td><td>the <b>longest prefix</b> decides</td><td>more specific</td></tr><tr class=""><td>Allow and deny at equal specificity</td><td><b>allow wins</b></td><td>a wrong block is worse than a missed ban for a protected range</td></tr><tr class=""><td>An allowlist range matches</td><td><b>allow, always</b>, checked first</td><td>independent of review</td></tr><tr class=""><td>Two sources disagree</td><td>written precedence: an unexpired manual entry beats a feed</td><td>no silent overrides</td></tr></table><div class="grade"><b class="t">Coach · what is graded here</b>Saying that the compiler expands an exception inside a range into explicit entries, so the node needs no special case, is a strong depth signal.</div>
+</div>
+<!-- v-103 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“Tombstones grow forever. And what if the version counter itself is lost or reset after a restore?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-104 &lt;div class="k"&gt;Challenge 2 of 7 · the se -->
+<div class="slide">
+<div class="k">Challenge 2 of 7 · the second fix, and the honest limit</div><h1>Bounded tombstones, and a counter that never rewinds</h1><div class="cards c2"><div class="cd grn"><h3>Tombstones</h3><p>Kept only for the delta window. A node older than the window takes a snapshot, which has none, so nothing is resurrected.</p></div><div class="cd red"><h3>The version counter</h3><p>Lives in the rule store's transaction log. A restore that would rewind it is refused. After a rebuild, start with a higher <b>epoch</b>: never reuse a number.</p></div></div><div class="whyb"><b class="t">Expiry is a command, not a node clock</b>A ban with an expiry is turned into an explicit remove by the compiler at that time, with its own version. Every node sees the same history.</div>
+</div>
+<!-- v-105 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“I do not trust arrival order. One writer assigns versions, and each key remembers the version of its last change, so a late or duplicate message is ignored. Ranges resolve by longest prefix, and an exception beats a deny. The merge is idempotent, so the same history gives the same list in any order.”</div>
+</div>
+<!-- v-106 card Challenge 3: The bad push -->
+<div class="slide th card">
+<div class="lbl">7.3 · Challenge 3</div><div class="s">The bad push</div>
+</div>
+<!-- v-107 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 3 of 7</div><div class="qq">“Someone publishes a range that covers a large part of Europe. How fast does it break, and how do you stop it?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-108 &lt;div class="k r"&gt;Challenge 3 of 7 · the  -->
+<div class="slide dia">
+<div class="k r">Challenge 3 of 7 · the bad push</div><h1 class="q">Everything worked, and everyone is blocked</h1><figure class="grow"><!--SVG:ch3-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Review the change before it goes out, and fix it quickly if it is wrong.”</div><div class="case"><b class="t">Break</b>Nothing between the author's keystroke and every node asks whether the content is plausible.</div></div>
+</div>
+<!-- v-109 &lt;div class="k r"&gt;Challenge 3 of 7 · the  -->
+<div class="slide">
+<div class="k r">Challenge 3 of 7 · the trace</div><h1 class="q">Forty seconds, and a review that saw one line</h1><table class="tl"><tr><th>14:00:00</th><td>operator adds /8 instead of /28. One line. Reviewed by one person</td></tr><tr><th>14:00:03</th><td>compiled as version 8,361,001</td></tr><tr><th>14:00:12</th><td>the push reaches the relays</td></tr><tr><th>14:00:21</th><td><span class="bad">all 100,000 nodes serve the new list</span></td></tr><tr><th>14:00:30</th><td><span class="bad">8 % of requests denied</span></td></tr><tr><th>14:00:40</th><td>on-call is paged; the fix is a new version that takes another 18 s</td></tr></table><div class="hedge"><b class="t">Label the numbers</b>Illustrative timings. The share denied depends on the range. The structure holds: speed in, speed out, and a human in the loop.</div>
+</div>
+<!-- v-110 &lt;div class="k"&gt;Challenge 3 of 7 · the fi -->
+<div class="slide">
+<div class="k">Challenge 3 of 7 · the first line of defence</div><h1>Validate at ingest, and an allowlist that always wins</h1><div class="cards c3"><div class="cd"><h3>Limits</h3><p>Shape and size checks. A cap on how much address space one change may cover. A change over the cap needs a second approver.</p></div><div class="cd grn"><h3>Allowlist</h3><p>Ranges that must never be blocked: the company's own, key partners, health checks. Checked at compile time <b>and</b> at enforcement.</p></div><div class="cd amb"><h3>Two-person approval</h3><p>Above a threshold. A review sees the effect, not just the line: “this change covers 16 M addresses”.</p></div></div>
+</div>
+<!-- v-111 &lt;div class="k"&gt;Challenge 3 of 7 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 3 of 7 · the fix</div><h1>Treat the list like code: stages, a gate, a kill flag</h1><figure class="grow"><!--SVG:ch3-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>Staged rollout 5 % → 25 % → 100 %, gated on block rate per node against its baseline. A kill flag in the manifest. Rollback is a new, higher version.</div><div class="whyb"><b class="t">Property</b>Safety against over-block (S2), at the cost of time. The blast radius of a mistake becomes the canary.</div></div>
+</div>
+<!-- v-112 &lt;div class="k"&gt;Challenge 3 of 7 · replay -->
+<div class="slide dia">
+<div class="k">Challenge 3 of 7 · replay</div><h1>The same mistake with a canary</h1><figure class="grow"><!--SVG:badpush--></figure>
+</div>
+<!-- v-113 &lt;div class="k"&gt;Challenge 3 of 7 · the ga -->
+<div class="slide">
+<div class="k">Challenge 3 of 7 · the gate, with numbers</div><h1>What exactly trips it</h1><table class="bt sm"><tr><th>Signal</th><th>Baseline</th><th>Trip</th><th>Action</th></tr><tr class=""><td>Block rate per node, 10 s window</td><td>0.5 % of requests</td><td>more than +3 points on the canary</td><td>freeze the stage, alert, no further stage</td></tr><tr class=""><td>Block rate by region</td><td>per region</td><td>a region doubles</td><td>halt and page the platform on-call</td></tr><tr class=""><td>Apply failures</td><td>~0</td><td>any checksum failure on a stage</td><td>halt that version</td></tr><tr class=""><td>Urgent ban</td><td>—</td><td>fast path: one region, 60 s bake</td><td>logged as an exception, reviewed after</td></tr></table><div class="hedge"><b class="t">Label the numbers</b>Initial targets, tuned from measured baselines. The principle: the gate is a number, not a person watching a graph.</div>
+</div>
+<!-- v-114 &lt;div class="k"&gt;Challenge 3 of 7 · the ac -->
+<div class="slide">
+<div class="k">Challenge 3 of 7 · the action is part of the rule</div><h1>Shadow first, then enforce</h1><div class="cards c3"><div class="cd grn"><h3>Log only</h3><p>A new or widened rule ships in shadow mode. Nodes record “would have denied” with the rule id. No user is affected.</p></div><div class="cd amb"><h3>Challenge</h3><p>For shared addresses, a softer response than a hard block: a challenge instead of a deny.</p></div><div class="cd red"><h3>Deny</h3><p>Promoted after the owner reads the shadow counts. The promotion is itself a version.</p></div></div>
+</div>
+<!-- v-115 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“The rule is legitimate-looking and wrong: a real customer's range. Block rate does not move. Or the kill switch rides the same pipe that is broken.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-116 &lt;div class="k"&gt;Challenge 3 of 7 · the se -->
+<div class="slide">
+<div class="k">Challenge 3 of 7 · the second fix, and the honest limit</div><h1>Nodes protect themselves; the kill flag is on its own channel</h1><div class="cards c2"><div class="cd grn"><h3>A local circuit breaker</h3><p>If a node's block rate jumps by a multiple of its baseline for N seconds right after an update, it reverts to the previous version on its own, reports, and pages. No central decision needed.</p></div><div class="cd grn"><h3>A separate, tiny channel</h3><p>The kill flag is one field in the manifest every poll reads. Not a new snapshot. It works even if the artifact path is the broken one.</p></div></div><div class="line r">A precise, plausible, wrong rule cannot be found by statistics. Only the allowlist, review of high-impact changes, audit and a fast removal path find it.</div>
+</div>
+<!-- v-117 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“The same pipe that delivers a ban in ten seconds delivers a mistake in ten seconds, so a push gets the same discipline as a binary: validation, an allowlist that always wins, a canary gated on block rate, a kill flag on its own channel, and a rollback that is just a new version. Nodes also protect themselves: if the block rate jumps right after an update, they revert on their own.”</div>
+</div>
+<!-- v-118 card Challenge 4: Stale or no control plane -->
+<div class="slide th card">
+<div class="lbl">7.4 · Challenge 4</div><div class="s">Stale or no control plane</div>
+</div>
+<!-- v-119 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 4 of 7</div><div class="qq">“A node cannot reach any relay for three hours. Or the whole distribution plane is down. What does the node do, and who decided?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-120 &lt;div class="k r"&gt;Challenge 4 of 7 · stal -->
+<div class="slide dia">
+<div class="k r">Challenge 4 of 7 · stale or no control plane</div><h1 class="q">Fail closed, or fail open?</h1><figure class="grow"><!--SVG:ch4-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Fail closed: deny everything if the list is old. Or fail open: serve everything.”</div><div class="case"><b class="t">Break</b>Nobody chose. Both defaults are an outage, in opposite directions.</div></div>
+</div>
+<!-- v-121 &lt;div class="k r"&gt;Challenge 4 of 7 · the  -->
+<div class="slide">
+<div class="k r">Challenge 4 of 7 · the trace</div><h1 class="q">Both defaults hurt</h1><table class="tl"><tr><th>09:00</th><td>node eu-3-0099 applies the last update. Then it loses all relays</td></tr><tr><th>12:00</th><td>3 h &times; 3,600 &times; 5 / s &#8202;=&#8202; <span class="bad">54,000 changes missed</span>, including one urgent ban</td></tr><tr><th>fail closed</th><td>10 req/s &times; 10,800 s &#8202;=&#8202; <span class="bad">108,000 legitimate requests refused</span> by this node alone</td></tr><tr><th>whole fleet</th><td>the plane is down: <span class="bad">every node fails closed together: a global outage</span></td></tr><tr><th>fail open</th><td>serves everything, including the <span class="bad">urgent ban it never heard about</span></td></tr></table><div class="hedge"><b class="t">Label the numbers</b>Illustrative: a 5-a-second average change rate and 10 requests a second per node.</div>
+</div>
+<!-- v-122 &lt;div class="k"&gt;Challenge 4 of 7 · the ke -->
+<div class="slide dia">
+<div class="k">Challenge 4 of 7 · the key sentence</div><h1>Stale is not open</h1><p class="chips">a node keeps enforcing its last list<i>·</i>only the newest bans are missing</p><figure class="grow"><!--SVG:stale--></figure>
+</div>
+<!-- v-123 &lt;div class="k"&gt;Challenge 4 of 7 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 4 of 7 · the fix</div><h1>A bound and an action, signed by the owner</h1><figure class="grow"><!--SVG:ch4-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>Each list has a maximum age and an action. Keep serving and alert, or drain the node out of rotation. A last known good copy on disk survives a restart.</div><div class="whyb"><b class="t">Property</b>Liveness made visible (L3) without turning a control-plane outage into a global outage.</div></div>
+</div>
+<!-- v-124 &lt;div class="k"&gt;Challenge 4 of 7 · who si -->
+<div class="slide">
+<div class="k">Challenge 4 of 7 · who signs what</div><h1>A table the owners agree before the incident</h1><table class="bt sm"><tr><th>List class</th><th>Bound</th><th>Action past the bound</th><th>Owner</th></tr><tr class=""><td>Abuse bans</td><td>15 min</td><td>alert, keep serving</td><td>security</td></tr><tr class=""><td>General list</td><td>60 min</td><td>drain the node, capped</td><td>platform, agreed with policy</td></tr><tr class=""><td>Legal list with a hard deadline</td><td>per the legal term</td><td>drain the node; escalate to legal</td><td>legal</td></tr><tr class=""><td>A node with no list on disk</td><td>—</td><td>stay out of rotation until it bootstraps</td><td>platform</td></tr></table><div class="hedge"><b class="t">Label the numbers</b>Initial targets, for the exercise. The structure is the point: per class, a number, an action and a named owner.</div>
+</div>
+<!-- v-125 &lt;div class="k"&gt;Challenge 4 of 7 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 4 of 7 · sequence</div><h1>Past the bound, drained, recovered</h1><figure class="grow"><!--SVG:seq-ch4-drain--></figure>
+</div>
+<!-- v-126 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“Every node passes the bound at once because the control plane is down. You just drained the fleet.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-127 &lt;div class="k"&gt;Challenge 4 of 7 · the se -->
+<div class="slide">
+<div class="k">Challenge 4 of 7 · the second fix, and the honest limit</div><h1>A drain budget, and a risk someone accepts in writing</h1><div class="cards c2"><div class="cd grn"><h3>A drain budget</h3><p>Automatic draining never removes more than a fixed share of the fleet: say 5 % per region. Past that, nodes keep serving and the page goes to a human.</p></div><div class="cd amb"><h3>The risk is named</h3><p>While the plane is down beyond the bound, some nodes serve a stale list. The owner of the list accepts that, in writing, as the price of not causing a global outage.</p></div></div><div class="line r">Nothing makes a partitioned node learn a ban it cannot hear. The cures are a plane that is not a single point, and a bound short enough to matter.</div>
+</div>
+<!-- v-128 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“Stale is not open: a node keeps enforcing what it has. For each list, the owner signs a maximum age and an action: alert and keep serving, or pull the node out of rotation. Automatic draining has a cap, so a control-plane outage cannot become a fleet outage. The risk of a late ban is a named decision, not an accident.”</div>
+</div>
+<!-- v-129 card Challenge 5: The list does not fit -->
+<div class="slide th card">
+<div class="lbl">7.5 · Challenge 5</div><div class="s">The list does not fit</div>
+</div>
+<!-- v-130 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 5 of 7</div><div class="qq">“A hundred million IPv6 prefixes. Why not one shared cache lookup per request? And a Bloom filter says maybe. Then what?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-131 &lt;div class="k r"&gt;Challenge 5 of 7 · the  -->
+<div class="slide dia">
+<div class="k r">Challenge 5 of 7 · the list does not fit</div><h1 class="q">One point seven gigabytes on every node?</h1><figure class="grow"><!--SVG:ch5-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Put it all in a shared cache and call it from every node. Or use a Bloom filter and block on a yes.”</div><div class="case"><b class="t">Break</b>The exact set no longer fits. The filter, used alone, turns its error into a block.</div></div>
+</div>
+<!-- v-132 &lt;div class="k r"&gt;Challenge 5 of 7 · the  -->
+<div class="slide">
+<div class="k r">Challenge 5 of 7 · the numbers</div><h1 class="q">Memory, and what a false positive costs</h1><table class="tl"><tr><th>exact set</th><td>100 M &times; 17 B &#8202;=&#8202; <span class="bad">1.7 GB</span> per node. The budget is 512 MB</td></tr><tr><th>shared lookup</th><td>1 M / s &times; 1 ms: <span class="bad">a hard dependency on every request</span></td></tr><tr><th>filter alone</th><td>1 M / s &times; 1 % false positives &#8202;=&#8202; <span class="bad">10,000 real users blocked every second</span></td></tr><tr><th>filter size</th><td>100 M &times; 10 bits &#8202;=&#8202; 125 MB: fits</td></tr></table><div class="hedge"><b class="t">Label the numbers</b>Derived from stated inputs. A false-positive rate is a property of the filter, so it is a design parameter, not a measurement.</div>
+</div>
+<!-- v-133 &lt;div class="k"&gt;Challenge 5 of 7 · the sh -->
+<div class="slide dia">
+<div class="k">Challenge 5 of 7 · the shape</div><h1>A filter says no with certainty. A maybe needs a check.</h1><figure class="grow"><!--SVG:bloom--></figure>
+</div>
+<!-- v-134 &lt;div class="k"&gt;Challenge 5 of 7 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 5 of 7 · the fix</div><h1>A filter in front, an exact tier behind, a cache</h1><figure class="grow"><!--SVG:ch5-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>A 125 MB filter answers “not listed” locally. A maybe is confirmed by a sharded exact tier, and the verdict is cached with a TTL bounded by the staleness bound.</div><div class="whyb"><b class="t">Property</b>Correct verdicts at scale (S2): the filter's error is one-sided, so a false positive costs a lookup, never a wrong block.</div></div>
+</div>
+<!-- v-135 &lt;div class="k"&gt;Challenge 5 of 7 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 5 of 7 · sequence</div><h1>Maybe, lookup, cache</h1><figure class="grow"><!--SVG:seq-ch5-lookup--></figure>
+</div>
+<!-- v-136 &lt;div class="k"&gt;Challenge 5 of 7 · where  -->
+<div class="slide">
+<div class="k">Challenge 5 of 7 · where each key is enforced</div><h1>The right enforcement point per entity</h1><table class="bt sm"><tr><th>Key</th><th>Where it is known</th><th>Enforced at</th><th>Structure</th></tr><tr class=""><td>Single address, range</td><td>at the connection</td><td>the edge or gateway, in the agent</td><td>sorted array, prefix trie</td></tr><tr class=""><td>User id</td><td>after authentication</td><td>the application layer, in the same agent library</td><td>hash set or filter + lookup</td></tr><tr class=""><td>Email, device</td><td>after login</td><td>the service that sees it</td><td>hash set</td></tr><tr class=""><td>A rotating address per request</td><td>never stable</td><td><b>not a denylist problem</b></td><td>an identity key or an abuse model (SD-43)</td></tr></table><div class="grade"><b class="t">Coach · what is graded here</b>Saying that the right place to enforce depends on where the key first becomes known is a depth signal. Do not stretch one structure over every key.</div>
+</div>
+<!-- v-137 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“During an attack nearly every request is a true hit, so every request goes to the lookup tier. What now?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-138 &lt;div class="k"&gt;Challenge 5 of 7 · the se -->
+<div class="slide">
+<div class="k">Challenge 5 of 7 · the second fix, and the honest limit</div><h1>Cache positives, coalesce, cap per node</h1><div class="cards c3"><div class="cd grn"><h3>Cache the verdict</h3><p>A positive verdict is cached on the node with a bounded lifetime. Repeated hits from one source cost one lookup.</p></div><div class="cd grn"><h3>Coalesce and shard</h3><p>Concurrent lookups for one key become one. The tier is sharded by prefix and sized for the hit rate it will see.</p></div><div class="cd amb"><h3>A per-node budget</h3><p>Past it, a node uses cached verdicts and, for an unknown key, its stated policy. The tier cannot be flooded by the very attack it is there to stop.</p></div></div><div class="line r">A very large list costs a tier on the path for hits. We pay that only for keys likely to be banned.</div>
+</div>
+<!-- v-139 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“A shared lookup per request puts the list service in everyone's availability, and a millisecond on every call. When the set does not fit, I keep a filter locally, which can say definitely not listed, and confirm a maybe with an exact tier, because a false positive blocks a real user. I cache the verdicts, coalesce lookups, and cap the load per node, so an attack does not take down the confirmation tier.”</div>
+</div>
+<!-- v-140 card Challenge 6: A slow external source -->
+<div class="slide th card">
+<div class="lbl">7.6 · Challenge 6</div><div class="s">A slow external source</div>
+</div>
+<!-- v-141 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 6 of 7</div><div class="qq">“The authority gives you only a lookup API: one second a call, a hundred calls a second. It is down for two days. And a new ban covers a slash-sixteen you already cached verdicts for.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-142 &lt;div class="k r"&gt;Challenge 6 of 7 · a sl -->
+<div class="slide dia">
+<div class="k r">Challenge 6 of 7 · a slow external source</div><h1 class="q">A hundred calls a second against twenty thousand addresses</h1><figure class="grow"><!--SVG:ch6-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Call the API on each new address and cache the answer.”</div><div class="case"><b class="t">Break</b>The adapter cannot keep up, and a per-address cache outlives a wider ban.</div></div>
+</div>
+<!-- v-143 &lt;div class="k"&gt;Challenge 6 of 7 · the ca -->
+<div class="slide dia">
+<div class="k">Challenge 6 of 7 · the case</div><h1>Two hundred times over, and seventeen percent coverage</h1><figure class="grow"><!--SVG:authority--></figure>
+</div>
+<!-- v-144 &lt;div class="k r"&gt;Challenge 6 of 7 · the  -->
+<div class="slide">
+<div class="k r">Challenge 6 of 7 · the cache that lies</div><h1 class="q">A per-address verdict outlives a wider ban</h1><table class="tl"><tr><th>day 0</th><td>192.0.2.7 checked: allowed. Cached for 24 h as an <span class="bad">address verdict</span></td></tr><tr><th>day 0</th><td>the authority bans 192.0.0.0/16 (it includes 192.0.2.7)</td></tr><tr><th>day 0 + 1 h</th><td>192.0.2.7 is served from cache: <span class="bad">allowed, for 23 more hours</span></td></tr><tr><th>fix</th><td>store the <span class="good">range rule</span> with a version; it supersedes address verdicts by version</td></tr></table><div class="hedge"><b class="t">Label the numbers</b>Illustrative. The point is the key: a cache of verdicts must be keyed by the rule the authority returns, not by the address that was asked.</div>
+</div>
+<!-- v-145 &lt;div class="k"&gt;Challenge 6 of 7 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 6 of 7 · the fix</div><h1>Prefer a bulk list; otherwise a bounded cache and a budget</h1><figure class="grow"><!--SVG:ch6-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>Mirror a bulk list if one exists. Otherwise: a range-keyed verdict cache with a bounded lifetime, single-flight lookups, a token bucket spent on the busiest addresses, a stated first-seen policy.</div><div class="whyb"><b class="t">Property</b>Bounded exposure instead of unbounded wait (L2, S1): the request path never waits for the authority.</div></div>
+</div>
+<!-- v-146 &lt;div class="k"&gt;Challenge 6 of 7 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 6 of 7 · sequence</div><h1>One lookup, one range rule</h1><figure class="grow"><!--SVG:seq-ch6-authority--></figure>
+</div>
+<!-- v-147 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“The API is down for two days, and your cache lifetime is one day.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-148 &lt;div class="k"&gt;Challenge 6 of 7 · the se -->
+<div class="slide">
+<div class="k">Challenge 6 of 7 · the second fix, and the honest limit</div><h1>A grace period, flagged, with a named owner</h1><div class="cards c2"><div class="cd grn"><h3>Grace</h3><p>Serve expired verdicts for a stated number of days. Every decision made on expired data is flagged in the log. The legal owner decides how many days.</p></div><div class="cd amb"><h3>The exposure</h3><p>First-seen addresses during the outage. Reduce it by spending the budget on the highest-volume ones first, and by asking for a bulk feed.</p></div></div><div class="line r">With only a slow lookup, full coverage is not possible. Say so, and ask for a better source.</div>
+</div>
+<!-- v-149 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“I never call a slow authority on the request path. If there is a bulk list, I mirror it. If there is only a lookup, I cache verdicts for no longer than the allowed staleness, coalesce lookups, spend the rate budget on the highest-volume addresses, and write down what happens on a first-seen address and on an outage. Full coverage is not possible, so I say how much we have, and I ask for a better feed.”</div>
+</div>
+<!-- v-150 card Challenge 7: How would you know? -->
+<div class="slide th card">
+<div class="lbl">7.7 · Challenge 7</div><div class="s">How would you know?</div>
+</div>
+<!-- v-151 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 7 of 7</div><div class="qq">“A ban was published an hour ago and one region is still serving the banned source. The dashboard is green. How would you have known?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-152 &lt;div class="k r"&gt;Challenge 7 of 7 · how  -->
+<div class="slide dia">
+<div class="k r">Challenge 7 of 7 · how would you know</div><h1 class="q">The relays are healthy. The promise is broken.</h1><figure class="grow"><!--SVG:ch7-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Watch the CPU and the error rate of the relays.”</div><div class="case"><b class="t">Break</b>The dashboard watches the machines. The promise is somewhere else.</div></div>
+</div>
+<!-- v-153 &lt;div class="k r"&gt;Challenge 7 of 7 · the  -->
+<div class="slide">
+<div class="k r">Challenge 7 of 7 · the case</div><h1 class="q">Green on the machines, red on the promise</h1><table class="tl"><tr><th>relay health</th><td>100 %, origin latency 40 ms: <span class="good">green</span></td></tr><tr><th>region ap-2</th><td><span class="bad">4 % of nodes on 8,360,990; the rest on 8,361,004</span></td></tr><tr><th>why</th><td>the push to one zone fails quietly; polls hit a relay cache that is stale</td></tr><tr><th>block rate</th><td>0.2 % in ap-2 against 0.5 % elsewhere: <span class="bad">a ban that did not land</span></td></tr></table><div class="hedge"><b class="t">Label the numbers</b>Illustrative. The shape holds: every machine metric is fine, and one pair of numbers says otherwise.</div>
+</div>
+<!-- v-154 &lt;div class="k"&gt;Challenge 7 of 7 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 7 of 7 · the fix</div><h1>Measure the promise, with a probe</h1><figure class="grow"><!--SVG:ch7-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>SLIs on the promise: version skew, propagation lag, snapshot age, apply failures, block-rate against baseline. A synthetic banned key per region. Decisions logged with their version.</div><div class="whyb"><b class="t">Property</b>It turns the propagation promise into something you can watch.</div></div>
+</div>
+<!-- v-155 &lt;div class="k"&gt;Challenge 7 of 7 · the SL -->
+<div class="slide">
+<div class="k">Challenge 7 of 7 · the SLIs</div><h1>Indicators on the promise</h1><table class="bt sm"><tr><th>SLI</th><th>Target (initial)</th><th>Why</th></tr><tr class=""><td>Version skew: nodes on the current version within 30 s</td><td>≥ 99.9 % per region</td><td>the propagation SLO, directly</td></tr><tr class=""><td>Propagation lag</td><td>p99.9 under 30 s</td><td>per publish, end to end</td></tr><tr class=""><td>List age per node against its bound</td><td>no node past its bound</td><td>the stale policy, watched</td></tr><tr class=""><td>Apply failures, checksum mismatches</td><td>≈ 0</td><td>a corrupt artifact or a bad relay</td></tr><tr class=""><td>Block rate against baseline, per version</td><td>within a few points</td><td>the gate, and the bad-rule alarm</td></tr><tr class=""><td>Lookup-tier hit rate</td><td>within capacity</td><td>the filter and the attack</td></tr></table>
+</div>
+<!-- v-156 &lt;div class="k"&gt;Challenge 7 of 7 · sympto -->
+<div class="slide">
+<div class="k">Challenge 7 of 7 · symptom pairs</div><h1>Two metrics, one conclusion</h1><table class="bt sm"><tr><th>Metric A</th><th>Metric B</th><th>Conclusion</th></tr><tr class=""><td>skew up</td><td>one zone's relay cache age up</td><td>a stale relay cache, not the nodes</td></tr><tr class=""><td>block rate down in one region</td><td>that region's applied version behind</td><td><b>a ban that did not land</b></td></tr><tr class=""><td>block rate up</td><td>a new version just applied</td><td>a bad rule: the gate, not the relay</td></tr><tr class=""><td>apply failures up</td><td>checksum mismatches up</td><td>a corrupt artifact at the origin</td></tr><tr class=""><td>lookup-tier load up</td><td>hit rate up</td><td>an attack, or a filter that is too small</td></tr></table><div class="grade"><b class="t">Coach · what is graded here</b>One metric tells you something is wrong. Two tell you where, and who gets the page.</div>
+</div>
+<!-- v-157 &lt;div class="k"&gt;Challenge 7 of 7 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 7 of 7 · sequence</div><h1>The probe, end to end</h1><figure class="grow"><!--SVG:seq-ch7-probe--></figure>
+</div>
+<!-- v-158 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“The probe passes and a real ban is still missing. Or the block rate is flat because traffic bypasses the enforcement point.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-159 &lt;div class="k"&gt;Challenge 7 of 7 · the se -->
+<div class="slide">
+<div class="k">Challenge 7 of 7 · the second fix, and the honest limit</div><h1>Per-node reports, and coverage</h1><div class="cards c2"><div class="cd grn"><h3>Skew from reports, not only probes</h3><p>A probe tests one key. Every node reports the version it runs, so a node that is behind shows up even if the probe passes.</p></div><div class="cd amb"><h3>Coverage is a metric</h3><p>The share of traffic that passes through an enforcement point, and a counter of requests that skipped the check.</p></div></div><div class="line r">You can detect a late ban after the fact and alarm on its precursors. You cannot observe an absence of risk.</div>
+</div>
+<!-- v-160 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“I alert on the promise: the share of nodes on the current version within thirty seconds, per region, plus a synthetic banned key sent through the real path. I read metrics in pairs so each page names a cause, and every decision logs the rule version so an auditor gets an answer. A green relay dashboard says nothing about whether a ban landed.”</div>
+</div>
+<!-- v-161 card Build cost -->
+<div class="slide th aux">
+<div class="lbl">Chapter 8 of 9</div><div class="s">Build cost</div><div class="sub">The manager layer: people, months, buy against build</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="done">Design</span><span class="done">Challenges</span><span class="on">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-162 &lt;div class="k"&gt;Build cost · three releas -->
+<div class="slide aux">
+<div class="k">Build cost · three releases</div><h1>R0, R1, R2: not one project</h1><table class="bt sm"><tr><th></th><th>R0 · Prototype</th><th>R1 · Production</th><th>R2 · Platform</th></tr><tr class=""><td>Goal</td><td>Prove the model with one list</td><td>One or two lists, the full fleet, safe to depend on</td><td>Several key types, regional layers, very large lists, streaming push</td></tr><tr class=""><td>Scope</td><td>Rule store, compiler, snapshot to object storage, 10 s manifest poll, atomic swap</td><td>Versions and deltas, relay tree, checksums, validation, allowlist, staged rollout and gates, kill flag, reports, decision log, console, audit</td><td>Push streams, layered rules, filter + lookup tier, external mirror adapter, per-key-type enforcement</td></tr><tr class=""><td>SLO · on-call</td><td>none</td><td>99.9 % in 30 s · business hours</td><td>error budgets · 24/7, shared rotation</td></tr><tr class=""><td>Effort, engineer-months</td><td>1–2</td><td>18–24</td><td>50–90</td></tr></table>
+</div>
+<!-- v-163 &lt;div class="k"&gt;Build cost · R1 in detail -->
+<div class="slide aux">
+<div class="k">Build cost · R1 in detail</div><h1>Who, and how long</h1><table class="bt sm"><tr><th>Role</th><th>FTE</th><th>Owns</th></tr><tr class=""><td>Tech lead</td><td>1.0</td><td>the version and ordering model, the merge, design reviews</td></tr><tr class=""><td>Senior backend</td><td>1.0</td><td>rule store, compiler, relays, rollout</td></tr><tr class=""><td>Backend</td><td>1.0</td><td>the agent library, the console, the first list's migration</td></tr><tr class=""><td>SRE</td><td>1.0</td><td>the controller, SLIs, probes, runbooks: the rollout is operations</td></tr><tr class=""><td>Manager · policy liaison</td><td>0.3 · 0.2</td><td>roadmap, adoption, the contract with policy</td></tr></table><p class="chips">RFC with policy 3 wk<i>·</i>skeleton 4<i>·</i>correctness 6<i>·</i>safety 5<i>·</i>operations 4<i>·</i>shadow then cutover 4</p>
+</div>
+<!-- v-164 &lt;div class="k"&gt;Build cost · ownership&lt;/d -->
+<div class="slide aux">
+<div class="k">Build cost · ownership</div><h1>People dominate the five years</h1><p class="chips">illustrative<i>·</i>engineer-months</p><div class="tiles" style="--n:3"><div class="tile blue"><b>22</b><span>to build R1</span></div><div class="tile blue"><b>1.5 × 60</b><span>= 90 to run it for five years</span></div><div class="tile"><b>≈ 112</b><span>≈ 9 engineer-years; infrastructure is a small share</span></div></div><div class="line a">A pipeline with no owner becomes an incident with no owner.</div>
+</div>
+<!-- v-165 &lt;div class="k"&gt;Build cost · build, adopt -->
+<div class="slide aux">
+<div class="k">Build cost · build, adopt, buy, or don't</div><h1>Four options, one table</h1><table class="bt sm mx"><tr><th>Option</th><th>To a pilot</th><th>5-year, eng-months (illustrative)</th><th>When it wins</th></tr><tr class=""><td><b>Don't</b>: the edge provider's managed IP sets</td><td>~2 weeks</td><td>~15</td><td>the limits fit; check first, every time</td></tr><tr class=""><td><b>Adopt</b>: a configuration-distribution fabric for transport; our compiler, gates and audit</td><td>~8 weeks</td><td>~70</td><td>a distribution fabric is already run</td></tr><tr class="pick"><td><b>Hybrid</b>: build compiler, gates and audit; buy the transport</td><td>~3 months</td><td>~85</td><td><b>R1 pick, if a transport exists</b></td></tr><tr class=""><td><b>Build</b>: this design, end to end</td><td>~5 months, 4 people</td><td>~112</td><td>lists beyond managed limits, custom keys, layered rules, audit</td></tr></table>
+</div>
+<!-- v-166 &lt;div class="k"&gt;Build cost · risks, cuts, -->
+<div class="slide aux">
+<div class="k">Build cost · risks, cuts, people</div><h1>What I would never cut</h1><div class="cards c3"><div class="cd red"><h3>Never cut</h3><p>Versions with checksums. Staged rollout with a gate. The allowlist. A kill flag. Last known good on disk. The version in the decision log.</p></div><div class="cd amb"><h3>Cut first</h3><p>Push streams: the 10 s poll meets the target. Regional layers. The second key type. The lookup tier. The console UI.</p></div><div class="cd"><h3>Top risks</h3><p>A bad rule. Owner ambiguity. The control plane as a single point. No adopter. Scope creep into a general config platform.</p></div></div>
+</div>
+<!-- v-167 &lt;div class="k"&gt;Build cost · staffing, an -->
+<div class="slide aux">
+<div class="k">Build cost · staffing, and the question to ask</div><h1>Small first. Do not add people in stabilisation.</h1><div class="cards c2"><div class="cd"><h3>Over time</h3><p>Two people for the design and skeleton. Grow to four in the middle, where the agent, compiler and console parallelise. Hold steady while stabilising. Share on-call with the team that runs the sibling rollout system.</p></div><div class="cd grn"><h3>The question before saying yes</h3><p>“What does a wrong block cost, who decides, and how fast must a ban land?”</p></div></div>
+</div>
+<!-- v-168 card Recap -->
+<div class="slide th">
+<div class="lbl">Chapter 9 of 9</div><div class="s">Recap</div><div class="sub">One picture, five paths, the mistakes, the thesis</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="done">Design</span><span class="done">Challenges</span><span class="done">Cost · AUX</span><span class="on">Recap</span></div>
+</div>
+<!-- v-169 &lt;div class="k"&gt;Recap&lt;/div&gt;&lt;h1&gt;The whole  -->
+<div class="slide dia">
+<div class="k">Recap</div><h1>The whole design on one baseline</h1><p class="chips">validate<i>·</i>versions<i>·</i>relay tree<i>·</i>atomic swap<i>·</i>gates<i>·</i>probes</p><figure class="grow"><!--SVG:base-final--></figure>
+</div>
+<!-- v-170 &lt;div class="k"&gt;Recap · one sentence per  -->
+<div class="slide">
+<div class="k">Recap · one sentence per path</div><h1>Five paths</h1><table class="bt"><tr><th>Path</th><th>In one sentence</th></tr><tr class=""><td><b>Publish</b></td><td>Validate, approve, one transaction, one version</td></tr><tr class=""><td><b>Distribute</b></td><td>Manifest, delta or snapshot, verify the chain, swap one pointer</td></tr><tr class=""><td><b>Enforce</b></td><td>Allowlist, exact key, longest prefix, the version in the verdict</td></tr><tr class=""><td><b>Explain</b></td><td>The version joins the rule history</td></tr><tr class=""><td><b>Roll back</b></td><td>A new, higher version, and a kill flag on its own channel</td></tr></table>
+</div>
+<!-- v-171 &lt;div class="k"&gt;Recap · seven fixes&lt;/div&gt; -->
+<div class="slide">
+<div class="k">Recap · seven fixes</div><h1>Each one names the property it protects</h1><table class="bt sm"><tr><th>Challenge</th><th>Fix</th><th>Property</th></tr><tr class=""><td>1 Offline node</td><td>manifest, delta window, snapshot fallback, chained checksums</td><td>L1, S2</td></tr><tr class=""><td>2 Order and overlap</td><td>one version order, per-key version, precedence</td><td>S1, S2, L1</td></tr><tr class=""><td>3 Bad push</td><td>validation, allowlist, canary gates, kill flag, local breaker</td><td><b>S2</b></td></tr><tr class=""><td>4 Stale</td><td>bound + action signed by the owner, drain with a cap</td><td>L3</td></tr><tr class=""><td>5 Does not fit</td><td>filter, exact tier, cache, per-node budget</td><td>S2</td></tr><tr class=""><td>6 Slow source</td><td>mirror, range cache, budget, grace, stated policy</td><td>L2, S1</td></tr><tr class=""><td>7 Silent failure</td><td>skew, probes, symptom pairs, coverage</td><td>all</td></tr></table>
+</div>
+<!-- v-172 &lt;div class="k"&gt;Recap · the contract betw -->
+<div class="slide">
+<div class="k">Recap · the contract between the owners</div><h1>Policy owns the list. Platform owns the pipe.</h1><div class="cards c2"><div class="cd"><h3>Policy owns</h3><p>What is listed, the reason, the allowlist, the action on a match, the signed staleness bound, and the risk of a late ban.</p></div><div class="cd grn"><h3>Platform owns</h3><p>The pipeline, the versions, the gates, the SLIs, and the propagation target: <b>99.9 % of nodes within 30 s</b>. That number is the contract between them.</p></div></div><div class="line a">A bad denylist is a global outage, so a push gets the same discipline as a binary.</div>
+</div>
+<!-- v-173 &lt;div class="k"&gt;Recap · if asked about a  -->
+<div class="slide">
+<div class="k">Recap · if asked about a second key type</div><h1>A user id, in three lines</h1><div class="cards c3"><div class="cd grn"><h3>Same pipeline</h3><p>The rule store, the compiler, the relays, the gates and the audit. The key kind is a field.</p></div><div class="cd amb"><h3>Different enforcement point</h3><p>After authentication, in the application layer, with the same agent library.</p></div><div class="cd red"><h3>Different bound</h3><p>A user ban may need a shorter bound than an address ban. The owner signs it.</p></div></div>
+</div>
+<!-- v-174 &lt;div class="k"&gt;Recap · common mistakes i -->
+<div class="slide">
+<div class="k">Recap · common mistakes in this round</div><h1>Ten ways this round goes wrong</h1><div class="cards c2"><div class="cd red"><h3>Design</h3><ul style="font-size:17pt"><li>A lookup per request on the path</li><li>“Eventually consistent” with no number</li><li>No versions or checksums</li><li>Trusting arrival order</li><li>A full download per node per change</li></ul></div><div class="cd amb"><h3>Judgment</h3><ul style="font-size:17pt"><li>Failing closed fleet-wide, or open silently</li><li>Never asking who owns the failure policy</li><li>A Bloom filter used as a verdict</li><li>One big push, no canary, no allowlist</li><li>A green relay dashboard as proof</li></ul></div></div>
+</div>
+<!-- v-175 &lt;div class="lbl"&gt;The close&lt;/div&gt;&lt;div cla -->
+<div class="slide th">
+<div class="lbl">The close</div><div class="s">The check is local because it must be fast and independent. The list cannot be, so I gave it <em>versions</em>, a <em>bound</em> on how old it may be, and the <em>discipline of a release</em>. So a ban lands quickly and a mistake does not.</div>
+</div>
+</body></html>

@@ -20,6 +20,7 @@ JS = """() => [...document.querySelectorAll('.slide')].flatMap((s, i) => {
     if (b.bottom > limit + 1) bad.push(el.tagName + '.' + el.className + ' past foot by ' + Math.round(b.bottom - limit));
     if (b.right > r.right - 10) bad.push(el.tagName + ' past right ' + Math.round(b.right - r.right)); }
   for (const el of s.querySelectorAll('pre,td,.opt')) { if (el.scrollWidth > el.clientWidth + 3) bad.push(el.tagName + ' clipped: ' + el.textContent.slice(0, 40)); }
+  for (const el of s.querySelectorAll('.fx .fm')) { const m = el.querySelector('math'); if (m && m.getBoundingClientRect().right > el.getBoundingClientRect().right + 2) bad.push('formula wider than its cell: ' + el.textContent.slice(0, 40)); }
   return bad.length ? [(i + 1) + ': ' + bad.join('; ')] : [];
 })"""
 with sync_playwright() as p:

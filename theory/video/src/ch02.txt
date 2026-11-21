@@ -5,17 +5,18 @@
 N: Part two. This is the vocabulary an interviewer uses to find out whether a trade-off in your design was chosen or stumbled into. None of it is exotic. All of it is easy to say almost correctly, and almost correctly is what gets probed.
 
 ## 2.0 Why this part decides rounds
+N: First, why this vocabulary decides rounds. One short story, about a design whose promise and mechanism disagree.
 
 = panel trap | The opening story | "Strongly consistent", over an arrow labelled "async"
 A candidate draws a primary database and two replicas, labels the arrows between them **async**, sends reads to the replicas, and writes in the requirements: *strongly consistent*.
 The interviewer asks one question: "A user saves, and reloads. What do they see?"
 N: A candidate draws a primary database and two replicas. The arrows between them are labelled asynchronous. Reads go to the replicas. And in the requirements, it says strongly consistent. The interviewer asks one question. A user saves, and reloads. What do they see? The honest answer is: sometimes the old value. The design and the promise disagree, and the candidate did not notice. This part is about making the promise match the mechanism.
 
-= panel note | Assumed reading | What this part does not repeat
-*Designing Data-Intensive Applications*, chapter 8, *The Trouble with Distributed Systems*: unreliable networks, unreliable clocks, process pauses.
-Chapter 9, *Consistency and Consensus*: what linearizability is, where it is needed, and what it costs.
-This part assumes both and works the cases an interviewer asks about.
-N: Two chapters of Designing Data-Intensive Applications are assumed: chapter eight on networks, clocks and pauses, and chapter nine on consistency. They explain the ideas at length. This part works the cases.
+= cards c2 | How this part works | Every idea twice: from the ground up, then at interview depth
+grn From the ground up :: What the idea is, in plain words, with an everyday example. No prior reading needed.
+Interview depth :: The mechanism, how it fails, one level down, the alternative and its price, and the line to say.
+> If a slide marked *from the ground up* is familiar, it is a quick recap. Skip ahead with the chapters.
+N: Every idea in this part comes twice. First from the ground up: what it is, in plain words, with an everyday example. You do not need to have read anything before. Then at interview depth: the mechanism, how it fails, one level down, and the sentence to say in a round. If the ground-up slides are familiar, treat them as a quick recap, or skip ahead using the chapters.
 
 = list | Map of the part | Fifteen ideas in four groups
 - **What you can promise**: CAP, PACELC, the consistency ladder, linearizable against serializable, quorums
@@ -25,6 +26,22 @@ N: Two chapters of Designing Data-Intensive Applications are assumed: chapter ei
 N: Four groups. What you can promise. Time. Getting effects right. And failure.
 
 ## 2.1 CAP, stated correctly
+N: The first group is what you can promise. We start with CAP: what the three letters mean exactly, and the choice a partition really forces.
+
+= cards c3 | FND-01 · From the ground up | Why one value lives on several machines
+Survive a failure :: A machine dies, a disk fails, a datacentre loses power. A second copy keeps the data and the service alive.
+Be near the user :: A copy in Frankfurt answers a user in Berlin in a few milliseconds, instead of a round trip to Virginia.
+Share the reading :: Ten copies can answer ten times the reads that one machine can.
+> Every copy is called a **replica**. Keeping replicas in agreement is what this whole part is about.
+N: Start from the ground. Why keep one value on several machines at all? Three reasons. To survive a failure: a machine dies, a disk fails, a datacentre loses power, and a second copy keeps the data alive. To be near the user: a copy in Frankfurt answers a user in Berlin in a few milliseconds. And to share the reading: ten copies can serve ten times the reads. Each copy is called a replica. Keeping replicas in agreement is what this whole part is about.
+
+= list | FND-01 · From the ground up | A network partition, in plain words
+~ A client sends a request to a server and hears nothing back. What happened?
+- The request was lost on the way, or is stuck in a queue
+- The server crashed, or is paused and will wake up later
+- The server did the work, and the **reply** was lost or delayed
+> From the outside these look **identical**. A partition is when some machines cannot hear others, and nobody can tell why.
+N: Now, what is a network partition? Picture a client that sends a request and hears nothing back. Maybe the request was lost on the way. Maybe the server crashed, or is paused and will wake up later. Maybe the server did the work, and the reply was lost. From the outside, these look exactly the same. A partition is simply the state where some machines cannot hear others. In a modern cloud it is rarely a cut cable. It is a misconfigured switch, an overloaded link between two zones, or one bad network card.
 
 = dia | FND-01 · Tier A · The failure | A partition forces a choice on the minority side
 @ FND-01
@@ -54,6 +71,13 @@ V: During a partition, each operation keeps either linearizability or availabili
 [pause: 0.8]
 
 ## 2.2 PACELC
+N: Next, P-A-C-E-L-C. It covers the trade-off you pay on every normal day, not only during a partition.
+
+= cards c2 | FND-02 · From the ground up | When is a write finished?
+Synchronous :: The leader waits until the other replicas confirm they have the write, then says done. Every replica is current. Every write pays the slowest network trip.
+Asynchronous :: The leader says done at once and copies the write to the others in the background. Writes are fast. A reader at another replica can see the old value for a while.
+> That waiting time on an ordinary day, with no failure at all, is the cost this section is about.
+N: From the ground up, one question decides a lot: when is a write finished? In synchronous replication, the leader waits until the other replicas confirm they have the write, and only then says done. Every replica is current, and every write pays for the slowest network trip. In asynchronous replication, the leader says done at once, and copies the write in the background. Writes are fast, and a reader at another replica can see the old value for a while. That waiting, on an ordinary day with nothing broken, is the cost this section is about.
 
 = table | FND-02 · Tier A · The mechanism | CAP covers the bad day. PACELC adds every other day
 @ FND-02
@@ -64,16 +88,9 @@ Spanner-style stores | C: the minority refuses | C: every write waits for a majo
 > PA/EL and PC/EC are the common pairs. The second letter pair is the one you pay for daily.
 N: CAP describes a bad day. P-A-C-E-L-C adds all the other days. If there is a partition, choose availability or consistency. Else, in normal operation, choose latency or consistency. A leaderless store in the Dynamo style picks availability in a partition, and low latency otherwise. A store in the Spanner style picks consistency both times: the minority refuses, and every write waits for a majority. The second choice is the one you pay for every day.
 
-= code | FND-02 · Tier A · One level down | The price of the E-C choice, in milliseconds
-three replicas, in three regions
-round trips from the leader:   region B  30 ms     region C  80 ms
-
-consistent write   = wait for the nearest majority  = leader + B   =  30 ms
-consistent read    = confirm leadership (a round to a majority)
-                     or hold a time-bounded lease             =  30 ms, or about 0
-low-latency write  = acknowledge locally, replicate behind    =  about 1 ms
-                     and the two regions can disagree for 80 ms or more
-N: One level down, put numbers on it. Three replicas in three regions. From the leader, one region is thirty milliseconds away and the other eighty. A consistent write waits for the nearest majority, so it costs thirty milliseconds, every time. A consistent read must confirm that the leader still leads, which is another round, unless it holds a lease, which part three covers. The low latency choice acknowledges locally in about a millisecond, and the regions can disagree for eighty milliseconds or longer.
+= dia | FND-02 · Tier A · One level down | The price of the E-C choice, in milliseconds
+p2-ec-price
+N: One level down, put numbers on it. On the left, three replicas in three regions. From the leader, region B is thirty milliseconds away, and region C is eighty. On the right, what each choice costs. A consistent write waits for the nearest majority, the leader plus region B, so it costs thirty milliseconds, every time. A consistent read must confirm that the leader still leads, which is another thirty millisecond round, unless it holds a lease, which part three covers. The low latency write is acknowledged locally in about a millisecond. The price moves somewhere else: for eighty milliseconds or more, the regions disagree.
 
 = panel key | FND-02 · Tier A · The alternative and the price | Most real stores let you choose per request
 A request can carry its own level: a quorum read or a single-replica read; a strong read or a bounded-stale one.
@@ -85,17 +102,30 @@ V: In a partition I trade availability against consistency. The rest of the time
 [pause: 0.8]
 
 ## 2.3 The consistency ladder
+N: Next, the consistency ladder. Six levels of promise, each one a sentence a user would understand.
 
-= table | FND-03 · Tier A · The mechanism | Six rungs, each with one sentence a user would understand
+= panel key | FND-03 · From the ground up | What a consistency promise is
+A consistency model is a **promise about what a read may return**, given the writes that happened before it.
+The strongest promise behaves like one machine with one copy. Weaker promises allow some staleness, and each one rules out a particular surprise.
+Weaker is cheaper: fewer machines must agree before you answer.
+N: From the ground up. A consistency model is a promise about what a read may return, given the writes that happened before it. The strongest promise makes many machines behave like one machine with one copy. Weaker promises allow some staleness, and each of them rules out one particular surprise. The weaker the promise, the fewer machines must agree before you answer, and so the cheaper and faster it is. Let us walk the rungs, from the top, with a user story for each.
+
+= cards c3 | FND-03 · From the ground up | The top three rungs, as user stories
+Linearizable :: Two people refresh an auction page. Once the hammer falls for one of them, **nobody anywhere** still sees the item as open.
+Causal :: In a chat, you never see an answer before the question it replies to. Unrelated messages may still arrive in any order.
+Read-your-writes :: You change your profile photo and reload. **You** always see the new one, even if a friend still sees the old one for a few seconds.
+N: The top three. Linearizable: two people watch an auction. Once the hammer falls for one of them, nobody anywhere still sees the item as open. It behaves like a single copy. Causal: in a group chat, you never see an answer before the question it replies to. Things that are unrelated may still arrive in any order. Read your writes: you change your profile photo and reload. You always see the new photo, even if a friend still sees the old one for a few seconds. That promise is about you, not about everyone.
+
+= cards c3 | FND-03 · From the ground up | The lower three rungs, as user stories
+Monotonic reads :: You refresh a comment thread twice. A reply you saw the first time **never vanishes** the second time.
+Bounded staleness :: A stock-price widget may be behind, but **never by more than five seconds**. The promise has a number in it.
+Eventual :: Stop writing, wait, and every replica ends up the same. **No promise about when.** A like count is fine with this.
+N: The lower three. Monotonic reads: you refresh a thread twice. A reply you saw the first time never vanishes the second time. Time does not go backwards for you. Bounded staleness: a price widget may be behind, but never by more than five seconds. The promise has a number in it. And eventual consistency: stop writing, wait, and every replica ends up the same. There is no promise about when. A like count is perfectly happy with that.
+
+= dia | FND-03 · Tier A · The mechanism | The ladder on one page, with its mechanisms
 @ FND-03
-Rung | The user's experience | Typical mechanism
-Linearizable | Everyone sees a write the instant it completes | A consensus group, reads through the leader
-Causal | You never see an answer before its question | Version vectors, dependency tracking
-Read-your-writes | You always see your own changes | Pin the session to the leader or to a version
-Monotonic reads | Time never goes backwards for you | Pin the session to one replica
-Bounded staleness | At most N seconds old | Read from a replica within a lag limit
-Eventual | The same, some time after writes stop | Asynchronous replication
-N: Consistency is a ladder with six useful rungs, and each can be said in words a user would understand. Linearizable: everyone sees a write the instant it completes. Causal: you never see an answer before its question. Read your writes: you always see your own changes. Monotonic reads: time never goes backwards for you. Bounded staleness: what you see is at most so many seconds old. And eventual: everyone agrees some time after writes stop.
+p2-ladder
+N: Here is the whole ladder as a staircase, now with the mechanism that delivers each rung. Going up, more replicas must agree, so each step is slower. Linearizable needs a consensus group, with reads through the leader. Causal needs dependency tracking, such as version vectors. Read your writes and monotonic reads are session guarantees: pin the session to a replica, or to a version. Bounded staleness reads from a replica within a lag limit. And eventual is what plain asynchronous replication gives you for free.
 
 = dia | FND-03 · Tier A · The failure | The two session anomalies that users actually report
 p2-session-anomalies
@@ -118,6 +148,13 @@ V: I choose consistency per operation, not per system. Checkout is linearizable.
 [pause: 0.8]
 
 ## 2.4 Linearizability and serializability
+N: Next, two words that sound alike and mean different things: linearizability and serializability.
+
+= panel key | FND-04 · From the ground up | What a transaction is, in one slide
+A **transaction** groups several reads and writes so they succeed or fail together: move money from A to B is two writes, and never just one.
+**Isolation** is the promise about transactions running at the same time: how much may they see of each other's half-done work?
+The strongest isolation, **serializable**, means the result is as if they ran one after another. Part 8 goes through the weaker levels.
+N: From the ground up, one term this section needs. A transaction groups several reads and writes so that they succeed or fail together. Moving money from A to B is two writes, and it must never happen as just one. Isolation is the promise about transactions that run at the same time: how much may each one see of the other's half-done work? The strongest isolation is called serializable. It means the result is as if the transactions had run one after another. Part eight walks through the weaker levels.
 
 = dia | FND-04 · Tier A · The mechanism | Two different guarantees that sound alike
 @ FND-04
@@ -143,17 +180,22 @@ V: Linearizability is about single operations in real-time order. Serializabilit
 [pause: 0.8]
 
 ## 2.5 Quorums
+N: Next, quorums. The arithmetic of overlap, and why overlap alone is not enough.
 
-= code | FND-12 · Tier A · The mechanism | Overlap is arithmetic
+= cards c3 | FND-12 · From the ground up | Replication with no leader
+Write to several :: The client sends the write to every replica and calls it done once **enough** of them confirm.
+Read from several :: The client asks several replicas and keeps the answer with the **newest version number**.
+Catch up later :: A replica that missed a write is fixed when a reader notices, or by a background job that compares replicas.
+> No failover is ever needed: there is no leader to lose. The question is how many is "enough".
+N: From the ground up. Some stores have no leader at all. The client sends a write to every replica, and calls it done once enough of them confirm. To read, it asks several replicas, and keeps the answer with the newest version number. A replica that missed a write is fixed later: either a reader notices the old value and writes the new one back, or a background job compares replicas and copies what differs. There is never a failover, because there is no leader to lose. The only question is how many is enough. That is the arithmetic on the next slide.
+
+= math | FND-12 · Tier A · The mechanism | Overlap is arithmetic
 @ FND-12
-N replicas, a write waits for W acknowledgements, a read asks R replicas
-
-R + W > N      every read set shares at least one replica with every write set
-               N = 3, W = 2, R = 2   →   2 + 2 > 3, overlap of one
-
-majority       N = 2f + 1 replicas survive f failures
-               3 survive 1      5 survive 2      7 survive 3
-               4 survive 1      (an even count buys nothing)
+~ \(N\) replicas. A write waits for \(W\) acknowledgements. A read asks \(R\) replicas.
+$$ R + W > N $$ :: every read set shares at least one replica with every write set
+$$ N=3,\; W=2,\; R=2 \;\Rightarrow\; 2+2>3 $$ :: write to two, read from two: the sets overlap in one
+$$ N = 2f + 1 $$ :: a majority survives \(f\) failures: 3 survive 1, 5 survive 2, 7 survive 3
+$$ N = 4 \;\Rightarrow\; f = 1 $$ :: an even count buys nothing
 N: A quorum is arithmetic. There are N replicas. A write waits for W acknowledgements. A read asks R replicas. If R plus W is greater than N, every read set shares at least one replica with every write set. With three replicas, write to two and read from two, and the sets overlap in one. For majorities, two F plus one replicas survive F failures. Three survive one. Five survive two. Four still survive only one, so an even count buys nothing.
 
 = dia | FND-12 · Tier A · The failure | Overlap is not linearizability
@@ -176,6 +218,14 @@ V: R plus W greater than N guarantees that a read set and a write set overlap. I
 [pause: 0.8]
 
 ## 2.6 Physical clocks
+N: Now we move from promises to time. First, physical clocks, and how the later write can lose.
+
+= tiles | FND-07 · From the ground up | How a server knows the time, and how wrong it can be
+Quartz drift | an ordinary oscillator gains or loses tens of microseconds per second, about a second a day uncorrected
+Network time sync | corrects the drift over the network, to about a millisecond in a datacentre on a good day
+Hardware time, 2026 | precision time protocol with clocks on the network card: the large clouds now offer **microsecond** error bounds
+Leap seconds | smeared over a day by the clouds; the world has agreed to stop adding them by 2035
+N: From the ground up: how does a server know the time? Its clock is a quartz oscillator, which drifts. Uncorrected, it can be off by about a second a day. Network time synchronisation corrects it, to around a millisecond inside a datacentre on a good day. Since 2023, the large clouds offer hardware time, with the precision time protocol and clocks on the network card, and they publish an error bound in microseconds. Leap seconds are smeared out over a whole day, and the world has agreed to stop adding them by 2035. Better clocks shrink the error. They never remove it, and that is the point of this section.
 
 = dia | FND-07 · Tier A · The failure | Last writer wins, and the later write loses
 @ FND-07
@@ -206,6 +256,20 @@ V: Clock synchronisation gives millisecond skew with no hard bound. So I use a m
 [pause: 0.8]
 
 ## 2.7 Logical clocks
+N: Next, logical clocks. They count events instead of reading time, to tell after from at the same time.
+
+= panel key | FND-08 · From the ground up | Happened before, without a clock
+Event A **happened before** B if B could have known about A: they are on the same machine in that order, or a message carried news of A to B's machine.
+If neither could have known about the other, they are **concurrent**, whatever the clocks say.
+A question and its answer are ordered. Two strangers posting at the same moment are concurrent.
+N: From the ground up. Forget clocks for a moment. Event A happened before event B if B could have known about A. Either they ran on the same machine in that order, or a message carried news of A to B's machine. If neither could have known about the other, they are concurrent, whatever the clocks say. A question and its answer are ordered. Two strangers posting at the same moment are concurrent. A logical clock tracks exactly this, and nothing else.
+
+= math | FND-08 · Tier B · From the ground up | The Lamport clock: two rules
+~ Each node keeps one counter \(C\). Every message carries the sender's counter.
+$$ C \leftarrow C + 1 $$ :: before every local event, and before sending
+$$ C \leftarrow \max(C,\ C_{\text{msg}}) + 1 $$ :: on receiving a message stamped \(C_{\text{msg}}\)
+$$ a \rightarrow b \;\Rightarrow\; C(a) < C(b) $$ :: cause before effect, always. The reverse does **not** hold
+N: The simplest logical clock has two rules. Each node keeps one counter. Before every event, add one. When a message arrives, take the larger of your counter and the one in the message, and add one. That guarantees that if A happened before B, A's number is smaller. The reverse does not hold: a smaller number does not prove that A came first. Keep that gap in mind. It is exactly what the next picture fixes.
 
 = dia | FND-08 · Tier B · The mechanism | Version vectors tell "after" from "at the same time"
 @ FND-08
@@ -225,6 +289,7 @@ V: Lamport timestamps give a total order that respects causality. Version vector
 [pause: 0.8]
 
 ## 2.8 Hybrid and bounded clocks
+N: Next, clocks that combine both ideas: hybrid clocks, and clocks that admit their own error.
 
 = dia | FND-09 · Tier B · The mechanism | Commit wait: sit out the uncertainty
 @ FND-09
@@ -244,6 +309,13 @@ V: A hybrid logical clock is physical time plus a logical counter. A bounded clo
 [pause: 0.8]
 
 ## 2.9 Ordering guarantees
+N: The third group is getting effects right. First, ordering: three strengths of order, and what each one costs.
+
+= panel trap | FND-11 · From the ground up | Why order matters: one story
+A user edits a document title, then deletes the document. Two events, a second apart.
+A search index receives them through two different paths. **The delete arrives first**, then the edit, which re-creates the entry.
+The document is gone, and it still shows up in search, forever. No message was lost. They only arrived in the wrong order.
+N: From the ground up, why does order matter? A user edits a document title, and a second later deletes the document. A search index receives the two events through different paths. The delete arrives first, and removes the entry. Then the edit arrives, and re-creates it. The document is gone, and it still shows up in search, forever. No message was lost. They simply arrived in the wrong order. Every guarantee in this section exists to prevent that.
 
 = table | FND-11 · Tier A · The mechanism | Three strengths of order, three prices
 @ FND-11
@@ -275,6 +347,13 @@ V: Total order needs a single log or consensus group. Per-key order needs only p
 [pause: 0.8]
 
 ## 2.10 Idempotency and exactly-once
+N: Next, idempotency. Why exactly once delivery does not exist, and what you build instead.
+
+= cards c2 | FND-10 · From the ground up | Safe to repeat, or not
+grn Idempotent :: Pressing a lift button five times calls the lift once. "Set the balance to 100" twice leaves 100. Repeating changes nothing.
+red Not idempotent :: "Add 10 to the balance" twice adds 20. "Send the email" twice sends two emails. Repeating changes the result.
+> Networks force retries. So every operation that can be retried must be made safe to repeat.
+N: From the ground up. An operation is idempotent if doing it twice has the same effect as doing it once. Pressing a lift button five times calls the lift once. Set the balance to one hundred, twice, leaves one hundred. But add ten to the balance, twice, adds twenty. And send the email, twice, sends two emails. Networks force retries, as the next picture shows. So every operation that may be retried has to be made safe to repeat.
 
 = dia | FND-10 · Tier A · The failure | The reply is lost, the client retries, the customer pays twice
 @ FND-10
@@ -302,6 +381,13 @@ V: Exactly-once delivery does not exist. What I can build is exactly-once effect
 [pause: 0.8]
 
 ## 2.11 Leases and fencing tokens
+N: Next, leases and fencing tokens. What happens when the lock holder pauses, and how the resource protects itself.
+
+= cards c2 | FND-13 · From the ground up | A lock that expires by itself
+Why a lock :: Only one worker may write the file, run the nightly job, or act as leader. The lock says who.
+Why it expires :: If the holder crashes, an ordinary lock is held forever. A **lease** is a lock with a time limit: renew it, or lose it.
+> A lease assumes the holder notices when its time is up. The next picture is what happens when it does not.
+N: From the ground up. Why do distributed systems need locks? So that only one worker writes a file, runs the nightly job, or acts as the leader. An ordinary lock has a problem: if its holder crashes, it is held forever. So distributed locks are leases: a lock with a time limit. The holder renews it, or loses it. A lease quietly assumes one thing: that the holder notices when its time is up. Here is what happens when it does not.
 
 = dia | FND-13 · Tier A · The failure | A paused holder writes after its lease has gone
 @ FND-13
@@ -312,17 +398,17 @@ N: Follow the picture from the left. Client A takes the lock, with a ten second 
 p2-fencing
 N: The repair is on the resource, not in the lock. Every grant carries a fencing token, a number that only goes up. A got thirty-three. B got thirty-four. The storage service remembers the highest token it has accepted. B writes with thirty-four, and that is accepted. A arrives late with thirty-three. Thirty-three is lower than thirty-four, so the write is refused. The pause no longer matters, however long it was.
 
-= code | FND-13 · Tier A · One level down | The check and the write are one conditional operation
+= code sql | FND-13 · Tier A · One level down | The check and the write are one conditional operation
 UPDATE objects
    SET body = :body, token = :token
  WHERE id = :id AND token <= :token;     -- zero rows changed: a newer owner exists
+N: One level down, two things. First, the check must be atomic with the write. Here it is a single conditional update: write only if the stored token is not greater than mine. Check first and write second, as two steps, and a late owner slips between them.
 
-lease timing, with clock drift bounded by d (say 1%):
-   holder  stops using the lease at   t_request + L × (1 − d)
-                                      on its own monotonic clock
-   grantor grants it again only after t_grant   + L
-                                      on its own clock
-N: One level down, two things. The check must be atomic with the write. Here it is a single conditional update: write only if the stored token is not greater than mine. Check first and write second, as two steps, and a late owner slips between them. And the lease itself has a timing rule. The holder counts from the moment it sent the request, and stops a little early. The grantor counts from the moment it granted, and waits the full length. The gap between those two absorbs clock drift.
+= math | FND-13 · Tier A · One level down | Lease timing that absorbs clock drift
+~ Lease length \(L\), clock drift bounded by \(d\) (say 1%), each side on its own monotonic clock.
+$$ t_{\text{stop}} = t_{\text{request}} + L\,(1-d) $$ :: the **holder** counts from when it sent the request, and stops a little early
+$$ t_{\text{regrant}} \ge t_{\text{grant}} + L $$ :: the **grantor** counts from when it granted, and waits the full length
+N: Second, the lease itself has a timing rule. The holder counts from the moment it sent the request, and stops a little early. The grantor counts from the moment it granted, and waits the full length. The gap between those two absorbs clock drift.
 
 = table | FND-13 · Tier A · The alternative and the price | A lease alone, a lease with fencing, or no lock
 Approach | Assumes | A long pause can | Costs
@@ -342,6 +428,13 @@ If the resource cannot check a token, say so, and say what bounds the damage ins
 N: Here is the trap. The token only helps if the thing being written to checks it. If the storage cannot compare tokens, the lock is advisory. Say that aloud, and say what limits the damage instead.
 
 ## 2.12 Safety, liveness and FLP
+N: The last group is failure. First, the two kinds of promise a protocol makes, and what the F-L-P result really says.
+
+= panel key | FND-05 · From the ground up | What consensus means
+Several machines must **agree on one value**: who the leader is, which write came next, whether a transaction commits.
+Agreement must hold even if some machines crash and messages are delayed. Part 3 shows how Raft does it.
+This section asks a simpler question first: what exactly may such a protocol promise?
+N: From the ground up. Consensus means several machines agree on one value: who the leader is, which write comes next, whether a transaction commits. And they must agree even when some machines crash and messages are delayed. Part three shows how a real protocol does it. This section asks a simpler question first: what, exactly, can such a protocol promise?
 
 = table | FND-05 · Tier B · The mechanism | Two kinds of promise, and which one may bend
 @ FND-05
@@ -363,6 +456,12 @@ V: Real consensus protocols keep safety always, and get liveness under partial s
 [pause: 0.8]
 
 ## 2.13 Failure models
+N: Next, failure models. What a node is allowed to do wrong, and the one that causes real incidents.
+
+= cards c2 | FND-06 · From the ground up | One computer fails whole. Many computers fail in parts
+One machine :: When something breaks badly, it usually stops. A crash is loud and total, which makes it simple to handle.
+Many machines :: One node is down, one is slow, one link drops packets, and the rest are fine. The system is **partly** broken, and nobody has the full picture.
+N: From the ground up. A single computer, when something breaks badly, usually stops. The failure is loud and total, which makes it simple. A distributed system fails in parts. One node is down, one is slow, one link drops packets, and everything else is fine. The system is partly broken, and no single machine has the full picture. So before designing for failure, you have to say what kind of failure you are designing for.
 
 = table | FND-06 · Tier B · The mechanism | What a node is allowed to do wrong
 @ FND-06
@@ -370,7 +469,7 @@ Model | The node | Designed for by
 Crash-stop | Halts and never returns | Timeouts and failover
 Crash-recovery | Halts, then returns with its disk and stale beliefs | Durable state, terms, fencing
 Omission | Runs, and drops some messages | Retries, acknowledgements
-Byzantine | Does anything, including lying | Signatures and 3f + 1 replicas; rare inside one company
+Byzantine | Does anything, including lying | Signatures and \(3f + 1\) replicas; rare inside one company
 **Grey failure** | Passes health checks and serves badly | Measuring from the client's side
 N: A failure model says what a node may do wrong. Crash stop: it halts for good. Crash recovery: it halts and comes back, with its disk, and with beliefs that are now out of date. Omission: it runs and drops messages. Byzantine: it does anything, including lying, which matters between organisations and rarely inside one. And the one that causes real incidents: grey failure. The node passes its health checks and serves badly.
 
@@ -385,17 +484,13 @@ V: I assume crash-recovery: a node can return with stale state, so it must be fe
 [pause: 0.8]
 
 ## 2.14 Failure detection
+N: Next, failure detection. A timeout is a trade between speed and false alarms.
 
-= code | FND-15 · Tier B · The mechanism | A timeout is a trade between speed and false alarms
+= dia | FND-15 · Tier B · The mechanism | A timeout is a trade between speed and false alarms
 @ FND-15
-heartbeat every 1 s, declare dead after 3 missed
-
-detection time    = between 3 s and 4 s
-false positive    = any pause or network delay longer than 3 s
-
-halve the timeout →  detect in 1.5 to 2 s,  and every 2-second pause looks like a death
-a false positive is not free: it triggers failover, re-replication, a cold cache
-N: A failure detector is a timeout, and a timeout is a trade. Send a heartbeat every second and declare a node dead after three are missed. Detection takes three to four seconds. And any pause or network delay longer than three seconds is a false alarm. Halve the timeout, and you detect in two seconds, and every two second pause looks like a death. A false alarm is not free. It triggers failover, re-replication, and a cold cache.
+p2-heartbeat
+N: A failure detector is a timeout, and a timeout is a trade. The node sends a heartbeat every second. The detector declares it dead after three are missed. Here the node pauses for almost four seconds, for garbage collection. Three heartbeats are missed, and at about five seconds it is declared dead. Then it wakes up. It was alive all along.
+N: So detection takes three to four seconds, and any pause or network delay longer than three seconds is a false alarm. Halve the timeout, and you detect in two seconds, and every two second pause looks like a death. A false alarm is not free. It triggers failover, re-replication, and a cold cache.
 
 = table | FND-15 · Tier B · One level down | Better detectors, and the question none of them answers
 Technique | Idea | Buys
@@ -410,6 +505,7 @@ V: A heartbeat timeout trades detection time against false positives. And a sing
 [pause: 0.8]
 
 ## 2.15 Gossip
+N: And the last idea, gossip. Spreading information with no coordinator, and where it must never be used.
 
 = dia | FND-16 · Tier B · The mechanism | Each round, everyone who knows tells someone at random
 @ FND-16
@@ -425,18 +521,19 @@ Repairing replicas in the background | Pairs compare and exchange what differs
 Anything that needs an order or a decision | Nodes learn at different times, and no node knows when everyone knows
 N: Gossip is right for soft state. Membership and liveness, where every node converges on the same list. Load and capacity hints, where slightly stale is fine. And background repair between replicas. It is wrong for anything that needs an order or a decision, because nodes learn at different times, and no node ever knows that everyone knows. A lock, a leader, or a configuration version that must be current needs consensus.
 
-= th | FND-16 · the line to say | Gossip reaches everyone in about log N rounds with no coordinator. Good for soft state, wrong for decisions.
+= th | FND-16 · the line to say | Gossip reaches everyone in about \(\log_2 N\) rounds with no coordinator. Good for soft state, wrong for decisions.
 V: Gossip reaches all nodes in a logarithmic number of rounds with no coordinator, and it converges eventually. So I use it for membership and soft state, and never for anything that needs an order.
 [pause: 0.8]
 
 ## 2.16 Recap
+N: Let's stop and collect what this part covered.
 
 = list | Recap | What to be able to explain without notes
 - **CAP** with its three definitions, and why "CA" is not a choice
 - **PACELC**, with the round trip in milliseconds
 - The **ladder**, each rung as a user's sentence, chosen per operation
 - **Linearizable** against **serializable**, and what each still allows
-- Why **R + W > N** is not linearizability: three interleavings
+- Why \(R + W > N\) is not linearizability: three interleavings
 - **Two clocks**; never order across machines by wall time
 - **Per-key order** with a version the receiver checks
 - **Exactly-once effect**: key and effect in one transaction
@@ -444,6 +541,7 @@ V: Gossip reaches all nodes in a logarithmic number of rounds with no coordinato
 N: Here is what you should be able to explain with no notes. CAP with its real definitions. P-A-C-E-L-C with a number of milliseconds. The ladder, a rung per operation. Linearizable against serializable. Three ways a quorum read goes stale. Two clocks and what each is for. Per key order with a version check. Exactly once effect. And a lease with a fencing token that the resource checks.
 
 ## 2.17 Probe drills
+N: Now, six probe drills. For each one, pause the video, answer aloud, and then compare.
 
 = probe | Is R plus W greater than N linearizable?
 - **No.** It guarantees overlap, not real-time order
@@ -483,6 +581,7 @@ C: I answer per operation and for each side of the split. Writes that protect an
 C: A lease needs a duration, not a time of day. Each side measures it on its own monotonic clock, the holder stopping slightly early. That assumes only bounded drift between two clocks over ten seconds, which is realistic. It does not assume the clocks agree on what time it is. And because a pause can outlast any lease, the resource still checks a fencing token.
 
 ## 2.18 Where this shows up
+N: Finally, where these ideas show up in the design problems.
 
 = table | Where this shows up | What each design problem takes from this part
 Problem | Takes
@@ -496,6 +595,6 @@ N: Each design problem takes something from this part. A lock service takes leas
 
 = panel note | Read next | Where to go deeper
 The Spanner paper, sections 3 and 4: TrueTime and how commit wait gives external consistency.
-*Designing Data-Intensive Applications*, chapter 5, the section on the limits of quorum consistency.
+*Designing Data-Intensive Applications*, chapters 5, 8 and 9: replication, the trouble with distributed systems, consistency and consensus.
 Kleppmann, *How to do distributed locking*: the pause, the fencing token, and when a best-effort lock is enough.
-N: To go deeper: sections three and four of the Spanner paper, for bounded clocks and commit wait. The section on the limits of quorum consistency in chapter five of Designing Data-Intensive Applications. And Martin Kleppmann's article on distributed locking. Part three is next: consensus.
+N: To go deeper: sections three and four of the Spanner paper, for bounded clocks and commit wait. Chapters five, eight and nine of Designing Data-Intensive Applications, for replication, unreliable networks and clocks, and consistency. And Martin Kleppmann's article on distributed locking. Part three is next: consensus.

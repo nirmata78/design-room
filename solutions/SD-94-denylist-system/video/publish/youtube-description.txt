@@ -1,0 +1,41 @@
+A denylist looks like a hash set and a lookup. The hard part is everything around it: how a ban reaches 100,000 servers in seconds, what a server does when it cannot hear about new bans, and what stops one wrong line from blocking everyone. This is a full reference solution at the Staff bar (L6/L7): theory, a three-version design, seven challenges that break it, and the build cost. 93 minutes, 175 numbered slides, with an interviewer, a candidate and a coach.
+
+The thesis: the check must be local and the list cannot be. So the design is the distance between them: a version every node can verify, a stated bound on how stale a node may be, and the discipline of a release, because the pipe that delivers a ban in ten seconds delivers a mistake in ten seconds.
+
+IN THIS VIDEO
+• Estimates as arithmetic: 40 MB per node, 4 TB against 800 MB of fan-out, 10,000 manifest polls a second, 18 seconds against a 30-second target
+• Theory: safety and liveness (a missing ban and a wrong block), seven mechanisms, an options matrix with a pick
+• Seven challenges: a node that was offline, order and overlap, a bad push, stale or no control plane, a list that does not fit, a slow external source, and how you would know
+• The build cost, in people and months (marked AUX, the manager layer)
+
+HOW TO USE IT
+Run the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first. Slides badged AUX are the manager layer: skip them in a Staff round.
+
+CHAPTERS
+0:00 0 Cold open
+3:01 1 Requirements and scope
+10:35 2 Estimates
+17:44 3 Theory
+29:00 4 API and entities
+35:07 5 High-level design
+47:08 6 Bridge
+47:52 7 Challenges
+48:12 7.1 Challenge 1: The node that was offline
+52:46 7.2 Challenge 2: Order, duplicates, overlap
+57:46 7.3 Challenge 3: The bad push
+1:03:51 7.4 Challenge 4: Stale or no control plane
+1:09:11 7.5 Challenge 5: The list does not fit
+1:14:30 7.6 Challenge 6: A slow external source
+1:19:03 7.7 Challenge 7: How would you know?
+1:23:57 8 Build cost
+1:28:38 9 Recap
+
+LINKS
+Written reference design (about 39 pages): https://github.com/nirmata78/design-room/blob/main/solutions/SD-94-denylist-system/SD-94_Denylist_System_Reference_Design.md
+Run this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room
+All videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md
+
+ABOUT THIS VIDEO
+This is a scripted walkthrough, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script, diagrams and the written design were produced with Claude Code. Numbers are back-of-the-envelope estimates for the exercise, labelled as given, illustrative or initial targets, not any company's real figures, and this is not any company's actual design. The technical content has not been reviewed by a person.
+
+#SystemDesign #SoftwareEngineering #DistributedSystems

@@ -67,3 +67,105 @@ table.bt td.calc { font-family: "DejaVu Sans Mono", monospace; font-size: 13pt; 
 pre.code { font-size: 16pt; line-height: 1.5; padding: 12pt 18pt; white-space: pre; }
 pre.code .cm, pre.wire .cm { color: #6e7781; font-style: italic; }
 pre.code .kw { color: #c8341f; font-weight: 700; }
+
+/* v3 (2026-11-12): reference-solution format — devices carried over from the reference walkthroughs
+   (design-room/.claude/skills/reference-solution-video/GUIDELINES.md): chip strip, stage ribbon, question titles,
+   case / fix strips, state traces, scope pair, traceability tags, options matrix, signal and symptom tables. */
+.chips { font: 600 14.5pt/1.3 "DejaVu Sans Mono", monospace; color: var(--blue); margin: -6pt 0 10pt; }
+.chips i { font-style: normal; color: #9aa4ae; margin: 0 9pt; }
+.ribbon { display: flex; gap: 6pt; margin: 0 0 14pt; }
+.ribbon span { flex: 1; font: 700 12.5pt/1 Inter, sans-serif; padding: 9pt 8pt; background: #eef1f4; color: #6e7781;
+  border-radius: 5pt; text-align: center; white-space: nowrap; }
+.ribbon span.done { background: var(--green-bg); color: #1d5c34; }
+.ribbon span.on { background: var(--red); color: #fff; }
+.th .ribbon { margin-top: 26pt; } .th .ribbon span { background: #2d333b; color: #9aa4ae; }
+.th .ribbon span.done { background: #1d3b29; color: #9fd8b3; } .th .ribbon span.on { background: #ff7a66; color: #1f2328; }
+/* a challenge slide: the title is the interviewer's question */
+.slide h1.q { color: #7a1a0c; border-bottom-color: var(--red); }
+.slide h1.q::before { content: "Q"; display: inline-block; background: var(--red); color: #fff; font-size: 0.72em;
+  font-weight: 800; padding: 1pt 8pt 2pt; border-radius: 5pt; margin-right: 11pt; vertical-align: 3pt; }
+.vtag { display: inline-block; font: 800 0.66em/1 Inter, sans-serif; background: var(--blue); color: #fff;
+  padding: 4pt 9pt; border-radius: 5pt; margin-right: 10pt; vertical-align: 3pt; letter-spacing: .5pt; }
+.strip { display: grid; grid-template-columns: 1fr 1fr; gap: 14pt; margin-top: 10pt; }
+.strip.one { grid-template-columns: 1fr; } .strip.three { grid-template-columns: 1fr 1fr 1fr; }
+.case, .fixb, .whyb, .hedge { font-size: 16.5pt; line-height: 1.36; padding: 10pt 14pt 11pt; border-radius: 0 6pt 6pt 0;
+  border-left: 6px solid; }
+.case b.t, .fixb b.t, .whyb b.t, .hedge b.t { display: block; font-size: 11pt; letter-spacing: 1.6pt;
+  text-transform: uppercase; margin-bottom: 3pt; }
+.case { background: var(--red-bg); border-color: var(--red); color: #5a1308; } .case b.t { color: var(--red); }
+.fixb { background: var(--green-bg); border-color: var(--green); color: #173d24; } .fixb b.t { color: var(--green); }
+.whyb { background: var(--blue-bg); border-color: var(--blue); color: #0b2540; } .whyb b.t { color: var(--blue); }
+.hedge { background: var(--amber-bg); border-color: #d18f1c; color: #4a3207; } .hedge b.t { color: var(--amber); }
+/* state trace: one line per event, mechanism before name */
+pre.trace { font: 15.5pt/1.55 "DejaVu Sans Mono", monospace; background: #fff; border: 1px solid var(--line);
+  border-left: 6px solid var(--ink); border-radius: 0 6pt 6pt 0; padding: 12pt 18pt; margin: 0 0 10pt; white-space: pre; }
+pre.trace .t { color: #6e7781; } pre.trace .bad { color: var(--red); font-weight: 700; }
+pre.trace .ok { color: var(--green); font-weight: 700; } pre.trace .hl { background: #fff3c4; }
+/* IN / OUT scope pair */
+.scope2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18pt; }
+.scope2 > div { border-radius: 7pt; padding: 14pt 18pt; border: 1px solid; }
+.scope2 .in { background: var(--green-bg); border-color: var(--green); } .scope2 .out { background: var(--red-bg); border-color: var(--red); }
+.scope2 h3 { font-size: 13pt; letter-spacing: 2pt; text-transform: uppercase; margin: 0 0 8pt; }
+.scope2 .in h3 { color: var(--green); } .scope2 .out h3 { color: var(--red); }
+.scope2 li { font-size: 18.5pt; line-height: 1.35; margin-bottom: 7pt; } .scope2 ul { margin: 0; padding-left: 20pt; }
+/* traceability: which requirement an API serves, which entity it writes */
+.tr { display: flex; flex-wrap: wrap; gap: 7pt; margin: 0 0 10pt; }
+.tr span { font: 700 12.5pt/1 "DejaVu Sans Mono", monospace; padding: 5pt 10pt; border-radius: 12pt; border: 1.5px solid; }
+.tr .fr { color: #215a9a; border-color: #2f6fb5; background: #dbeafe; } .tr .api { color: #2a1d66; border-color: #6b4fc4; background: #e6dcfb; }
+.tr .ent { color: #0d3b2a; border-color: #1f8a63; background: #d3f3e6; } .tr .nfr { color: #4a3207; border-color: #b7860b; background: #fdf0c2; }
+/* options matrix: the pick in green, rejected rows greyed, never erased */
+table.mx tr.pick td { background: var(--green-bg); font-weight: 600; } table.mx tr.pick td:first-child { border-left: 6px solid var(--green); }
+table.mx tr.rej td { color: #8c959f; } table.mx tr.rej td:first-child { text-decoration: line-through; }
+table.mx td.y { color: var(--green); font-weight: 700; } table.mx td.n { color: var(--red); font-weight: 700; }
+table.mx td.why { font-size: 0.9em; }
+/* weak signal vs strong signal · symptom pair → conclusion */
+table.sig td:nth-child(2) { background: var(--red-bg); color: #5a1308; } table.sig td:nth-child(3) { background: var(--green-bg); color: #173d24; }
+table.sym td:nth-child(3) { font-weight: 700; } table.sym td.up::after { content: " ↑"; color: var(--red); font-weight: 800; }
+table.sym td.dn::after { content: " ↓"; color: var(--blue); font-weight: 800; }
+/* theory chapter: every slide carries the badge, so a viewer can tell theory from design */
+.slide.theory .k { color: #6b4fc4; }
+.slide.theory::before { content: "THEORY"; position: absolute; top: 0.24in; right: 1.0in; font: 700 10.5pt/1 Inter, sans-serif;
+  letter-spacing: 1.5pt; padding: 5pt 9pt; border-radius: 5pt; background: #efe9fd; color: #4a2fa3; border: 1px solid #6b4fc4; }
+.prop { border: 1px solid var(--line); border-left: 7px solid #6b4fc4; border-radius: 0 7pt 7pt 0; padding: 12pt 18pt; margin-bottom: 12pt; }
+.prop .lbl { font: 800 11.5pt/1 Inter, sans-serif; letter-spacing: 2pt; text-transform: uppercase; color: #6b4fc4; }
+.prop p { font-size: 20pt; line-height: 1.36; margin: 6pt 0 0; } .prop.safe { border-left-color: var(--red); } .prop.safe .lbl { color: var(--red); }
+.prop.live { border-left-color: var(--green); } .prop.live .lbl { color: var(--green); }
+/* pause marker on a question slide · the "if asked, I'd say" closer · the coach's grading note */
+.qs .pz { margin-top: 20pt; font: 700 13pt/1 Inter, sans-serif; letter-spacing: 2pt; text-transform: uppercase; color: #5b44b5; }
+.qs .pz::before { content: "❚❚"; margin-right: 9pt; font-size: 0.85em; }
+.th.say .s { font-size: 31pt; font-weight: 650; letter-spacing: -0.4pt; line-height: 1.3; }
+.grade { font-size: 16.5pt; line-height: 1.36; padding: 10pt 14pt; background: #f3f0fb; border-left: 6px solid #5b44b5;
+  border-radius: 0 6pt 6pt 0; color: #2a1d66; margin-top: auto; }
+.grade b.t { display: block; font-size: 11pt; letter-spacing: 1.6pt; text-transform: uppercase; color: #5b44b5; margin-bottom: 3pt; }
+
+/* 2026-11-20 readability rework (course-builder pacing port) */
+table.tl { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--line); border-left: 6px solid var(--ink);
+  border-radius: 0 6pt 6pt 0; margin: 0 0 12pt; font-size: 19pt; line-height: 1.4; }
+table.tl th { text-align: left; white-space: nowrap; color: #57606a; font-weight: 700; font-size: 15pt; padding: 9pt 14pt 9pt 18pt;
+  vertical-align: top; width: 1%; border-bottom: 1px solid #eef0f2; letter-spacing: .3pt; }
+table.tl td { padding: 9pt 18pt 9pt 6pt; border-bottom: 1px solid #eef0f2; }
+table.tl tr:last-child th, table.tl tr:last-child td { border-bottom: 0; }
+table.tl .bad { color: var(--red); font-weight: 700; } table.tl .ok, table.tl .good { color: var(--green); font-weight: 700; }
+table.tl .hl { background: #fff3c4; } table.tl .t { color: #6e7781; }
+pre.code { font-size: 18pt; position: relative; } pre.wire { font-size: 15pt; } .cols2 pre.wire { font-size: 14pt; white-space: pre-wrap; }
+pre.code::before, pre.wire::before { content: "pseudocode"; position: absolute; top: 6pt; right: 10pt; font: 700 10pt/1 "Inter", sans-serif;
+  letter-spacing: 1.5pt; text-transform: uppercase; color: #8c959f; }
+pre.wire { position: relative; } pre.wire::before { content: "wire format"; }
+pre.code .kw { color: #cf222e; } pre.code .fn, pre.wire .k { color: #8250df; }
+.th.card .s { font-size: 54pt; } .th.card .lbl { font-size: 17pt; }
+.slide .cols2 pre.wire { font-size: 16.5pt; line-height: 1.42; }
+.slide pre.code { font-size: 17pt; }
+pre.code[data-lang]::before { content: attr(data-lang); }
+/* SD-08 2026-11-20: display formulas (KaTeX MathML) and highlight.js tokens, as in the course builder */
+math { font-family: "STIX Two Math", "Latin Modern Math", "Cambria Math", serif; }
+.fxone { background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 8pt; padding: 18pt 22pt; margin: 14pt 0 16pt; text-align: center; }
+.fxone math { font-size: 30pt; color: #0b3d6e; }
+pre.code.hl { color: #1f2328; }
+.hljs-keyword, .hljs-meta .hljs-keyword, .hljs-built_in, .hljs-type { color: #cf222e; font-weight: 600; }
+.hljs-string, .hljs-regexp, .hljs-meta .hljs-string { color: #0a3069; }
+.hljs-number, .hljs-literal, .hljs-symbol, .hljs-bullet { color: #0550ae; }
+.hljs-comment, .hljs-quote { color: #6e7781; font-style: italic; }
+.hljs-title, .hljs-title.function_, .hljs-section { color: #8250df; }
+.hljs-attr, .hljs-attribute, .hljs-variable, .hljs-template-variable, .hljs-params { color: #953800; }
+.hljs-name, .hljs-selector-tag { color: #116329; }
+.hljs-operator { color: #cf222e; } .hljs-meta { color: #57606a; }

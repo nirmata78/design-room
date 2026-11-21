@@ -30,7 +30,7 @@ touch, each deep enough to survive three "why?" in a row. Three decisions shape 
 | Concept register | `theory/video/concepts.tsv` | `id · name · tier · part · form`; 195 concepts and 22 blocks; drives the coverage check |
 | **Course index** | `theory/video/INDEX.md` (generated) | Concept → part → section title → chapter timestamp. **Plan 01's videos point at these rows instead of re-teaching** |
 | Claims ledger | `theory/video/claims/pNN.md` | Shared rules §5 |
-| 17 part videos + merged course | `~/Movies/SD-Building-Blocks-course/` (not in the repo) | 1080p, burned captions, chapters. Stays local: no copy to Google Drive (author's decision, 2026-11-13) |
+| 17 part videos + merged course | `theory/video/out/` (gitignored, not committed) | 1080p, burned captions, chapters. Stays local: no copy to Google Drive (author's decision, 2026-11-13) |
 | Slide PDFs | same folder, `SD-Part-NN-slides.pdf` | Written by the frame render; one per part |
 | Written companion | `theory/video/companion/SD-Building-Blocks-Companion.md` → PDF | Generated from the sources: per part the reading list, the concept table with the lines to say, the diagrams, traps, probe drills with answers |
 | README | `theory/video/README.md` | Files, commands, part list with real durations, the reading plan, how to rebuild |

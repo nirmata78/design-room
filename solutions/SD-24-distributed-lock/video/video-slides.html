@@ -1,0 +1,773 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>SD-24 distributed lock: slides</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="deck.css">
+<link rel="stylesheet" href="video.css">
+</head><body>
+<!-- v-001 card Cold open -->
+<div class="slide th">
+<div class="lbl">Chapter 0 of 9</div><div class="s">Cold open</div><div class="sub">Design a distributed lock service</div><div class="ribbon"><span class="">Requirements</span><span class="">Estimates</span><span class="">Theory</span><span class="">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-002 &lt;div class="who"&gt;Interviewer · the promp -->
+<div class="slide qs">
+<div class="who">Interviewer · the prompt</div><div class="qq">“Design a distributed lock service that other teams use to make sure only one process does a thing at a time.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-003 &lt;div class="k"&gt;Why it is harder than it  -->
+<div class="slide">
+<div class="k">Why it is harder than it looks</div><h1>The lock service did everything right, and it still failed</h1><p class="chips">lease 10 s<i>·</i>pause 15 s<i>·</i>two writers</p><figure class="grow"><!--SVG:pause-unfenced--></figure>
+</div>
+<!-- v-004 &lt;div class="k"&gt;Before the design&lt;/div&gt;&lt;h -->
+<div class="slide">
+<div class="k">Before the design</div><h1>What this question grades</h1><table class="bt sm sig"><tr><th>Axis</th><th>Weak signal</th><th>Strong signal</th></tr><tr class=""><td><b>Requirements</b></td><td>A key in a cache with an expiry</td><td>Asks what a double hold costs: efficiency lock or correctness lock</td></tr><tr class=""><td><b>Correctness</b></td><td>“Tune the lease length”</td><td>Names the pause, puts a token at the resource</td></tr><tr class=""><td><b>Trade-offs</b></td><td>Picks a product</td><td>Options with the failure that rules each out</td></tr><tr class=""><td><b>Depth</b></td><td>Stops at “uses Raft”</td><td>Why the token is the log index; what a new leader assumes</td></tr><tr class=""><td><b>Operations</b></td><td>Watches CPU and uptime</td><td>Fenced-out writes, error budget, people and months</td></tr></table><div class="grade"><b class="t">Coach · what is graded here</b>The signal is in the gap between the lock and the resource. Draw the consensus group quickly and spend the time there.</div>
+</div>
+<!-- v-005 &lt;div class="lbl"&gt;The thesis&lt;/div&gt;&lt;div cl -->
+<div class="slide th">
+<div class="lbl">The thesis</div><div class="s">A lock service says who <em>should</em> be working. Only the <em>resource</em> says who is <em>allowed</em> to write.</div>
+</div>
+<!-- v-006 &lt;div class="k"&gt;The order I will follow&lt;/ -->
+<div class="slide">
+<div class="k">The order I will follow</div><h1>Scope, numbers, theory, a simple design, then I break it</h1><div class="ribbon" style="margin-top:14pt"><span>Requirements</span><span>Estimates</span><span>Theory</span><span>API + data</span><span>Design</span><span>Challenges</span><span>Cost · AUX</span><span>Recap</span></div><div class="cards c3" style="margin-top:18pt"><div class="cd"><h3>First</h3><p>Requirements and scope. Numbers. A short theory chapter.</p></div><div class="cd grn"><h3>Then</h3><p>API and data. A high-level design in three versions, each answering the one before.</p></div><div class="cd red"><h3>Most of the time</h3><p>Seven challenges that break the design. A build cost. A recap.</p></div></div>
+</div>
+<!-- v-007 card Requirements and scope -->
+<div class="slide th">
+<div class="lbl">Chapter 1 of 9</div><div class="s">Requirements and scope</div><div class="sub">Ask first. Cut on purpose. Put numbers on it.</div><div class="ribbon"><span class="on">Requirements</span><span class="">Estimates</span><span class="">Theory</span><span class="">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-008 &lt;div class="who"&gt;Clarifying question 1 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 1 of 6</div><div class="qq">Who calls this, and for what?</div><div class="ans">Internal teams. Background workers electing a leader, per-entity exclusion before a write, and some “run this job once” schedulers.</div>
+</div>
+<!-- v-009 &lt;div class="who"&gt;Clarifying question 2 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 2 of 6</div><div class="qq">What happens if two holders act at once?</div><div class="ans">Depends on the team. For some it corrupts records. For some it wastes an hour of compute. Tell me how you would find out.</div>
+</div>
+<!-- v-010 &lt;div class="who"&gt;Clarifying question 3 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 3 of 6</div><div class="qq">What is the scale?</div><div class="ans">About 10,000 acquisition attempts a second, around 5,000 lock names, holds from 100 ms to 30 s, default lease 10 s.</div>
+</div>
+<!-- v-011 &lt;div class="who"&gt;Clarifying question 4 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 4 of 6</div><div class="qq">Latency, availability, failure?</div><div class="ans">p99 acquisition under 20 ms. Survive the loss of a minority of nodes. One region, three zones. Multi-region is a later question.</div>
+</div>
+<!-- v-012 &lt;div class="who"&gt;Clarifying question 5 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 5 of 6</div><div class="qq">What are the protected resources?</div><div class="ans">Mostly SQL databases and an object store. A few call partner HTTP APIs. Callers are JVM services. Assume pauses up to 15 s in the tail: a fact, not a tuning problem.</div>
+</div>
+<!-- v-013 &lt;div class="who"&gt;Clarifying question 6 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 6 of 6</div><div class="qq">Several locks at once? Shared mode? Strict order?</div><div class="ans">Several at once: some callers do, tell me what you would say. Shared mode: no. Strict first-come order: not required.</div>
+</div>
+<!-- v-014 &lt;div class="k"&gt;Requirements · functional -->
+<div class="slide">
+<div class="k">Requirements · functional</div><h1>Five things the service must do</h1><div class="cards c3"><div class="cd"><h3>FR1 · Acquire</h3><p>An exclusive lock on a name. Bounded wait. Try-once is a wait of zero.</p></div><div class="cd"><h3>FR2 · Hold and renew</h3><p>Keep the lease alive while working. Learn quickly if it is lost.</p></div><div class="cd"><h3>FR3 · Release</h3><p>Release, and free a dead holder's locks automatically.</p></div><div class="cd amb"><h3>FR4 · Fence</h3><p>Every grant carries a strictly increasing token for the resource.</p></div><div class="cd grn"><h3>FR5 · Inspect and revoke</h3><p>Operators see who holds a name and can force-revoke, audited.</p></div></div>
+</div>
+<!-- v-015 &lt;div class="k"&gt;Requirements · non-functi -->
+<div class="slide">
+<div class="k">Requirements · non-functional</div><h1>The numbers, and what each is for</h1><p class="chips">all initial targets, not measurements</p><div class="tiles" style="--n:4"><div class="tile"><b>&lt; 20 ms</b><span>acquire p99, because locks sit in a request path</span></div><div class="tile"><b>99.99%</b><span>acquire availability: about 4.3 minutes a month</span></div><div class="tile blue"><b>10 s</b><span>default lease, capped at 60 s</span></div><div class="tile blue"><b>2 of 5</b><span>replicas can be lost with no manual action</span></div></div>
+</div>
+<!-- v-016 &lt;div class="k"&gt;Requirements · behaviour&lt; -->
+<div class="slide">
+<div class="k">Requirements · behaviour</div><h1>Three promises that are not numbers</h1><div class="cards c3"><div class="cd red"><h3>Fail closed</h3><p>If the service cannot decide, the protected operation does not proceed.</p></div><div class="cd amb"><h3>Free within one lease</h3><p>A dead holder's name is available again within one lease.</p></div><div class="cd"><h3>Tokens never go back</h3><p>Strictly increasing per name, even after a disaster-recovery rebuild.</p></div></div>
+</div>
+<!-- v-017 &lt;div class="k"&gt;Requirements · scope&lt;/div -->
+<div class="slide">
+<div class="k">Requirements · scope</div><h1>In scope, out of scope</h1><p class="chips">exclusive named leases<i>·</i>sessions<i>·</i>tokens<i>·</i>operator tools</p><div class="scope2"><div class="in"><h3>In scope</h3><ul><li>Exclusive named leases, bounded wait</li><li>Sessions and heartbeats</li><li>Fencing tokens</li><li>Operator inspect and revoke</li><li>One region, per-tenant quotas</li></ul></div><div class="out"><h3>Out of scope, on purpose</h3><ul><li>Shared and read-write modes</li><li>Atomic multi-name acquire</li><li>Cross-region consensus</li><li>A general key-value store</li></ul></div></div>
+</div>
+<!-- v-018 &lt;div class="k"&gt;Requirements · the split  -->
+<div class="slide">
+<div class="k">Requirements · the split that runs through everything</div><h1>Two kinds of lock</h1><div class="cards c2"><div class="cd grn"><h3>Efficiency lock</h3><p>A double hold wastes work: a job runs twice, an email is sent twice.</p><p><b>Needs:</b> usually avoids it. Occasional failure is acceptable.</p></div><div class="cd red"><h3>Correctness lock</h3><p>A double hold corrupts data: two writers, a lost update, a double charge.</p><p><b>Needs:</b> a token checked at the resource. No exceptions.</p></div></div><div class="line a">Most lock requests are idempotency problems in disguise. I ask which kind first.</div>
+</div>
+<!-- v-019 &lt;div class="lbl"&gt;The core&lt;/div&gt;&lt;div clas -->
+<div class="slide th">
+<div class="lbl">The core</div><div class="s">The core is four things: a <em>lease</em>, a <em>replicated record</em>, a <em>token</em>, and a <em>check at the resource</em>.</div>
+</div>
+<!-- v-020 card Estimates -->
+<div class="slide th">
+<div class="lbl">Chapter 2 of 9</div><div class="s">Estimates</div><div class="sub">Every number is arithmetic, with a label. Each one changes a decision.</div><div class="ribbon"><span class="done">Requirements</span><span class="on">Estimates</span><span class="">Theory</span><span class="">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-021 &lt;div class="k"&gt;Estimates · 1 of 10 · rat -->
+<div class="slide">
+<div class="k">Estimates · 1 of 10 · rate</div><h1>Peak, not average</h1><div class="tiles" style="--n:3"><div class="tile blue"><b>10,000</b><span>attempts a second, given</span></div><div class="tile"><b>× 3</b><span>peak factor, illustrative: top-of-hour storms</span></div><div class="tile"><b>30,000</b><span>attempts a second at peak</span></div></div><div class="line r">Size for the peak. A lock service that fails at the top of the hour fails when it matters.</div>
+</div>
+<!-- v-022 &lt;div class="k"&gt;Estimates · 2 of 10 · the -->
+<div class="slide">
+<div class="k">Estimates · 2 of 10 · the ceiling nobody states</div><h1>One holder per name caps the whole system</h1><table class="bt"><tr><th>Quantity</th><th>Arithmetic</th><th>Label</th></tr><tr class=""><td>Held at once, at most</td><td>1 holder × 5,000 names = <b>5,000</b></td><td>derived</td></tr><tr class=""><td>Grants a second, at most</td><td>5,000 ÷ 0.5 s mean hold = <b>10,000</b>, only if every name is always held</td><td>derived</td></tr><tr class=""><td>So most attempts…</td><td>cannot succeed: they fail, or wait</td><td>consequence</td></tr></table><div class="line a">The lock, not the service, is the limit.</div>
+</div>
+<!-- v-023 &lt;div class="k"&gt;Estimates · 3 of 10 · Lit -->
+<div class="slide">
+<div class="k">Estimates · 3 of 10 · Little's law</div><h1>What is held at once</h1><table class="bt"><tr><th>Quantity</th><th>Arithmetic</th><th>Label</th></tr><tr class=""><td>Grants a second</td><td>40% of 10,000 attempts = <b>4,000</b></td><td>illustrative</td></tr><tr class=""><td>Held at once</td><td>4,000 × 0.5 s = <b>2,000 locks</b></td><td>Little's law: L = λ × W</td></tr><tr class=""><td>Long holds</td><td>2% × 4,000 = 80 a second × 20 s = 1,600 locks</td><td>illustrative</td></tr><tr class=""><td>Short holds</td><td>3,920 × 0.1 s ≈ 392 locks</td><td>illustrative</td></tr></table>
+</div>
+<!-- v-024 &lt;div class="k"&gt;Estimates · 4 of 10 · sta -->
+<div class="slide">
+<div class="k">Estimates · 4 of 10 · state size</div><h1>The state is tiny</h1><p class="chips">5,000 entries<i>·</i>× 200 B<i>·</i>≈ 1 MB</p><div class="tiles" style="--n:3"><div class="tile blue"><b>~1 MB</b><span>held and waiting, illustrative</span></div><div class="tile blue"><b>memory</b><span>the whole state, with a log and snapshots on disk</span></div><div class="tile"><b>ms</b><span>to snapshot</span></div></div><div class="line ">So we shard for throughput and blast radius. Never for capacity.</div>
+</div>
+<!-- v-025 &lt;div class="k"&gt;Estimates · 5 of 10 · wri -->
+<div class="slide">
+<div class="k">Estimates · 5 of 10 · writes</div><h1>What goes through consensus</h1><table class="bt"><tr><th>Quantity</th><th>Arithmetic</th><th>Label</th></tr><tr class=""><td>Grant + release</td><td>2 × 4,000 = <b>8,000 / s</b> average</td><td>illustrative</td></tr><tr class=""><td>At peak</td><td>× 3 = <b>24,000 / s</b></td><td>illustrative</td></tr><tr class=""><td>All-in</td><td>+ waiter enqueues and expiries ≈ <b>30,000 / s</b></td><td>illustrative</td></tr><tr class=""><td>Failed try-once attempts</td><td>answered by the leader under its lease: no log entry</td><td>design choice</td></tr></table>
+</div>
+<!-- v-026 &lt;div class="k"&gt;Estimates · 6 of 10 · gro -->
+<div class="slide">
+<div class="k">Estimates · 6 of 10 · groups</div><h1>How many consensus groups</h1><p class="chips">15,000 writes/s a group<i>·</i>initial target, to be measured</p><table class="bt"><tr><th>Quantity</th><th>Arithmetic</th><th>Label</th></tr><tr class=""><td>One group's ceiling</td><td>~15,000 committed writes/s, batched fsync on SSD</td><td>initial target</td></tr><tr class=""><td>Groups needed</td><td>30,000 ÷ (15,000 × 0.5 headroom) = <b>4</b></td><td>derived</td></tr><tr class=""><td>Hash slots</td><td>64, so a slot can move later</td><td>design choice</td></tr></table><div class="line a">One group nearly carries the average. We shard for the peak, and so a bad group takes a quarter, not everything.</div>
+</div>
+<!-- v-027 &lt;div class="k"&gt;Estimates · 7 of 10 · ren -->
+<div class="slide">
+<div class="k">Estimates · 7 of 10 · renewals</div><h1>Renew a session, not a lock</h1><p class="chips">only holds > 3.3 s renew<i>·</i>illustrative</p><table class="bt"><tr><th>Design</th><th>Arithmetic</th><th>Rate</th></tr><tr class=""><td>Per lock</td><td>1,600 long-held ÷ 3.3 s</td><td><b>≈ 480 / s</b></td></tr><tr class=""><td>Per session</td><td>400 client processes ÷ 3.3 s</td><td><b>≈ 120 / s</b></td></tr><tr class=""><td>Cleanup when a client dies</td><td>50 expiries against 1 session expiry</td><td>50 : 1</td></tr></table>
+</div>
+<!-- v-028 &lt;div class="k"&gt;Estimates · 8 of 10 · lat -->
+<div class="slide">
+<div class="k">Estimates · 8 of 10 · latency</div><h1>The p99 budget, with spare</h1><p class="chips">quorum in one region<i>·</i>20 ms</p><figure class="grow"><!--SVG:budget--></figure>
+</div>
+<!-- v-029 &lt;div class="k"&gt;Estimates · 9 of 10 · pau -->
+<div class="slide">
+<div class="k">Estimates · 9 of 10 · pause against lease, per-key cap</div><h1>Two numbers that settle the argument</h1><table class="bt"><tr><th>Number</th><th>Arithmetic</th><th>Decision</th></tr><tr class=""><td>Pause against lease</td><td>15 s pause against a 10 s lease: the pause wins. Raise it to 60 s: a 70 s migration still wins, and every crash now stalls its name a minute</td><td><b>Tuning the lease cannot fix this. A token can.</b></td></tr><tr class=""><td>Per-name ceiling</td><td>grants ≤ 1 ÷ hold: 100 ms → 10 / s · 0.5 s → 2 / s · 30 s → 0.03 / s</td><td>Hot names need a policy, not more machines</td></tr></table>
+</div>
+<!-- v-030 &lt;div class="k"&gt;Estimates · 10 of 10 · th -->
+<div class="slide">
+<div class="k">Estimates · 10 of 10 · the last three</div><h1>Margin, election budget, token space</h1><table class="bt"><tr><th>Number</th><th>Arithmetic</th><th>Label</th></tr><tr class=""><td>Client clock margin</td><td>200 ppm × 10 s = 2 ms drift. Client stops at 0.7 × lease = 7 s; server waits 10 s: <b>3 s gap</b></td><td>illustrative</td></tr><tr class=""><td>Election budget</td><td>99.99% of 30 days = 259 s. At 2 s an election ≈ <b>130 a group a month</b></td><td>initial target</td></tr><tr class=""><td>Token space</td><td>16-bit epoch + 48-bit index. 2<sup>48</sup> ≈ 2.8 × 10<sup>14</sup> ÷ 15,000/s ≈ <b>600 years</b> an epoch</td><td>derived</td></tr></table>
+</div>
+<!-- v-031 card Theory -->
+<div class="slide th theory">
+<div class="lbl">Chapter 3 of 9</div><div class="s">Theory</div><div class="sub">What makes this problem hard, in words that outlive any product name</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="on">Theory</span><span class="">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-032 &lt;div class="lbl"&gt;Theory · 1 of 6 · what  -->
+<div class="slide th theory">
+<div class="lbl">Theory · 1 of 6 · what it is</div><div class="s">A small, consensus-replicated store of <em>named leases</em>: one holder at a time, for bounded time, with a number that orders every grant.</div>
+</div>
+<!-- v-033 &lt;div class="k"&gt;Theory · 1 of 6 · what it -->
+<div class="slide theory">
+<div class="k">Theory · 1 of 6 · what it is not</div><h1>Three things it is confused with</h1><div class="cards c3"><div class="cd"><h3>Not a mutex</h3><p>A mutex lives in shared memory and can stop the holder. A distributed lock cannot reach into a paused process.</p></div><div class="cd"><h3>Not a queue</h3><p>No payload, no work ordering. “One at a time per entity, in order” wants a single writer per partition.</p></div><div class="cd red"><h3>Not a transaction</h3><p>It protects nothing by itself. The resource has to take part.</p></div></div>
+</div>
+<!-- v-034 &lt;div class="k"&gt;Theory · 2 of 6 · the two -->
+<div class="slide theory">
+<div class="k">Theory · 2 of 6 · the two properties</div><h1>State safety and liveness separately</h1><div class="prop safe"><div class="lbl">Safety · must never happen</div><p>Two parties both act as the holder of a name, and both effects take hold at the resource.</p></div><div class="prop live"><div class="lbl">Liveness · must eventually happen</div><p>A free name is granted. A dead holder's name frees within one lease. A waiter is served, or told no, within its wait budget.</p></div><div class="whyb"><b class="t">Why separate them</b>A lock service that never grants anything is perfectly safe. One that grants everything immediately is perfectly live. Every fix later says which one it serves.</div>
+</div>
+<!-- v-035 &lt;div class="k"&gt;Theory · 2 of 6 · honesty -->
+<div class="slide theory">
+<div class="k">Theory · 2 of 6 · honesty about impossibility</div><h1>You cannot have both, unconditionally</h1><div class="cards c2"><div class="cd"><h3>The result</h3><p>In an asynchronous network, with even one process allowed to fail, no protocol guarantees agreement and always finishes. This is the F-L-P result.</p></div><div class="cd amb"><h3>What real systems do</h3><p>Add a timing assumption, such as a failure detector with a timeout. They keep safety unconditional and lose liveness while a partition lasts.</p></div></div><div class="line r">Our position: safety unconditional. The minority side of a partition gets “unavailable”, never a second grant.</div>
+</div>
+<!-- v-036 &lt;div class="k"&gt;Theory · 3 of 6 · the cen -->
+<div class="slide dia theory">
+<div class="k">Theory · 3 of 6 · the central tension</div><h1>You cannot tell a dead holder from a slow one</h1><figure class="grow"><!--SVG:ttl-slider--></figure>
+</div>
+<!-- v-037 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 1 of 7</div><h1>A lease with a TTL</h1><div class="prop live"><div class="lbl">Property it protects</div><p>Liveness.</p></div><div class="prop"><div class="lbl">How it works</div><p>A grant is valid for a stated time. When it ends, the service may give the name to someone else without asking the holder.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>A lock held forever by a dead holder, and manual cleanup.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>A slow holder can be expired while alive. A crash stalls its name for up to one lease.</p></div>
+</div>
+<!-- v-038 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 2 of 7</div><h1>A consensus-replicated record</h1><div class="prop live"><div class="lbl">Property it protects</div><p>Safety of the grant record.</p></div><div class="prop"><div class="lbl">How it works</div><p>Every grant is a log entry committed by a majority of replicas. One leader per term. A stale leader cannot commit.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>Split brain, and a failover that forgets a grant.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>A quorum round trip on every write. No majority, no service. A cluster to run.</p></div>
+</div>
+<!-- v-039 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 3 of 7</div><h1>A fencing token, checked at the resource</h1><div class="prop safe"><div class="lbl">Property it protects</div><p>Safety at the resource.</p></div><div class="prop"><div class="lbl">How it works</div><p>Each grant carries a number larger than every earlier one for that name. The resource remembers the highest it accepted and rejects anything smaller.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>A paused holder's stale write landing after a newer holder's.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>The resource must check. One number per protected row. It orders writes: it does not make a multi-step read consistent by itself.</p></div>
+</div>
+<!-- v-040 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 4 of 7</div><h1>Monotonic clocks, and a conservative client deadline</h1><div class="prop safe"><div class="lbl">Property it protects</div><p>Safety of the lease arithmetic.</p></div><div class="prop"><div class="lbl">How it works</div><p>Durations are measured on a monotonic clock. The client measures from when it sent the request and gives up at 0.7 of the lease.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>Wall-clock steps and skew that make the client believe it holds a lock it lost.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>The client gives up early: 30% of the lease is wasted. It still assumes bounded drift.</p></div>
+</div>
+<!-- v-041 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 5 of 7</div><h1>Sessions</h1><div class="prop live"><div class="lbl">Property it protects</div><p>Liveness and throughput.</p></div><div class="prop"><div class="lbl">How it works</div><p>A client holds one session, kept alive by one heartbeat. Locks hang off the session. When it dies, all its locks are freed in one command.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>Per-lock renewal storms, and many separate expiries for one dead client.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>A coarser failure unit: one missed heartbeat drops every lock that client holds.</p></div>
+</div>
+<!-- v-042 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 6 of 7</div><h1>A deterministic replicated state machine</h1><div class="prop safe"><div class="lbl">Property it protects</div><p>Safety across replicas.</p></div><div class="prop"><div class="lbl">How it works</div><p>Every replica applies the same entries in the same order. The time used is written into the entry by the leader. Expiry is a command, not a background sweep.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>Replicas that disagree about who holds a lock, or a follower expiring a lease on its own clock.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>Expiry waits for the leader's timer. A new leader must re-derive pending expiries.</p></div>
+</div>
+<!-- v-043 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 7 of 7</div><h1>Bounded wait with directed hand-off</h1><div class="prop live"><div class="lbl">Property it protects</div><p>Liveness under contention.</p></div><div class="prop"><div class="lbl">How it works</div><p>Waiters queue per name, with a depth cap and a wait budget. Release grants to the head waiter in the same step.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>A thundering herd on release, an unbounded queue, and polling that burns consensus.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>Queue state in the replicated machine. First-come order adds tail latency.</p></div>
+</div>
+<!-- v-044 &lt;div class="k"&gt;Theory · 5 of 6 · the opt -->
+<div class="slide theory">
+<div class="k">Theory · 5 of 6 · the options, part one</div><h1>Three ways that look cheap</h1><table class="bt sm mx"><tr><th>Approach</th><th>Safe without fencing?</th><th>Token</th><th>Fails when</th></tr><tr class="rej"><td>A · One cache node, set-if-absent with an expiry</td><td>no</td><td>bolt-on counter, not atomic with the grant</td><td>the primary dies before replicating the grant; the new primary grants it again</td></tr><tr class="rej"><td>B · A quorum of independent cache nodes</td><td>disputed</td><td>none</td><td>a pause between acquire and use; a node's clock jumps and its key expires early; no token to reject a stale holder</td></tr><tr class="rej"><td>C · A relational row: conditional update or row lock</td><td>yes, with synchronous commit</td><td>a version column</td><td>above a few thousand grants a second, or on a hot row; a row lock tied to a connection has no lease</td></tr></table>
+</div>
+<!-- v-045 &lt;div class="k"&gt;Theory · 5 of 6 · the opt -->
+<div class="slide theory">
+<div class="k">Theory · 5 of 6 · the options matrix</div><h1>Six approaches, one pick</h1><table class="bt sm mx"><tr><th>Approach</th><th>Safe w/o fencing?</th><th>Token</th><th>Throughput</th><th>Ops</th><th>Fails when</th></tr><tr class="rej"><td>A · One cache node</td><td>no</td><td>bolt-on</td><td>very high</td><td>very low</td><td>primary dies before replicating</td></tr><tr class="rej"><td>B · Quorum of caches</td><td>disputed</td><td>none</td><td>high</td><td>medium</td><td>pause, clock jump, no token</td></tr><tr class="rej"><td>C · Relational row</td><td>yes (sync)</td><td>version</td><td>low to medium</td><td>very low</td><td>over a few thousand grants/s, hot row</td></tr><tr class="pick"><td>D · Consensus coordination store: lease + compare-and-set + revision</td><td>yes</td><td>store revision</td><td>10–30k writes/s a cluster</td><td>medium</td><td>load beyond a cluster; exotic semantics</td></tr><tr class="rej"><td>E · Custom consensus service</td><td>yes</td><td>log index</td><td>high, sharded</td><td>very high</td><td>you cannot staff it</td></tr><tr class="rej"><td>F · No lock: conditional write or idempotency key</td><td>yes, at the resource</td><td>the resource's version</td><td>n/a</td><td>lowest</td><td>non-idempotent and no conditional write</td></tr></table>
+</div>
+<!-- v-046 &lt;div class="k"&gt;Theory · 5 of 6 · the pic -->
+<div class="slide theory">
+<div class="k">Theory · 5 of 6 · the pick, and what it gives up</div><h1>D, behind our own API</h1><div class="cards c2"><div class="cd grn"><h3>What the pick buys</h3><p>Safety proven by someone else's consensus. Leases and a revision number built in. One place to enforce rules, behind our A-P-I and S-D-K, so we can swap the substrate later.</p></div><div class="cd red"><h3>What it gives up</h3><p>One cluster's write ceiling, so we shard. Fairness, priority and shared modes. Cross-region reach. And the operating burden of a consensus cluster.</p></div></div><div class="line a">Always ask first: does the resource support a conditional write? If it does, that is row F, and it is cheaper.</div>
+</div>
+<!-- v-047 &lt;div class="k"&gt;Theory · 5 of 6 · a probe -->
+<div class="slide theory">
+<div class="k">Theory · 5 of 6 · a probe you may get</div><h1>“Why not SELECT FOR UPDATE on a Postgres row?”</h1><div class="cards c3"><div class="cd amb"><h3>No lease</h3><p>A row lock lives as long as the connection. A paused client keeps it. A dead one drops it only when the database notices.</p></div><div class="cd amb"><h3>No token</h3><p>A held lock hands out no number the resource can check later.</p></div><div class="cd grn"><h3>When it is right</h3><p>The resource is in the same database, so lock and work commit together. Or load is under a few thousand a second.</p></div></div>
+</div>
+<!-- v-048 &lt;div class="k"&gt;Theory · 6 of 6 · the fai -->
+<div class="slide theory">
+<div class="k">Theory · 6 of 6 · the failure catalogue, part one</div><h1>What will go wrong</h1><table class="bt sm"><tr><th>#</th><th>Failure</th><th>Becomes</th></tr><tr class=""><td>F1</td><td>A holder crashes</td><td>the lease (M1). Covered in the flows</td></tr><tr class=""><td>F2</td><td>A holder pauses, then resumes</td><td><b>Challenge 1</b></td></tr><tr class=""><td>F3</td><td>The resource cannot check tokens, or no lock is needed</td><td><b>Challenge 2</b></td></tr><tr class=""><td>F4</td><td>Clocks skew, jump or drift</td><td><b>Challenge 3</b></td></tr><tr class=""><td>F5</td><td>Leader fails, partition, whole group lost</td><td><b>Challenge 4</b></td></tr></table>
+</div>
+<!-- v-049 &lt;div class="k"&gt;Theory · 6 of 6 · the fai -->
+<div class="slide theory">
+<div class="k">Theory · 6 of 6 · the failure catalogue, part two</div><h1>What will go wrong, continued</h1><table class="bt sm"><tr><th>#</th><th>Failure</th><th>Becomes</th></tr><tr class=""><td>F6</td><td>Duplicate acquire, stale release, delayed message</td><td>designed out in the A-P-I: release takes the token; acquire carries a request id</td></tr><tr class=""><td>F7</td><td>A load peak, renewal storm, retry storm</td><td><b>Challenge 5</b></td></tr><tr class=""><td>F8</td><td>A hot name, a herd, several locks at once</td><td><b>Challenge 6</b></td></tr><tr class=""><td>F9</td><td>A holder hung but alive</td><td>bounded lease, and force revoke (FR5)</td></tr><tr class=""><td>F10</td><td>Nobody notices</td><td><b>Challenge 7</b></td></tr></table>
+</div>
+<!-- v-050 &lt;div class="k"&gt;Theory · what each mechan -->
+<div class="slide theory">
+<div class="k">Theory · what each mechanism serves</div><h1>Safety or liveness, never both unnamed</h1><table class="bt sm"><tr><th>Mechanism</th><th>Serves</th><th>Where it returns</th></tr><tr class=""><td>M1 Lease</td><td>liveness</td><td>flows, challenge 3</td></tr><tr class=""><td>M2 Consensus record</td><td>safety</td><td>challenge 4</td></tr><tr class=""><td>M3 Fencing token</td><td><b>safety, at the resource</b></td><td>challenges 1 and 2</td></tr><tr class=""><td>M4 Monotonic clocks</td><td>safety of the lease arithmetic</td><td>challenge 3</td></tr><tr class=""><td>M5 Sessions</td><td>liveness, throughput</td><td>challenge 5</td></tr><tr class=""><td>M6 Deterministic machine</td><td>safety across replicas</td><td>challenges 3 and 4</td></tr><tr class=""><td>M7 Hand-off queue</td><td>liveness under contention</td><td>challenge 6</td></tr></table><div class="grade"><b class="t">Coach · what is graded here</b>Every mechanism must name the property it protects. A mechanism with no stated property is decoration.</div>
+</div>
+<!-- v-051 card API and entities -->
+<div class="slide th">
+<div class="lbl">Chapter 4 of 9</div><div class="s">API and entities</div><div class="sub">The contract first. It forces the semantics into the open.</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="on">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-052 &lt;div class="k"&gt;API · sessions&lt;/div&gt;&lt;h1&gt;O -->
+<div class="slide">
+<div class="k">API · sessions</div><h1>OpenSession and Heartbeat</h1><div class="tr"><span class="fr">serves FR2</span><span class="api">OpenSession · Heartbeat</span><span class="ent">writes Session</span><span class="nfr">lease ≤ 60 s</span></div><div class="cols2"><pre class="wire"><span class="cm">// request</span>
+OpenSession {
+  owner: "billing-worker-7",
+  ttlMs: 10000
+}
+
+<span class="cm">// heartbeat, a stream, every ~3.3 s</span>
+Heartbeat { sessionId: 88123 }</pre><pre class="wire"><span class="cm">// response</span>
+OpenSession -> {
+  sessionId: 88123,
+  epoch: 6,
+  serverTimeMs: 1731400000000   <span class="cm">// logging only</span>
+}
+
+Heartbeat -> { ok: true }
+<span class="cm">// the client trusts nothing but "ok"</span></pre></div>
+</div>
+<!-- v-053 &lt;div class="k"&gt;API · acquire&lt;/div&gt;&lt;h1&gt;Ac -->
+<div class="slide">
+<div class="k">API · acquire</div><h1>Acquire returns a token or an honest no</h1><div class="tr"><span class="fr">serves FR1, FR4</span><span class="api">Acquire</span><span class="ent">writes Lock · Waiter</span><span class="nfr">bounded wait</span></div><div class="cols2"><pre class="wire"><span class="cm">// request</span>
+Acquire {
+  name: "invoice:17",
+  sessionId: 88123,
+  requestId: "9f1c…",   <span class="cm">// retries are idempotent</span>
+  maxWaitMs: 2000      <span class="cm">// 0 = try once</span>
+}</pre><pre class="wire"><span class="cm">// responses</span>
+granted   { token: 9001, ttlMs: 10000 }
+queued    { position: 2 }
+timeout   { }
+contended { retryAfterMs: 200 }
+
+<span class="cm">// a duplicate requestId returns
+// the SAME token, never a new one</span></pre></div>
+</div>
+<!-- v-054 &lt;div class="k"&gt;API · release&lt;/div&gt;&lt;h1&gt;Re -->
+<div class="slide">
+<div class="k">API · release</div><h1>Release takes the token, not the name</h1><div class="tr"><span class="fr">serves FR3</span><span class="api">Release</span><span class="ent">writes Lock</span></div><div class="cols2"><pre class="wire"><span class="cm">// request</span>
+Release {
+  name: "invoice:17",
+  token: 9001
+}</pre><pre class="wire"><span class="cm">// apply, inside the state machine</span>
+if held[name].token == token:
+    free it, hand off to head waiter
+else:
+    reject   <span class="cm">// someone else holds it now</span></pre></div><div class="line ">Releasing someone else's lock cannot even be expressed. Failure six is designed out, not guarded against.</div>
+</div>
+<!-- v-055 &lt;div class="k"&gt;API · operators&lt;/div&gt;&lt;h1&gt; -->
+<div class="slide">
+<div class="k">API · operators</div><h1>Inspect, and break glass</h1><div class="tr"><span class="fr">serves FR5</span><span class="api">Inspect · ForceRevoke</span><span class="ent">reads Lock · writes Audit</span></div><div class="cols2"><pre class="wire"><span class="cm">// never used for correctness</span>
+Inspect { name: "invoice:17" } ->
+  { owner, token: 9001,
+    acquiredAt, expiresAt,
+    waiters: 2 }</pre><pre class="wire"><span class="cm">// audited, alerting, awkward on purpose</span>
+ForceRevoke {
+  name: "invoice:17",
+  reason: "holder hung, ticket 4411",
+  operator: "alice"
+}</pre></div>
+</div>
+<!-- v-056 &lt;div class="k"&gt;API · the resource's side -->
+<div class="slide">
+<div class="k">API · the resource's side of the contract</div><h1>The resource must take the token</h1><div class="tr"><span class="fr">serves FR4</span><span class="api">Write(..., token)</span><span class="ent">writes the resource row</span><span class="nfr">reject if smaller</span></div><pre class="code"><span class="cm">-- reject if the token is SMALLER than the highest accepted. Equal is allowed.</span>
+<span class="kw">UPDATE</span> invoice
+   <span class="kw">SET</span> amount = :amount, fence = :token
+ <span class="kw">WHERE</span> id = :id <span class="kw">AND</span> fence &lt;= :token;
+<span class="cm">-- 0 rows updated: FencedOut. Log both tokens. Alert.</span></pre><div class="line r">Pass the token as an explicit argument. Never in a thread-local: it is lost silently when work moves threads.</div>
+</div>
+<!-- v-057 &lt;div class="k"&gt;API · a question to dismi -->
+<div class="slide">
+<div class="k">API · a question to dismiss aloud</div><h1>Reentrancy</h1><div class="cards c2"><div class="cd amb"><h3>The question</h3><p>Can a holder acquire a lock it already holds?</p></div><div class="cd grn"><h3>My answer</h3><p>Yes, as a hold count in the S-D-K, keyed by session. The server keeps one grant per name. Doing it server-side doubles writes for no gain.</p></div></div><div class="line a">Scope it to a session, not a process, or a reconnecting client deadlocks against its own stale grant.</div>
+</div>
+<!-- v-058 &lt;div class="k"&gt;Data · conceptual model&lt;/ -->
+<div class="slide dia">
+<div class="k">Data · conceptual model</div><h1>Entities and relationships, in Chen notation</h1><figure class="grow"><!--SVG:erd-chen--></figure>
+</div>
+<!-- v-059 &lt;div class="k"&gt;Data · physical model&lt;/di -->
+<div class="slide dia">
+<div class="k">Data · physical model</div><h1>What is stored, and where</h1><figure class="grow"><!--SVG:erd-physical--></figure>
+</div>
+<!-- v-060 &lt;div class="k"&gt;Data · the state machine&lt; -->
+<div class="slide">
+<div class="k">Data · the state machine</div><h1>Apply is deterministic</h1><pre class="code"><span class="cm">// runs on every replica, in log order</span>
+<span class="kw">apply</span>(Acquire a, index, timeFromEntry):
+  cur = held[a.name]
+  <span class="cm">// same owner retrying: return the same grant</span>
+  <span class="kw">if</span> cur live <span class="kw">and</span> cur.owner == a.owner: <span class="kw">return</span> cur
+  <span class="kw">if</span> cur live: enqueue(a); <span class="kw">return</span> queued
+  <span class="cm">// token is the log index: monotonic, free</span>
+  held[a.name] = {a.owner, token: index,
+                  expires: timeFromEntry + a.ttl}
+  <span class="kw">return</span> granted(index)</pre><div class="grade"><b class="t">Coach · what is graded here</b>Naming this unprompted is a depth signal: never read the clock inside apply. The leader stamps the time into the entry.</div>
+</div>
+<!-- v-061 &lt;div class="k"&gt;Data · the token&lt;/div&gt;&lt;h1 -->
+<div class="slide dia">
+<div class="k">Data · the token</div><h1>A token is a number: epoch and index</h1><figure class="grow"><!--SVG:token-bits--></figure>
+</div>
+<!-- v-062 &lt;div class="k"&gt;Data · which stores, and  -->
+<div class="slide">
+<div class="k">Data · which stores, and can you lose them</div><h1>Four stores, four answers</h1><table class="bt sm"><tr><th>Store</th><th>Holds</th><th>If lost</th></tr><tr class=""><td>Replicated log + snapshot</td><td>grants, sessions, queues</td><td>survives a minority loss. Total loss: start empty (challenge 4)</td></tr><tr class=""><td>Leader memory</td><td>last heartbeat per session</td><td>a new leader treats all sessions as alive for one lease</td></tr><tr class=""><td>Epoch store</td><td>epoch and slot floors</td><td><b>must not be lost</b>: tokens would go backwards</td></tr><tr class=""><td>The resource</td><td>highest token per row</td><td>its own durability. The check is only as good as its store</td></tr></table>
+</div>
+<!-- v-063 card High-level design -->
+<div class="slide th">
+<div class="lbl">Chapter 5 of 9</div><div class="s">High-level design</div><div class="sub">Simple first. Each version answers the objection to the one before.</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="on">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-064 &lt;div class="k"&gt;High-level design · versi -->
+<div class="slide dia">
+<div class="k">High-level design · version 1 of 3</div><h1><span class=vtag>V1</span>The simplest thing that works</h1><p class="chips">one server<i>·</i>a map of name to owner and expiry<i>·</i>a lease, so a dead holder frees its name</p><figure class="grow"><!--SVG:base-v1--></figure>
+</div>
+<!-- v-065 &lt;div class="k r"&gt;V1 · the objection&lt;/div -->
+<div class="slide">
+<div class="k r">V1 · the objection</div><h1>The server restarts, and forgets who holds what</h1><pre class="trace"><span class="t">t = 0 s    </span>A acquires invoice-17 (lease 10 s)
+<span class="t">t = 4 s    </span><span class="bad">lock server crashes, memory lost</span>
+<span class="t">t = 5 s    </span>server restarts, map is empty
+<span class="t">t = 6 s    </span>B acquires invoice-17: <span class="bad">granted</span>
+<span class="t">t = 7 s    </span>A is still working. <span class="bad">Two holders.</span></pre><div class="hedge"><b class="t">Also</b>One box is a single point of failure for every team that uses it.</div>
+</div>
+<!-- v-066 &lt;div class="k"&gt;High-level design · versi -->
+<div class="slide dia">
+<div class="k">High-level design · version 2 of 3</div><h1><span class=vtag>V2</span>Replace the box with a consensus group</h1><p class="chips">5 replicas<i>·</i>majority commit<i>·</i>token = log index</p><figure class="grow"><!--SVG:base-v2--></figure>
+</div>
+<!-- v-067 &lt;div class="k"&gt;V2 · how the group works, -->
+<div class="slide">
+<div class="k">V2 · how the group works, in one slide</div><h1>Leader, term, majority</h1><div class="cards c3"><div class="cd"><h3>One leader per term</h3><p>All writes go to the leader. A new election starts a higher term. A node with an old term is ignored.</p></div><div class="cd grn"><h3>Commit = majority</h3><p>3 of 5 replicas hold the entry. Any later leader must have been among them, so it has the entry.</p></div><div class="cd red"><h3>No majority, no service</h3><p>With 2 of 5, nothing commits. Safety is kept. Availability is not.</p></div></div>
+</div>
+<!-- v-068 &lt;div class="k"&gt;V2 · the objection&lt;/div&gt;&lt; -->
+<div class="slide">
+<div class="k">V2 · the objection</div><h1>Nobody is told when the lock is lost</h1><div class="cards c2"><div class="cd red"><h3>The caller cannot tell</h3><p>A holder that loses its lease keeps working. Nothing tells it to stop.</p></div><div class="cd amb"><h3>Renewal is hand-rolled</h3><p>Every team writes its own heartbeat, clock arithmetic and retries, and gets it subtly wrong.</p></div></div><div class="line a">Half the correctness lives in the client library. So the library is part of the product.</div>
+</div>
+<!-- v-069 &lt;div class="k"&gt;High-level design · versi -->
+<div class="slide dia">
+<div class="k">High-level design · version 3 of 3</div><h1><span class=vtag>V3</span>A client library with sessions, and a gateway</h1><p class="chips">sessions<i>·</i>monotonic local deadline<i>·</i>LockLost callback</p><figure class="grow"><!--SVG:base-v3--></figure>
+</div>
+<!-- v-070 &lt;div class="k"&gt;V3 · what the library doe -->
+<div class="slide">
+<div class="k">V3 · what the library does</div><h1>Lease timing in eight lines</h1><pre class="code"><span class="cm">// every ~3.3 s, on a background thread</span>
+sentAt = monotonicNow()
+<span class="kw">try</span> { heartbeat(sessionId)
+       <span class="cm">// measured from SEND time: the conservative choice</span>
+       deadline = sentAt + 0.7 * ttl }
+<span class="kw">catch</span> (e) {
+  <span class="kw">if</span> (monotonicNow() &gt; deadline) loseAllLocks(e)  <span class="cm">// fail closed</span>
+}</pre><div class="line r">Check-still-held narrows the window. It does not close it. The token does.</div>
+</div>
+<!-- v-071 &lt;div class="k"&gt;V3 · what it leaves open&lt; -->
+<div class="slide">
+<div class="k">V3 · what it leaves open</div><h1>Nothing checks the token</h1><div class="cards c2"><div class="cd red"><h3>What V3 has</h3><p>A correct grant record. A library that stops when it loses the lease. A token handed to the caller.</p></div><div class="cd red"><h3>What V3 lacks</h3><p>The resource accepts any write. A paused holder that wakes up after the lease expired still writes.</p></div></div><div class="line r">Safety is not here yet. That is challenge one.</div>
+</div>
+<!-- v-072 &lt;div class="k"&gt;High-level design · requi -->
+<div class="slide dia">
+<div class="k">High-level design · requirement 1 · acquire</div><h1>FR1: one acquire, in four numbered steps</h1><div class="tr"><span class="fr">serves FR1, FR4</span><span class="api">Acquire</span><span class="ent">writes Lock</span><span class="nfr">p99 &lt; 20 ms</span></div><figure class="grow"><!--SVG:flow-fr1--></figure>
+</div>
+<!-- v-073 &lt;div class="k"&gt;High-level design · requi -->
+<div class="slide dia">
+<div class="k">High-level design · requirement 2 · hold and renew</div><h1>FR2: one heartbeat keeps every lock alive</h1><div class="tr"><span class="fr">serves FR2</span><span class="api">Heartbeat</span><span class="ent">touches Session</span><span class="nfr">every ~3.3 s</span></div><figure class="grow"><!--SVG:flow-fr2--></figure>
+</div>
+<!-- v-074 &lt;div class="k"&gt;High-level design · requi -->
+<div class="slide dia">
+<div class="k">High-level design · requirement 3 · release and expiry</div><h1>FR3: release by token, or expire by silence</h1><div class="tr"><span class="fr">serves FR3</span><span class="api">Release</span><span class="ent">writes Lock</span><span class="nfr">hand-off in one step</span></div><figure class="grow"><!--SVG:flow-fr3--></figure>
+</div>
+<!-- v-075 &lt;div class="k"&gt;High-level design · requi -->
+<div class="slide dia">
+<div class="k">High-level design · requirement 4 · fence</div><h1>FR4: the write carries the token, and the resource compares</h1><div class="tr"><span class="fr">serves FR4</span><span class="api">Write(..., token)</span><span class="ent">writes the resource row</span><span class="nfr">reject if smaller</span></div><figure class="grow"><!--SVG:flow-fr4--></figure>
+</div>
+<!-- v-076 &lt;div class="k"&gt;High-level design · requi -->
+<div class="slide dia">
+<div class="k">High-level design · requirement 5 · inspect and revoke</div><h1>FR5: an operator breaks glass, audited</h1><div class="tr"><span class="fr">serves FR5</span><span class="api">ForceRevoke</span><span class="ent">writes Lock · Audit</span><span class="nfr">alerts</span></div><figure class="grow"><!--SVG:flow-fr5--></figure>
+</div>
+<!-- v-077 &lt;div class="k"&gt;Design · C4 level 1&lt;/div&gt; -->
+<div class="slide dia">
+<div class="k">Design · C4 level 1</div><h1>The system in its context</h1><figure class="grow"><!--SVG:c4-context--></figure>
+</div>
+<!-- v-078 &lt;div class="k"&gt;Design · C4 level 2&lt;/div&gt; -->
+<div class="slide dia">
+<div class="k">Design · C4 level 2</div><h1>The containers</h1><figure class="grow"><!--SVG:c4-containers--></figure>
+</div>
+<!-- v-079 &lt;div class="k"&gt;Design · sequence · acqui -->
+<div class="slide dia">
+<div class="k">Design · sequence · acquire</div><h1>Acquire, message by message</h1><figure class="grow"><!--SVG:seq-acquire--></figure>
+</div>
+<!-- v-080 &lt;div class="k"&gt;Design · sequence · losin -->
+<div class="slide dia">
+<div class="k">Design · sequence · losing the lease</div><h1>Heartbeat, silence, LockLost, expiry</h1><figure class="grow"><!--SVG:seq-heartbeat-loss--></figure>
+</div>
+<!-- v-081 &lt;div class="k"&gt;Design · sequence · relea -->
+<div class="slide dia">
+<div class="k">Design · sequence · release</div><h1>Release with a direct hand-off</h1><figure class="grow"><!--SVG:seq-release-handoff--></figure>
+</div>
+<!-- v-082 &lt;div class="k"&gt;Design · sequence · the r -->
+<div class="slide dia">
+<div class="k">Design · sequence · the resource check</div><h1>Accept, and reject</h1><figure class="grow"><!--SVG:seq-fence-write--></figure>
+</div>
+<!-- v-083 &lt;div class="k"&gt;Design · what correct cal -->
+<div class="slide">
+<div class="k">Design · what correct caller code looks like</div><h1>The whole pattern, from the caller's side</h1><pre class="code"><span class="kw">try</span> {
+  g = session.acquire(<span class="str">"invoice:"</span> + id, ttl, maxWait: 2s)   <span class="cm">// bounded</span>
+  <span class="kw">if</span> (g.empty) <span class="kw">return</span> retryLater()                  <span class="cm">// no side effect</span>
+  <span class="kw">var</span> inv = repo.load(id)
+  session.checkStillHeld(g)                    <span class="cm">// narrows the window</span>
+  payments.execute(inv, g.token)               <span class="cm">// the token makes it safe</span>
+  repo.markPaid(id, g.token)                   <span class="cm">// both resources check</span>
+  session.release(g)
+} <span class="kw">catch</span> (LockLost e) { <span class="kw">return</span> abortedSafely() }  <span class="cm">// never "continue anyway"</span></pre>
+</div>
+<!-- v-084 &lt;div class="k"&gt;Design · mechanism before -->
+<div class="slide">
+<div class="k">Design · mechanism before brand</div><h1>What the pick must provide</h1><table class="bt sm"><tr><th>Needed</th><th>Why</th><th>A consensus coordination store gives</th></tr><tr class=""><td>Leases that expire</td><td>liveness</td><td>lease grant and keep-alive</td></tr><tr class=""><td>Atomic compare-and-set</td><td>one grant at a time</td><td>a transaction with an if-absent condition</td></tr><tr class=""><td>A monotonic number per change</td><td>the token</td><td>the key's revision</td></tr><tr class=""><td>Ordered, resumable watches</td><td>waiters wake in order</td><td>watch from a revision</td></tr></table><div class="line a">Mechanism first, product second. If the store lacks one of these four, it is the wrong store.</div>
+</div>
+<!-- v-085 card Bridge -->
+<div class="slide th">
+<div class="lbl">Chapter 6 of 9</div><div class="s">Bridge</div><div class="sub">It works. Where does it break first?</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="on">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-086 &lt;div class="k"&gt;Challenge map&lt;/div&gt;&lt;h1&gt;Se -->
+<div class="slide dia">
+<div class="k">Challenge map</div><h1>Seven attack points on the same baseline</h1><p class="chips">each fix creates the next question</p><figure class="grow"><!--SVG:map--></figure>
+</div>
+<!-- v-087 card Challenges -->
+<div class="slide th">
+<div class="lbl">Chapter 7 of 9</div><div class="s">Challenges</div><div class="sub">Seven ways to break it, and what survives</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="done">Design</span><span class="on">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-088 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 1 of 7</div><div class="qq">“A holder is stopped by a fifteen-second garbage-collection pause. Its lease expires, another process acquires, and then the first one wakes up. Both now write. What saves you?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-089 &lt;div class="k r"&gt;Challenge 1 of 7 · the  -->
+<div class="slide dia">
+<div class="k r">Challenge 1 of 7 · the paused holder</div><h1 class="q">What saves you when the holder wakes up?</h1><figure class="grow"><!--SVG:ch1-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Make the lease longer, and check the lease is still valid just before every write.”</div><div class="case"><b class="t">Why it fails</b>Between the check and the write, the lease can still expire. The check and the write are not atomic.</div></div>
+</div>
+<!-- v-090 &lt;div class="k r"&gt;Challenge 1 of 7 · the  -->
+<div class="slide">
+<div class="k r">Challenge 1 of 7 · the trace</div><h1 class="q">What does the resource see?</h1><pre class="trace"><span class="t">t = 0.0 s   </span>A acquires invoice-17: token 41, lease 10 s
+<span class="t">t = 0.2 s   </span>A reads the invoice
+<span class="t">t = 0.3 s   </span>A checks "still held": yes. <span class="bad">Then A pauses.</span>
+<span class="t">t = 10.0 s  </span>lease expires
+<span class="t">t = 10.4 s  </span>B acquires: token 42
+<span class="t">t = 10.5 s  </span>B writes
+<span class="t">t = 15.3 s  </span><span class="bad">A resumes and writes</span></pre><div class="hedge"><b class="t">Raising the lease</b>At 60 s a 70 s pause still wins, and every real crash now stalls its name for a minute. It moves the failure. It does not remove it.</div>
+</div>
+<!-- v-091 &lt;div class="k"&gt;Challenge 1 of 7 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 1 of 7 · the fix</div><h1>A fencing token, checked at the resource</h1><figure class="grow"><!--SVG:ch1-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>Each grant carries a token bigger than every earlier one. The resource keeps the highest it accepted and rejects any write with a smaller one.</div><div class="whyb"><b class="t">Property</b>Safety, enforced where the effect happens. The check and the write are one atomic step at the resource.</div></div>
+</div>
+<!-- v-092 &lt;div class="k"&gt;Challenge 1 of 7 · replay -->
+<div class="slide dia">
+<div class="k">Challenge 1 of 7 · replay</div><h1>Same story, with the resource checking</h1><figure class="grow"><!--SVG:pause-fenced--></figure>
+</div>
+<!-- v-093 &lt;div class="k"&gt;Challenge 1 of 7 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 1 of 7 · sequence</div><h1>The fix, message by message</h1><figure class="grow"><!--SVG:seq-ch1-pause--></figure>
+</div>
+<!-- v-094 &lt;div class="k"&gt;Challenge 1 of 7 · the me -->
+<div class="slide">
+<div class="k">Challenge 1 of 7 · the mechanism as code</div><h1>One conditional statement</h1><pre class="code"><span class="cm">-- a database row: the token is the version</span>
+<span class="kw">UPDATE</span> invoice
+   <span class="kw">SET</span> amount = :amount, fence = :token
+ <span class="kw">WHERE</span> id = :id <span class="kw">AND</span> fence &lt;= :token;
+<span class="cm">-- 0 rows: throw FencedOut(id, token). Log both tokens. Alert.
+
+// an object store: the object's generation is the token
+// write only if generation matches what you read</span></pre><div class="strip one"><div class="whyb"><b class="t">Why it works</b>Consensus gives a correct order. The resource, which is the only place that can check and write atomically, enforces it. Equal tokens pass: one holder, several writes.</div></div>
+</div>
+<!-- v-095 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“A's stale write arrives before B's first write. The resource has only seen forty-one, so it accepts A. Then B, who read the old row, writes forty-two on top. Is that fenced?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-096 &lt;div class="k"&gt;Challenge 1 of 7 · the ho -->
+<div class="slide">
+<div class="k">Challenge 1 of 7 · the honest limit</div><h1>No. Fencing orders writes. It does not repair a stale read.</h1><pre class="trace"><span class="t">t = 10.4 s  </span>B acquires: token 42. Resource has only seen 41
+<span class="t">t = 10.45 s </span>B reads the invoice
+<span class="t">t = 10.5 s  </span><span class="bad">A (stale, token 41) writes: not smaller than 41, accepted</span>
+<span class="t">t = 10.6 s  </span>B writes on its old read: <span class="bad">A's update is lost</span></pre><div class="strip "><div class="fixb"><b class="t">Fix 1</b>Make B's critical section one conditional write against the version it read. The token is the version.</div><div class="fixb"><b class="t">Fix 2</b>Or B claims its token at the resource first. Then any later write by 41 is rejected.</div></div>
+</div>
+<!-- v-097 &lt;div class="k"&gt;Challenge 1 of 7 · the se -->
+<div class="slide dia">
+<div class="k">Challenge 1 of 7 · the second fix, as a sequence</div><h1>Claim first, then read</h1><figure class="grow"><!--SVG:seq-ch1-claim--></figure>
+</div>
+<!-- v-098 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“A lease cannot guarantee exclusion at the resource, because the holder cannot know it still holds the lock when its write lands. So the grant carries a token that only increases, and the resource rejects anything older than it has accepted. Safety lives at the resource. The lock service only has to give a correct order.”</div>
+</div>
+<!-- v-099 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 2 of 7</div><div class="qq">“The thing you are protecting is a partner's HTTP API, or a cron job. There is no conditional write. Now what?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-100 &lt;div class="k r"&gt;Challenge 2 of 7 · the  -->
+<div class="slide dia">
+<div class="k r">Challenge 2 of 7 · the resource cannot check</div><h1 class="q">What if there is nowhere to put the check?</h1><figure class="grow"><!--SVG:ch2-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Use a long lease, trust the client library, and call it correct.”</div><div class="case"><b class="t">Case</b>A payment call with no idempotency key, paused after the lock check, charges twice.</div></div>
+</div>
+<!-- v-101 &lt;div class="k r"&gt;Challenge 2 of 7 · a su -->
+<div class="slide">
+<div class="k r">Challenge 2 of 7 · a survey, illustrative</div><h1 class="q">Before building anything, sort the callers</h1><table class="bt sm"><tr><th>Callers (of 100)</th><th>What they really need</th><th>Right tool</th></tr><tr class=""><td>55</td><td>only to avoid duplicate work</td><td><b>efficiency lock</b>: no token needed</td></tr><tr class=""><td>30</td><td>the resource has a conditional write or version column</td><td><b>the resource's own version is the token</b></td></tr><tr class=""><td>10</td><td>a resource with neither</td><td>a <b>validating proxy</b></td></tr><tr class=""><td>5</td><td>truly non-idempotent, no check possible</td><td>change the contract, or accept the risk in writing</td></tr></table><div class="hedge"><b class="t">Label the numbers</b>Illustrative: a made-up survey to show the shape. The method is the point: classify before you build.</div>
+</div>
+<!-- v-102 &lt;div class="k"&gt;Challenge 2 of 7 · the or -->
+<div class="slide">
+<div class="k">Challenge 2 of 7 · the order of questions</div><h1>Ask first, then pick the cheapest place to enforce</h1><div class="cards c4"><div class="cd"><h3>1 · Is it idempotent?</h3><p>Give it a key: lock name plus job instance. A double hold becomes harmless.</p></div><div class="cd grn"><h3>2 · Conditional write?</h3><p>Use its version as the token.</p></div><div class="cd amb"><h3>3 · Proxy</h3><p>Put a checker in front. It keeps the highest token per resource.</p></div><div class="cd red"><h3>4 · None fit</h3><p>Ship an efficiency lock and say so in the contract.</p></div></div>
+</div>
+<!-- v-103 &lt;div class="k"&gt;Challenge 2 of 7 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 2 of 7 · the fix</div><h1>A proxy that remembers the highest token</h1><figure class="grow"><!--SVG:ch2-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>The proxy stores the highest token per resource in a consistent store and forwards only fresh calls.</div><div class="whyb"><b class="t">Property</b>Matching the guarantee to the cost of a double hold: safety where a check can be atomic.</div></div>
+</div>
+<!-- v-104 &lt;div class="k"&gt;Challenge 2 of 7 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 2 of 7 · sequence</div><h1>The proxy, accept and reject</h1><figure class="grow"><!--SVG:seq-ch2-proxy--></figure>
+</div>
+<!-- v-105 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“The proxy is now a single point of failure, and a new thing that must itself be consistent. And your idempotency records: how long do you keep them?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-106 &lt;div class="k"&gt;Challenge 2 of 7 · the se -->
+<div class="slide">
+<div class="k">Challenge 2 of 7 · the second fix, and the honest limit</div><h1>Fail closed, and keep records long enough</h1><div class="cards c2"><div class="cd grn"><h3>The proxy</h3><p>Fails closed. Its token table lives in a consensus-backed store. Scoped per resource class, so one failure does not take all.</p></div><div class="cd amb"><h3>Idempotency records</h3><p>Keep at least: <b>max lease + max pause + retry horizon</b>. Illustrative: 24 h for a 60 s lease.</p></div></div><div class="line r">A non-idempotent call to a system with no check cannot be made safe by any lock. Change the contract.</div>
+</div>
+<!-- v-107 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“Before I build a lock for a team I ask what a double hold costs and whether the operation can be made idempotent. If the resource supports a conditional write, the resource enforces exclusion and the lock is an optimisation. I only claim a correctness lock where something downstream checks the token.”</div>
+</div>
+<!-- v-108 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 3 of 7</div><div class="qq">“A client's clock is five seconds slow. Or time is stepped back eight seconds in the middle of a lease. What happens to the lease?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-109 &lt;div class="k r"&gt;Challenge 3 of 7 · time -->
+<div class="slide dia">
+<div class="k r">Challenge 3 of 7 · time</div><h1 class="q">What does the client believe?</h1><figure class="grow"><!--SVG:ch3-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“The server returns an expiry timestamp and the client compares it with its own clock.”</div><div class="case"><b class="t">Break</b>The library's deadline logic trusts a timestamp from a machine whose clock it cannot trust.</div></div>
+</div>
+<!-- v-110 &lt;div class="k"&gt;Challenge 3 of 7 · the ca -->
+<div class="slide dia">
+<div class="k">Challenge 3 of 7 · the case</div><h1>A slow clock: two holders for five seconds</h1><figure class="grow"><!--SVG:clock-skew--></figure>
+</div>
+<!-- v-111 &lt;div class="k"&gt;Challenge 3 of 7 · three  -->
+<div class="slide">
+<div class="k">Challenge 3 of 7 · three kinds of time</div><h1>Use each kind for one job</h1><table class="bt sm"><tr><th>Kind</th><th>Property</th><th>Use it for</th></tr><tr class=""><td>Wall clock</td><td>can jump forwards and backwards: steps, leap seconds, migration</td><td><b>never</b> for lease arithmetic</td></tr><tr class=""><td>Monotonic clock</td><td>never goes backwards on one machine. Meaningless across machines</td><td><b>durations</b></td></tr><tr class=""><td>Logical order</td><td>log index, term. Says nothing about duration</td><td><b>the token, and correctness</b></td></tr></table><div class="line ">Durations on monotonic clocks, correctness on logical order, and nothing that depends on two machines agreeing what time it is.</div>
+</div>
+<!-- v-112 &lt;div class="k"&gt;Challenge 3 of 7 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 3 of 7 · the fix</div><h1>Durations, not timestamps</h1><figure class="grow"><!--SVG:ch3-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>deadline = send time + 0.7 × lease, on the monotonic clock. The server counts its own lease from its own commit. No timestamp crosses the wire.</div><div class="whyb"><b class="t">Property</b>Safety of the lease arithmetic: it depends on how fast two clocks tick, not on what they read.</div></div>
+</div>
+<!-- v-113 &lt;div class="k"&gt;Challenge 3 of 7 · replay -->
+<div class="slide dia">
+<div class="k">Challenge 3 of 7 · replay</div><h1>The client stops first</h1><figure class="grow"><!--SVG:clock-fixed--></figure>
+</div>
+<!-- v-114 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“What if the process pauses between reading the monotonic clock and doing the write? Or drift is far above your assumption, as on a throttled virtual machine?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-115 &lt;div class="k"&gt;Challenge 3 of 7 · the ho -->
+<div class="slide">
+<div class="k">Challenge 3 of 7 · the honest limit</div><h1>The margin cannot see a pause. The token can.</h1><div class="cards c2"><div class="cd red"><h3>Pause between check and write</h3><p>The margin does nothing. That is challenge one again, and the token is the backstop.</p></div><div class="cd amb"><h3>Drift above the assumption</h3><p>Bounded drift is an assumption. With fencing it is no longer load-bearing for safety. We still monitor clock health and the rate of missed local deadlines.</p></div></div>
+</div>
+<!-- v-116 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“I use monotonic clocks for durations and logical order for correctness. The client gives up before the server does, so there is never a window where it believes it holds a lock the server has given away. And because that still assumes bounded drift, the token at the resource is what the safety argument rests on.”</div>
+</div>
+<!-- v-117 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 4 of 7</div><div class="qq">“The leader dies mid-grant, and a partition leaves two of the five replicas talking to some clients. What do those clients see?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-118 &lt;div class="k r"&gt;Challenge 4 of 7 · lead -->
+<div class="slide dia">
+<div class="k r">Challenge 4 of 7 · leader, partition, group loss</div><h1 class="q">What do the clients on the small side see?</h1><figure class="grow"><!--SVG:ch4-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Promote a follower quickly, and let the minority side keep serving so we stay available.”</div><div class="case"><b class="t">Break</b>The group box. Two replicas must not grant on their own.</div></div>
+</div>
+<!-- v-119 &lt;div class="k"&gt;Challenge 4 of 7 · the ca -->
+<div class="slide dia">
+<div class="k">Challenge 4 of 7 · the case</div><h1>Five replicas, one partition</h1><figure class="grow"><!--SVG:partition--></figure>
+</div>
+<!-- v-120 &lt;div class="k"&gt;Challenge 4 of 7 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 4 of 7 · sequence</div><h1>Both sides ask for the same name</h1><figure class="grow"><!--SVG:seq-ch4-election--></figure>
+</div>
+<!-- v-121 &lt;div class="k"&gt;Challenge 4 of 7 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 4 of 7 · the fix</div><h1>Majority commit, terms, a leader lease, a grace period</h1><figure class="grow"><!--SVG:ch4-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>Only the majority commits. A stale leader steps down on a higher term. A new leader treats every session as alive for one lease.</div><div class="whyb"><b class="t">Property</b>Safety unconditional. Liveness given up on the minority side.</div></div>
+</div>
+<!-- v-122 &lt;div class="k"&gt;Challenge 4 of 7 · why it -->
+<div class="slide">
+<div class="k">Challenge 4 of 7 · why it works</div><h1>The honest CP position</h1><div class="prop safe"><div class="lbl">Safety · kept</div><p>Two replicas cannot commit. So a name never has two holders because of a partition.</p></div><div class="prop live"><div class="lbl">Liveness · given up, on the small side only</div><p>The minority gets “unavailable”. A failover takes about 2 s. Tokens stay monotonic, because they are log indexes.</p></div><div class="line a">There is no clever third option. Interviewers listen for candidates who try to invent one.</div>
+</div>
+<!-- v-123 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“Three of the five replicas are gone. Or someone restores last night's snapshot. What happens to the tokens?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-124 &lt;div class="k r"&gt;Challenge 4 of 7 · why  -->
+<div class="slide">
+<div class="k r">Challenge 4 of 7 · why a restore is wrong</div><h1 class="q">Restoring an old snapshot reissues tokens</h1><pre class="trace"><span class="t">Mon 23:00  </span>snapshot taken. Highest token for invoice-17: 41
+<span class="t">Tue 09:00  </span>grants continue: tokens 42, 43 ... 9,000 issued. Resource stores 9,000
+<span class="t">Tue 11:00  </span><span class="bad">all replicas lost. Restore Monday's snapshot</span>
+<span class="t">Tue 11:05  </span>next grant of invoice-17: <span class="bad">token 42 again</span>
+<span class="t">Tue 11:05  </span>resource holds 9,000: <span class="bad">rejects every new holder as stale</span></pre><div class="hedge"><b class="t">Both directions</b>Tokens reused means the check wrongly rejects. Tokens that restart low can also let a stale holder through.</div>
+</div>
+<!-- v-125 &lt;div class="k"&gt;Challenge 4 of 7 · the se -->
+<div class="slide dia">
+<div class="k">Challenge 4 of 7 · the second fix</div><h1>Start empty, higher epoch, wait one maximum lease</h1><figure class="grow"><!--SVG:seq-ch4-recovery--></figure>
+</div>
+<!-- v-126 &lt;div class="k"&gt;Challenge 4 of 7 · the co -->
+<div class="slide">
+<div class="k">Challenge 4 of 7 · the cost, and the arithmetic</div><h1>A minute of outage against a double grant</h1><div class="tiles" style="--n:3"><div class="tile blue"><b>60 s</b><span>quiet period: the cap on a lease</span></div><div class="tile blue"><b>16 + 48</b><span>bits: epoch and index</span></div><div class="tile"><b>65,536</b><span>rebuilds before the epoch runs out</span></div></div><div class="line a">An outage of a minute is cheap. The alternative is two holders.</div>
+</div>
+<!-- v-127 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“Under partition I choose safety: the minority side refuses, it does not guess. After the loss of a whole group I start empty with a higher epoch, so every new token exceeds every old one, and I wait out the longest possible lease before granting. The outage is a minute. The alternative is two holders.”</div>
+</div>
+<!-- v-128 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 5 of 7</div><div class="qq">“At the top of the hour traffic triples, and two thousand clients retry at once after a network blip. What happens, and what do you do?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-129 &lt;div class="k r"&gt;Challenge 5 of 7 · the  -->
+<div class="slide dia">
+<div class="k r">Challenge 5 of 7 · the top of the hour</div><h1 class="q">What happens to one group at three times the load?</h1><figure class="grow"><!--SVG:ch5-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Add replicas, or shorten the lease so dead holders clear faster.”</div><div class="case"><b class="t">Break</b>One group: about 30,000 writes a second against about 15,000.</div></div>
+</div>
+<!-- v-130 &lt;div class="k r"&gt;Challenge 5 of 7 · the  -->
+<div class="slide">
+<div class="k r">Challenge 5 of 7 · the trace</div><h1 class="q">A queue that outlives the lease</h1><pre class="trace"><span class="t">t = 0 s    </span>peak: 30,000 writes/s arrive, group commits 15,000/s
+<span class="t">t = 1 s    </span>backlog 15,000 writes. p99 acquire: <span class="bad">1 s</span>
+<span class="t">t = 10 s   </span>backlog <span class="bad">150,000</span>. Latency now exceeds the 10 s lease
+<span class="t">t = 10+ s  </span>leases expire while grants are in flight; clients retry
+<span class="t">t = 11 s   </span><span class="bad">retries add load: metastable collapse</span></pre><div class="hedge"><b class="t">More replicas?</b>Every write must reach a majority. Replicas add fault tolerance, not write throughput.</div>
+</div>
+<!-- v-131 &lt;div class="k"&gt;Challenge 5 of 7 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 5 of 7 · the fix</div><h1>Partition by name, admit at the edge</h1><figure class="grow"><!--SVG:ch5-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>slot = hash(name) mod 64, mapped to 4 groups. Gateway quotas shed with retry-after. Library backoff with jitter. Sessions. Batched syncs.</div><div class="whyb"><b class="t">Property</b>Liveness inside capacity. Locks are independent per name, so partitioning costs nothing.</div></div>
+</div>
+<!-- v-132 &lt;div class="k"&gt;Challenge 5 of 7 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 5 of 7 · sequence</div><h1>Shed at the edge, retry with jitter</h1><figure class="grow"><!--SVG:seq-ch5-admission--></figure>
+</div>
+<!-- v-133 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“One group goes bad. Or you need to move a slot while its locks are held.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-134 &lt;div class="k"&gt;Challenge 5 of 7 · the ho -->
+<div class="slide dia">
+<div class="k">Challenge 5 of 7 · the honest limit</div><h1>A quarter fails closed. A move freezes, drains, bumps the epoch</h1><figure class="grow"><!--SVG:slots--></figure>
+</div>
+<!-- v-135 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“I size for the peak: thirty thousand writes a second against a fifteen thousand ceiling means four groups with headroom. Replicas do not add write throughput. I shed load at the gateway with a retry-after, make clients back off with jitter, and shard by name because locks are independent. A bad shard fails closed for a quarter of the names.”</div>
+</div>
+<!-- v-136 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 6 of 7</div><div class="qq">“One name gets forty attempts a second, and each hold lasts a hundred milliseconds. What happens?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-137 &lt;div class="k r"&gt;Challenge 6 of 7 · a ho -->
+<div class="slide dia">
+<div class="k r">Challenge 6 of 7 · a hot name</div><h1 class="q">Who gets the lock, and who pays?</h1><figure class="grow"><!--SVG:ch6-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Everyone polls until they get it, or we keep a queue that grows.”</div><div class="case"><b class="t">Break</b>The leader of the group that owns this one name.</div></div>
+</div>
+<!-- v-138 &lt;div class="k"&gt;Challenge 6 of 7 · the ca -->
+<div class="slide dia">
+<div class="k">Challenge 6 of 7 · the case</div><h1>A name can grant at most one over the hold time</h1><figure class="grow"><!--SVG:hot-key--></figure>
+</div>
+<!-- v-139 &lt;div class="k"&gt;Challenge 6 of 7 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 6 of 7 · the fix</div><h1>A bounded queue with directed hand-off</h1><figure class="grow"><!--SVG:ch6-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>Waiters queue per name, capped, session-scoped. Release grants to the head waiter in the same step. Beyond the cap: contended, retry-after.</div><div class="whyb"><b class="t">Property</b>Liveness and fairness without burning consensus. Waiting costs no writes.</div></div>
+</div>
+<!-- v-140 &lt;div class="k"&gt;Challenge 6 of 7 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 6 of 7 · sequence</div><h1>Release hands over in one step</h1><figure class="grow"><!--SVG:seq-ch6-queue--></figure>
+</div>
+<!-- v-141 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“A team now asks to acquire three locks atomically.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-142 &lt;div class="k"&gt;Challenge 6 of 7 · severa -->
+<div class="slide">
+<div class="k">Challenge 6 of 7 · several locks</div><h1>Push back, and make deadlock heal itself</h1><table class="bt sm"><tr><th>Move</th><th>What it does</th><th>Cost</th></tr><tr class=""><td>Push back first</td><td>Atomic multi-name acquire across groups is a distributed transaction</td><td>a rework of the caller, or two-phase commit</td></tr><tr class=""><td>Canonical order</td><td>SDK sorts names and acquires in that order</td><td>discipline, enforced in the library</td></tr><tr class=""><td>Try with timeout, release all</td><td>back off and retry if the full set is not got in budget</td><td>some wasted work</td></tr><tr class=""><td>Bounded leases</td><td>any deadlock heals within one lease</td><td>up to one lease of stall</td></tr></table><div class="line a">Detecting deadlock cycles is rarely worth it. Saying so is a better answer than describing the algorithm.</div>
+</div>
+<!-- v-143 &lt;div class="k"&gt;Challenge 6 of 7 · the ho -->
+<div class="slide">
+<div class="k">Challenge 6 of 7 · the honest limit</div><h1>A lock caps a name. A hot name is the wrong tool.</h1><div class="cards c2"><div class="cd red"><h3>The limit</h3><p>A name grants at most one over the hold time. No design makes that bigger.</p></div><div class="cd grn"><h3>Go back to the requirement</h3><p>Forty a second on one name means the caller wants a queue, or a single writer per partition, not a lock.</p></div></div>
+</div>
+<!-- v-144 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“A lock serialises. If the name is hot, the lock is the wrong tool. I bound the queue, hand the lock directly to the next waiter so a release is one write, and return an explicit rejection beyond the limit. For several locks I fix the order, bound every wait, and rely on leases so a deadlock heals in one lease. I would not offer atomic multi-lock.”</div>
+</div>
+<!-- v-145 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 7 of 7</div><div class="qq">“It is three in the morning. A team says duplicates are happening, and your dashboard is green. How would you have known?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-146 &lt;div class="k r"&gt;Challenge 7 of 7 · how  -->
+<div class="slide dia">
+<div class="k r">Challenge 7 of 7 · how would you know</div><h1 class="q">Green dashboard, broken promise</h1><figure class="grow"><!--SVG:ch7-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Watch CPU, memory and uptime of the service.”</div><div class="case"><b class="t">Case</b>Availability 99.99%, p99 8 ms: green. But one service has 12 FencedOut rejections a minute, and one name's hold time grew from 0.5 s to 9 s.</div></div>
+</div>
+<!-- v-147 &lt;div class="k"&gt;Challenge 7 of 7 · the SL -->
+<div class="slide">
+<div class="k">Challenge 7 of 7 · the SLIs</div><h1>Measure the guarantee, not the machine</h1><table class="bt sm"><tr><th>SLI</th><th>Target (initial)</th><th>Why</th></tr><tr class=""><td>Acquire availability</td><td>99.99%</td><td>the headline contract</td></tr><tr class=""><td>Acquire latency p50 / p99</td><td>3 ms / 20 ms</td><td>locks sit in a request path</td></tr><tr class=""><td>Session-loss rate</td><td>< 0.01% of sessions an hour</td><td>every loss may abort work</td></tr><tr class=""><td><b>Fenced-out writes</b></td><td><b>alert on any</b></td><td>a stale holder reached a resource</td></tr><tr class=""><td>Elections per group per day</td><td>< 1</td><td>an unhealthy group, and the error budget</td></tr><tr class=""><td>Time to leader after failure</td><td>< 2 s p99</td><td>bounds the unavailable window</td></tr></table>
+</div>
+<!-- v-148 &lt;div class="k"&gt;Challenge 7 of 7 · sympto -->
+<div class="slide">
+<div class="k">Challenge 7 of 7 · symptom pairs</div><h1>Which two numbers tell you what broke?</h1><table class="bt sm sym"><tr><th>Symptom</th><th>Together with</th><th>Conclusion</th></tr><tr class=""><td><span class='up'>Fenced-out writes</span></td><td><span class='up'>renewal failures</span> on one client</td><td>That client is pausing. The net worked. Fix the client</td></tr><tr class=""><td><span class='up'>Elections</span></td><td><span class='up'>acquire p99</span></td><td>An unhealthy group or disk</td></tr><tr class=""><td><span class='up'>Hold-time tail</span></td><td><span class='up'>waiter depth</span></td><td>Someone holds across a network call, or a hot name</td></tr><tr class=""><td><span class='up'>Token gaps</span></td><td><span class='up'>attempts</span></td><td>A retry storm</td></tr></table><div class="line a">One metric tells you something is wrong. Two tell you where.</div>
+</div>
+<!-- v-149 &lt;div class="k"&gt;Challenge 7 of 7 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 7 of 7 · the fix</div><h1>A canary, and the guarantee on a page</h1><figure class="grow"><!--SVG:ch7-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>SLIs on the guarantee, symptom pairs, a canary lock acquired continuously, an offline checker that replays the log for overlapping holds.</div><div class="whyb"><b class="t">Property</b>It turns the safety argument into something you can watch.</div></div>
+</div>
+<!-- v-150 &lt;div class="k"&gt;Challenge 7 of 7 · the er -->
+<div class="slide dia">
+<div class="k">Challenge 7 of 7 · the error budget</div><h1>Turn a target into a constraint</h1><figure class="grow"><!--SVG:error-budget--></figure>
+</div>
+<!-- v-151 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“Fenced-out is zero this week. Does that mean you are safe?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-152 &lt;div class="k"&gt;Challenge 7 of 7 · the ho -->
+<div class="slide">
+<div class="k">Challenge 7 of 7 · the honest limit</div><h1>Zero can mean nobody is sending tokens</h1><div class="cards c2"><div class="cd red"><h3>Coverage</h3><p>Track the share of protected writes that carry a token, and count writes that arrive without one. A zero with no coverage is a blind spot.</p></div><div class="cd amb"><h3>The invisible double hold</h3><p>A double hold that causes no stale write is invisible to the resource. The log audit finds overlapping holds, from the server's durations.</p></div></div><div class="line r">You can observe a violation after the fact and alarm on precursors. You cannot observe an absence of risk.</div>
+</div>
+<!-- v-153 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“I alert on the guarantee. Any fenced-out write pages someone, because it is either the safety net working or the first sign of a problem. I read metrics in pairs so each page names a cause. I track how many protected writes carry a token at all, and I audit the grant log for overlapping holds. A green dashboard about the service says nothing about the promise.”</div>
+</div>
+<!-- v-154 card Build cost -->
+<div class="slide th aux">
+<div class="lbl">Chapter 8 of 9</div><div class="s">Build cost</div><div class="sub">The manager layer: people, months, buy against build</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="done">Design</span><span class="done">Challenges</span><span class="on">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-155 &lt;div class="k"&gt;Build cost · three releas -->
+<div class="slide aux">
+<div class="k">Build cost · three releases</div><h1>R0, R1, R2: not one project</h1><table class="bt sm"><tr><th></th><th>R0 · Prototype</th><th>R1 · One region, production</th><th>R2 · Platform</th></tr><tr class=""><td>Goal</td><td>Prove the model</td><td>One or two teams' correctness locks</td><td>Company-wide, multi-tenant</td></tr><tr class=""><td>Substrate</td><td>Coordination store, or a row</td><td>Coordination store, sharded</td><td>Custom service, or managed global store</td></tr><tr class=""><td>Fencing</td><td>Demonstrated</td><td>Enforced for one resource type</td><td>Every type; proxy for legacy</td></tr><tr class=""><td>Availability · on-call</td><td>none</td><td>99.9% · business hours</td><td>99.99% · 24/7 with a budget</td></tr><tr class=""><td>Effort, engineer-months</td><td>1–1.5</td><td>20–24</td><td>70–140</td></tr></table>
+</div>
+<!-- v-156 &lt;div class="k"&gt;Build cost · R1 in detail -->
+<div class="slide aux">
+<div class="k">Build cost · R1 in detail</div><h1>Who, and how long</h1><table class="bt sm"><tr><th>Role</th><th>FTE</th><th>Owns</th></tr><tr class=""><td>Tech lead</td><td>1.0</td><td>protocol correctness, the fencing contract, design reviews</td></tr><tr class=""><td>Senior backend</td><td>1.0</td><td>service, sharding, gateway, admin tools</td></tr><tr class=""><td>Mid backend</td><td>1.0</td><td>client libraries, first two customers, migration</td></tr><tr class=""><td>SRE</td><td>1.0</td><td>deployment, SLOs, load and chaos tests: half the build is operations</td></tr><tr class=""><td>Manager · programme</td><td>0.3 · 0.2</td><td>roadmap, adoption, hiring</td></tr></table><p class="chips">discovery 3 wk<i>·</i>skeleton 4<i>·</i>correctness 6<i>·</i>hardening 6<i>·</i>operations 4<i>·</i>first customer 3</p>
+</div>
+<!-- v-157 &lt;div class="k"&gt;Build cost · ownership&lt;/d -->
+<div class="slide aux">
+<div class="k">Build cost · ownership</div><h1>People dominate the five years</h1><p class="chips">illustrative<i>·</i>engineer-months</p><div class="tiles" style="--n:3"><div class="tile blue"><b>24</b><span>to build R1</span></div><div class="tile blue"><b>1.75 × 60</b><span>= 105 to run it for five years</span></div><div class="tile"><b>≈ 129</b><span>≈ 11 engineer-years; infrastructure is about a tenth</span></div></div><div class="line a">A service with no owner becomes an incident with no owner.</div>
+</div>
+<!-- v-158 &lt;div class="k"&gt;Build cost · build, adopt -->
+<div class="slide aux">
+<div class="k">Build cost · build, adopt, buy, or don't</div><h1>Four options, one table</h1><table class="bt sm mx"><tr><th>Option</th><th>To a pilot</th><th>5-year, eng-months (illustrative)</th><th>When it wins</th></tr><tr class=""><td><b>Don't</b>: conditional write or idempotency</td><td>~2 weeks per resource</td><td>~10</td><td>the resource supports it: check first</td></tr><tr class=""><td><b>Buy</b>: managed transactional store</td><td>~4 weeks</td><td>~60</td><td>moderate volume, latency tolerant</td></tr><tr class="pick"><td><b>Adopt</b>: coordination store behind our A-P-I</td><td>~10 weeks</td><td>~80</td><td>high volume, correctness-critical. <b>R1 pick</b></td></tr><tr class=""><td><b>Build</b>: custom consensus service</td><td>~6 months, 4 people</td><td>~129</td><td>a unique semantic, or very large scale</td></tr></table>
+</div>
+<!-- v-159 &lt;div class="k"&gt;Build cost · risks, cuts, -->
+<div class="slide aux">
+<div class="k">Build cost · risks, cuts, people</div><h1>What I would never cut</h1><div class="cards c3"><div class="cd red"><h3>Never cut</h3><p>Fencing end to end. The conservative client deadline. The linearizability harness. The runbook and a qualified on-call.</p></div><div class="cd amb"><h3>Cut first</h3><p>Multi-region. Shared modes. First-come fairness. Extra-language libraries. The admin console.</p></div><div class="cd"><h3>Top risks</h3><p>Fencing not enforceable. Adoption fails. Scope creep into a key-value store. Key-person on the protocol. A split-brain incident.</p></div></div>
+</div>
+<!-- v-160 &lt;div class="k"&gt;Build cost · staffing, an -->
+<div class="slide aux">
+<div class="k">Build cost · staffing, and the question to ask</div><h1>Small first. Do not add people in stabilisation.</h1><div class="cards c2"><div class="cd"><h3>Over time</h3><p>Two people to design and build the skeleton. Grow to four in the middle, where work parallelises. Hold steady while stabilising. Share on-call with a sibling team.</p></div><div class="cd grn"><h3>The question before saying yes</h3><p>“What happens if two of you hold this at once, and could the operation be made idempotent?”</p></div></div>
+</div>
+<!-- v-161 card Recap -->
+<div class="slide th">
+<div class="lbl">Chapter 9 of 9</div><div class="s">Recap</div><div class="sub">One picture, five paths, the mistakes, the thesis</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="done">Design</span><span class="done">Challenges</span><span class="done">Cost · AUX</span><span class="on">Recap</span></div>
+</div>
+<!-- v-162 &lt;div class="k"&gt;Recap&lt;/div&gt;&lt;h1&gt;The whole  -->
+<div class="slide dia">
+<div class="k">Recap</div><h1>The whole design on one baseline</h1><p class="chips">library<i>·</i>gateway<i>·</i>4 groups<i>·</i>epoch store<i>·</i>resource with the check</p><figure class="grow"><!--SVG:base-final--></figure>
+</div>
+<!-- v-163 &lt;div class="k"&gt;Recap · one sentence per  -->
+<div class="slide">
+<div class="k">Recap · one sentence per path</div><h1>Five paths</h1><table class="bt"><tr><th>Path</th><th>In one sentence</th></tr><tr class=""><td><b>Acquire</b></td><td>One committed write, and a token out</td></tr><tr class=""><td><b>Renew</b></td><td>One heartbeat per client, measured from send time</td></tr><tr class=""><td><b>Release and expiry</b></td><td>Compare by token, hand off to the head waiter; a dead session is one command</td></tr><tr class=""><td><b>Fence</b></td><td>The resource rejects anything older than it has seen</td></tr><tr class=""><td><b>Revoke</b></td><td>Audited, and the next token is higher</td></tr></table>
+</div>
+<!-- v-164 &lt;div class="k"&gt;Recap · if asked about re -->
+<div class="slide">
+<div class="k">Recap · if asked about regions</div><h1>Multi-region, in three lines</h1><div class="cards c3"><div class="cd grn"><h3>Preferred</h3><p>Region-local lock services over region-owned resources.</p></div><div class="cd amb"><h3>Sparingly</h3><p>A global lock only for rare, coarse locks: a global leader, a schema change.</p></div><div class="cd red"><h3>Never</h3><p>Asynchronous replication of lock state. It is split brain with extra steps.</p></div></div>
+</div>
+<!-- v-165 &lt;div class="k"&gt;Recap · common mistakes i -->
+<div class="slide">
+<div class="k">Recap · common mistakes in this round</div><h1>Ten ways this round goes wrong</h1><div class="cards c2"><div class="cd red"><h3>Design</h3><ul style="font-size:17pt"><li>A cache key with an expiry presented as a correctness lock</li><li>“Tune the lease” as the answer to a pause</li><li>No token, or a token nobody checks</li><li>Timestamps compared across machines</li><li>Failing open without saying so</li></ul></div><div class="cd amb"><h3>Judgment</h3><ul style="font-size:17pt"><li>A beautiful consensus group and no word about the resource</li><li>Never asking whether a lock is needed</li><li>Offering atomic multi-lock</li><li>Restoring an old snapshot</li><li>Hiding the token in a thread-local</li></ul></div></div>
+</div>
+<!-- v-166 &lt;div class="lbl"&gt;The close&lt;/div&gt;&lt;div cla -->
+<div class="slide th">
+<div class="lbl">The close</div><div class="s">The lock service decides who should be working. The resource decides who is allowed to write. Everything I built is there so those two answers can <em>disagree safely</em>.</div>
+</div>
+</body></html>

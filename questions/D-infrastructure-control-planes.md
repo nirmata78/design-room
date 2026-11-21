@@ -1,6 +1,6 @@
 # Archetype D · Infrastructure & control planes
 
-**SD-24 – SD-35.** Slice with `grep -n '^### SD-25' questions/D-infrastructure-control-planes.md`,
+**SD-24 – SD-35, SD-94.** Slice with `grep -n '^### SD-25' questions/D-infrastructure-control-planes.md`,
 then Read with `offset`. Do not read this file whole.
 
 **What this archetype tests as a family:** whether they think in **control plane versus data plane**.
@@ -638,3 +638,45 @@ bake times, drain handling, deploy/release decoupled by flags. *Exceptional* —
 against detectable error rates, treats backward-compatible data as a rollout precondition, handles
 non-revertible changes with expand/contract, reasons about cross-service rollback ordering, and ties
 it to change-failure-rate as the metric.
+
+---
+
+### SD-94 · Blocking / denylist system   [T2 · G★]
+
+**Read aloud:** *"Design a distributed system that stops requests from banned sources, such as IP addresses,
+from being served, on every one of our servers."*
+
+**Crux.** **Separate the check from the distribution.** The check runs in-process on every request in
+microseconds; the list reaches every node over a slow, partly broken path. The design is the staleness
+bound and the failure policy you state for that path, plus the discipline to push a rule change like a
+binary: a bad denylist is a global outage.
+
+**Numbers if asked:** 100,000 serving nodes in 20 regions, 1 M requests/s at peak, 10 M listed entries today
+(IPv4 and IPv6, single addresses and ranges), up to 100 M later, 50 changes a second at peak, a new ban must
+take effect fleet-wide within 30 s for 99.9% of nodes. The list comes from an internal policy team; in one
+variant it comes from an external authority with a slow, rate-limited lookup API.
+
+**Listen for:** **in-process check, no network call on the request path** (the 1 M/s against a 1 s lookup
+arithmetic) · **an exact structure sized with arithmetic** (sorted array or hash set for single keys, a prefix
+trie for ranges, memory for IPv6) · **a filter in front only if its one-sided error is handled** (a hit needs
+an authoritative check; a false positive blocks a real user) · **versioned snapshots plus deltas**, each with
+a checksum, applied atomically, with a full snapshot as the fallback · **pull as the backstop for push** and
+catch-up after a node was offline · **a measured propagation SLO** (applied version and its age per node) ·
+**a stated policy for a node whose copy is too old**: keep serving stale, or fail closed, decided by the
+policy owner · **sanity limits, an allowlist of ranges that must never be blocked, staged rollout, a kill
+switch and one-step rollback** · **ordering** of an add and a remove for the same key · **audit**: which rule
+version decided this request · for the external-authority variant: mirror a bulk list, or cache verdicts with
+a TTL, coalesce lookups, spend a rate-limit budget, and an explicit fleet-wide fail-open rule.
+
+**Probes:** *"A node was offline for two hours. How does it catch up?"* · *"How do you know all 100,000 nodes
+run version N?"* · *"A bad push blocks all of Europe. Stop it."* · *"An add and a remove for the same key
+arrive out of order."* · *"Why not one shared cache lookup per request?"* · *"The filter says maybe. Then
+what?"* · *"The external source is down for two days."* · *(EM bar)* *"Who owns the list and who owns the
+mechanism, and what is the contract between them?"*
+
+**Weak / Strong / Exceptional.** *Weak* — a shared database or cache queried on every request; no staleness
+bound; no rollout discipline. *Strong* — local in-memory structure, versioned snapshots and deltas, push with
+pull backstop, a propagation SLO, a stated stale and fail-closed policy, staged pushes with rollback.
+*Exceptional* — sizes memory and bandwidth with arithmetic, handles the filter's one-sided error and range
+overlap, treats the bad-rule push as the main risk, separates policy from mechanism ownership, and ties the
+propagation SLO to an alert and an error budget.

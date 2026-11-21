@@ -1,0 +1,42 @@
+Everyone has drawn the URL shortener: a hash, a table, a cache. It is still asked at every level, because the grade is on what comes after the diagram. This is a full reference solution at the Staff bar (L6/L7): theory, a three-version design, eight challenges that break it, and the build cost. 71 minutes, 153 numbered slides, with an interviewer, a candidate and a coach.
+
+The thesis: a URL shortener is a read path with a write path attached. Codes must be unique without a lock per create and unguessable without a lookup, the redirect must be one memory read, and nothing else (counting, abuse, analytics) may stand between the click and the answer.
+
+IN THIS VIDEO
+• Estimates as arithmetic: why seven characters (3.5 trillion codes for 12 billion links), 4,000 redirects a second but 40 at the store, 7 of 20 milliseconds
+• Theory: safety and liveness, six mechanisms, an options matrix for code generation with a pick (and an honest equal)
+• Eight challenges: two servers and one code, codes that can be walked, one link at 40,000 clicks a second, 301 or 302, a takedown everywhere in five minutes, counting without slowing the redirect, a region lost, and how you would know
+• The build cost and team split (marked AUX, the manager layer)
+
+HOW TO USE IT
+Run the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first. Slides badged AUX are the manager layer: skip them in a Staff round.
+
+CHAPTERS
+0:00 0 Cold open
+2:28 1 Requirements and scope
+6:57 2 Estimates
+11:37 3 Theory
+20:25 4 API and entities
+24:04 5 High-level design
+32:41 6 Bridge
+33:28 7 Challenges
+33:46 7.1 Challenge 1: Two servers, one code
+38:56 7.2 Challenge 2: Codes in order
+42:57 7.3 Challenge 3: One link at 40,000 clicks a second
+47:10 7.4 Challenge 4: 301 or 302?
+50:38 7.5 Challenge 5: Dead everywhere in five minutes
+55:07 7.6 Challenge 6: Counting without slowing the redirect
+58:39 7.7 Challenge 7: A region goes dark
+1:02:18 7.8 Challenge 8: How would you know it is broken?
+1:05:54 8 Build cost
+1:08:11 9 Recap
+
+LINKS
+Written reference design: https://github.com/nirmata78/design-room/blob/main/solutions/SD-96-url-shortener/SD-96_URL_Shortener_Reference_Design.md
+Run this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room
+All videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md
+
+ABOUT THIS VIDEO
+This is a scripted walkthrough, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script, diagrams and the written design were produced with Claude Code. Numbers are back-of-the-envelope estimates for the exercise, labelled as given, derived, illustrative or initial targets, not any company's real figures, and this is not any company's actual design. The technical content has not been reviewed by a person.
+
+#SystemDesign #SoftwareEngineering #DistributedSystems

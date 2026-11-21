@@ -1,0 +1,42 @@
+A customer at a counter wants to pay a $1,200 bill in instalments, and you have three seconds to decide. The load is tiny: eight applications a second at the peak. The grade is on everything else. This is a full reference solution at the Staff bar (L6/L7): theory, a three-version design, eight challenges that break it, and the build cost. 70 minutes, 149 numbered slides, with an interviewer, a candidate and a coach.
+
+The thesis: instant credit at the counter is a regulated decision under a deadline set by slow, paid vendors, followed by one atomic step. Every degraded path is a credit decision with an owner and a cap, not an engineering default.
+
+IN THIS VIDEO
+• Estimates that decide: 8 applications a second (one database), $2M a month in bureau pulls (never race them), 3 % of applications reaching the deadline without a bureau (a signed policy, not a catch block)
+• Theory: four safety and three liveness properties, six mechanisms, an options matrix with a pick and an honest equal
+• Eight challenges: a slow bureau, a bureau down for everyone, a phone that drops between accept and the answer, funding that fails after booking, explaining a decline fourteen months later, a new model that approves more, where identity data lives, and how you would know
+• The build cost and the six owners (marked AUX, the manager layer)
+
+HOW TO USE IT
+Run the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first. Slides badged AUX are the manager layer: skip them in a Staff round.
+
+CHAPTERS
+0:00 0 Cold open
+2:30 1 Requirements and scope
+7:37 2 Estimates
+12:05 3 Theory
+20:11 4 API and entities
+23:47 5 High-level design
+31:30 6 Bridge
+32:14 7 Challenges
+32:31 7.1 Challenge 1: The bureau is slow
+37:05 7.2 Challenge 2: The bureau is down for everyone
+41:26 7.3 Challenge 3: The phone drops
+45:48 7.4 Challenge 4: Funding fails after booking
+49:32 7.5 Challenge 5: Explain a decision fourteen months later
+53:52 7.6 Challenge 6: A new model approves six percent more
+57:32 7.7 Challenge 7: Where identity data lives
+1:01:08 7.8 Challenge 8: How would you know it is broken?
+1:04:49 8 Build cost
+1:07:24 9 Recap
+
+LINKS
+Written reference design: https://github.com/nirmata78/design-room/blob/main/solutions/SD-82-credit-decisioning/SD-82_Credit_Decisioning_Reference_Design.md
+Run this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room
+All videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md
+
+ABOUT THIS VIDEO
+This is a scripted walkthrough, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script, diagrams and the written design were produced with Claude Code. Numbers are back-of-the-envelope estimates for the exercise, labelled as given, derived, illustrative or initial targets, not any lender's real figures, and this is not any company's actual design. Statements about lending rules are general and not legal or compliance advice. The technical content has not been reviewed by a person.
+
+#SystemDesign #Fintech #DistributedSystems

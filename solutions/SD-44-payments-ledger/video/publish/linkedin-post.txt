@@ -1,0 +1,21 @@
+Your payment call times out. Did the customer pay? "Mark it failed" is how double charges happen.
+
+I've published a 74-minute reference solution for the payment system and double-entry ledger question, at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on 160 numbered slides.
+
+The idea that unlocks it: exactly-once does not exist across a network boundary. So you design for one effect per intent, a state for "we don't know yet", and a reconciliation that finds what everything else missed.
+
+What it goes into:
+→ A timeout is a state: UNKNOWN, then an inquiry by your own reference
+→ Idempotency keys are inserted, not checked
+→ A balance is a sum of immutable entries, never a column
+→ Reconciliation is a component, not a safety net
+
+Best on a second pass: pause after each question and answer it first.
+
+▶ [YouTube link: rerun publish_kit.py with --youtube-url]
+
+It's a scripted walkthrough with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator.
+
+When your books and the processor's disagree by two, where do you start?
+
+#SystemDesign #SoftwareEngineering #Fintech

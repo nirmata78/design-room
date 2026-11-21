@@ -235,7 +235,56 @@ def domains():
     return svg(W, H, b)
 
 
-FIGS = {"p6-hash-range": hash_range, "p6-mod-n": mod_n, "p6-ring": ring, "p6-split": split, "p6-move": move,
+
+# ---------------------------------------------------------------- p6-repair-fanin  (replaces a text block)
+def repair_fanin():
+    W, H = 1600, 700
+    b = [text(800, 26, "A node holding 4 TB fails. Its ranges are copied again from the partners that hold them.", 22, INK, "middle", 700), panel(30, 50, 740, 620, "red", "partners on 2 nodes", at="top"), panel(830, 50, 740, 620, "green", "partners spread over 100 nodes", at="top")]
+    # left
+    b.append(box(300, 300, 200, 90, ["new copies", "4 TB in total"], RED))
+    for x in (90, 510):
+        b.append(box(x, 130 if x == 90 else 130, 200, 80, ["partner"], BLUE, size=22))
+    b.append(arrow(190, 212, 360, 298, colour=BLUE, w=3)); b.append(arrow(610, 212, 440, 298, colour=BLUE, w=3))
+    b.append(text(400, 470, "rebuild reads from 2 sources", 23, INK, "middle"))
+    b.append(text(400, 510, "4 TB ÷ (2 × 100 MB/s)", 23, MUTED, "middle"))
+    b.append(text(400, 590, "about 5.6 hours exposed", 30, RED, "middle", 800))
+    # right
+    cx, cy = 1200, 345
+    b.append(box(cx - 100, cy - 45, 200, 90, ["new copies", "4 TB in total"], GREEN))
+    import math as _m
+    for k in range(20):
+        a = 2 * _m.pi * k / 20
+        x, y = cx + 300 * _m.cos(a), cy + 205 * _m.sin(a)
+        b.append(rect(x - 26, y - 16, 52, 32, FILL[BLUE], BLUE, 2, 6))
+        b.append(line(x - (x - cx) * 0.18, y - (y - cy) * 0.18, cx + (x - cx) * 0.42, cy + (y - cy) * 0.42, BLUE, 1.6, arrow=True))
+    b.append(text(cx, 600, "100 sources × 40 GB, in parallel", 23, INK, "middle"))
+    b.append(text(cx, 650, "under 7 minutes exposed", 30, GREEN, "middle", 800))
+    return svg(W, H, b)
+
+
+# ---------------------------------------------------------------- p6-id-bits  (replaces a text block: the 64-bit ID)
+def id_bits():
+    W, H = 1600, 620
+    PX = 1500 / 64
+    parts = [(1, "sign", "", GREY), (41, "milliseconds since a custom epoch", "2⁴¹ ms ≈ 69 years", BLUE), (10, "worker", "1,024 workers", AMBER), (12, "sequence", "4,096 per ms per worker", GREEN)]
+    x = 50
+    b = [title(50, 50, "One 64-bit ID: time, then worker, then a counter")]
+    for bits, lab, sub, col in parts:
+        w = bits * PX
+        b.append(rect(x, 100, w, 110, FILL[col], col, 3, 6))
+        if lab == "sign": b.append(text(x, 88, "1 sign bit", 20, MUTED, "start")); x += w; continue
+        b.append(text(x + w / 2, 150, f"{bits} bits", 24, col, "middle", 800))
+        if True:
+            b.append(text(x + w / 2, 185, lab, 21, INK, "middle"))
+            b.append(text(x + w / 2, 250, sub, 23, col, "middle", 700))
+        x += w
+    b.append(text(50, 330, "≈ 4 million IDs a second per worker · unique with no coordination · roughly ordered by time", 23, INK))
+    b.append(text(50, 420, "Alternatives", 24, INK, "start", 800))
+    b.append(text(50, 465, "**UUID version 7** (standardised in RFC 9562, 2024): 48 bits of milliseconds, then random bits. No worker IDs to assign.", 22, INK))
+    b.append(text(50, 510, "**Leased ranges**: a worker takes IDs 1,000,000 to 1,009,999 from a central counter, and hands them out locally.", 22, INK))
+    return svg(W, H, b)
+
+FIGS = {"p6-repair-fanin": repair_fanin, "p6-id-bits": id_bits, "p6-hash-range": hash_range, "p6-mod-n": mod_n, "p6-ring": ring, "p6-split": split, "p6-move": move,
         "p6-routing": routing, "p6-indexes": indexes, "p6-domains": domains}
 
 if __name__ == "__main__":

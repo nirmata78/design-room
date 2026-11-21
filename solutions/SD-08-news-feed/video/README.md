@@ -1,32 +1,89 @@
-# SD-08 news feed — mock-round video (v3, Staff L6/L7)
+# SD-08 · News feed / home timeline: reference-solution video
 
-A narrated mock system-design round at the **Staff L6/L7** bar, **43:48 at 1080p, 23 chapters, 74 numbered slides** (AUX = EM layer, optional), in local
-Kokoro voices (interviewer, candidate, candidate key lines spoken slower, coach) with burned-in captions and
-chapters. Built with the `system-design-video` skill to `slide-video-kit/STANDARD.md`; content follows
-`../../SD-08-news-feed.md`.
+Staff bar (L6/L7), manager layer marked AUX. **Length 73:52**, 18 chapters, **164 numbered slides**, **9,087 spoken words**
+(candidate 83.8 %, interviewer 4.0 %, key line 7.9 %, coach 4.3 %). Built 2026-11-20 in the SD-94 reference format. Scripted
+walkthrough with synthetic voices; figures are illustrative, not any company's numbers. **The technical content has not been
+reviewed by a person, and the video has not been watched end to end.** It replaces the earlier mock-round videos, which have
+been retired.
 
-| File | Role |
+Written companion: [`../SD-08_News_Feed_Reference_Design.md`](../SD-08_News_Feed_Reference_Design.md) (PDF built locally, 30 pages,
+about 10,900 words). Outline and budget: [`OUTLINE.md`](OUTLINE.md).
+
+## Chapters
+
+| Time | Chapter |
 |---|---|
-| `feed-mock.script.md` | the spoken script: `[slide: v-NN]` / `[pause: s]` cues, `I:` / `C:` / `V:` (key line) / `N:` coach |
-| `video-slides.html` + `video.css` + `deck.css` | 74 one-idea 16:9 slides; diagrams inlined from `svg/` |
-| `diagrams.py` → `svg/` | C4 context, write-path and read-path container views, the feed-service component view, six sequences (outbox/CDC, publish, read, celebrity merge, delete on read, rebuild), push vs pull, the follower tail, a Chen conceptual ERD, the physical tables, wide-column partitions, the Redis key space and its writers, fan-out routing on `authorTier`, the fan-out tiers, the 48-hour delta, phasing, four follow-up diagrams |
-| `build-video.sh` | diagrams → slides → `frames/` → `feed-mock.mp4` (`--frames` stops after the frames) |
+| 00:00 | 0 Cold open |
+| 03:07 | 1 Requirements and scope |
+| 08:07 | 2 Estimates |
+| 13:40 | 3 Theory |
+| 22:40 | 4 API and entities |
+| 26:14 | 5 High-level design |
+| 36:24 | 6 Bridge |
+| 37:05 | 7 Challenges |
+| 37:24 | 7.1 Challenge 1: The celebrity post |
+| 41:32 | 7.2 Challenge 2: Where is the line, and who crosses it? |
+| 46:03 | 7.3 Challenge 3: Delete, block, unfollow |
+| 49:39 | 7.4 Challenge 4: Twice, or never |
+| 53:11 | 7.5 Challenge 5: A timeline shard is gone |
+| 57:33 | 7.6 Challenge 6: The ranker takes 300 ms |
+| 61:24 | 7.7 Challenge 7: Catch up on the last 48 hours |
+| 64:55 | 7.8 Challenge 8: How would you know the feed got worse? |
+| 68:54 | 8 Build cost (AUX) |
+| 71:03 | 9 Recap |
 
-Shape: requirements (the maximum follower count), the thesis ("push for most accounts, pull for celebrities"), four
-numbers (the celebrity post is a hundred million writes; IDs not bodies, 4 TB vs 250 TB), API and cursor, stores, the
-C4 walk, three deep dives (the celebrity threshold and crossing, deletes and blocks on the read path, a lost timeline
-shard), the 48-hour catch-up as a mid-round delta, failures, freshness SLO, cost, phasing and teams, the close; then
-four manager follow-ups: **(1)** the ranking team wants 300 ms; **(2)** a timeline cluster is lost on a Sunday
-evening; **(3)** pure pull to hybrid in one quarter; **(4)** the timeline memory bill doubled. QA: Whisper excerpts
-76–88% (homophones), a sync probe at 19:40, sampled frames; not watched end to end. The MP4 and `frames/` are
-gitignored; rebuild with `video/build-video.sh` (about 15 minutes).
+## The eight challenges
 
-**v2 (2026-10-29)** adds, per `STANDARD.md` §1a: estimates as calculations (slides 9–12), wire formats for publish and the feed page with a signed cursor (14–16), the Redis key space and an ERD (17–18), three technology-vs-alternatives tables (20–22), fan-out worker and read-path pseudo-code (27, 29), the follower-threshold table (34), cost arithmetic (47), and a fifth technical follow-up, the power reader (59–60). Phasing and teams are AUX. QA: Whisper 72–89%, sync probe at 20:00, sampled frames; not watched end to end. v1 is in `.v1-em-2026-10-29/`.
+| # | Challenge | The fix |
+|---|---|---|
+| 1 | The celebrity post | Pull it: one write to the author's recent list; priority lanes for bursts |
+| 2 | Where is the line, and who crosses it? | Three tiers from both sides of the arithmetic, hysteresis, no backfill; power readers precomputed |
+| 3 | Delete, block, unfollow | Correctness on the read path; cleanup is cosmetic; a recently-removed set as backstop |
+| 4 | Twice, or never | A set keyed by post ID; a (score, ID) cursor; the session's ranked list |
+| 5 | A timeline shard is gone | Rebuild by pull, coalesced, rate-limited, degraded beyond the limit |
+| 6 | The ranker takes 300 ms | A hard deadline, a counted fallback, an owner for the fallback rate |
+| 7 | Catch up on the last 48 hours | The source of truth through the rebuild path, cached; a view only if it earns it |
+| 8 | How would you know it got worse? | Synthetic probes per tier, quality metrics, symptom pairs, the memory lever |
 
-**v3 (2026-10-29, the author's review of v2: "too quick to follow")** follows `STANDARD.md` §1b. New: a vocabulary
-slide plus pictures for push vs pull and the follower tail (7–9); the ranking service's request and response (20);
-the data model as a Chen conceptual ERD, then physical tables, a wide-column explainer, the Redis keys with arrows
-between them, and who writes each key (21–26); outbox vs CDC and its sequence (32–33); fan-out routing on
-`authorTier` (35); each path told as C4 → sequence → code, with the code split into two readable slides per path
-(write 31–37, read 38–42). Every diagram is walked box by box or message by message. The script grew from 3,400 to
-5,800 words. QA: Whisper excerpts 76–86% (all flagged words homophones: cache/cash, dedup), sync probe at 40:00, sampled frames; not watched end to end. Copied to Drive as `Interview videos/System design/SD-08-news-feed.mp4`. v2 is in `.v2-staff-2026-10-29/`.
+## Rebuild
+
+```bash
+solutions/SD-08-news-feed/video/build-video.sh            # diagrams -> slides + script -> frames -> news-feed-reference.mp4
+solutions/SD-08-news-feed/video/build-video.sh --frames   # stop after the frames
+solutions/SD-08-news-feed/build-sd-booklet.sh SD-08_News_Feed_Reference_Design   # the written reference design (PDF)
+python3 ~/.claude/skills/slide-video-kit/scripts/publish_kit.py solutions/SD-08-news-feed/video/publish/meta.json
+```
+
+The slides and the script are generated together from `video/src/*.py` (the SD-94 DSL, plus KaTeX formulas and highlighted
+code with a language flag): edit the sources, not `video-slides.html` or the script. Every frame has exactly one cue.
+
+## QA done
+
+- ffprobe: H.264 1920×1080 + AAC, 18 chapters, no subtitle stream; 73:52.
+- Every one of the 164 frames read on contact sheets before the voice build (fixed: an overflowing code slide, a shrunken
+  baseline, sequence widths); every SVG checked on sheets.
+- Whisper (faster-whisper base.en) on 20 excerpts of 45 s: confidence −0.14 to −0.28; 21 suspect substitutions, all
+  homophones or near-homophones (write/right, cache/cash, waits/weights, bill/build), none a mispronounced term.
+- Eight frames sampled across the length with their burned captions: slide and caption agree, including at 73:00 (sync).
+- **Not watched end to end.**
+
+## Canon check
+
+| Canonical point | Source | Covered at, or dismissed because |
+|---|---|---|
+| Feed publishing and feed retrieval as two flows | book ch. 11; cue sheet | FR1, FR2 flows; V2 |
+| Fan-out on write against fan-out on read, pros and cons | book; all | Theory 3 and 5; C1 |
+| Hybrid: push for most, pull for celebrities | book; cue sheet | Pick E; C1, C2 |
+| Inactive users: don't fan out to them | book (as a pull advantage); cue sheet | Ch. 2; M3; ch. 8 lever |
+| Graph store for follow relations; filter by mute settings | book | Ch. 4; FR4; C3 |
+| News feed cache stores IDs, not objects | book; cue sheet | M4; ch. 2 (4 TB against 250 TB) |
+| Five cache tiers (feed, content with hot set, graph, action, counters) | book | Ch. 4 physical; counters dismissed aloud as a separate service |
+| Message queue between post and fan-out | book | M7; V2 (outbox + log) |
+| Ranking as a separate stage with a budget | cue sheet | M6; C6 |
+| Cursor pagination | cue sheet | C4 |
+| Celebrity threshold and its transition | cue sheet (crux) | C2 |
+| Deletes and blocks | cue sheet | C3 |
+| Cache loss and rebuild | cue sheet | C5 |
+| 48-hour catch-up curveball | cue sheet | C7 |
+| Rate limiting, authentication, CDN for media | book (wrap-up) | Dismissed aloud in ch. 1 OUT: standard edge concerns, not this question's grade |
+| What changed since the book | — | Ranked feeds with a candidate-generation stage are now the default; "chronological only" is a user setting, which C7 covers |

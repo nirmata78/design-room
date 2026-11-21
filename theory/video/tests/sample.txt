@@ -5,6 +5,7 @@
 N: This is the sample part. It exists so the builder can be tested.
 
 ## 99.1 Every slide type
+N: First, every slide type the builder knows, one after another.
 
 = panel note | Assumed reading | What this part does not repeat
 A short note about reading.
@@ -41,7 +42,7 @@ N: Three items. The first. The second. And the third. Then the takeaway.
 sample-box
 N: One box in a figure, drawn for this test.
 
-= code | Code | Two lines
+= code python | Code | Two lines
 x = 1
 y = x + 1
 N: Two lines of code. Y is one more than X.

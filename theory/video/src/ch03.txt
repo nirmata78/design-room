@@ -5,6 +5,7 @@
 N: Part three, consensus. In an infrastructure round this is the subject most likely to be drilled to the bottom. You will rarely be asked to invent it. You will be asked what happens to one particular write when one particular node fails, and the answer has to come from the mechanism.
 
 ## 3.0 Why this part decides rounds
+N: First, why consensus decides infrastructure rounds, through one story about two leaders.
 
 = panel trap | The opening story | Two leaders, each sure it leads
 A leader is cut off from its followers. It does not know. It keeps accepting writes.
@@ -12,13 +13,20 @@ On the other side, the followers time out and elect a new leader, which also acc
 The interviewer asks: "A client wrote to the old leader during those ten seconds. Where is that write now?"
 N: A leader is cut off from its followers, and does not know it. It keeps accepting writes. On the other side of the partition, the followers time out and elect a new leader, which accepts writes too. Two leaders, each sure it leads. The interviewer asks: a client wrote to the old leader during those ten seconds. Where is that write now? By the end of this part you can answer in one sentence. It was never committed, the client was never told it succeeded, and it will be erased.
 
-= panel note | Assumed reading | What this part does not repeat
-The Raft paper, extended version: section 5 (the algorithm) and section 8 (client interaction). Read them with the figures.
-The SRE book, chapter 23, *Managing Critical State*: what to build on consensus and how to deploy it.
-This part walks the algorithm as one trace and then goes to what the paper leaves to implementers.
-N: Two readings are assumed. Sections five and eight of the extended Raft paper. And chapter twenty-three of the S-R-E book, which covers what you build on top of consensus and how to deploy it. This part walks the algorithm as one continuous trace, and then goes to what production adds.
+= cards c2 | How this part works | Every idea twice: from the ground up, then at interview depth
+grn From the ground up :: What the idea is, in plain words, with an everyday example. No prior reading needed.
+Interview depth :: The mechanism, how it fails, one level down, the alternative and its price, and the line to say.
+> Part two introduced consensus in one sentence. This part opens the box.
+N: As before, every idea comes twice: first from the ground up, in plain words, then at interview depth. Part two introduced consensus in one sentence: a group of machines agreeing on one value, even when some of them fail. This part opens the box and shows how it works.
 
 ## 3.1 State-machine replication
+N: We start with the idea consensus serves: many copies of one program, fed the same log.
+
+= cards c2 | FND-14 · From the ground up | A state machine and a log, with a bank account
+The log :: An ordered list of commands: *open account*, *deposit 100*, *withdraw 30*, *deposit 5*.
+The state machine :: A program that applies one command at a time to its state. Start at 0, apply the log: **75**.
+> Give three copies the same log, in the same order, and all three reach 75. Disagree on the order, and a withdrawal can bounce on one copy and not on another.
+N: From the ground up, with a bank account. The log is an ordered list of commands. Open the account. Deposit a hundred. Withdraw thirty. Deposit five. The state machine is a program that applies one command at a time. Start at zero, apply the log, and the balance is seventy-five. Now give the same log, in the same order, to three copies of the program. All three reach seventy-five. But if two copies disagree about the order, a withdrawal can bounce on one and succeed on the other. So the only thing the copies need to agree on is the log.
 
 = dia | FND-14 · Tier B · The mechanism | The same log, applied in the same order, gives the same state
 @ FND-14
@@ -35,7 +43,15 @@ N: Three conditions, each easy to break. Apply must be deterministic. No local t
 V: A replicated log, applied deterministically in order, gives identical replicas. So consensus is really agreement on a log, and everything else is a state machine on top.
 [pause: 0.8]
 
+= math | FND-14 · From the ground up | Why a majority, and why odd numbers
+~ With \(N\) voters, a decision needs a majority, and the group survives \(f\) failures:
+$$ \text{majority} = \lfloor N/2 \rfloor + 1 $$ :: any two majorities share at least one voter, who remembers
+$$ f = \lfloor (N-1)/2 \rfloor $$ :: 3 voters survive 1 failure, 5 survive 2
+$$ N = 4 \Rightarrow f = 1 $$ :: a fourth voter adds cost and no extra tolerance: use odd numbers
+N: From the ground up, why a majority. With N voters, a decision needs more than half of them. The reason is overlap. Any two majorities share at least one voter, and that voter remembers what the first majority decided. With three voters, the group survives one failure. With five, two. And with four? Still only one, because a majority of four is three. The fourth voter adds cost, and no tolerance. That is why consensus groups have three or five members.
+
 ## 3.2 Raft: the election
+N: Next, Raft as one continuous trace. Step one, the election.
 
 = dia | CON-03 · Tier A · The trace, step 1 | A follower times out, raises the term and asks for votes
 @ CON-03
@@ -49,23 +65,25 @@ N: Now Raft, as one trace on five servers. Time is divided into terms, numbered 
 N: Why is this safe? Each server votes once per term, and any two majorities of five share at least one server. So two candidates cannot both win the same term. Why is it quick? The timers are random on purpose, so one server usually fires well before the others. A split vote just times out and tries again. And one rule ties it together: any server that sees a higher term steps down at once. That is how a cut-off leader, when it reconnects, learns that it was replaced.
 
 ## 3.3 Raft: replication
+N: Step two: how the leader copies the log, and when an entry counts as committed.
 
 = dia | CON-03 · Tier A · The trace, step 2 | Append, check the previous entry, commit on a majority
 p3-append
 N: The leader of term two receives a command from a client. Step one: it appends the entry to its own log at index five, and writes it to disk. Step two: it sends the entry to every follower, along with the index and term of the entry just before it. Step three: each follower checks that its own log has that previous entry. If so, it appends, writes to disk, and acknowledges. Step four: once three of the five have it, the entry is committed. The leader applies it and answers the client. Followers learn the new commit point from the next message.
 
-= code | CON-03 · Tier A · One level down | What is on disk before anyone answers
-persisted with fsync BEFORE replying to any message:
-    currentTerm     the highest term this server has seen
-    votedFor        whom it voted for in currentTerm
-    log[]           every entry, with its term
+= cards c2 | CON-03 · From the ground up | Written is not the same as on disk
+write() :: The bytes land in the operating system's memory. Fast. A power cut **loses them**, even though the program was told "done".
+fsync() :: Forces those bytes onto the device and waits. On a cloud disk about a millisecond. After it returns, a power cut cannot lose them.
+> "Durable" means: an fsync returned before you said yes.
+N: From the ground up, one detail that every storage system depends on. When a program writes to a file, the bytes first land in the operating system's memory. That is fast, and the program is told the write is done. But a power cut loses them. A second call, fsync, forces the bytes onto the device and waits until they are there. On a cloud disk that takes about a millisecond. After it returns, a power cut cannot lose them. So durable means one precise thing: an fsync returned before you said yes.
 
-volatile, rebuilt after a restart:
-    commitIndex     highest entry known to be committed
-    lastApplied     highest entry applied to the state machine
-
-cost of one write = leader fsync  ∥  (round trip + follower fsync)
-                    to the fastest majority
+= table | CON-03 · Tier A · One level down | What is on disk before anyone answers
+State | Where | Lose it, and…
+`currentTerm`, the highest term seen | fsync before any reply | a server could go back to an old term
+`votedFor`, the vote in that term | fsync before any reply | **two votes in one term: two leaders**
+`log[]`, every entry with its term | fsync before acknowledging | **a committed entry could vanish**
+`commitIndex`, `lastApplied` | memory, rebuilt on restart | nothing: recomputed from the log
+> One write costs a leader fsync, in parallel with a round trip and an fsync on the fastest majority.
 N: One level down: what is on disk before anyone answers? Three things. The current term, the vote cast in that term, and the log. They are forced to disk before a server replies to anything. Lose the vote, and a restarted server could vote twice in one term, and there could be two leaders. Lose a log entry it acknowledged, and a committed entry could vanish. So the cost of one write is a disk sync on the leader, in parallel with a round trip and a disk sync on the fastest majority of followers. Batching many entries into one sync is how real systems get throughput.
 
 = panel key | CON-03 · Tier A · The log-matching check | How a follower's log is repaired
@@ -75,6 +93,7 @@ Only uncommitted entries can ever be overwritten. That is what happens to the wr
 N: What if the follower's log is different? Then it does not have the previous entry, and it rejects the message. The leader steps back one entry and tries again, until it finds the last point where the two logs agree. From there the follower's entries are overwritten with the leader's. And here is the answer to the opening story. The cut-off leader appended a write that never reached a majority. When it rejoins as a follower, that entry is overwritten. Only uncommitted entries can ever be overwritten.
 
 ## 3.4 Raft: the two safety rules
+N: Step three: the two safety rules that make all of it correct.
 
 = panel key | CON-03 · Tier A · The election restriction | Only an up-to-date server may win
 A server grants its vote only if the candidate's log is **at least as up to date** as its own: a higher last term wins; with equal last terms, the longer log wins.
@@ -107,6 +126,7 @@ V: Raft has terms with at most one leader each. The leader appends, and follower
 [pause: 0.8]
 
 ## 3.5 Raft in production
+N: Next, what a production Raft adds to the paper, and how you operate one.
 
 = table | CON-04 · Tier B · The mechanism | Five things the core algorithm leaves to you
 @ CON-04
@@ -124,11 +144,21 @@ Adding or removing **one** server at a time guarantees that any old majority and
 The configuration is itself a log entry, and a server uses the newest configuration in its log, committed or not.
 N: Membership is the dangerous one. Go from three servers to five in a single step, and for a moment two of the old servers, and three of the new, can each believe they are a majority. Two leaders in one term. Change one server at a time, and any old majority and any new majority are guaranteed to share a server. The configuration is itself an entry in the log. To replace a dead replica: add the new one as a learner, let it catch up, promote it, then remove the dead one.
 
+= table | CON-04 · Tier B · Operating it | What to watch on a running consensus group
+Signal | Healthy | What it tells you
+Leader changes | a few a week | Many an hour: a flapping network, a busy leader, tight timeouts
+Commit latency, p99 | nearest-majority round trip + fsync | Rising: a slow disk or follower on the critical path
+Followers behind | none, or one catching up | Two of three behind: one more failure and writes stop
+Disk sync latency | about 1 ms | Spikes: a noisy neighbour; elections follow
+> A consensus group holds the **critical state**: who leads, who holds a lock, the configuration. Keep bulk data out of it.
+N: Operating one, from scratch. Watch four signals. Leader changes: a few a week is healthy, many an hour means a flapping network, an overloaded leader, or timeouts set too tight. Commit latency: it should sit near the round trip to the nearest majority plus a disk sync. Followers behind: if two of three are behind, one more failure stops all writes. And disk sync latency, because a slow disk on the leader turns into missed heartbeats and elections. Above all, use a consensus group for critical state only: who leads, who holds a lock, the configuration. Bulk data belongs elsewhere.
+
 = th | CON-04 · the line to say | Production Raft adds single-server membership change, snapshots, pre-vote, learners and leadership transfer.
 V: Beyond the paper's core, a production system needs membership change one server at a time, snapshots to bound the log, pre-vote against disruptive rejoiners, non-voting learners for new replicas, and leadership transfer for maintenance.
 [pause: 0.8]
 
 ## 3.6 Linearizable reads
+N: Next, reads. Why reading from the leader is not automatically linearizable.
 
 = dia | CON-05 · Tier B · The mechanism | The leader must prove it still leads before it answers a read
 @ CON-05
@@ -148,6 +178,7 @@ V: Reading from a leader is not enough. Either the leader confirms it still lead
 [pause: 0.8]
 
 ## 3.7 Paxos, single decree
+N: Next, Paxos, the older algorithm, for a single value.
 
 = dia | CON-01 · Tier B · The mechanism | Two phases, and a proposer that must adopt what it finds
 @ CON-01
@@ -164,6 +195,7 @@ V: Single-decree Paxos has two phases: prepare and promise, then accept and acce
 [pause: 0.8]
 
 ## 3.8 Multi-Paxos
+N: Next, Multi-Paxos: from one value to a log, and how it compares with Raft.
 
 = table | CON-02 · Tier B · The mechanism | From one value to a log, and from a paper to a service
 @ CON-02
@@ -181,21 +213,25 @@ Multi-Paxos lets any node lead and **recover** missing entries during phase one;
 For a design round they are the same building block. Say "a consensus log" and name whichever your store uses.
 N: How do they compare? Both have a leader, a replicated log, majorities, and one round trip per write in the steady state. Raft requires the new leader to already hold every committed entry, and its log has no gaps. Multi-Paxos lets any node lead, and recovers missing entries during phase one, so slots may be decided out of order. For a design round they are the same building block. Say a consensus log, and name whichever the store you have in mind uses.
 
+= panel now | CON-02 · Since 2025 | Consensus became the default plumbing
+Kafka 4.0 (March 2025) runs only in KRaft mode: cluster metadata lives on a Raft log inside Kafka, and ZooKeeper is gone.
+etcd, Consul, CockroachDB, TiKV and YugabyteDB all use Raft; Spanner uses Paxos groups per split.
+In a 2026 round, "a consensus log" is an ordinary component. The questions are about its failure modes, not its existence.
+E: Since 2025, consensus has become ordinary plumbing. Kafka four point oh, released in March 2025, runs only in its Raft mode. The cluster's metadata lives on a Raft log inside Kafka itself, and the separate ZooKeeper ensemble is gone. etcd, Consul, CockroachDB, TiKV and YugabyteDB all use Raft, and Spanner uses Paxos groups per split. So in a round today, a consensus log is an ordinary component. The questions are about how it fails, not whether it exists.
+
 = th | CON-02 · the line to say | A stable leader skips phase one for a run of slots. Production adds snapshots, membership, leases and corruption checks.
 V: In Multi-Paxos a stable leader runs phase one once and then needs one round trip per log slot. A production implementation adds snapshots, membership change, leader leases and checks against disk corruption.
 [pause: 0.8]
 
 ## 3.9 Many groups at once
+N: Next, scale. Why a large store runs thousands of consensus groups at once.
 
-= code | CON-06 · Tier B · The mechanism | One group cannot hold a large store, so there is one per shard
+= math | CON-06 · Tier B · The mechanism | One group per shard, and what thousands of them cost
 @ CON-06
-100 TB of data  ÷  256 MB per range        =  about 400,000 ranges
-× 3 replicas                                =  1,200,000 replicas
-÷ 150 nodes                                 =  8,000 replicas on every node
-
-heartbeats, one per group every second, done naively:
-each node leads about 2,700 groups × 2 followers  =  5,300 messages a second, per node
-coalesced: one message per pair of nodes per tick =  149 a second, per node
+$$ \dfrac{100\ \text{TB}}{256\ \text{MB}} \approx 4 \times 10^{5}\ \text{ranges} $$ :: one consensus group per range
+$$ 4 \times 10^{5} \times 3 \,/\, 150\ \text{nodes} = 8{,}000 $$ :: replicas on **every** node
+$$ 2{,}700 \times 2 \approx 5{,}300\ \text{msg/s} $$ :: naive heartbeats: each node leads about 2,700 groups, two followers each
+$$ 150 - 1 = 149\ \text{msg/s} $$ :: coalesced: one heartbeat per other node, per second
 N: One consensus group has one leader, so one machine's throughput. A large store therefore runs one group per shard. Take a hundred terabytes in ranges of two hundred and fifty-six megabytes. That is four hundred thousand ranges. Three replicas each: one point two million replicas. Over a hundred and fifty nodes: eight thousand replicas on every node. Now the cost. If every group sends its own heartbeat each second, each node sends over five thousand messages a second while idle. Coalesce them into one message per pair of nodes, and it is a hundred and forty-nine.
 
 = table | CON-06 · Tier B · One level down | Three costs of running thousands of groups on one node
@@ -210,6 +246,7 @@ V: A large store runs one consensus group per shard. The costs are heartbeats pe
 [pause: 0.8]
 
 ## 3.10 Quorums across regions
+N: Next, placement. Where the voters sit decides what every write costs.
 
 = dia | CON-14 · Tier B · The mechanism | Commit latency is the round trip to the nearest majority
 @ CON-14
@@ -230,6 +267,7 @@ V: I place three or five voters over at least three failure domains. Commit late
 [pause: 0.8]
 
 ## 3.11 Recap
+N: Time to gather the whole part onto one page.
 
 = list | Recap | What to be able to explain without notes
 - Why agreeing on a **log** is enough
@@ -242,6 +280,7 @@ V: I place three or five voters over at least three failure domains. Commit late
 N: You should be able to explain, with no notes: why agreeing on a log is enough. A Raft election. Replication with the previous-entry check. What is on disk before a reply. The election restriction, and the own-term commit rule, with the scenario. How a read is made linearizable. And how to read a commit latency off a table of round trips.
 
 ## 3.12 Probe drills
+N: Now the drills. Pause after each question, answer it aloud, then compare.
 
 = probe | A partitioned leader still accepts a write. What happens to it?
 - It appends locally but **cannot reach a majority**, so the entry never commits
@@ -281,6 +320,7 @@ C: It is the round trip from the leader to the nearest majority. With two, two a
 C: The clients near the new leader gain, and the others lose about the same. But there is a second effect. If the new region has only one voter, the leader needs two remote acknowledgements, so every commit gets slower. And the move itself should be a leadership transfer to a caught-up follower, which takes a moment, not a kill, which costs an election timeout.
 
 ## 3.13 Where this shows up
+N: Finally, where consensus shows up in the design problems.
 
 = table | Where this shows up | What each design problem takes from this part
 Problem | Takes

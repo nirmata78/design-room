@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>SD-82 credit decisioning: slides</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="deck.css">
+<link rel="stylesheet" href="video.css">
+</head><body>
+<!-- v-001 card Cold open -->
+<div class="slide th">
+<div class="lbl">Chapter 0 of 9</div><div class="s">Cold open</div><div class="sub">Instant credit at the point of sale</div><div class="ribbon"><span class="">Requirements</span><span class="">Estimates</span><span class="">Theory</span><span class="">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-002 &lt;div class="who"&gt;Interviewer · the promp -->
+<div class="slide qs">
+<div class="who">Interviewer · the prompt</div><div class="qq">“A customer at a merchant's counter scans a QR code to pay a $1,200 bill in instalments. Design the system that decides within a few seconds whether to lend, shows the offers, and creates the loan when the customer accepts.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-003 &lt;div class="k"&gt;Why it is harder than it  -->
+<div class="slide">
+<div class="k">Why it is harder than it looks</div><h1>Time, evidence and money pull three ways</h1><p class="chips">a slow bureau, one call in ten<i>·</i>a dropped phone<i>·</i>a regulator, 14 months later</p><figure class="grow"><!--SVG:tension--></figure>
+</div>
+<!-- v-004 &lt;div class="k"&gt;Before the design&lt;/div&gt;&lt;h -->
+<div class="slide">
+<div class="k">Before the design</div><h1>What this question grades</h1><table class="bt sm sig"><tr><th>Axis</th><th>Weak signal</th><th>Strong signal</th></tr><tr class=""><td><b>Requirements</b></td><td>“Score the customer and create a loan”</td><td>The lender of record, the counter deadline, vendor latency and cost, decline reasons, retention: asked first</td></tr><tr class=""><td><b>Correctness</b></td><td>A saga that “compensates” every step</td><td>A state machine with one atomic step, accept to book, with an outbox</td></tr><tr class=""><td><b>Trade-offs</b></td><td>Hedged bureau calls; “approve with partial data”</td><td>One deadline; a missing-data policy owned by credit risk, capped</td></tr><tr class=""><td><b>Depth</b></td><td>“The model returns a score”</td><td>Frozen inputs and versions; a capped challenger; a vault with tokens</td></tr><tr class=""><td><b>Operations</b></td><td>CPU and error rate</td><td>Offers in 3 s, approval per merchant per hour, fallback against cap, owners</td></tr></table><div class="grade"><b class="t">Coach · what is graded here</b>Every degraded path is a credit decision with an owner and a cap, not an engineering default.</div>
+</div>
+<!-- v-005 &lt;div class="lbl"&gt;The thesis&lt;/div&gt;&lt;div cl -->
+<div class="slide th">
+<div class="lbl">The thesis</div><div class="s">A <em>regulated decision</em> under a deadline set by <em>slow, paid vendors</em>, then <em>one atomic step</em>. The load is tiny; the grade is on the slow edges, one loan, a decision you can replay, and identity in a small box.</div>
+</div>
+<!-- v-006 &lt;div class="k"&gt;The order I will follow&lt;/ -->
+<div class="slide">
+<div class="k">The order I will follow</div><h1>Scope, numbers, theory, a simple design, then I break it</h1><div class="ribbon" style="margin-top:14pt"><span>Requirements</span><span>Estimates</span><span>Theory</span><span>API + data</span><span>Design</span><span>Challenges</span><span>Cost · AUX</span><span>Recap</span></div><div class="cards c3" style="margin-top:18pt"><div class="cd"><h3>First</h3><p>Requirements and scope. Numbers. A short theory chapter.</p></div><div class="cd grn"><h3>Then</h3><p>API and data. A design in three versions, each answering the one before.</p></div><div class="cd red"><h3>Most of the time</h3><p>Eight challenges that break the design. A build cost. A recap.</p></div></div>
+</div>
+<!-- v-007 card Requirements and scope -->
+<div class="slide th">
+<div class="lbl">Chapter 1 of 9</div><div class="s">Requirements and scope</div><div class="sub">Ask first. Cut on purpose. Put numbers on it.</div><div class="ribbon"><span class="on">Requirements</span><span class="">Estimates</span><span class="">Theory</span><span class="">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-008 &lt;div class="who"&gt;Clarifying question 1 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 1 of 6</div><div class="qq">How many applications?</div><div class="ans">2 million a month. The Saturday peak is about ten times the average.</div>
+</div>
+<!-- v-009 &lt;div class="who"&gt;Clarifying question 2 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 2 of 6</div><div class="qq">How long can the customer wait?</div><div class="ans">Offers on screen in under 3 s for 95 % of applications. 10 s is a lost sale.</div>
+</div>
+<!-- v-010 &lt;div class="who"&gt;Clarifying question 3 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 3 of 6</div><div class="qq">Who is the lender of record?</div><div class="ans">We decide on the partner bank's credit policy and service the loan. The bank is the lender of record.</div>
+</div>
+<!-- v-011 &lt;div class="who"&gt;Clarifying question 4 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 4 of 6</div><div class="qq">Which vendors, and how fast?</div><div class="ans">Two credit bureaus: p50 0.6 s, p99 several seconds, about 1 % errors. An identity and fraud vendor, p99 400 ms. Optional bank-account data: seconds to minutes.</div>
+</div>
+<!-- v-012 &lt;div class="who"&gt;Clarifying question 5 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 5 of 6</div><div class="qq">What do the calls cost?</div><div class="ans">About $1 a bureau pull. Identity checks about 5 cents.</div>
+</div>
+<!-- v-013 &lt;div class="who"&gt;Clarifying question 6 o -->
+<div class="slide qs">
+<div class="who">Clarifying question 6 of 6</div><div class="qq">Which rules apply?</div><div class="ans">Disclosures before signing. The principal reasons for every decline. Records kept about seven years. Fairness testing of models.</div>
+</div>
+<!-- v-014 &lt;div class="k"&gt;Requirements · functional -->
+<div class="slide">
+<div class="k">Requirements · functional</div><h1>Four things the system must do</h1><div class="cards c2"><div class="cd"><h3>FR1 · Apply</h3><p>The customer scans the merchant's code. Identity goes into a vault. An application exists, and a retry returns the same one.</p></div><div class="cd grn"><h3>FR2 · Decide</h3><p>Identity, fraud and credit data under one deadline. Offers, a refer, or a decline with reasons.</p></div><div class="cd amb"><h3>FR3 · Accept and book</h3><p>The customer accepts one disclosed offer. Exactly one loan is booked.</p></div><div class="cd red"><h3>FR4 · Fund and hand off</h3><p>The merchant is paid net of fees. The loan goes to servicing. Decline notices go out.</p></div></div>
+</div>
+<!-- v-015 &lt;div class="k"&gt;Requirements · non-functi -->
+<div class="slide">
+<div class="k">Requirements · non-functional</div><h1>The numbers, and what each is for</h1><p class="chips">all initial targets, not measurements</p><div class="tiles" style="--n:4"><div class="tile blue"><b>3 s</b><span>offers on screen, p95</span></div><div class="tile red"><b>0</b><span>loans booked twice or unaccepted</span></div><div class="tile"><b>7 years</b><span>every decision replayable</span></div><div class="tile blue"><b>vault</b><span>raw identity nowhere else</span></div></div><div class="line a">Plus: 99.9 % in merchant hours · merchant funded within one business day · every degraded path under a cap.</div>
+</div>
+<!-- v-016 &lt;div class="k"&gt;Requirements · scope&lt;/div -->
+<div class="slide">
+<div class="k">Requirements · scope</div><h1>In, and out on purpose</h1><div class="cards c2"><div class="cd grn"><h3>In scope</h3><p>Apply, identity, decide, offers, refer, accept, book, the funding instruction, the servicing handoff, decline notices.</p></div><div class="cd red"><h3>Out, on purpose</h3><p>Repayments and the ledger (SD-95). Card authorisation (SD-77). Merchant onboarding and merchant fraud. Model training: we load a versioned model. Collections. The payment rail.</p></div></div>
+</div>
+<!-- v-017 &lt;div class="lbl"&gt;The core&lt;/div&gt;&lt;div clas -->
+<div class="slide th">
+<div class="lbl">The core</div><div class="s">The core is three things: an <em>orchestrator</em> that decides under one deadline with a policy for what is missing; a <em>state machine</em> whose only atomic step is accept to book; and a <em>record and a vault</em>.</div>
+</div>
+<!-- v-018 card Estimates -->
+<div class="slide th">
+<div class="lbl">Chapter 2 of 9</div><div class="s">Estimates</div><div class="sub">Three numbers, each with the decision it drives</div><div class="ribbon"><span class="done">Requirements</span><span class="on">Estimates</span><span class="">Theory</span><span class="">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-019 &lt;div class="k"&gt;Estimates · the load&lt;/div -->
+<div class="slide">
+<div class="k">Estimates · the load</div><h1>Eight a second at the peak</h1><table class="bt sm"><tr><th>Number</th><th>Arithmetic</th><th>Label</th><th>Decides</th></tr><tr class=""><td>Applications</td><td>2 × 10⁶ ÷ (30 × 86,400 s) ≈ <b>0.8/s</b>; peak × 10 ≈ <b>8/s</b></td><td>given → derived</td><td>One relational primary</td></tr><tr class=""><td>Transitions</td><td>8/s × about 6 ≈ <b>50 writes/s</b></td><td>derived</td><td>Every transition can be a committed row</td></tr><tr class=""><td>Vendor calls</td><td>8/s × 4 ≈ <b>32/s</b>; in flight 32 × 2 s ≈ <b>64</b></td><td>derived</td><td>Per-vendor limits matter more than our servers</td></tr></table>
+</div>
+<!-- v-020 &lt;div class="k"&gt;Estimates · the money&lt;/di -->
+<div class="slide">
+<div class="k">Estimates · the money</div><h1>The largest line on the bill is not servers</h1><table class="bt sm"><tr><th>Number</th><th>Arithmetic</th><th>Label</th><th>Decides</th></tr><tr class=""><td>Bureau pulls</td><td>2 × 10⁶ × $1 ≈ <b>$2M a month</b></td><td>illustrative</td><td>Never race two bureaus</td></tr><tr class=""><td>Report reuse</td><td>20 % re-apply in 30 days: 4 × 10⁵ × $1 ≈ <b>$400k a month</b></td><td>illustrative</td><td>A report store with a reuse rule</td></tr><tr class=""><td>Identity checks</td><td>2 × 10⁶ × $0.05 ≈ <b>$100k a month</b></td><td>illustrative</td><td>Also paid per call</td></tr><tr class=""><td>Loans</td><td>2 × 10⁶ × 60 % × 70 % ≈ <b>840,000 a month</b> ≈ $1.0B</td><td>illustrative</td><td>Funding is a daily batch per merchant</td></tr></table>
+</div>
+<!-- v-021 &lt;div class="k"&gt;Estimates · the missing-d -->
+<div class="slide">
+<div class="k">Estimates · the missing-data path</div><h1>Not an edge case: fourteen a minute</h1><table class="bt sm"><tr><th>Number</th><th>Arithmetic</th><th>Label</th><th>Decides</th></tr><tr class=""><td>Bureau missing at the deadline</td><td>≈ 2 % late + ≈ 1 % errors ≈ <b>3 %</b> ≈ 60,000 a month</td><td>illustrative, to measure</td><td>A signed, versioned policy, not a catch block</td></tr><tr class=""><td>At the peak</td><td>8/s × 3 % × 60 s ≈ <b>14 a minute</b></td><td>derived</td><td>Counters and caps on every row</td></tr><tr class=""><td>A 20-minute outage</td><td>8 × 1,200 ≈ <b>9,600</b>; approve all ≈ $11.5M unscored; decline all ≈ <b>4,000</b> lost loans</td><td>derived</td><td>Neither extreme: challenge two</td></tr></table>
+</div>
+<!-- v-022 &lt;div class="k"&gt;Estimates · records&lt;/div&gt; -->
+<div class="slide">
+<div class="k">Estimates · records</div><h1>Kept for years, rarely read</h1><table class="bt sm"><tr><th>Number</th><th>Arithmetic</th><th>Label</th><th>Decides</th></tr><tr class=""><td>Decision records</td><td>2 × 10⁶ × 50 KB ≈ <b>100 GB a month</b></td><td>illustrative</td><td>Object storage, not the database</td></tr><tr class=""><td>Seven years</td><td>100 GB × 84 months ≈ <b>8.4 TB</b></td><td>derived</td><td>Encrypted, a retention lock, a key per record</td></tr></table><div class="line ">The database keeps a reference and the hot fields: outcome, reasons, versions.</div>
+</div>
+<!-- v-023 &lt;div class="k"&gt;Estimates · the latency b -->
+<div class="slide">
+<div class="k">Estimates · the latency budget</div><h1>Three seconds, and where they go</h1><p class="chips">initial target<i>·</i>p95, submit to offers on screen</p><figure class="grow"><!--SVG:budget--></figure>
+</div>
+<!-- v-024 &lt;div class="k"&gt;Estimates · what the numb -->
+<div class="slide">
+<div class="k">Estimates · what the numbers decided</div><h1>Four decisions, before any box is drawn</h1><div class="cards c2"><div class="cd"><h3>One database</h3><p>Eight applications and about fifty writes a second: one replicated relational primary. No sharding.</p></div><div class="cd red"><h3>No races</h3><p>About $1 a pull and $2M a month: a second bureau only on failure, never on slowness.</p></div><div class="cd amb"><h3>A policy, not a catch block</h3><p>About 3 % reach the deadline without a bureau: fourteen a minute at the peak.</p></div><div class="cd grn"><h3>Object storage for records</h3><p>8.4 TB over seven years, written once, rarely read.</p></div></div>
+</div>
+<!-- v-025 card Theory -->
+<div class="slide th theory">
+<div class="lbl">Chapter 3 of 9</div><div class="s">Theory</div><div class="sub">What makes this problem hard, in words that outlive any product name</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="on">Theory</span><span class="">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-026 &lt;div class="lbl"&gt;Theory · 1 of 6 · what  -->
+<div class="slide th theory">
+<div class="lbl">Theory · 1 of 6 · what it is</div><div class="s">A system that gathers identity, fraud and credit data from <em>paid vendors</em> under <em>one deadline</em>, returns an <em>explainable</em> decision with priced offers, and books <em>exactly one loan</em> when the customer accepts an offer <em>they were shown</em>.</div>
+</div>
+<!-- v-027 &lt;div class="k"&gt;Theory · 1 of 6 · what it -->
+<div class="slide theory">
+<div class="k">Theory · 1 of 6 · what it is not</div><h1>Four things it is confused with</h1><div class="cards c2"><div class="cd"><h3>Not a scoring model</h3><p>The model is one input. Policy decides, and pricing prices. Each is versioned on its own.</p></div><div class="cd amb"><h3>Not a payment</h3><p>No money moves at accept. Funding the merchant happens later, asynchronously.</p></div><div class="cd red"><h3>Not a saga</h3><p>Only one step must be atomic. A credit pull cannot be compensated: it happened.</p></div><div class="cd"><h3>Not an underwriting queue</h3><p>Refer means minutes, by text. A human queue of days is another product.</p></div></div>
+</div>
+<!-- v-028 &lt;div class="k"&gt;Theory · 2 of 6 · the pro -->
+<div class="slide theory">
+<div class="k">Theory · 2 of 6 · the properties</div><h1>State safety and liveness separately</h1><div class="prop safe"><div class="lbl">Safety · must never happen</div><p><b>S1</b> A loan booked twice, or without acceptance of the exact offer and disclosure shown.<br><b>S2</b> A decline or a price without reasons about the applicant that can be reproduced.<br><b>S3</b> Raw identity data outside the vault boundary.<br><b>S4</b> More than one pull per bureau per application.</p></div><div class="prop live"><div class="lbl">Liveness · must eventually happen</div><p><b>L1</b> Every application gets an answer (offer, refer, decline) within the deadline.<br><b>L2</b> Every booked loan is funded and handed to servicing, with one effect.<br><b>L3</b> Every referred application is finished within ten minutes.</p></div>
+</div>
+<!-- v-029 &lt;div class="k"&gt;Theory · 3 of 6 · the cen -->
+<div class="slide dia theory">
+<div class="k">Theory · 3 of 6 · the central tension</div><h1>Time against evidence against money</h1><figure class="grow"><!--SVG:tension--></figure>
+</div>
+<!-- v-030 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 1 of 6</div><h1>Scatter-gather under one deadline, a breaker per vendor</h1><div class="prop live"><div class="lbl">Property it protects</div><p>L1 and S4.</p></div><div class="prop"><div class="lbl">How it works</div><p>All vendor calls at once; decide at the deadline with what has arrived. A breaker per vendor stops calls to a vendor failing for everyone.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>One slow vendor setting the customer's wait; customers waiting on a dead vendor.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>Decisions with data missing, which mechanism 2 must decide.</p></div>
+</div>
+<!-- v-031 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 2 of 6</div><h1>A missing-data policy table, signed and capped</h1><div class="prop safe"><div class="lbl">Property it protects</div><p>S2 and L1.</p></div><div class="prop"><div class="lbl">How it works</div><p>A versioned table in the policy: second bureau, decide small and known under a cap, refer, or decline with a real reason. A counter and a dashboard per row.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>“Approve with partial data” as a code default; declines for “our vendor was slow”.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>A refer path to run; an exposure counter; an owner in credit risk who signs it.</p></div>
+</div>
+<!-- v-032 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 3 of 6</div><h1>The application as a state machine</h1><div class="prop safe"><div class="lbl">Property it protects</div><p>S1 and L1.</p></div><div class="prop"><div class="lbl">How it works</div><p>One committed row per transition, with an optimistic version; idempotency keys on create and accept.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>Two workers moving one application; progress lost when a phone drops.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>A committed write per transition: at 50 a second, nothing.</p></div>
+</div>
+<!-- v-033 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 4 of 6</div><h1>One local transaction: book, unique loan, outbox</h1><div class="prop safe"><div class="lbl">Property it protects</div><p>S1 and L2.</p></div><div class="prop"><div class="lbl">How it works</div><p>Move the status at a version, insert the loan under UNIQUE(application_id), insert an outbox row, commit. A relay publishes the row.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>Two loans for one application; a loan nobody hears about.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>A relay to run; consumers that de-duplicate by event ID.</p></div>
+</div>
+<!-- v-034 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 5 of 6</div><h1>An immutable decision record</h1><div class="prop safe"><div class="lbl">Property it protects</div><p>S2.</p></div><div class="prop"><div class="lbl">How it works</div><p>Written once: frozen inputs (the report by reference, the feature vector, missing calls), every version, the outputs and ranked reasons. Old models stay loadable.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>Unexplainable declines; a re-run that contradicts the notice we sent.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>8.4 TB over seven years; a model registry kept for as long as the records.</p></div>
+</div>
+<!-- v-035 &lt;div class="k"&gt;Theory · 4 of 6 · mechani -->
+<div class="slide theory">
+<div class="k">Theory · 4 of 6 · mechanism 6 of 6</div><h1>An identity vault with tokens</h1><div class="prop safe"><div class="lbl">Property it protects</div><p>S3.</p></div><div class="prop"><div class="lbl">How it works</div><p>Identity is tokenised at apply. Only the vault and the vendor adapters see real values; every detokenise is logged with a purpose.</p></div><div class="prop safe"><div class="lbl">Failure it rules out</div><p>Identity in rows, logs, exports and training sets.</p></div><div class="prop" style="border-left-color:#d18f1c"><div class="lbl" style="color:#a86a12">What it costs</div><p>A small, critical service; a hop at apply and at each vendor call; key management.</p></div>
+</div>
+<!-- v-036 &lt;div class="k"&gt;Theory · 5 of 6 · the opt -->
+<div class="slide theory">
+<div class="k">Theory · 5 of 6 · the options</div><h1>Six ways to run an application</h1><table class="bt sm"><tr><th>Approach</th><th>3 s p95</th><th>One pull per bureau</th><th>Survives a drop</th><th>Explainable</th><th>Fails when</th></tr><tr class="rej"><td>A · Sequential calls in the request</td><td>no</td><td>yes</td><td>no</td><td>partly</td><td>the bureau's tail alone is seconds</td></tr><tr class="rej"><td>B · Parallel, hedged: race two bureaus</td><td>yes</td><td><b>no</b></td><td>no</td><td>partly</td><td>every race is two paid pulls</td></tr><tr class="rej"><td>C · A saga, a compensation per step</td><td>yes</td><td>yes</td><td>yes</td><td>partly</td><td>a pull cannot be undone</td></tr><tr class=""><td>D · A durable workflow engine</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>not a failure: another system to run</td></tr><tr class="pick"><td><b>E · State machine + one deadline + policy table + atomic book</b></td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>steps grow to days</td></tr><tr class="rej"><td>F · A manual underwriting queue</td><td>no</td><td>yes</td><td>yes</td><td>yes</td><td>ten seconds is a lost sale</td></tr></table>
+</div>
+<!-- v-037 &lt;div class="k"&gt;Theory · 6 of 6 · the fai -->
+<div class="slide theory">
+<div class="k">Theory · 6 of 6 · the failure catalogue</div><h1>What will go wrong, in the order I'll take it</h1><table class="bt sm"><tr><th>#</th><th>Failure</th><th>Kind</th></tr><tr class=""><td>1</td><td>The bureau is slow</td><td>latency · crux</td></tr><tr class=""><td>2</td><td>The bureau is down for everyone</td><td>failure, policy · crux</td></tr><tr class=""><td>3</td><td>The phone drops; two taps</td><td>correctness · crux</td></tr><tr class=""><td>4</td><td>Funding fails after booking</td><td>failure recovery · crux</td></tr><tr class=""><td>5</td><td>A decision nobody can explain</td><td>correctness, regulation</td></tr><tr class=""><td>6</td><td>A new model approves more</td><td>trade-off</td></tr><tr class=""><td>7</td><td>Identity data spreading</td><td>security</td></tr><tr class=""><td>8</td><td>A silent approval drop</td><td>observability</td></tr></table><div class="line ">Out of scope, named: merchant fraud, a merchant ringing up fake sales. Merchant risk owns it.</div>
+</div>
+<!-- v-038 card API and entities -->
+<div class="slide th">
+<div class="lbl">Chapter 4 of 9</div><div class="s">API and entities</div><div class="sub">The contract forces the hard semantics into the open</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="on">API + data</span><span class="">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-039 &lt;div class="k"&gt;API · apply and decide&lt;/d -->
+<div class="slide">
+<div class="k">API · apply and decide</div><h1>An application is a resource, not a call  <span class=vtag>FR1 · FR2</span></h1><pre class="code" data-lang="http">POST /v1/applications
+Idempotency-Key: 6f1e2c90-…      <span class="cm"># the POS and the phone retry</span>
+{ <span class="st">"merchant_id"</span>: <span class="st">"m_42"</span>, <span class="st">"amount_cents"</span>: 120000,
+  <span class="st">"applicant"</span>: { <span class="st">"vault_token"</span>: <span class="st">"tok_8f2c"</span> } }
+→ 202 { <span class="st">"application_id"</span>: <span class="st">"ap_91"</span>, <span class="st">"status"</span>: <span class="st">"STARTED"</span> }
+
+GET /v1/applications/ap_91            <span class="cm"># poll, or a push to the phone</span>
+→ 200 { <span class="st">"status"</span>: <span class="st">"OFFERED"</span>, <span class="st">"offers"</span>: [ … ], <span class="st">"expires_at"</span>: … }</pre><div class="strip one"><div class="whyb"><b class="t">Writes Application</b>202 at once: the decision takes seconds and the phone may drop. A token, never identity. Offers expire in 15 minutes; REFERRED carries a promise time.</div></div>
+</div>
+<!-- v-040 &lt;div class="k"&gt;API · accept and the even -->
+<div class="slide">
+<div class="k">API · accept and the event</div><h1>What the customer agreed to, and who hears about it  <span class=vtag>FR3 · FR4</span></h1><pre class="code" data-lang="http">POST /v1/applications/ap_91/accept
+Idempotency-Key: 0b7d11a4-…
+{ <span class="st">"offer_id"</span>: <span class="st">"of_3"</span>, <span class="st">"disclosure_version"</span>: <span class="st">"v7"</span> }
+→ 201 { <span class="st">"loan_id"</span>: <span class="st">"ln_5531"</span> }    <span class="cm"># a second accept: the same loan</span>
+
+event LoanBooked { event_id, loan_id, application_id, merchant_id,
+                   principal_cents, merchant_fee_cents, terms }</pre><div class="strip one"><div class="whyb"><b class="t">Writes Loan, Outbox</b>The disclosure version is part of the contract. The event is at least once; every consumer de-duplicates by event_id.</div></div>
+</div>
+<!-- v-041 &lt;div class="k"&gt;API · the internal contra -->
+<div class="slide">
+<div class="k">API · the internal contract</div><h1>The decision interface between two teams</h1><pre class="code" data-lang="json">Decide(application_id, applicant_token, merchant, amount) →
+{ <span class="st">"outcome"</span>: <span class="st">"APPROVE | REFER | DECLINE"</span>,
+  <span class="st">"offers"</span>: [ … ], <span class="st">"reasons"</span>: [<span class="st">"high utilisation"</span>, <span class="st">"short history"</span>],
+  <span class="st">"versions"</span>: { <span class="st">"model"</span>: <span class="st">"v9"</span>, <span class="st">"policy"</span>: <span class="st">"v31"</span>, <span class="st">"pricing"</span>: <span class="st">"v12"</span> },
+  <span class="st">"missing"</span>: [<span class="st">"bureau_a"</span>], <span class="st">"path"</span>: <span class="st">"second_bureau"</span>, <span class="st">"record_uri"</span>: … }</pre><div class="strip one"><div class="whyb"><b class="t">Why missing and path</b>The applications team shows “pending” for a refer; operations counts how often each degraded path is taken, which proves the caps hold.</div></div>
+</div>
+<!-- v-042 &lt;div class="k"&gt;Data · conceptual&lt;/div&gt;&lt;h -->
+<div class="slide dia">
+<div class="k">Data · conceptual</div><h1>One application, many calls, one decision, at most one loan</h1><figure class="grow"><!--SVG:erd-chen--></figure>
+</div>
+<!-- v-043 &lt;div class="k"&gt;Data · physical&lt;/div&gt;&lt;h1&gt; -->
+<div class="slide dia">
+<div class="k">Data · physical</div><h1>The constraints carry the correctness</h1><figure class="grow"><!--SVG:erd-physical--></figure>
+</div>
+<!-- v-044 &lt;div class="k"&gt;Data · stores&lt;/div&gt;&lt;h1&gt;Wh -->
+<div class="slide">
+<div class="k">Data · stores</div><h1>Which stores, and can we lose them?</h1><table class="bt sm"><tr><th>Store</th><th>Holds</th><th>Lose it?</th></tr><tr class=""><td>Application database</td><td>applications, decisions, offers, loans, outbox, vendor calls</td><td>No: synchronous standby in another zone</td></tr><tr class=""><td>Decision records</td><td>the full record, encrypted, one key each</td><td>No: retention lock for seven years</td></tr><tr class=""><td>Vault</td><td>identity, encrypted per field</td><td>No: the only copy; replicated across zones</td></tr><tr class=""><td>Event log</td><td>LoanBooked, decisions</td><td>Rebuildable from the outbox table</td></tr><tr class=""><td>Report store</td><td>recent bureau reports for reuse</td><td>Yes: a miss costs a dollar, not correctness</td></tr></table>
+</div>
+<!-- v-045 card High-level design -->
+<div class="slide th">
+<div class="lbl">Chapter 5 of 9</div><div class="s">High-level design</div><div class="sub">Three versions, each answering the one before</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="on">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-046 &lt;div class="k"&gt;Design · V1&lt;/div&gt;&lt;h1&gt;&lt;spa -->
+<div class="slide dia">
+<div class="k">Design · V1</div><h1><span class=vtag>V1</span>The simplest thing that works</h1><figure class="grow"><!--SVG:base-v1--></figure>
+</div>
+<!-- v-047 &lt;div class="k"&gt;Design · V2&lt;/div&gt;&lt;h1&gt;&lt;spa -->
+<div class="slide dia">
+<div class="k">Design · V2</div><h1><span class=vtag>V2</span>One deadline, one state machine, one atomic step</h1><figure class="grow"><!--SVG:base-v2--></figure>
+</div>
+<!-- v-048 &lt;div class="k"&gt;Design · V3&lt;/div&gt;&lt;h1&gt;&lt;spa -->
+<div class="slide dia">
+<div class="k">Design · V3</div><h1><span class=vtag>V3</span>Regulated, explainable, owned</h1><figure class="grow"><!--SVG:base-v3--></figure>
+</div>
+<!-- v-049 &lt;div class="k"&gt;Flow · FR1 apply&lt;/div&gt;&lt;h1 -->
+<div class="slide dia">
+<div class="k">Flow · FR1 apply</div><h1>Identity is a token before anything else sees it</h1><div class="tr"><span class="fr">FR1</span><span class="ent">Application</span></div><figure class="grow"><!--SVG:flow-fr1--></figure>
+</div>
+<!-- v-050 &lt;div class="k"&gt;Flow · FR2 decide&lt;/div&gt;&lt;h -->
+<div class="slide dia">
+<div class="k">Flow · FR2 decide</div><h1>Everything at once, one deadline, one record</h1><div class="tr"><span class="fr">FR2</span><span class="ent">Decision</span><span class="ent">Offer</span></div><figure class="grow"><!--SVG:flow-fr2--></figure>
+</div>
+<!-- v-051 &lt;div class="k"&gt;Flow · FR3 accept and boo -->
+<div class="slide dia">
+<div class="k">Flow · FR3 accept and book</div><h1>One transaction while the customer watches</h1><div class="tr"><span class="fr">FR3</span><span class="ent">Loan</span><span class="ent">Outbox</span></div><figure class="grow"><!--SVG:flow-fr3--></figure>
+</div>
+<!-- v-052 &lt;div class="k"&gt;Flow · FR4 fund and hand  -->
+<div class="slide dia">
+<div class="k">Flow · FR4 fund and hand off</div><h1>After the customer has left the counter</h1><div class="tr"><span class="fr">FR4</span><span class="ent">FundingTransfer</span></div><figure class="grow"><!--SVG:flow-fr4--></figure>
+</div>
+<!-- v-053 &lt;div class="k"&gt;C4 · context&lt;/div&gt;&lt;h1&gt;Who -->
+<div class="slide dia">
+<div class="k">C4 · context</div><h1>Who is at the counter, and who is slow</h1><figure class="grow"><!--SVG:c4-context--></figure>
+</div>
+<!-- v-054 &lt;div class="k"&gt;C4 · containers&lt;/div&gt;&lt;h1&gt; -->
+<div class="slide dia">
+<div class="k">C4 · containers</div><h1>Every container exists for one reason</h1><figure class="grow"><!--SVG:c4-containers--></figure>
+</div>
+<!-- v-055 &lt;div class="k"&gt;Sequence · apply and deci -->
+<div class="slide dia">
+<div class="k">Sequence · apply and decide</div><h1>Submit, then everything at once</h1><figure class="grow"><!--SVG:seq-decide--></figure>
+</div>
+<!-- v-056 &lt;div class="k"&gt;Sequence · accept and boo -->
+<div class="slide dia">
+<div class="k">Sequence · accept and book</div><h1>One commit, then at-least-once publishing</h1><figure class="grow"><!--SVG:seq-book--></figure>
+</div>
+<!-- v-057 &lt;div class="k"&gt;Design · one application  -->
+<div class="slide">
+<div class="k">Design · one application in time</div><h1>Where the 1.3 seconds of a usual case go</h1><table class="bt sm"><tr><th>t (ms)</th><th>What happens</th><th>Where</th></tr><tr class=""><td>0</td><td>submit; idempotency key checked</td><td>API edge</td></tr><tr class=""><td>150 – 200</td><td>identity tokenised; row STARTED committed</td><td>vault, database</td></tr><tr class=""><td>200</td><td>three vendor calls at once; deadline set at 2,200</td><td>orchestrator</td></tr><tr class=""><td>550 · 600 · 820</td><td>fraud, identity, bureau A answer</td><td>adapters</td></tr><tr class=""><td>820</td><td>all required answers in: no need to wait for the deadline</td><td>orchestrator</td></tr><tr class=""><td>1,070 – 1,120</td><td>model, policy, pricing; record written; row OFFERED</td><td>policy engine, storage</td></tr><tr class=""><td>1,320</td><td>offers on the phone</td><td>push</td></tr></table>
+</div>
+<!-- v-058 &lt;div class="lbl"&gt;The line to remember&lt;/d -->
+<div class="slide th">
+<div class="lbl">The line to remember</div><div class="s">The core is small and boring on purpose: <em>one database, one atomic step</em>. The design lives at the slow edges.</div>
+</div>
+<!-- v-059 card Bridge -->
+<div class="slide th">
+<div class="lbl">Chapter 6 of 9</div><div class="s">Bridge</div><div class="sub">It works. Where does it break first?</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="on">Design</span><span class="">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-060 &lt;div class="k"&gt;Challenge map&lt;/div&gt;&lt;h1&gt;Ei -->
+<div class="slide dia">
+<div class="k">Challenge map</div><h1>Eight attack points on the same baseline</h1><p class="chips">each fix creates the next question</p><figure class="grow"><!--SVG:map--></figure>
+</div>
+<!-- v-061 card Challenges -->
+<div class="slide th">
+<div class="lbl">Chapter 7 of 9</div><div class="s">Challenges</div><div class="sub">Eight ways to break it, and what survives</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="done">Design</span><span class="on">Challenges</span><span class="">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-062 card Challenge 1: The bureau is slow -->
+<div class="slide th card">
+<div class="lbl">7.1 · Challenge 1</div><div class="s">The bureau is slow</div>
+</div>
+<!-- v-063 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 1 of 8</div><div class="qq">“One bureau call in ten takes four seconds today. What does the customer at the counter see?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-064 &lt;div class="k r"&gt;Challenge 1 of 8 · the  -->
+<div class="slide dia">
+<div class="k r">Challenge 1 of 8 · the bureau is slow</div><h1 class="q">Wait, or race a second bureau?</h1><figure class="grow"><!--SVG:ch1-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Wait for it; if it's slow, send the same request to the second bureau and take whichever answers first.”</div><div class="case"><b class="t">Break</b>The calls to the vendors: waiting misses 3 s; racing pays twice.</div></div>
+</div>
+<!-- v-065 &lt;div class="k r"&gt;Challenge 1 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 1 of 8 · the trace</div><h1 class="q">Two pulls, two inquiries, or a lost promise</h1><table class="tl"><tr><th>10:00:00.000</th><td>submit from the phone</td></tr><tr><th>.050</th><td>identity, fraud and bureau A called</td></tr><tr><th>.400</th><td>identity and fraud are back</td></tr><tr><th>01.000</th><td>hedge: the same pull sent to bureau B</td></tr><tr><th>01.700</th><td>bureau B answers; offers at about 2.0 s</td></tr><tr><th>04.100</th><td>bureau A answers: <span class="bad">a second paid pull, a second inquiry on the file</span></td></tr><tr><th>no hedge</th><td><span class="bad">offers at about 4.4 s: past the 3 s promise</span></td></tr></table><div class="hedge"><b class="t">Label the numbers</b>Illustrative: about $1 a pull, one slow call in ten. The shape is the point.</div>
+</div>
+<!-- v-066 &lt;div class="k"&gt;Challenge 1 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 1 of 8 · the fix</div><h1>The orchestrator owns time</h1><figure class="grow"><!--SVG:ch1-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>All calls at once; decide at a 2.0 s deadline with what has arrived. A breaker per vendor. Bureau B only after an error or an open breaker, never as a race.</div><div class="whyb"><b class="t">Property</b>L1: the wait is bounded by the deadline, not the slowest vendor. S4: a second pull only when the first has failed, not when it is slow.</div></div>
+</div>
+<!-- v-067 &lt;div class="k"&gt;Challenge 1 of 8 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 1 of 8 · sequence</div><h1>The late answer is kept, not thrown away</h1><figure class="grow"><!--SVG:seq-ch1-gather--></figure>
+</div>
+<!-- v-068 &lt;div class="k"&gt;Challenge 1 of 8 · the ga -->
+<div class="slide">
+<div class="k">Challenge 1 of 8 · the gather, as code</div><h1>One deadline; late calls are recorded, not cancelled</h1><pre class="code" data-lang="python"><span class="kw">async def</span> decide(app, deadline_s=2.0):
+    calls = {v: create_task(adapter[v].call(app)) <span class="kw">for</span> v <span class="kw">in</span> required(app)}
+    done, pending = <span class="kw">await</span> wait(calls.values(), timeout=deadline_s)
+    <span class="kw">for</span> t <span class="kw">in</span> pending:
+        t.add_done_callback(record_late_answer)   <span class="cm"># paid for: keep it</span>
+    got = {v: t.result() <span class="kw">for</span> v, t <span class="kw">in</span> calls.items() <span class="kw">if</span> t <span class="kw">in</span> done}
+    missing = [v <span class="kw">for</span> v <span class="kw">in</span> calls <span class="kw">if</span> v <span class="kw">not in</span> got]
+    <span class="kw">return</span> policy.decide(features(app, got), missing)  <span class="cm"># the table decides</span></pre><div class="strip one"><div class="whyb"><b class="t">Why it works</b>The deadline is one point in time for the whole decision. The code never decides what missing means: it hands the list to the signed policy.</div></div>
+</div>
+<!-- v-069 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“The bureau's answer arrives at 4.1 seconds, after you decided. You paid for it. What do you do with it?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-070 &lt;div class="k"&gt;Challenge 1 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 1 of 8 · the second fix, and the honest limit</div><h1>Record it, use it, never rewrite the past</h1><div class="cards c3"><div class="cd grn"><h3>Record it</h3><p>The call happened and was billed: a row in vendor_call, with its cost.</p></div><div class="cd"><h3>Use it</h3><p>A referred application is finished with it: the customer gets a text with offers.</p></div><div class="cd amb"><h3>Never rewrite</h3><p>An offer already shown stays as shown. Keep the report for reuse where the contract allows.</p></div></div><div class="line r">Honest limit: a deadline means about 3 % of applications reach the missing-data path every day. That is the next question.</div>
+</div>
+<!-- v-071 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“All vendors at once, one deadline, a breaker per vendor. I never race two bureaus: each pull is paid and may show on the customer's file. A late answer is recorded and finishes a refer.”</div>
+</div>
+<!-- v-072 card Challenge 2: The bureau is down for everyone -->
+<div class="slide th card">
+<div class="lbl">7.2 · Challenge 2</div><div class="s">The bureau is down for everyone</div>
+</div>
+<!-- v-073 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 2 of 8</div><div class="qq">“Bureau A is down for everyone for twenty minutes on a Saturday. What happens at the counter?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-074 &lt;div class="k r"&gt;Challenge 2 of 8 · the  -->
+<div class="slide dia">
+<div class="k r">Challenge 2 of 8 · the bureau is down</div><h1 class="q">Approve everyone, or decline everyone?</h1><figure class="grow"><!--SVG:ch2-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Approve with whatever data we have.” Or: “decline until it's back.”</div><div class="case"><b class="t">Break</b>The vendors are gone, and the policy engine has no rule for it: a catch block decides credit risk.</div></div>
+</div>
+<!-- v-075 &lt;div class="k r"&gt;Challenge 2 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 2 of 8 · the trace</div><h1 class="q">Twenty minutes at eight a second</h1><table class="tl"><tr><th>Sat 11:00</th><td>bureau A starts timing out for everyone</td></tr><tr><th>11:00–11:20</th><td>8 applications a second &times; 1,200 s &#8202;=&#8202; 9,600 applications</td></tr><tr><th>approve all</th><td><span class="bad">9,600 &times; $1,200 ≈ $11.5M offered with no credit file</span></td></tr><tr><th>decline all</th><td><span class="bad">9,600 &times; 60 % &times; 70 % ≈ 4,000 lost loans</span></td></tr><tr><th>and</th><td><span class="bad">9,600 notices whose real reason is “our vendor was down”</span></td></tr></table><div class="hedge"><b class="t">Label the numbers</b>Derived from the given peak; approval and take-up are illustrative.</div>
+</div>
+<!-- v-076 &lt;div class="k"&gt;Challenge 2 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 2 of 8 · the fix</div><h1>A signed table, inside the credit policy</h1><figure class="grow"><!--SVG:ch2-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>The missing-data policy table: versioned with the credit policy, signed by credit risk, approved by the partner bank. A counter, a cap and a dashboard per row.</div><div class="whyb"><b class="t">Property</b>S2: nobody is declined for our outage. L1: everyone gets an answer. Exposure bounded by arithmetic: the cap is the worst case.</div></div>
+</div>
+<!-- v-077 &lt;div class="k"&gt;Challenge 2 of 8 · the ta -->
+<div class="slide dia">
+<div class="k">Challenge 2 of 8 · the table</div><h1>Four answers, in order</h1><figure class="grow"><!--SVG:policy--></figure>
+</div>
+<!-- v-078 &lt;div class="k"&gt;Challenge 2 of 8 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 2 of 8 · sequence</div><h1>A refer, finished by text</h1><figure class="grow"><!--SVG:seq-ch2-refer--></figure>
+</div>
+<!-- v-079 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“Bureau B's contract allows five calls a second. You're sending eight.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-080 &lt;div class="k"&gt;Challenge 2 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 2 of 8 · the second fix, and the honest limit</div><h1>A bucket per vendor; a cap per merchant</h1><div class="cards c3"><div class="cd grn"><h3>Token bucket</h3><p>Five tokens a second for bureau B. A call without a token is not sent: refer. About 3 a second overflow: ≈ 3,600 referred in 20 minutes.</p></div><div class="cd"><h3>Drain in order</h3><p>Oldest first, when a token frees up or A's breaker half-opens, inside the 10-minute promise.</p></div><div class="cd amb"><h3>Cap per merchant</h3><p>Row 2's daily cap is split, so one busy merchant cannot spend it in an hour.</p></div></div><div class="line r">Honest limit: referred customers walk away. Measure refer completion and lost sales per minute of outage, and give them to credit risk.</div>
+</div>
+<!-- v-081 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“Every timeout is a credit decision with an owner. Credit risk signs a table: second bureau, small known customers under a cap, refer, or decline with a real reason. Engineering makes it a setting with a counter and a dashboard.”</div>
+</div>
+<!-- v-082 card Challenge 3: The phone drops -->
+<div class="slide th card">
+<div class="lbl">7.3 · Challenge 3</div><div class="s">The phone drops</div>
+</div>
+<!-- v-083 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 3 of 8</div><div class="qq">“The customer taps accept, the phone loses signal, and they tap again on the merchant's tablet. How many loans?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-084 &lt;div class="k r"&gt;Challenge 3 of 8 · the  -->
+<div class="slide dia">
+<div class="k r">Challenge 3 of 8 · the phone drops</div><h1 class="q">Two devices, two keys, one application</h1><figure class="grow"><!--SVG:ch3-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Check whether a loan exists, and create one if it doesn't.” Or: “an orchestrated saga, with a compensation for each step.”</div><div class="case"><b class="t">Break</b>The application service and its database: two workers both see no loan.</div></div>
+</div>
+<!-- v-085 &lt;div class="k r"&gt;Challenge 3 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 3 of 8 · the trace</div><h1 class="q">Two loans, one purchase</h1><table class="tl"><tr><th>14:31:07.200</th><td>phone posts accept, idempotency key k1</td></tr><tr><th>07.900</th><td>the response is lost in the shop's dead zone</td></tr><tr><th>08.050</th><td>tablet posts accept, key k2: another device, another key</td></tr><tr><th>08.060</th><td>worker 1 reads ap_91: OFFERED, version 7, no loan</td></tr><tr><th>08.070</th><td>worker 2 reads ap_91: OFFERED, version 7, no loan</td></tr><tr><th>08.090</th><td><span class="bad">both insert: two loans, two transfers of $1,200, the customer billed twice</span></td></tr></table><div class="hedge"><b class="t">Why keys alone fail</b>Two devices, two idempotency keys. Check-then-insert fails because both checks ran before either insert.</div>
+</div>
+<!-- v-086 &lt;div class="k"&gt;Challenge 3 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 3 of 8 · the fix</div><h1>The database decides, in one transaction</h1><figure class="grow"><!--SVG:ch3-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>UPDATE … WHERE status = OFFERED AND version = 7; INSERT loan with UNIQUE(application_id); INSERT outbox; COMMIT. Zero rows updated: return the existing loan.</div><div class="whyb"><b class="t">Property</b>S1, enforced by the one place that sees both writers. No lock across a network call; no distributed coordination.</div></div>
+</div>
+<!-- v-087 &lt;div class="k"&gt;Challenge 3 of 8 · the tr -->
+<div class="slide">
+<div class="k">Challenge 3 of 8 · the transaction, as code</div><h1>Book once, publish once</h1><pre class="code" data-lang="sql"><span class="kw">BEGIN</span>;
+<span class="kw">UPDATE</span> application <span class="kw">SET</span> status = <span class="st">'BOOKED'</span>, version = 8
+ <span class="kw">WHERE</span> id = <span class="st">'ap_91'</span> <span class="kw">AND</span> status = <span class="st">'OFFERED'</span> <span class="kw">AND</span> version = 7;
+<span class="cm">-- 0 rows: someone booked, or the offer expired → return the existing loan</span>
+<span class="kw">INSERT INTO</span> loan (id, application_id, offer_id, disclosure_v, terms)
+<span class="kw">VALUES</span> (<span class="st">'ln_5531'</span>, <span class="st">'ap_91'</span>, <span class="st">'of_3'</span>, <span class="st">'v7'</span>, <span class="st">'{"months": 6}'</span>);
+<span class="kw">INSERT INTO</span> outbox (event_id, type, payload)
+<span class="kw">VALUES</span> (<span class="st">'ev_77'</span>, <span class="st">'LoanBooked'</span>, <span class="st">'{"loan_id": "ln_5531"}'</span>);
+<span class="kw">COMMIT</span>;</pre><div class="strip one"><div class="whyb"><b class="t">Why it works</b>The second worker's update matches zero rows: the first changed the status and the version. The unique constraint is a second wall. The outbox makes “the loan exists” and “the world will hear” one fact.</div></div>
+</div>
+<!-- v-088 &lt;div class="k"&gt;Challenge 3 of 8 · saga o -->
+<div class="slide">
+<div class="k">Challenge 3 of 8 · saga or state machine</div><h1>Use the word only where it fits</h1><table class="bt sm"><tr><th>Step</th><th>Can it be undone?</th><th>So</th></tr><tr class=""><td>Identity check, credit pull</td><td>No: it happened, it was paid, it may be on the file</td><td>Record it; never “compensate”</td></tr><tr class=""><td>Offer</td><td>Expires by itself</td><td>A lifetime, no action</td></tr><tr class=""><td>Accept → book</td><td>Must be atomic</td><td>One local transaction with the outbox</td></tr><tr class=""><td>Fund the merchant</td><td>Yes, by a reversal or a return</td><td>Asynchronous, retried, reconciled: challenge four</td></tr></table>
+</div>
+<!-- v-089 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“The commit succeeded, but the relay crashed before publishing. Or it published twice.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-090 &lt;div class="k"&gt;Challenge 3 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 3 of 8 · the second fix, and the honest limit</div><h1>At least once, and every consumer de-duplicates</h1><div class="cards c3"><div class="cd grn"><h3>The relay</h3><p>Reads unpublished rows, publishes, then marks them published. A crash in between publishes again: by design.</p></div><div class="cd"><h3>Consumers</h3><p>Funding and servicing de-duplicate by event_id.</p></div><div class="cd amb"><h3>The money</h3><p>Funding uses the loan ID as its idempotency key at the bank: a duplicate that slips through cannot pay twice.</p></div></div><div class="line r">Honest limit: at-least-once delivery with idempotent consumers. Not “exactly once”.</div>
+</div>
+<!-- v-091 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“Only one step is atomic: accept to book. A conditional update at a version, a unique constraint on the application, and the outbox row in the same commit. A second tap finds the loan.”</div>
+</div>
+<!-- v-092 card Challenge 4: Funding fails after booking -->
+<div class="slide th card">
+<div class="lbl">7.4 · Challenge 4</div><div class="s">Funding fails after booking</div>
+</div>
+<!-- v-093 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 4 of 8</div><div class="qq">“The loan is booked. The transfer to the merchant is rejected, or the bank times out. What do you undo?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-094 &lt;div class="k r"&gt;Challenge 4 of 8 · fund -->
+<div class="slide dia">
+<div class="k r">Challenge 4 of 8 · funding fails</div><h1 class="q">Undo the loan? Re-send the money?</h1><figure class="grow"><!--SVG:ch4-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Roll back the saga: cancel the loan, reverse the credit check, delete the application.”</div><div class="case"><b class="t">Break</b>Funding, after the customer has left: a rejected transfer, and one with no answer at all.</div></div>
+</div>
+<!-- v-095 &lt;div class="k r"&gt;Challenge 4 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 4 of 8 · the trace</div><h1 class="q">One rejected, one silent</h1><table class="tl"><tr><th>14:31</th><td>loan ln_5531 booked</td></tr><tr><th>18:00</th><td>daily batch: $1,164 to the merchant ($1,200 less a 3 % fee)</td></tr><tr><th>18:02</th><td>the bank returns: <span class="bad">account closed</span></td></tr><tr><th>18:03</th><td>another merchant's transfer: <span class="bad">timeout, no answer</span></td></tr><tr><th>“to be safe”</th><td><span class="bad">re-send both: the second merchant may be paid twice</span></td></tr></table><div class="hedge"><b class="t">Label the numbers</b>The fee is illustrative. A timeout says nothing about whether the money moved.</div>
+</div>
+<!-- v-096 &lt;div class="k"&gt;Challenge 4 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 4 of 8 · the fix</div><h1>Funding is its own state machine</h1><figure class="grow"><!--SVG:ch4-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>PENDING → SENT → SETTLED, or RETURNED → fix the account → a new attempt. A timeout is UNKNOWN: query by our key, never resend. Reconcile daily against the bank's file.</div><div class="whyb"><b class="t">Property</b>L2 with one effect: the loan ID is the idempotency key end to end, and UNKNOWN stops “maybe paid” from becoming “paid twice”.</div></div>
+</div>
+<!-- v-097 &lt;div class="k"&gt;Challenge 4 of 8 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 4 of 8 · sequence</div><h1>Unknown, resolved by the file, not by a resend</h1><figure class="grow"><!--SVG:seq-ch4-fund--></figure>
+</div>
+<!-- v-098 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“The bank's status API says ‘not found’ for the timed-out transfer, and tomorrow's file shows it paid.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-099 &lt;div class="k"&gt;Challenge 4 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 4 of 8 · the second fix, and the honest limit</div><h1>Not found is not “not sent”</h1><div class="cards c3"><div class="cd amb"><h3>Wait for the window</h3><p>Bank interfaces often index instructions late. No resend before the reconciliation window closes.</p></div><div class="cd grn"><h3>Three-way reconciliation</h3><p>Our funding records, the bank's settlement file, the loans booked. Every difference is a break.</p></div><div class="cd"><h3>Breaks have owners</h3><p>An owner and an age; older than two days pages someone.</p></div></div><div class="line r">Honest limit: some outcomes are known only the next day. The merchant sees “in progress”, not a guess.</div>
+</div>
+<!-- v-100 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“The credit pull and the booking aren't compensated: they happened. The one step with a real undo is funding, so it's its own state machine, with UNKNOWN as a state: query, never resend.”</div>
+</div>
+<!-- v-101 card Challenge 5: Explain a decision fourteen months later -->
+<div class="slide th card">
+<div class="lbl">7.5 · Challenge 5</div><div class="s">Explain a decision fourteen months later</div>
+</div>
+<!-- v-102 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 5 of 8</div><div class="qq">“A regulator asks why a customer was declined fourteen months ago. Reproduce it.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-103 &lt;div class="k r"&gt;Challenge 5 of 8 · expl -->
+<div class="slide dia">
+<div class="k r">Challenge 5 of 8 · explain it later</div><h1 class="q">The policy engine only knows today</h1><figure class="grow"><!--SVG:ch5-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Re-run the model on the customer's data.”</div><div class="case"><b class="t">Break</b>The policy engine: today's model, today's rules, today's credit file.</div></div>
+</div>
+<!-- v-104 &lt;div class="k r"&gt;Challenge 5 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 5 of 8 · the trace</div><h1 class="q">A notice that says one thing, a replay that says another</h1><table class="tl"><tr><th>Jan 2026</th><td>ap_204 declined by model v9, policy v31</td></tr><tr><th>Jan 2026</th><td>notice sent: “high utilisation, short history”</td></tr><tr><th>2026</th><td>models v10 to v14 ship; policy reaches v38</td></tr><tr><th>Mar 2027</th><td>regulator: why was ap_204 declined?</td></tr><tr><th>Mar 2027</th><td>re-run v14 on today's bureau file: <span class="bad">APPROVE</span></td></tr><tr><th>so</th><td><span class="bad">the notice and the replay disagree, and neither shows what happened</span></td></tr></table>
+</div>
+<!-- v-105 &lt;div class="k"&gt;Challenge 5 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 5 of 8 · the fix</div><h1>Write down what we knew, once</h1><figure class="grow"><!--SVG:ch5-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>An immutable decision record written by the orchestrator: frozen inputs, every version, the outputs with ranked reasons. Old models stay loadable. A nightly replay of a sample.</div><div class="whyb"><b class="t">Property</b>S2: the same inputs and versions give the same answer, and the replay proves it every night, not on the day the regulator asks.</div></div>
+</div>
+<!-- v-106 &lt;div class="k"&gt;Challenge 5 of 8 · what a -->
+<div class="slide dia">
+<div class="k">Challenge 5 of 8 · what a record holds</div><h1>Inputs, versions, outputs</h1><figure class="grow"><!--SVG:record--></figure>
+</div>
+<!-- v-107 &lt;div class="k"&gt;Challenge 5 of 8 · sequen -->
+<div class="slide dia">
+<div class="k">Challenge 5 of 8 · sequence</div><h1>The replay matches the notice</h1><figure class="grow"><!--SVG:seq-ch5-replay--></figure>
+</div>
+<!-- v-108 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“The customer asks us to delete their data. The record holds their bureau report.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-109 &lt;div class="k"&gt;Challenge 5 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 5 of 8 · the second fix, and the honest limit</div><h1>Retention wins for its period; then destroy the key</h1><div class="cards c3"><div class="cd"><h3>Who decides</h3><p>Retention duties for credit records take precedence for their period. Compliance owns that call, not engineering.</p></div><div class="cd grn"><h3>Within the period</h3><p>Tokens, not identity; the report encrypted under a key per record; use restricted to allowed purposes.</p></div><div class="cd amb"><h3>At the end</h3><p>Destroy the record's key: every copy, backups included, becomes unreadable at once.</p></div></div><div class="line r">Honest limit: a deletion request inside the retention period is answered by restricting use, and the customer is told so.</div>
+</div>
+<!-- v-110 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“I never re-run today's model to explain yesterday. Every decision freezes its inputs, versions and ranked reasons, and a nightly replay proves records still reproduce.”</div>
+</div>
+<!-- v-111 card Challenge 6: A new model approves six percent more -->
+<div class="slide th card">
+<div class="lbl">7.6 · Challenge 6</div><div class="s">A new model approves six percent more</div>
+</div>
+<!-- v-112 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 6 of 8</div><div class="qq">“Data science has a new model. It approves six percent more people at the same predicted loss. Roll it out.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-113 &lt;div class="k r"&gt;Challenge 6 of 8 · a ne -->
+<div class="slide dia">
+<div class="k r">Challenge 6 of 8 · a new model</div><h1 class="q">Where a new model's risk lands</h1><figure class="grow"><!--SVG:ch6-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Shadow mode for a week, it looks good, switch it on.” Or: “a fifty-fifty A/B test.”</div><div class="case"><b class="t">Break</b>The policy engine: a switch that changes a hundred million dollars of exposure a month.</div></div>
+</div>
+<!-- v-114 &lt;div class="k r"&gt;Challenge 6 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 6 of 8 · the trace</div><h1 class="q">Approvals today, losses in four months</h1><table class="tl"><tr><th>month 0</th><td>6 % of 2 million &#8202;=&#8202; 120,000 more approvals a month</td></tr><tr><th>month 0</th><td>× 70 % take-up ≈ 84,000 more loans ≈ <span class="bad">$100M a month of new exposure</span></td></tr><tr><th>weeks 2–4</th><td>first payments fall due</td></tr><tr><th>days 90–120</th><td>losses become visible</td></tr><tr><th>after a week</th><td><span class="bad">shadow shows the approval rate, and nothing about repayment</span></td></tr></table><div class="hedge"><b class="t">Label the numbers</b>Derived from the given volume; take-up and loss timing are illustrative.</div>
+</div>
+<!-- v-115 &lt;div class="k"&gt;Challenge 6 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 6 of 8 · the fix</div><h1>A challenger beside the champion, capped</h1><figure class="grow"><!--SVG:ch6-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>Backtest → shadow → a 5 % challenger slice under its own exposure cap → early signals at 30–45 days → widen by a policy version change, with a kill switch.</div><div class="whyb"><b class="t">Property</b>S2 kept: every record says which model decided. The cost of learning is bounded by the slice cap, not by optimism.</div></div>
+</div>
+<!-- v-116 &lt;div class="k"&gt;Challenge 6 of 8 · the st -->
+<div class="slide dia">
+<div class="k">Challenge 6 of 8 · the steps</div><h1>Each step sees what the one before cannot</h1><figure class="grow"><!--SVG:rollout--></figure>
+</div>
+<!-- v-117 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“Shadow looked great. Why isn't that enough?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-118 &lt;div class="k"&gt;Challenge 6 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 6 of 8 · the second fix, and the honest limit</div><h1>Shadow cannot see loss</h1><div class="cards c3"><div class="cd red"><h3>No labels</h3><p>People only the challenger would approve were declined by the champion. They never got a loan, so there is no repayment to observe.</p></div><div class="cd grn"><h3>Only a slice learns</h3><p>Only where the challenger decides do those people get loans, and labels.</p></div><div class="cd"><h3>Fairness, twice</h3><p>On shadow: who would be approved. On the slice: who repays. Thresholds owned by compliance.</p></div></div><div class="line r">Honest limit: a slice is real money at risk. The cap is the price of learning, and credit risk owns it.</div>
+</div>
+<!-- v-119 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“Shadow tells you who the new model would approve, not whether they repay. So: backtest, shadow, a capped slice where the challenger decides, early signals at thirty days, and a kill switch.”</div>
+</div>
+<!-- v-120 card Challenge 7: Where identity data lives -->
+<div class="slide th card">
+<div class="lbl">7.7 · Challenge 7</div><div class="s">Where identity data lives</div>
+</div>
+<!-- v-121 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 7 of 8</div><div class="qq">“The analytics team wants application data to train the next model. What do they get?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-122 &lt;div class="k r"&gt;Challenge 7 of 8 · iden -->
+<div class="slide dia">
+<div class="k r">Challenge 7 of 8 · identity</div><h1 class="q">Identity in rows, logs and exports</h1><figure class="grow"><!--SVG:ch7-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“A copy of the database; we encrypt it at rest.” Or: “we drop the name column.”</div><div class="case"><b class="t">Break</b>The application service, its database and the export: identity everywhere they go.</div></div>
+</div>
+<!-- v-123 &lt;div class="k r"&gt;Challenge 7 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 7 of 8 · the trace</div><h1 class="q">One extract, two million identities</h1><table class="tl"><tr><th>table</th><td>application holds SSN, date of birth, address</td></tr><tr><th>log</th><td>the bureau adapter's debug line prints the full request</td></tr><tr><th>support</th><td>every agent sees the full number</td></tr><tr><th>extract</th><td>names dropped; <span class="bad">date of birth + postcode re-identify most people</span></td></tr><tr><th>a leak</th><td><span class="bad">one extract &#8202;=&#8202; two million identities a month</span></td></tr></table><div class="hedge"><b class="t">Encryption at rest</b>Protects a stolen disk. Does nothing for a query, a log line or an export.</div>
+</div>
+<!-- v-124 &lt;div class="k"&gt;Challenge 7 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 7 of 8 · the fix</div><h1>Only two things see real values</h1><figure class="grow"><!--SVG:ch7-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>A vault: identity tokenised at apply; only the vault and the vendor adapters detokenise; every access logged with a purpose; logs scrubbed at the adapter. Training gets derived features.</div><div class="whyb"><b class="t">Property</b>S3 by construction: a leak anywhere outside the boundary leaks tokens.</div></div>
+</div>
+<!-- v-125 &lt;div class="k"&gt;Challenge 7 of 8 · the bo -->
+<div class="slide dia">
+<div class="k">Challenge 7 of 8 · the boundary</div><h1>Drawn small on purpose</h1><figure class="grow"><!--SVG:vault--></figure>
+</div>
+<!-- v-126 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“The vault is down.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-127 &lt;div class="k"&gt;Challenge 7 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 7 of 8 · the second fix, and the honest limit</div><h1>Tier zero, and boring on purpose</h1><div class="cards c3"><div class="cd grn"><h3>Small and replicated</h3><p>No business logic. Replicated across zones. Its own 99.95 % objective and its own on-call.</p></div><div class="cd amb"><h3>When it is down</h3><p>Nothing new starts: applications refer, the merchant sees pending. Booked loans continue.</p></div><div class="cd red"><h3>Never “help” it</h3><p>Nothing raw is ever cached outside the vault to ride out an outage.</p></div></div><div class="line r">Honest limit: the vault is reliable because it is small. Resist every feature request that would grow it.</div>
+</div>
+<!-- v-128 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“They get tokens and derived features, never identity. Only the vault and the vendor adapters see real values, every access is logged, and identity data falls under privacy and lending law, not the card standard.”</div>
+</div>
+<!-- v-129 card Challenge 8: How would you know it is broken? -->
+<div class="slide th card">
+<div class="lbl">7.8 · Challenge 8</div><div class="s">How would you know it is broken?</div>
+</div>
+<!-- v-130 &lt;div class="who"&gt;Interviewer · challenge -->
+<div class="slide qs">
+<div class="who">Interviewer · challenge 8 of 8</div><div class="qq">“Your dashboards are green. How would you know decisions are going wrong?”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-131 &lt;div class="k r"&gt;Challenge 8 of 8 · a si -->
+<div class="slide dia">
+<div class="k r">Challenge 8 of 8 · a silent failure</div><h1 class="q">No error, no latency, wrong answers</h1><figure class="grow"><!--SVG:ch8-attack--></figure><div class="strip "><div class="case"><b class="t">Naive answer</b>“Error rate, latency and CPU.”</div><div class="case"><b class="t">Break</b>The policy engine: a change that returns valid, wrong decisions.</div></div>
+</div>
+<!-- v-132 &lt;div class="k r"&gt;Challenge 8 of 8 · the  -->
+<div class="slide">
+<div class="k r">Challenge 8 of 8 · the trace</div><h1 class="q">Fifteen hours of wrong declines</h1><table class="tl"><tr><th>Fri 18:00</th><td>a pricing-table change maps one bureau field wrongly</td></tr><tr><th>18:00</th><td>no errors · latency fine · CPU flat</td></tr><tr><th>18:00</th><td><span class="bad">approval rate, all merchants: 62 % → 41 %</span></td></tr><tr><th>per hour</th><td>about 2/s &times; 3,600 &#8202;=&#8202; 7,200; <span class="bad">≈ 1,500 wrongly declined, each with a notice</span></td></tr><tr><th>Sat 09:00</th><td>merchants start calling: <span class="bad">≈ 22,000 customers</span></td></tr></table><div class="hedge"><b class="t">Label the numbers</b>Illustrative, assuming the evening rate held overnight.</div>
+</div>
+<!-- v-133 &lt;div class="k"&gt;Challenge 8 of 8 · the fi -->
+<div class="slide dia">
+<div class="k">Challenge 8 of 8 · the fix</div><h1>Watch the decision, not the servers</h1><figure class="grow"><!--SVG:ch8-fix--></figure><div class="strip "><div class="fixb"><b class="t">Mechanism</b>SLIs on the promise and on the decision; read in pairs. Policy and pricing changes ship as canaries on a small slice with the approval-rate alarm armed.</div><div class="whyb"><b class="t">Property</b>The SLIs measure what the customer and the lender experience; a pair of metrics turns into one cause.</div></div>
+</div>
+<!-- v-134 &lt;div class="k"&gt;Challenge 8 of 8 · the si -->
+<div class="slide">
+<div class="k">Challenge 8 of 8 · the signals</div><h1>What pages, and why</h1><table class="bt sm"><tr><th>SLI</th><th>Why it pages</th></tr><tr class=""><td>Offers on screen within 3 s, p95</td><td>The promise at the counter</td></tr><tr class=""><td>Approval rate per merchant per hour, against its baseline</td><td>A sudden drop is almost never the customers</td></tr><tr class=""><td>Fallback rate per policy row, against its cap</td><td>Credit risk said “capped”: prove it</td></tr><tr class=""><td>Loans booked and not funded after an hour, batch-aware</td><td>Money owed to a merchant</td></tr><tr class=""><td>Vendor errors, latency and spend per hour</td><td>The deadline's enemy and the largest cost</td></tr><tr class=""><td>The mix of decline reasons</td><td>A new dominant reason is a change, not a population</td></tr></table>
+</div>
+<!-- v-135 &lt;div class="k"&gt;Challenge 8 of 8 · sympto -->
+<div class="slide">
+<div class="k">Challenge 8 of 8 · symptom pairs</div><h1>Two metrics, one cause</h1><table class="bt sm"><tr><th>When you see</th><th>Together with</th><th>It means</th></tr><tr class=""><td>Approval down</td><td>vendor errors flat, a deploy at the same time</td><td>our change</td></tr><tr class=""><td>Refer rate up</td><td>a breaker open</td><td>an outage, handled as designed</td></tr><tr class=""><td>Offer latency up</td><td>breakers closed</td><td>a vendor slow, under the breaker's threshold</td></tr><tr class=""><td>Booked up</td><td>funded flat</td><td>funding stuck</td></tr><tr class=""><td>One decline reason jumps</td><td>one bureau's field distribution shifted</td><td>a vendor changed a field</td></tr></table>
+</div>
+<!-- v-136 &lt;div class="who"&gt;Interviewer · the secon -->
+<div class="slide qs">
+<div class="who">Interviewer · the second-level push</div><div class="qq">“Approval drops at one merchant only.”</div><div class="pz">Pause and answer before you continue</div>
+</div>
+<!-- v-137 &lt;div class="k"&gt;Challenge 8 of 8 · the se -->
+<div class="slide">
+<div class="k">Challenge 8 of 8 · the second fix, and the honest limit</div><h1>One merchant is usually not credit</h1><div class="cards c3"><div class="cd"><h3>Baselines</h3><p>Per merchant, by hour of the week.</p></div><div class="cd amb"><h3>Usual causes</h3><p>An integration bug (amounts in dollars, not cents), or a fraud ring testing stolen identities.</p></div><div class="cd grn"><h3>Route it</h3><p>To merchant operations or fraud, not to credit risk.</p></div></div><div class="line r">Honest limit: small merchants have noisy baselines. Alarm on totals over a window, not on one hour.</div>
+</div>
+<!-- v-138 &lt;div class="lbl"&gt;If asked, I'd say&lt;/div&gt; -->
+<div class="slide th say">
+<div class="lbl">If asked, I'd say</div><div class="s">“I watch the decision, not the servers: offers in three seconds, approval per merchant per hour, fallback against its cap, booked but not funded. Two metrics together tell me whether it's us, a vendor or one merchant.”</div>
+</div>
+<!-- v-139 card Build cost -->
+<div class="slide th aux">
+<div class="lbl">Chapter 8 of 9</div><div class="s">Build cost</div><div class="sub">Who, how long, buy or build: the manager layer</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="done">Design</span><span class="done">Challenges</span><span class="on">Cost · AUX</span><span class="">Recap</span></div>
+</div>
+<!-- v-140 &lt;div class="k"&gt;Build cost · releases&lt;/di -->
+<div class="slide aux">
+<div class="k">Build cost · releases</div><h1>Three versions, three budgets</h1><table class="bt sm"><tr><th></th><th>V1</th><th>V2</th><th>V3</th></tr><tr class=""><td>Scope</td><td>one service, sequential calls, one table</td><td>orchestrator, state machine, outbox, policy engine</td><td>vault, records, policy table, funding, challenger</td></tr><tr class=""><td>People</td><td>3 engineers</td><td>a team of 6</td><td>two teams, plus security and compliance time</td></tr><tr class=""><td>Time</td><td>2 months, to learn the vendors</td><td>2 quarters</td><td>2 more quarters</td></tr><tr class=""><td>Riskiest first</td><td>vendor adapters</td><td>the policy table</td><td>funding and reconciliation</td></tr></table>
+</div>
+<!-- v-141 &lt;div class="k"&gt;Build cost · team seams&lt;/ -->
+<div class="slide dia aux">
+<div class="k">Build cost · team seams</div><h1>Six owners, three contracts</h1><figure class="grow"><!--SVG:teams--></figure>
+</div>
+<!-- v-142 &lt;div class="k"&gt;Build cost · buy or build -->
+<div class="slide aux">
+<div class="k">Build cost · buy or build</div><h1>Buy what is not the decision</h1><div class="cards c3"><div class="cd"><h3>Buy</h3><p>Bureaus, identity and bank data. A tokenisation vault is a reasonable buy. A workflow engine, if steps grow to days.</p></div><div class="cd grn"><h3>Build</h3><p>The orchestrator, the policy engine, the records: a regulator asks us, not a vendor, why someone was declined.</p></div><div class="cd amb"><h3>Half the team</h3><p>Keep deadline, policy table, atomic booking, records. Buy the vault. Defer the challenger and bank data.</p></div></div>
+</div>
+<!-- v-143 &lt;div class="k"&gt;Build cost · money and ri -->
+<div class="slide aux">
+<div class="k">Build cost · money and risks</div><h1>The bill, and what could sink it</h1><div class="cards c2"><div class="cd"><h3>The bill (illustrative)</h3><p>Bureau pulls about $2M a month; identity about $100k; compute and storage a small fraction. Levers: report reuse, no races, pull only when the policy needs it.</p></div><div class="cd red"><h3>Top risks</h3><p>A degraded path without an owner or a cap. A model change without a replayable record. Identity leaking into logs. Funding retries without an UNKNOWN state.</p></div></div>
+</div>
+<!-- v-144 card Recap -->
+<div class="slide th">
+<div class="lbl">Chapter 9 of 9</div><div class="s">Recap</div><div class="sub">One picture, four paths, the mistakes, the thesis</div><div class="ribbon"><span class="done">Requirements</span><span class="done">Estimates</span><span class="done">Theory</span><span class="done">API + data</span><span class="done">Design</span><span class="done">Challenges</span><span class="done">Cost · AUX</span><span class="on">Recap</span></div>
+</div>
+<!-- v-145 &lt;div class="k"&gt;Recap · the final design&lt; -->
+<div class="slide dia">
+<div class="k">Recap · the final design</div><h1>One picture</h1><figure class="grow"><!--SVG:base-final--></figure>
+</div>
+<!-- v-146 &lt;div class="k"&gt;Recap · four paths&lt;/div&gt;&lt; -->
+<div class="slide">
+<div class="k">Recap · four paths</div><h1>One sentence each</h1><table class="bt sm"><tr><th>Path</th><th>In one sentence</th><th>Serves</th></tr><tr class=""><td>Apply</td><td>Tokenise, create the row, answer at once with an ID</td><td>FR1 · S3</td></tr><tr class=""><td>Decide</td><td>All vendors at once, one deadline, a signed policy for what's missing, a record</td><td>FR2 · L1 S2 S4</td></tr><tr class=""><td>Book</td><td>One transaction: conditional update, unique loan, outbox row</td><td>FR3 · S1</td></tr><tr class=""><td>Fund</td><td>Its own state machine, UNKNOWN as a state, reconciled daily</td><td>FR4 · L2</td></tr></table>
+</div>
+<!-- v-147 &lt;div class="k"&gt;Recap · how it degrades&lt;/ -->
+<div class="slide">
+<div class="k">Recap · how it degrades</div><h1>In priority order: what still works</h1><table class="bt sm"><tr><th>What fails</th><th>What still works</th><th>The customer sees</th></tr><tr class=""><td>One bureau slow</td><td>everything; the deadline decides</td><td>offers, rarely a refer</td></tr><tr class=""><td>One bureau down</td><td>second bureau, small known customers, refer</td><td>offers, or “we'll text you”</td></tr><tr class=""><td>Policy engine down</td><td>apply still records; nothing decides</td><td>pending; the refer queue fills</td></tr><tr class=""><td>Vault down</td><td>nothing new starts; booked loans continue</td><td>pending</td></tr><tr class=""><td>Event log or funding down</td><td>booking continues; the outbox holds events</td><td>nothing; merchants paid in the next batch</td></tr></table>
+</div>
+<!-- v-148 &lt;div class="k"&gt;Recap · common mistakes&lt;/ -->
+<div class="slide">
+<div class="k">Recap · common mistakes</div><h1>What costs points in this round</h1><div class="cards c2"><div class="cd red"><h3>Design</h3><p>Treating it as a throughput problem. Sequential vendor calls. Hedging paid pulls. A saga that compensates a credit pull. Check-then-insert on the loan.</p></div><div class="cd amb"><h3>Judgement</h3><p>“Approve with partial data” as a default. Re-running today's model to explain yesterday. “Encrypt the database” for identity. The card standard quoted for an SSN. No owner for any degraded path.</p></div></div>
+</div>
+<!-- v-149 &lt;div class="lbl"&gt;The close&lt;/div&gt;&lt;div cla -->
+<div class="slide th">
+<div class="lbl">The close</div><div class="s">The core is small and boring on purpose: <em>one database, one atomic step</em>. The design lives at the slow edges and in what we keep: <em>one deadline</em> with a signed policy, a record that <em>replays</em>, identity in a <em>vault</em>.</div>
+</div>
+</body></html>

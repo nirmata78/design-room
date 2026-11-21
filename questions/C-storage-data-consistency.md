@@ -1,6 +1,6 @@
 # Archetype C · Storage, data & consistency
 
-**SD-15 – SD-23.** Slice with `grep -n '^### SD-15' questions/C-storage-data-consistency.md`, then
+**SD-15 – SD-23, plus SD-96.** Slice with `grep -n '^### SD-15' questions/C-storage-data-consistency.md`, then
 Read with `offset`. Do not read this file whole.
 
 **What this archetype tests as a family:** whether they are **honest about consistency**. Every question
@@ -529,3 +529,47 @@ justification, tenant enforced at the data layer, quotas at every shared resourc
 radius, per-tenant metrics. *Exceptional* — treats cell placement and tenant migration as designed
 operations, isolates the whale tenant, has a supported-version policy with a stated cost, and detects
 noisy neighbours before the ticket arrives.
+
+---
+
+### SD-96 · URL shortener   [T1 · G M A MS]
+
+**Read aloud:** *"Design a URL shortener: a long URL goes in, a short link comes out, and anyone who
+opens the short link is redirected."*
+
+**Crux.** **It sounds too simple; the grade is on three places it is not**: generating codes that are
+unique without a lock per create and not guessable; a redirect path that is read-dominated (100:1) and
+must survive one viral key; and the things beside the redirect (analytics, abuse takedowns) that must
+never slow it. Asked at every level; at Staff the bar is arithmetic, costed options and the 301/302 trade.
+
+**If they ask:**
+
+| Question | Answer |
+|---|---|
+| New links? | 100M/month (≈ 40/s, 400/s peak) |
+| Redirects? | 10B/month (≈ 4k/s, 40k/s viral peak) |
+| Lifetime? | forever by default; optional expiry |
+| Custom aliases? | yes, for paying users |
+| Analytics? | clicks per link by day and country |
+| Abuse? | phishing must be dead everywhere within minutes |
+
+**Listen for:** the **redirect as the product** said early · code length from arithmetic
+(62⁶ ≈ 5.7×10¹⁰ vs 62⁷ ≈ 3.5×10¹²; 12B links in a decade) · options for code generation with costs
+(random + retry, hash prefix, counter + base62) · **counter ranges** (coordination once per block) and a
+**keyed permutation** so codes are not enumerable · the **primary key as the authority** for custom-alias
+collisions (409, no check-then-insert) · cache-aside with a working set that fits in memory; in-process
+hot-key cache + **request coalescing** for a viral code · **301 vs 302** as a product decision (analytics and
+takedowns vs traffic) · click events **off the critical path**, lossy by choice, and when that changes
+(billed clicks) · takedown reaching **every copy** (DB status, shared cache, in-process, CDN purge,
+browsers only reachable with 302).
+
+**Probes:** *"How do two servers never hand out the same code?"* · *"Six or seven characters — show me."* ·
+*"A link gets 40k clicks a second. What happens?"* · *"301 or 302?"* · *"Legal wants a phishing link dead
+in five minutes."* · *(EM)* *"Two teams, one quarter — split it."*
+
+**Weak / Strong / Exceptional.** *Weak* — hash the URL, six characters, "add a cache", a counter increment
+on every redirect. *Strong* — ranges + base62, constraint as authority, cache with hot-key defence, async
+analytics, 302 with a reason. *Exceptional* — keyed shuffle against enumeration, layer-by-layer redirect
+costs, takedown propagation designed, analytics loss stated as a product choice, synthetic end-to-end SLOs.
+
+**Reference solution:** `solutions/SD-96-url-shortener/` (reference design and video).

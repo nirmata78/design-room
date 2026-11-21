@@ -242,7 +242,34 @@ def trie():
     return svg(W, H, b)
 
 
-FIGS = {"p11-dns-anycast": dns_anycast, "p11-l4-l7": l4_l7, "p11-health": health, "p11-gateway-bloat": gateway_bloat,
+
+# ---------------------------------------------------------------- p11-deadline-budget  (the deadline budget across three hops)
+def deadline_budget():
+    W, H = 1600, 700
+    X0, PX = 230, 1.3
+    def X(ms): return X0 + ms * PX
+    b = [title(40, 50, "User-facing p99 target: 1,000 ms")]
+    rows = [(130, "Front end", 0, 200, GREY, "keeps 200 ms for itself"),
+            (230, "Service A", 200, 250, BLUE, "own work 50 ms → calls B with 750 ms left"),
+            (330, "Service B", 250, 330, BLUE, "own work 80 ms → calls C with 670 ms left"),
+            (430, "Service C", 330, 630, GREEN, "")]
+    for y, lab, a, z, col, note in rows:
+        b.append(text(40, y + 34, lab, 24, INK, "start", 700))
+        b.append(line(X(0), y + 25, X(1000), y + 25, "#e3e8ee", 2))
+        b.append(bar(X(a), y, X(z) - X(a), 50, f"{z - a} ms" + (" query: fits" if lab == "Service C" else ""), col, 21))
+        b.append(text(X(z) + 14, y + 33, note, 21, MUTED, "start"))
+    b.append(hatchbar(X(630), 430, X(1000) - X(630), 50, "hatch", GREEN))
+    b.append(text((X(630) + X(1000)) / 2 + 120, 523, "370 ms spare", 21, GREEN, "middle", 700))
+    b.append(line(X(1000), 110, X(1000), 560, RED, 3, "10 7"))
+    b.append(text(X(1000), 100, "deadline", 22, RED, "middle", 800))
+    AY = 600
+    b.append(line(X(0), AY, X(1000) + 30, AY, MUTED, 2, arrow=True))
+    for ms in (0, 200, 400, 600, 800, 1000):
+        b.append(line(X(ms), AY - 8, X(ms), AY + 8, MUTED, 2)); b.append(text(X(ms), AY + 34, f"{ms} ms", 21, MUTED, "middle"))
+    b.append(text(40, 680, "If C takes 700 ms, B's deadline passes first: B returns DEADLINE_EXCEEDED, and A does **not** retry. No time is left.", 22, INK))
+    return svg(W, H, b)
+
+FIGS = {"p11-deadline-budget": deadline_budget, "p11-dns-anycast": dns_anycast, "p11-l4-l7": l4_l7, "p11-health": health, "p11-gateway-bloat": gateway_bloat,
         "p11-orphan-work": orphan_work, "p11-deadline": deadline, "p11-offset": offset, "p11-conn-tier": conn_tier,
         "p11-resumable": resumable, "p11-trie": trie}
 

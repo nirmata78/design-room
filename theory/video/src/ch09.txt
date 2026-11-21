@@ -5,6 +5,7 @@
 N: Part nine, caching. Every design has a cache in it, and in most rounds it is drawn as one box with the word cache. The deep questions are all about what that box promises: how stale it may be, what happens when it is empty, and what the database sees when the hit ratio moves by a few points. This part teaches those on one node and one key. The cache as a whole distributed system belongs to the task videos.
 
 ## 9.0 Why this part decides rounds
+N: First, a story about a cache that was carrying the whole system without anyone saying so.
 
 = panel trap | The opening story | The cache restarts cold at peak, and the database follows it down
 A cache tier serves 99% of a million reads a second. The database sees ten thousand, and is sized for twenty.
@@ -12,10 +13,12 @@ A bad deploy restarts every cache node at noon. The hit ratio drops to zero.
 The database receives a **million** reads a second, falls over, and the cache cannot refill from a database that is down.
 N: A cache tier serves ninety-nine percent of a million reads a second. The database sees ten thousand, and is sized for twenty thousand. Then a bad deploy restarts every cache node at noon. The hit ratio drops to zero, and the database receives a million reads a second, fifty times its capacity. It falls over. And the cache cannot refill, because it refills from the database. The system is down, and nothing is broken except that the cache is empty. The cache was not an optimisation. It was load-bearing, and nobody had said so.
 
-= panel note | Assumed reading | What this part does not repeat
-Nishtala et al., *Scaling Memcache at Facebook*, **section 3**: leases, pools, gutter servers.
-The paper's regional and cross-region story stays in the paper. This part does the mechanisms on one key, with the arithmetic.
-N: One reading is assumed: section three of Scaling Memcache at Facebook, on leases, pools and gutter servers. The paper's regional and cross-region deployment stays in the paper. Here we work the mechanisms on one key, with the arithmetic.
+= cards c4 | CAC-01 · From the ground up | A cache, as the fridge next to the supermarket
+Hit :: The milk is in the fridge: seconds. A cache answers from memory, in under a millisecond.
+Miss :: Not in the fridge: a trip to the shop. The request goes to the database, a hundred times slower.
+Eviction :: The fridge is full: something old goes out to make room.
+Staleness :: The fridge's milk may be older than the shop's. A cache can be **behind** the truth.
+N: From the ground up. A cache is the fridge next to the supermarket. A hit: the milk is in the fridge, and you have it in seconds. A cache answers from memory in under a millisecond. A miss: it is not there, so you go to the shop. The request goes to the database, perhaps a hundred times slower. Eviction: the fridge is full, so something old goes out. And staleness: the milk in the fridge may be older than the milk in the shop. A cache can be behind the truth. Every idea in this part is about one of those four words.
 
 = list | Map of the part | Four groups
 - **What the cache is**: patterns, eviction and admission, expiry, hit-ratio arithmetic
@@ -25,6 +28,7 @@ N: One reading is assumed: section three of Scaling Memcache at Facebook, on lea
 N: Four groups. What the cache is: patterns, eviction, expiry and the arithmetic. Keeping it right: invalidation and the stale-set race. Keeping it standing: stampedes, hot keys and tiers. And keeping the database standing when the cache cannot help: negative caching, cold start and node loss.
 
 ## 9.1 Caching patterns
+N: We start with the five ways to put a cache next to a store.
 
 = table | CAC-01 · Tier A · The failure | A write-behind cache loses money on a crash
 @ CAC-01
@@ -63,16 +67,14 @@ V: My default is cache-aside: read the cache, on a miss load from the store and 
 [pause: 0.8]
 
 ## 9.2 Hit-ratio maths
+N: Next, the arithmetic: what the hit ratio does to the database behind it.
 
-= code | CAC-10 · Tier A · The mechanism | Backend load is the miss ratio times the traffic
+= math | CAC-10 · Tier A · The mechanism | Backend load is the miss ratio times the traffic
 @ CAC-10
-reads                  1,000,000 a second
-hit ratio 99%   ->  misses 1%    ->  10,000 a second to the database
-hit ratio 95%   ->  misses 5%    ->  50,000
-hit ratio 90%   ->  misses 10%   ->  100,000           ten times the 99% load
-
-mean latency = hit x 0.5 ms + miss x 10 ms
-    99%: 0.6 ms        90%: 1.5 ms
+$$ \text{load} = (1 - h) \times \text{reads} $$ :: the misses, not the hits, reach the database
+$$ 0.01 \times 10^{6} = 10{,}000/\text{s} $$ :: a million reads a second at 99% hits
+$$ 0.10 \times 10^{6} = 100{,}000/\text{s} $$ :: at 90% hits: **ten times** the load
+$$ \bar{t} = h \cdot 0.5\ \text{ms} + (1 - h) \cdot 10\ \text{ms} $$ :: mean latency: 0.6 ms at 99%, 1.5 ms at 90%
 N: The arithmetic everyone should be able to do. Backend load is the miss ratio times the traffic, not the hit ratio. A million reads a second at ninety-nine percent hits means ten thousand to the database. At ninety-five, fifty thousand. At ninety, a hundred thousand: ten times the load, from a hit ratio that only fell by nine points. Mean latency moves too: with half a millisecond for a hit and ten for a miss, about point six milliseconds at ninety-nine percent, and one and a half at ninety.
 
 = dia | CAC-10 · Tier A · The failure | The backend load curve as the hit ratio falls
@@ -97,6 +99,7 @@ V: I size the database from the miss ratio, not the hit ratio. Backend load is m
 [pause: 0.8]
 
 ## 9.3 Eviction policies
+N: Next, eviction. Which keys to throw out when memory is full.
 
 = table | CAC-02 · Tier A · The failure | One scan empties an LRU cache
 @ CAC-02
@@ -132,6 +135,7 @@ V: Least recently used adapts fast and is flushed by a single scan. I add freque
 [pause: 0.8]
 
 ## 9.4 Expiry
+N: Next, expiry. Why ten thousand keys set together expire together.
 
 = dia | CAC-03 · Tier A · The failure | Ten thousand keys set at the same second expire at the same second
 @ CAC-03
@@ -160,6 +164,7 @@ V: Every time to live gets random jitter, so keys loaded together do not expire 
 [pause: 0.8]
 
 ## 9.5 Invalidation
+N: Next, invalidation, and the bigger idea behind it: data derived from a system of record.
 
 = dia | CAC-04 · Tier A · The failure | The writer committed, then crashed before deleting the key
 @ CAC-04
@@ -186,11 +191,29 @@ The consumer must map a row change to **every cache key derived from it**: a pro
 That mapping is the hard part, and the usual source of "we invalidated the wrong key".
 N: The price of the change stream. A log consumer to run and scale, whose lag is now your staleness, so you alert on it. And the consumer must know every cache key derived from a row. One product row may feed a product page, a search result and a category list. That mapping is the hard part, and the usual cause of we invalidated the wrong key.
 
+= panel key | CAC-04 · From the ground up | A system of record, and data derived from it
+The **system of record** is the authoritative copy: when two copies disagree, it is right by definition.
+**Derived data** is anything you can recompute from it: a cache, a search index, a materialised view, a report, a recommendation model.
+Two rules follow. A derived copy can always be **thrown away and rebuilt**. And it is **never written back** to the source.
+N: From the ground up, the idea behind invalidation. The system of record is the authoritative copy of the data. When two copies disagree, it is right by definition. Derived data is anything you can recompute from it: a cache, a search index, a materialised view, a report, a recommendation model. Two rules follow. A derived copy can always be thrown away and rebuilt from the source. And it is never written back to the source, or a stale copy can overwrite the truth.
+
+= dia | CAC-04 · From the ground up | One log, many derived views
+p9-derived
+N: Here is the shape that keeps derived data honest. On the left, the system of record, the only copy anyone writes to. Its change log lists every commit in order. On the right, each derived view subscribes to that log. The cache invalidator deletes changed keys. The search index updates, and can be rebuilt by replaying the log from the start. The warehouse loads changes for analytics, hours later. And a feature store feeds ranking and machine learning. Each view has its own lag, and says what it is.
+
+= panel now | CAC-04 · Since 2023 | The database, unbundled
+A database already keeps indexes and materialised views in step with its own log. Large systems do the same **across** systems: one log feeds many specialised stores.
+In 2026 this is routine plumbing: change data capture (Debezium, Kafka Connect, managed CDC in every major cloud) and engines that keep SQL views up to date incrementally (Materialize, RisingWave).
+The design question is no longer *can* you derive it, but *how stale* each view may be, and how you **rebuild** it when it is wrong.
+E: Step back and see the pattern. Inside one database, indexes and materialised views are kept in step with the database's own log. Large systems do the same thing across systems: one log feeds many specialised stores. That is sometimes called unbundling the database.
+E: In 2026 it is routine plumbing. Change data capture tools such as Debezium and Kafka Connect, managed capture services in every major cloud, and engines that keep SQL views up to date incrementally, such as Materialize and RisingWave. So the question in a round is not whether you can derive a view. It is how stale each one may be, and how you rebuild it when it is wrong.
+
 = th | CAC-04 · the line to say | State the staleness bound: TTL alone, writer deletes with TTL as backstop, or the change stream's lag.
 V: I state the staleness I guarantee, with the mechanism behind it. Invalidation from the database's change stream bounds staleness by the stream's lag and survives writer crashes. A writer deleting after commit is usually fresh, with the time to live as the backstop. And the TTL alone is the worst case.
 [pause: 0.8]
 
 ## 9.6 The stale-set race and leases
+N: Next, a subtle race in which a slow reader puts an old value back into the cache.
 
 = dia | CAC-06 · Tier B · The failure | A slow reader writes an old value after the delete
 @ CAC-06
@@ -206,6 +229,7 @@ V: The stale-set race lets a slow reader write an old value after the invalidati
 [pause: 0.8]
 
 ## 9.7 Stampede control
+N: Next, stampedes. One hot key expires, and every reader rushes the database at once.
 
 = tiles | CAC-05 · Tier A · The failure | One hot key expires
 @ CAC-05
@@ -223,15 +247,19 @@ Early refresh | Refresh **before** expiry, with a probability that rises as expi
 Stale-while-revalidate | Serve the expired value for a grace window while **one** background refresh runs | In the cache, or HTTP's own header
 N: Four defences. Single flight: the first miss for a key starts the load, and every other miss for the same key waits for that result instead of loading again. Leases: the cache gives a load token to one caller per key every few seconds, and the others wait briefly or take a stale value. Early refresh: each reader refreshes before expiry with a probability that rises as expiry approaches, so one of them usually does it early, with no coordination. And stale while revalidate: serve the expired value for a short grace window while one background refresh runs.
 
-= code | CAC-05 · Tier A · One level down | Probabilistic early refresh, and why it works
-on each read of a cached value (fetched with: value, delta, expiry):
-    delta  = how long the last rebuild took
-    if now - delta x beta x ln(random()) >= expiry:
-        refresh now, as if it had expired
+= code python | CAC-05 · Tier A · One level down | Probabilistic early refresh, and why it works
+import math, random, time
 
-ln(random()) is negative, so the term pushes "now" forward by a random amount
-scaled to the rebuild time; hotter keys are read more, so one reader
-almost always refreshes shortly before expiry, and only one
+def get(key, beta=1.0):
+    # delta: how long the last rebuild took
+    value, delta, expiry = cache.get_with_meta(key)
+    # log(random()) < 0: "now" jumps ahead by a random amount
+    now = time.time() - delta * beta * math.log(random.random())
+    if value is None or now >= expiry:
+        start = time.time()
+        value = rebuild(key)
+        cache.set(key, value, delta=time.time() - start, ttl=TTL)
+    return value
 N: One level down: probabilistic early refresh. Each value is stored with how long its last rebuild took. On each read, push the current time forward by a random amount proportional to that rebuild time, and if that passes the expiry, refresh now. Because a hot key is read thousands of times a second, one of those reads almost always refreshes it shortly before it expires, and only one, since the probability is small for each. Cold keys are rarely refreshed early, which is exactly right. No locks, no coordination.
 
 = panel watch | CAC-05 · Tier A · The alternative and the price | What each defence costs
@@ -245,6 +273,7 @@ V: On a hot key's expiry, I make sure there is one rebuild, not thousands. Singl
 [pause: 0.8]
 
 ## 9.8 Hot keys and big values
+N: Next, a single key read half a million times a second, and values too big to move.
 
 = table | CAC-07 · Tier B · The mechanism | One key at 500,000 reads a second
 @ CAC-07
@@ -265,6 +294,7 @@ V: A single hot key beyond one node's capacity gets a short-lived in-process cop
 [pause: 0.8]
 
 ## 9.9 Multi-tier caching
+N: Next, several tiers of cache, and the one that is hardest to keep fresh.
 
 = dia | CAC-08 · Tier B · The mechanism | In-process first, then remote, then the store
 @ CAC-08
@@ -282,6 +312,7 @@ V: I stack an in-process tier for the hottest keys, with a time to live of secon
 [pause: 0.8]
 
 ## 9.10 Negative caching and penetration
+N: Next, requests for keys that do not exist, and why they go straight through.
 
 = dia | CAC-09 · Tier B · The mechanism | Keys that do not exist go straight through the cache
 @ CAC-09
@@ -298,6 +329,7 @@ V: Keys that do not exist go straight through a cache. I cache not found with a 
 [pause: 0.8]
 
 ## 9.11 Cold start and node loss
+N: Next, the empty cache: after a restart, or after losing a node.
 
 = table | CAC-11 · Tier B · The mechanism | Three ways to stop an empty cache from killing the database
 @ CAC-11
@@ -319,6 +351,7 @@ V: An empty cache is a database outage waiting to happen. I warm a cold tier fro
 [pause: 0.8]
 
 ## 9.12 Recap
+N: Time to gather the whole part onto one page.
 
 = list | Recap | What to be able to explain without notes
 - **Cache-aside** written correctly: delete, never set; always a TTL
@@ -331,6 +364,7 @@ V: An empty cache is a database outage waiting to happen. I warm a cold tier fro
 N: Without notes: cache-aside written correctly. Backend load as misses times traffic. Why least recently used fails on a scan, and how admission fixes it. Jitter and the two kinds of expiry. Three invalidation paths with their staleness bounds. The stale-set race and the lease. And stampedes, hot keys, tiers, negative caching and cold start.
 
 ## 9.13 Probe drills
+N: Now the drills. Pause after each question, answer it aloud, then compare.
 
 = probe | State the staleness you guarantee.
 - Normally: the **change stream's lag**, under a second
@@ -363,6 +397,7 @@ C: If the traffic mixes popular keys with scans or one-off reads, frequency-base
 C: The hit ratio goes to nearly zero, so the database sees the full read rate, likely many times its capacity. The defences: restart nodes in stages, never all at once; warm a cold tier from a warm peer; and keep an admission limit in front of the database, so excess misses are shed rather than taking it down. And in the design I would say plainly that the cache is load-bearing.
 
 ## 9.14 Where this shows up
+N: Finally, where caching shows up in the design problems.
 
 = table | Where this shows up | What each design problem takes from this part
 Problem | Takes

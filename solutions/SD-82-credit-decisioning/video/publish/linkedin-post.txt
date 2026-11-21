@@ -1,0 +1,21 @@
+Eight loan applications a second. Any database takes that. So why does this round fail strong engineers?
+
+I've published a 70-minute reference solution for instant credit at the point of sale, at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on 149 numbered slides.
+
+The idea that unlocks it: the core is small and boring on purpose, one database and one atomic step. The design lives at the slow edges and in what you keep.
+
+What it goes into:
+→ Never race two credit bureaus: every pull is paid and may show on the customer's file
+→ "Our vendor was slow" is not a decline reason, which is why "refer" exists
+→ A credit pull can't be compensated; only funding the merchant can
+→ Shadow mode can't tell you whether newly approved people repay
+
+Best on a second pass: pause after each question and answer it first.
+
+▶ [YouTube link: rerun publish_kit.py with --youtube-url]
+
+It's a scripted walkthrough with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator.
+
+When a vendor is down, who should decide what happens at the counter: engineering, credit risk or compliance?
+
+#SystemDesign #Fintech #DistributedSystems

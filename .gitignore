@@ -40,6 +40,9 @@ pdf-kit/.venv/
 **/video/.v[0-9]*/
 **/video/.*.v[0-9]*.md
 *.mp4
+# Course builder output (theory/video/course.py): MP4s, slide PDFs, chapter files; inside the repo, never ~/Movies
+theory/**/out/
+solutions/**/out/
 *.m4a
 *.mov
 *.webm
@@ -49,3 +52,18 @@ pdf-kit/.venv/
 # ── Python ──
 __pycache__/
 *.pyc
+
+# ── Third-party reference videos: private study copies; only our own notes (README/ANALYSIS) are tracked ──
+references/video-examples/**/original.mp4
+references/video-examples/**/frames/
+references/video-examples/**/sheet_*.jpg
+references/video-examples/**/meta.info.json
+references/video-examples/**/subs.*
+references/video-examples/**/transcript*
+
+# ── Claude Code: project skills are tracked; local settings and locks are not ──
+.claude/*
+!.claude/skills/
+
+# Build logs carry local paths
+build.log

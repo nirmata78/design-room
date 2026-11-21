@@ -21,16 +21,11 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 
 # Part 1 · Estimation that changes the design
 
-**Assumed reading.**
-
-- The SRE workbook, chapter 12, *Introducing Non-Abstract Large System Design*, walks one design from a single machine to a planet-wide system with numbers at every step. Read it twice.
-- The SRE book, chapter 3, *Embracing Risk*, is where the availability targets in this part come from.
-
 **Read next.**
 
 - *Designing Data-Intensive Applications*, chapter 1: describing load and describing performance, including why percentiles and not averages.
 - Dean and Barroso, *The Tail at Scale*: where the fan-out arithmetic comes from, and what to do about it.
-- The SRE workbook, chapter 12, again, now with a pencil: redo its numbers before reading its answers.
+- The SRE workbook, chapter 12: one design sized end to end. Redo its numbers before reading its answers.
 
 ## Concepts
 
@@ -52,11 +47,15 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 
 ![A system sized for the average falls over every evening](diagrams/video-p1-load-curve.pdf){width=100%}
 
+![One chain, from records to machines](diagrams/video-p1-storage-chain.pdf){width=100%}
+
 ![Six rungs, each about ten times the one below](diagrams/video-p1-latency-ladder.pdf){width=100%}
 
 ![Three good dependencies make one mediocre service](diagrams/video-p1-series-parallel.pdf){width=100%}
 
 ![Latency does not rise in a straight line](diagrams/video-p1-utilisation-curve.pdf){width=100%}
+
+![Average, median, and the ninety-ninth percentile](diagrams/video-p1-percentiles.pdf){width=100%}
 
 ![One request, a hundred leaves, and the slowest one sets the time](diagrams/video-p1-fanout.pdf){width=100%}
 
@@ -119,16 +118,10 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 
 # Part 2 · Consistency, time and failure
 
-**Assumed reading.**
-
-- *Designing Data-Intensive Applications*, chapter 8, *The Trouble with Distributed Systems*: unreliable networks, unreliable clocks, process pauses.
-- Chapter 9, *Consistency and Consensus*: what linearizability is, where it is needed, and what it costs.
-- This part assumes both and works the cases an interviewer asks about.
-
 **Read next.**
 
 - The Spanner paper, sections 3 and 4: TrueTime and how commit wait gives external consistency.
-- *Designing Data-Intensive Applications*, chapter 5, the section on the limits of quorum consistency.
+- *Designing Data-Intensive Applications*, chapters 5, 8 and 9: replication, the trouble with distributed systems, consistency and consensus.
 - Kleppmann, *How to do distributed locking*: the pause, the fencing token, and when a best-effort lock is enough.
 
 ## Concepts
@@ -155,6 +148,10 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 
 ![A partition forces a choice on the minority side](diagrams/video-p2-partition.pdf){width=100%}
 
+![The price of the E-C choice, in milliseconds](diagrams/video-p2-ec-price.pdf){width=100%}
+
+![The ladder on one page, with its mechanisms](diagrams/video-p2-ladder.pdf){width=100%}
+
 ![The two session anomalies that users actually report](diagrams/video-p2-session-anomalies.pdf){width=100%}
 
 ![Two different guarantees that sound alike](diagrams/video-p2-lin-vs-ser.pdf){width=100%}
@@ -175,6 +172,8 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 
 ![The resource checks a number that only grows](diagrams/video-p2-fencing.pdf){width=100%}
 
+![A timeout is a trade between speed and false alarms](diagrams/video-p2-heartbeat.pdf){width=100%}
+
 ![Each round, everyone who knows tells someone at random](diagrams/video-p2-gossip.pdf){width=100%}
 
 ## Traps and easy confusions
@@ -182,6 +181,8 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 **Trap · "Strongly consistent", over an arrow labelled "async".** A candidate draws a primary database and two replicas, labels the arrows between them **async**, sends reads to the replicas, and writes in the requirements: *strongly consistent*. The interviewer asks one question: "A user saves, and reloads. What do they see?"
 
 **Trap · Why "CA" is not on the menu, and what a "CP" system really does.** You cannot choose to have no partitions: a network of more than one machine can always lose messages. So "CA" describes a single node, or a wish. A consistent system does not go wholly dark in a partition. **The majority side keeps working.** Only nodes on the minority side refuse. Say which requests fail, and for whom.
+
+**Trap · Why order matters: one story.** A user edits a document title, then deletes the document. Two events, a second apart. A search index receives them through two different paths. **The delete arrives first**, then the edit, which re-creates the entry. The document is gone, and it still shows up in search, forever. No message was lost. They only arrived in the wrong order.
 
 **Trap · Per-key order is lost in three ordinary ways.** **A retry overtakes**: message 1 fails, message 2 succeeds, message 1 is retried and lands second. **The partition count changes**: the key now hashes elsewhere, and old and new partitions are read in parallel. **Parallel consumers** inside one partition process two events for one key at once.
 
@@ -239,12 +240,6 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 > A lease needs a duration, not a time of day. Each side measures it on its own monotonic clock, the holder stopping slightly early. That assumes only bounded drift between two clocks over ten seconds, which is realistic. It does not assume the clocks agree on what time it is. And because a pause can outlast any lease, the resource still checks a fencing token.
 
 # Part 3 · Consensus
-
-**Assumed reading.**
-
-- The Raft paper, extended version: section 5 (the algorithm) and section 8 (client interaction). Read them with the figures.
-- The SRE book, chapter 23, *Managing Critical State*: what to build on consensus and how to deploy it.
-- This part walks the algorithm as one trace and then goes to what the paper leaves to implementers.
 
 **Read next.**
 
@@ -341,12 +336,6 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 > The clients near the new leader gain, and the others lose about the same. But there is a second effect. If the new region has only one voter, the leader needs two remote acknowledgements, so every commit gets slower. And the move itself should be a leadership transfer to a caught-up follower, which takes a moment, not a kill, which costs an election timeout.
 
 # Part 4 · Coordination services
-
-**Assumed reading.**
-
-- Burrows, *The Chubby Lock Service for Loosely-Coupled Distributed Systems*: read it whole, it is short.
-- Part 2 of this course: leases and fencing tokens. Part 3: the consensus log underneath.
-- This part leaves the paper's design rationale and usage statistics to the paper, and goes to the timeline, the primitives and the patterns.
 
 **Read next.**
 
@@ -447,12 +436,6 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 
 # Part 5 · Replication
 
-**Assumed reading.**
-
-- *Designing Data-Intensive Applications*, chapter 5, **whole**.
-- Part 2 of this course: session guarantees on the consistency ladder, quorums, last-writer-wins and version vectors. Part 3: consensus.
-- The chapter's survey of topologies and the history of conflict resolution stay in the chapter. This part goes to failover, the outbox, repair and the numbers.
-
 **Read next.**
 
 - DeCandia et al., *Dynamo*: sloppy quorums, hinted handoff, Merkle trees, vector clocks, in one paper.
@@ -483,6 +466,8 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 
 ![Asynchronous replication loses the tail on failover](diagrams/video-p5-async-tail.pdf){width=100%}
 
+![Failover, step by step](diagrams/video-p5-failover.pdf){width=100%}
+
 ![Lag is usually milliseconds, and sometimes minutes](diagrams/video-p5-lag-curve.pdf){width=100%}
 
 ![Two writes, two systems, no atomicity](diagrams/video-p5-dual-write.pdf){width=100%}
@@ -499,6 +484,8 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 
 ![A new replica copies a snapshot, then replays the log from the snapshot's position](diagrams/video-p5-seed.pdf){width=100%}
 
+![A replica two days behind: catch up, or rebuild?](diagrams/video-p5-catchup.pdf){width=100%}
+
 ## Traps and easy confusions
 
 **Trap · The follower that was one second behind.** A database primary fails at peak. Automation promotes a follower within thirty seconds. Everyone is pleased. The follower was **one second** behind. At five thousand writes a second, five thousand acknowledged writes are gone. Worse: some of them had already been copied into a cache and a search index, which now hold data the database never had.
@@ -512,6 +499,8 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 **Easy to confuse · Repair must finish inside the tombstone grace period.** A replica that misses a delete must be repaired before tombstones are discarded, or the deleted data returns (section 5.11). So the repair schedule is a **correctness** requirement, not a tuning knob.
 
 **Easy to confuse · Choose per data type, not per system.** Most systems mix them: **account balance** on consensus, **user profile** homed, **counters and likes** multi-leader with a CRDT, **catalogue** one leader with followers everywhere. The price of mixing is that a single request may touch data with different guarantees. Say which data each screen shows.
+
+**Trap · Replication is not a backup.** A replica copies **every** change within seconds, including a mistaken `DELETE`, a bad migration, or corruption from a bug. Protection against mistakes needs copies from the past: **point-in-time backups** and log archives, kept somewhere a bad change cannot reach, and **restored regularly** to prove they work.
 
 **Trap · A regional failover nobody had the authority to start.** The primary region is degraded, not down. Writes succeed slowly, some fail. Failing over would lose the replication lag, about 4 seconds of payments. Not failing over keeps a third of requests failing. Two teams argue for forty minutes about whose decision it is.
 
@@ -567,11 +556,6 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 
 # Part 6 · Partitioning and placement
 
-**Assumed reading.**
-
-- *Designing Data-Intensive Applications*, chapter 6.
-- The chapter's comparison of rebalancing strategies across products stays there. This part does the arithmetic, the protocols and the failure cases.
-
 **Read next.**
 
 - Chang et al., *Bigtable*: tablets, splits and the location hierarchy.
@@ -611,6 +595,10 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 ![Index local to each shard, or partitioned by the indexed value](diagrams/video-p6-indexes.pdf){width=100%}
 
 ![Three replicas, one rack](diagrams/video-p6-domains.pdf){width=100%}
+
+![Why spreading partners speeds repair](diagrams/video-p6-repair-fanin.pdf){width=100%}
+
+![Time plus worker plus sequence, in 64 bits](diagrams/video-p6-id-bits.pdf){width=100%}
 
 ## Traps and easy confusions
 
@@ -678,11 +666,6 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 
 # Part 7 · Storage engines and blob storage
 
-**Assumed reading.**
-
-- *Designing Data-Intensive Applications*, chapter 3.
-- The chapter's build-up from an append-only file, and the basics of B-trees, stay in the chapter. This part goes to the trace, the arithmetic and the failure cases.
-
 **Read next.**
 
 - Chang et al., *Bigtable*: memtables, SSTables, compactions and Bloom filters in production.
@@ -746,6 +729,8 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 
 **Easy to confuse · Old versions, and the transaction that holds them.** A version can be deleted only when **no active snapshot** can still see it: below the **oldest running transaction**. One analytics query open for six hours keeps **six hours** of versions of every changed row. Tables bloat, scans slow down. Bound transaction age, and run long reads against a replica or a snapshot copy.
 
+**Easy to confuse · Where documents strain, and tables shine: many-to-many.** A company has **many** employees, and a person has **many** employers. The company's name and logo must exist **once**, not copied into every profile. So the document holds an ID, and the application looks the company up: a join, done in code, one request per company. Tables do this in the engine. Graphs do it as a first-class idea. Choose the shape by **which relationships dominate**.
+
 **Easy to confuse · One store for everything, or several.** **One relational store** is the right first answer far more often than it sounds: it scales to tens of thousands of writes a second and terabytes. **Several stores** each fit one pattern, and each adds a copy to keep consistent, a schema to evolve, and an on-call surface. Say what would make you add the second store: a number.
 
 **Easy to confuse · Index, denormalise, or derive.** **Another index**: cheapest for a query on the same store; costs every write. **A denormalised column** or summary row: one read, and a second write you must keep consistent. **A derived store** fed by change data capture: no cost on the write path; reads are stale by the lag.
@@ -799,12 +784,6 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 > I would ask where the write is at that moment. Two tenths of a millisecond is plausible for an fsync on local NVMe with power-loss protection, and implausible on network block storage, where a sync is about a millisecond. And durable against what? One node's power loss, or a rack, or a zone? That decides whether one local sync is enough or I need a quorum.
 
 # Part 8 · Transactions and concurrency control
-
-**Assumed reading.**
-
-- *Designing Data-Intensive Applications*, chapter 7.
-- The chapter's taxonomy of isolation levels and the history of their names stay there. This part does the traces and the choices.
-- Part 2 of this course: idempotency and exactly-once, with the deduplication sequence. Part 7: multi-version storage.
 
 **Read next.**
 
@@ -913,11 +892,6 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 
 # Part 9 · Caching
 
-**Assumed reading.**
-
-- Nishtala et al., *Scaling Memcache at Facebook*, **section 3**: leases, pools, gutter servers.
-- The paper's regional and cross-region story stays in the paper. This part does the mechanisms on one key, with the arithmetic.
-
 **Read next.**
 
 - Nishtala et al., *Scaling Memcache at Facebook*, after section 3: regions and consistency across them.
@@ -947,6 +921,8 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 ![Ten thousand keys set at the same second expire at the same second](diagrams/video-p9-ttl-sync.pdf){width=100%}
 
 ![The writer committed, then crashed before deleting the key](diagrams/video-p9-lost-invalidation.pdf){width=100%}
+
+![One log, many derived views](diagrams/video-p9-derived.pdf){width=100%}
 
 ![A slow reader writes an old value after the delete](diagrams/video-p9-stale-set.pdf){width=100%}
 
@@ -1020,12 +996,6 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 
 # Part 10 · Logs, queues, streams and sketches
 
-**Assumed reading.**
-
-- *Designing Data-Intensive Applications*, chapter 11.
-- Part 2 of this course: idempotency and exactly-once, ordering guarantees. Part 5: change data capture and the outbox.
-- The chapter's stream joins and its survey of brokers stay there.
-
 **Read next.**
 
 - Akidau et al., *The Dataflow Model*: event time, windows, watermarks and triggers.
@@ -1048,7 +1018,7 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 | MSG-10 | Fan-out | A | Fan-out on write makes reads cheap and pays per follower at post time. Fan-out on read makes posts cheap and pays on every read. I use a hybrid: push for ordinary authors, pull and merge the few huge accounts at read time, with the threshold set from the write and read arithmetic. | 10.10 Fan-out |
 | MSG-11 | Event time, windows, watermarks | B | I window by event time. The watermark is the minimum progress across input partitions, and it decides when a window is emitted, so an idle partition must be detected or it stalls everything. Late events within an allowed lateness update the result, and later ones go to a side output. | 10.11 Event time, windows and watermarks |
 | MSG-12 | Stateful stream processing | B | A stateful stream processor keeps keyed state locally and checkpoints it together with the input offsets. On failure it restores the checkpoint and rewinds the input, so state is exactly once, and outputs are recomputed, which the sink must make harmless. | 10.12 Stateful stream processing |
-| MSG-13 | Lambda vs Kappa | B | I prefer one replayable stream path, and reprocess by running a new version of the job over the retained log beside the old one, then switching. I keep a separate batch path only when history is far bigger than any log retention. | 10.13 Lambda versus Kappa |
+| MSG-13 | Lambda vs Kappa | B | I prefer one replayable stream path, and reprocess by running a new version of the job over the retained log beside the old one, then switching. I keep a separate batch path only when history is far bigger than any log retention. | 10.13 Batch, stream, Lambda and Kappa |
 | MSG-15 | Schema evolution | B | Topic schemas evolve under a compatibility rule, at least backward, so consumers upgrade first. I only add optional fields with defaults, never reuse or retype a field, and a schema registry rejects any version that breaks the rule. | 10.14 Schema evolution |
 | DS-02 | HyperLogLog | B | For distinct counts at scale I use HyperLogLog: about twelve kilobytes per counter for under one percent error, and sketches merge across shards and time by taking the maximum per register. | 10.15 HyperLogLog |
 | DS-03 | Count-Min Sketch and heavy hitters | B | A Count-Min Sketch estimates frequencies in a few tens of kilobytes. It never underestimates and overestimates by at most epsilon times the total, with width e over epsilon and depth log of one over delta. With a small heap on top it finds heavy hitters, and sketches merge by adding counters. | 10.16 Count-Min Sketch and heavy hitters |
@@ -1077,6 +1047,8 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 ![Count by when it happened, not when it arrived](diagrams/video-p10-watermark.pdf){width=100%}
 
 ![Local state, checkpointed with the input offsets](diagrams/video-p10-checkpoint.pdf){width=100%}
+
+![A batch job: map, shuffle, reduce](diagrams/video-p10-mapreduce.pdf){width=100%}
 
 ## Traps and easy confusions
 
@@ -1142,11 +1114,6 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 
 # Part 11 · Networking, the edge and API contracts
 
-**Assumed reading.**
-
-- *Site Reliability Engineering*, chapter 19, *Load Balancing at the Frontend*, and chapter 20, *Load Balancing in the Datacenter*.
-- The chapters' account of DNS and virtual-IP balancing, subsetting and weighted round robin stays there. This part keeps one picture and the probe for each, then goes to RPC and the API contract.
-
 **Read next.**
 
 - Eisenbud et al., *Maglev: A Fast and Reliable Software Network Load Balancer*.
@@ -1187,6 +1154,8 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 ![The caller gave up; the callee did not](diagrams/video-p11-orphan-work.pdf){width=100%}
 
 ![Pass a deadline, not a timeout](diagrams/video-p11-deadline.pdf){width=100%}
+
+![The deadline budget across three hops](diagrams/video-p11-deadline-budget.pdf){width=100%}
 
 ![Gateways hold connections; a routing table says where each user is](diagrams/video-p11-conn-tier.pdf){width=100%}
 
@@ -1268,12 +1237,6 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 
 # Part 12 · Rate limiting and overload control
 
-**Assumed reading.**
-
-- *Site Reliability Engineering*, chapter 21, *Handling Overload*.
-- The chapter's criticality classes, per-customer limits, the derivation of client-side throttling and its utilisation signals stay there.
-- Part 8 of this course: reservations and escrow, for quotas that are money.
-
 **Read next.**
 
 - *The Site Reliability Workbook*, chapter 11, *Managing Load*, and chapter 17, *Identifying and Recovering from Overload*.
@@ -1299,6 +1262,10 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 ![Twice the limit across a window boundary](diagrams/video-p12-boundary.pdf){width=100%}
 
 ![Fifty gateways, each enforcing the limit locally](diagrams/video-p12-local-limit.pdf){width=100%}
+
+![Goodput under overload, for three costs of a reject](diagrams/video-p12-goodput.pdf){width=100%}
+
+![Max–min fairness, worked](diagrams/video-p12-maxmin.pdf){width=100%}
 
 ![A bounded queue, deadlines checked at dequeue, newest first under overload](diagrams/video-p12-queue.pdf){width=100%}
 
@@ -1366,12 +1333,6 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 
 # Part 13 · Reliability patterns
 
-**Assumed reading.**
-
-- *Site Reliability Engineering*, chapter 22, *Addressing Cascading Failures*.
-- The chapter's anatomy of a cascade, queue management, testing advice and immediate steps during an incident stay there.
-- Part 11: deadlines passed down a call chain. Part 12: shedding and client-side throttling.
-
 **Read next.**
 
 - Dean and Barroso, *The Tail at Scale*: hedged and tied requests, micro-partitions.
@@ -1398,6 +1359,8 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 | REL-14 | Disaster recovery | B | My disaster recovery plan lists scenarios, each with its recovery point and time, runbook and decision owner, and I only trust it once it has been exercised, ideally in production where safe, with restores tested on a schedule. | 13.14 Disaster recovery |
 
 ## Figures
+
+![The amplification when every layer retries](diagrams/video-p13-retry-amp.pdf){width=100%}
 
 ![Calling a dependency that is certainly down](diagrams/video-p13-no-breaker.pdf){width=100%}
 
@@ -1488,12 +1451,6 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 > The offered load is normal, but the work is not: retries, queued requests already past their deadlines, and cold caches keep the system above capacity, and its own timeouts keep generating more retries. I would shed load hard, drop queued work past its deadline, set the retry budget to zero for a while, warm the caches, and then let traffic back in steps.
 
 # Part 14 · Observability and time-series storage
-
-**Assumed reading.**
-
-- *Site Reliability Engineering*, chapter 4 (*Service Level Objectives*) and chapter 6 (*Monitoring Distributed Systems*).
-- *The Site Reliability Workbook*, chapter 2 (*Implementing SLOs*) and chapter 5 (*Alerting on SLOs*).
-- How to choose SLIs, the burn-rate derivation and its table of windows, and alert hygiene stay in those chapters.
 
 **Read next.**
 
@@ -1589,12 +1546,6 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 
 # Part 15 · Scheduling and control planes
 
-**Assumed reading.**
-
-- *Site Reliability Engineering*, chapter 24, *Distributed Periodic Scheduling with Cron*.
-- The chapter's design history of the cron service and its handling of large installations stay there.
-- Part 3 (consensus), part 2 (fencing), part 13 (static stability).
-
 **Read next.**
 
 - Verma et al., *Large-scale cluster management at Google with Borg*.
@@ -1683,11 +1634,6 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 
 # Part 16 · Security, operating and evolving systems, the manager layer
 
-**Assumed reading.**
-
-- *The Site Reliability Workbook*, chapter 16, *Canarying Releases*.
-- Canary evaluation and metric selection stay in the chapter.
-
 **Read next.**
 
 - *Site Reliability Engineering*, chapter 17 (*Testing for Reliability*) and chapter 27 (*Reliable Product Launches at Scale*).
@@ -1721,6 +1667,8 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 ## Figures
 
 ![One timeline: expand, capture, backfill, verify, switch reads, switch writes, contract](diagrams/video-p16-migration.pdf){width=100%}
+
+![Unit cost, and its biggest lever](diagrams/video-p16-cost.pdf){width=100%}
 
 ## Traps and easy confusions
 
@@ -1803,11 +1751,6 @@ checked against their online tables of contents on 2026-11-12. DDIA is the first
 > Anything that is not why customers choose us and has a product that meets the requirements in numbers: identity, the message queue, metrics, the workflow engine. I would build the part that differentiates us, here the core data path. And I would state when I would revisit each, for instance if the bought queue's cost per message became the biggest line item at ten times the volume.
 
 # Part 17 · The building blocks
-
-**Assumed reading.**
-
-- *Site Reliability Engineering*, chapter 2, *The Production Environment at Google, from the Viewpoint of an SRE*.
-- Each block's mechanism is in the part named on its card. This part only says when to draw it.
 
 **Read next.**
 

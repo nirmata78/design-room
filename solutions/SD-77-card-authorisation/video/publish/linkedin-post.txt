@@ -1,0 +1,21 @@
+"Check the balance and say yes" is wrong three times over in card authorisation.
+
+I've published a 75-minute reference solution for the card authorisation question, at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on 156 numbered slides.
+
+The idea that unlocks it: an approval is a promise made inside someone else's deadline. It places a hold, not a debit, and the real money moves days later in a file, often for a different amount.
+
+What it goes into:
+→ Why two swipes two milliseconds apart need one conditional write per account
+→ A reversal that arrives before its authorisation
+→ A fraud model at 1.8 seconds: a cut-off and a fail-policy table that risk and finance sign
+→ Twenty minutes of stand-in: record what the network decided, even when it overdraws
+
+Best on a second pass: pause after each question and answer it first.
+
+▶ [YouTube link: rerun publish_kit.py with --youtube-url]
+
+It's a scripted walkthrough with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator.
+
+Who should own the fail-open policy for fraud: engineering, risk or finance?
+
+#SystemDesign #Fintech #Payments

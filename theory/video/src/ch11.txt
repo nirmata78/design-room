@@ -5,6 +5,7 @@
 N: Part eleven, the edge and the API. A request crosses a name lookup, one or two load balancers, a gateway, several remote calls, and an interface contract, before any of the interesting design is reached. Each of those has a failure that interviewers like, because a candidate who draws a box called load balancer often cannot say what it does when a backend is half alive.
 
 ## 11.0 Why this part decides rounds
+N: First, a story about a failover that took thirty seconds and an outage that took an hour.
 
 = panel trap | The opening story | A failover that took as long as the DNS TTL
 A region fails. The team changes the DNS record to point at the healthy region, in thirty seconds.
@@ -12,10 +13,11 @@ The record's TTL was **one hour**. Resolvers and clients keep the old address fo
 The failover was quick. The outage lasted an hour.
 N: A region fails. The team updates the DNS record to point at the healthy region, which takes thirty seconds. But the record's time to live was one hour. Resolvers and clients keep the old address for up to an hour, and some clients ignore the time to live and keep it even longer. The failover was quick, and the outage lasted an hour. The interviewer's question is simple: how long does your failover take, end to end, for a client? The answer is set by a number chosen months earlier.
 
-= panel note | Assumed reading | What this part does not repeat
-*Site Reliability Engineering*, chapter 19, *Load Balancing at the Frontend*, and chapter 20, *Load Balancing in the Datacenter*.
-The chapters' account of DNS and virtual-IP balancing, subsetting and weighted round robin stays there. This part keeps one picture and the probe for each, then goes to RPC and the API contract.
-N: Two chapters of the S-R-E book are assumed: nineteen, on load balancing at the front end, and twenty, on load balancing in the data center. Their explanations of DNS balancing, virtual addresses, subsetting and weighted round robin stay in the book. This part keeps one picture and one probe for each, and spends its time on remote calls and the API contract.
+= cards c3 | NET-01 · From the ground up | How one request reaches one server
+Name to address :: `api.example.com` is looked up in DNS, the internet's phone book, and becomes an IP address.
+Address to site :: That address leads to the nearest healthy datacentre, by DNS answers that differ per region, or by one address announced from many places.
+Site to server :: A load balancer picks one of hundreds of identical servers, and keeps picking as they come and go.
+N: From the ground up, how one request reaches one server, in three steps. Name to address: a name like api dot example dot com is looked up in DNS, the internet's phone book, and becomes an address. Address to site: that address leads to the nearest healthy datacentre, either because DNS gives different answers in different regions, or because one address is announced from many places at once. And site to server: a load balancer picks one of hundreds of identical servers, and keeps choosing as they come and go. As always, green slides start from nothing.
 
 = list | Map of the part | Three groups
 - **Getting to a server**: DNS and anycast, L4 and L7 balancing, health and draining, the gateway
@@ -24,6 +26,13 @@ N: Two chapters of the S-R-E book are assumed: nineteen, on load balancing at th
 N: Three groups. Getting to a server: names, anycast, load balancing, health checks and the gateway. Talking to it: remote call semantics, push transports, and tiers of persistent connections. And the contract on the wire, from pagination to the throttling response, with the data structure that routing tables use.
 
 ## 11.1 DNS, geo-routing and anycast
+N: We start at the very beginning of a request: finding the right site, by name.
+
+= panel key | NET-01 · From the ground up | DNS, as a phone book with an expiry date
+A DNS answer comes with a **time to live** (TTL): "this address is good for 300 seconds". Resolvers and clients cache it that long.
+A short TTL makes changes visible quickly, and sends more lookups to the name servers. A long TTL is cheap, and slow to change.
+Some clients ignore the TTL and keep an address for far longer. So a DNS change is a **suggestion**, taken up over time.
+N: From the ground up, DNS. Every answer comes with a time to live: this address is good for three hundred seconds. Resolvers and clients cache the answer for that long. A short time to live makes a change visible quickly, and sends more lookups to the name servers. A long one is cheap, and slow to change. And some clients ignore it and keep an address much longer. So a DNS change is a suggestion that the world takes up over time, which is exactly the opening story.
 
 = dia | NET-01 · Tier A · The mechanism | Three ways to send a user to the nearest healthy site
 @ NET-01
@@ -49,24 +58,33 @@ V: DNS failover takes at least the record's time to live, plus clients that cach
 [pause: 0.8]
 
 ## 11.2 L4 versus L7 load balancing
+N: Next, load balancers. Balancing connections, or balancing requests.
 
-= dia | NET-02 · Tier A · Assumes SRE book ch. 19 and 20 | Packets, or requests
+= dia | NET-02 · Tier A · The mechanism | Packets, or requests
 @ NET-02
 p11-l4-l7
-N: Assumes chapters nineteen and twenty of the S-R-E book. The one picture: a layer four balancer sees connections and packets. It picks a backend per connection, often by a consistent hash of the connection's addresses, and forwards packets, so it is fast and protocol-agnostic. Google's Maglev is one. A layer seven balancer terminates the connection, reads each request, and picks a backend per request, by path, header or load. It can retry, route and observe, and it costs more processing per request.
+N: The picture: a layer four balancer sees connections and packets. It picks a backend per connection, often by a consistent hash of the connection's addresses, and forwards packets, so it is fast and protocol-agnostic. Google's Maglev is one. A layer seven balancer terminates the connection, reads each request, and picks a backend per request, by path, header or load. It can retry, route and observe, and it costs more processing per request.
 
-= panel trap | NET-02 · Tier A · The probe the chapters leave | "One backend gets all the traffic over a few long connections."
+= cards c3 | NET-02 · From the ground up | How a balancer chooses, and why each client sees only some servers
+Round robin :: Next server in turn. Fair when every request costs the same, unfair when some take a second and some a millisecond.
+Least loaded :: The server with the fewest requests in flight. Adapts to slow servers and slow requests; needs a fresh count.
+Weighted by capacity :: Each server reports how much more it can take, from its CPU and errors; the balancer sends in proportion.
+> **Subsetting**: with ten thousand clients and a thousand servers, each client connects to a random subset of, say, 20, so no server holds ten thousand connections.
+N: From the ground up, how a balancer chooses. Round robin: the next server in turn. Fair when every request costs the same, unfair when some take a second and others a millisecond. Least loaded: the server with the fewest requests in flight, which adapts to slow servers and slow requests. Weighted by capacity: each server reports how much more it can take, from its processor and its error rate, and traffic goes in proportion. And one more idea, subsetting. With ten thousand clients and a thousand servers, each client connects only to a random twenty, so no server holds ten thousand connections.
+
+= panel trap | NET-02 · Tier A · The probe | "One backend gets all the traffic over a few long connections."
 A **layer 4** balancer balances **connections**. A client with one HTTP/2 or gRPC connection sends every request to one backend.
 Fix: balance at **layer 7**, per request; or have clients open several connections and rotate them; or cap a connection's lifetime so it reconnects elsewhere.
-N: The probe the chapters do not spell out. A few clients with long-lived connections send all their traffic to one backend. A layer four balancer balances connections, not requests, and one gRPC connection carries thousands of requests. Fix it by balancing per request at layer seven, by having clients hold several connections and rotate among them, or by capping each connection's lifetime so it reconnects and is placed again.
+N: The probe. A few clients with long-lived connections send all their traffic to one backend. A layer four balancer balances connections, not requests, and one gRPC connection carries thousands of requests. Fix it by balancing per request at layer seven, by having clients hold several connections and rotate among them, or by capping each connection's lifetime so it reconnects and is placed again.
 
 = th | NET-02 · the line to say | Layer 4 balances connections and is fast; layer 7 balances requests and can route and retry. Long-lived connections need layer 7.
 V: A layer four balancer places connections, fast and protocol-blind; a layer seven balancer places each request and can route, retry and observe. With long-lived multiplexed connections, I balance at layer seven, or cap connection lifetime.
 [pause: 0.8]
 
 ## 11.3 Health checks and draining
+N: Next, health checks, and stopping a server without dropping a single request.
 
-= dia | NET-03 · Tier A · Assumes SRE book ch. 20 | Healthy, half alive, or dead, and the panic threshold
+= dia | NET-03 · Tier A · The mechanism | Healthy, half alive, or dead, and the panic threshold
 @ NET-03
 p11-health
 N: The picture: the balancer probes each backend, and also watches real traffic. A backend that fails probes, or returns errors to real requests well above its peers, is ejected: outlier ejection. Draining is the reverse path for a planned stop. The backend fails its readiness check, the balancer stops sending new requests, existing requests finish, and only then does the process exit. And the box at the bottom: if more than half the backends look unhealthy, the balancer stops ejecting and sends traffic to all of them, because the likelier problem is the health check.
@@ -82,6 +100,7 @@ V: Health checks eject outliers, using both probes and real error rates. A plann
 [pause: 0.8]
 
 ## 11.4 The API gateway
+N: Next, the gateway: the one box every request crosses, and what belongs in it.
 
 = dia | NET-04 · Tier A · The failure | A gateway that grew business logic
 @ NET-04
@@ -115,6 +134,7 @@ V: My gateway does only what every request needs: TLS, authentication, per-clien
 [pause: 0.8]
 
 ## 11.5 RPC semantics
+N: Next, calls between services, and why a deadline beats a timeout.
 
 = dia | NET-07 · Tier A · The failure | The caller gave up; the callee did not
 @ NET-07
@@ -125,16 +145,8 @@ N: A remote call is not a local call, and the failure in the picture shows the d
 p11-deadline
 N: The fix is to pass an absolute deadline down the call chain. The front end sets the deadline at now plus eight hundred milliseconds and sends it with the request. A receives it, spends fifty milliseconds, and calls B with the same deadline, so B has seven hundred and fifty left. B calls C with what remains. Each hop checks the deadline before starting work, and refuses work that cannot finish in time. When the front end gives up, it sends a cancellation, and every hop stops. gRPC carries both, deadline and cancellation, for this reason.
 
-= code | NET-07 · Tier A · One level down | The deadline budget across three hops
-user-facing SLO: p99 under 1,000 ms; front end keeps 200 ms for itself
-deadline sent to A:          now + 800 ms
-
-hop A: own work p99  50 ms   ->  calls B with  750 ms left
-hop B: own work p99  80 ms   ->  calls C with  670 ms left
-hop C: query p99    300 ms   ->  fits, with 370 ms spare
-
-if C is slow at 700 ms: B's deadline passes first;
-B returns DEADLINE_EXCEEDED to A; A does NOT retry, there is no time left
+= dia | NET-07 · Tier A · One level down | The deadline budget across three hops
+p11-deadline-budget
 N: The budget, in numbers. The user-facing target is a p99 under a second, and the front end keeps two hundred milliseconds for itself, so it sends a deadline eight hundred milliseconds away. A's own work takes fifty, so B gets seven hundred and fifty. B's own work takes eighty, so C gets six hundred and seventy, and C's query, three hundred at p99, fits. If C takes seven hundred, B's deadline passes first, B returns deadline exceeded, and A does not retry, because there is no time left to retry in.
 
 = table | NET-07 · Tier A · The alternative and the price | Four rules for calls between services
@@ -150,6 +162,7 @@ V: Between services I pass an absolute deadline and cancellation down the whole 
 [pause: 0.8]
 
 ## 11.6 Polling, long polling, SSE and WebSocket
+N: Next, pushing updates to clients: polling, long polling, server-sent events and WebSockets.
 
 = table | NET-08 · Tier A · The failure | Polling a million clients every five seconds
 @ NET-08
@@ -182,20 +195,18 @@ V: I choose the transport by direction and rate. Polling only for rare updates a
 [pause: 0.8]
 
 ## 11.7 Persistent-connection tiers
+N: Next, a tier that holds ten million open connections.
 
 = dia | NET-09 · Tier B · The mechanism | Gateways hold connections; a routing table says where each user is
 @ NET-09
 p11-conn-tier
 N: A tier of connection gateways holds the open connections, and nothing else. In the picture, user forty-two connects to gateway seven. Gateway seven writes user forty-two, gateway seven, into a routing table, with a lease it renews by heartbeat. When a message for user forty-two arrives from any service, the dispatcher looks up the table, and sends it to gateway seven, which writes it down the connection. If user forty-two has three devices, the table has three entries. The gateways are stateless apart from the connections themselves.
 
-= code | NET-09 · Tier B · One level down | Ten million connections, and the reconnect storm
-per connection: TLS and socket buffers, about 10 to 30 KB
-10,000,000 connections x 20 KB          = 200 GB of memory
-at 500,000 connections per gateway      = 20 gateways, plus headroom: 30
-
-one gateway dies: 500,000 clients reconnect at once
-    without jitter: 500,000 TLS handshakes in a second, on the survivors
-    with reconnect spread over 30 s by random backoff: about 17,000 a second
+= math | NET-09 · Tier B · One level down | Ten million connections, and the reconnect storm
+$$ 10^{7} \times 20\ \text{KB} = 200\ \text{GB} $$ :: TLS state and socket buffers: 10 to 30 KB per connection
+$$ 10^{7} / (5 \times 10^{5}) = 20\ \text{gateways} $$ :: at half a million connections each; thirty with headroom
+$$ 5 \times 10^{5}\ \text{in one second} $$ :: one gateway dies: every client reconnects at once, without jitter
+$$ 5 \times 10^{5} / 30\ \text{s} \approx 17{,}000/\text{s} $$ :: with random backoff spread over 30 seconds
 N: One level down, the numbers. Each connection costs ten to thirty kilobytes of TLS state and socket buffers. Ten million connections at twenty kilobytes is two hundred gigabytes of memory. At half a million connections per gateway, that is twenty gateways, thirty with headroom. Now the probe. One gateway dies, and half a million clients reconnect. Without jitter they all try in the same second: half a million TLS handshakes on the survivors. With a random backoff spread over thirty seconds, about seventeen thousand a second, which the tier can absorb.
 
 = th | NET-09 · the line to say | A connection tier holds sockets and registers each user's gateway under a lease; clients reconnect with jittered backoff.
@@ -203,6 +214,7 @@ V: A persistent-connection tier only holds sockets. Each gateway registers its u
 [pause: 0.8]
 
 ## 11.8 API style
+N: Now the contract on the wire. First, the style of the API.
 
 = table | API-01 · Tier A · The mechanism | Resource-oriented, RPC, or query
 @ API-01
@@ -235,20 +247,24 @@ Dozens of independent clients over one graph: GraphQL earns its cost-control mac
 N: The probe: why not GraphQL here? Answer with the consumers. How many client screens, how different are their shapes, and who controls them? One mobile app and one web app owned by the same team are served more simply by a backend-for-frontend with plain methods. Dozens of independent clients over one large graph is where GraphQL earns the machinery it needs.
 
 ## 11.9 Pagination
+N: Next, pagination that stays correct while new rows arrive.
 
 = dia | API-02 · Tier A · The failure | Offset pagination under inserts
 @ API-02
 p11-offset
 N: Offset pagination asks for page two as skip twenty, take twenty. The failure is in the picture. The user reads page one: items one to twenty, newest first. While they read, three new items are inserted at the top. They ask for page two: skip twenty. Everything has shifted down by three, so items eighteen, nineteen and twenty appear again, at the top of page two. With deletes, items are silently skipped. And a deep offset is slow: skip a million rows means reading a million rows to throw them away.
 
-= code | API-02 · Tier A · The mechanism | A cursor encodes where you stopped, not how far you went
-page 1:  SELECT ... WHERE feed = 7 ORDER BY created_at DESC, id DESC LIMIT 20
-         last row: created_at 12:04:07.331, id 98812
-         next_page_token = base64( { "t": "12:04:07.331", "id": 98812, "v": 1 } )
+= code sql | API-02 · Tier A · The mechanism | A cursor encodes where you stopped, not how far you went
+-- page 1
+SELECT * FROM posts WHERE feed = 7
+ ORDER BY created_at DESC, id DESC LIMIT 20;
+-- last row: created_at 12:04:07.331, id 98812
+-- next_page_token = base64({"t": "12:04:07.331", "id": 98812, "v": 1})
 
-page 2:  SELECT ... WHERE feed = 7
-           AND (created_at, id) < ('12:04:07.331', 98812)
-         ORDER BY created_at DESC, id DESC LIMIT 20
+-- page 2: strictly after the last row, in the same order
+SELECT * FROM posts WHERE feed = 7
+   AND (created_at, id) < ('12:04:07.331', 98812)
+ ORDER BY created_at DESC, id DESC LIMIT 20;
 N: A cursor encodes where you stopped, not how far you went. Page one orders by creation time, then by identifier as a tie-breaker, and returns twenty rows. The last row's time and identifier go into the next page token. Page two asks for rows strictly before that pair, in the same order. Inserts at the top do not shift anything, because the position is a value, not a count. And it is fast at any depth, because it is an index range seek, not a skip.
 
 = panel key | API-02 · Tier A · One level down | What the token must carry
@@ -269,21 +285,24 @@ V: I paginate with an opaque cursor that encodes the last row's unique sort key,
 [pause: 0.8]
 
 ## 11.10 Idempotent writes
+N: Next, a payment request that is safe to send twice.
 
-= code | API-03 · Tier A · The mechanism | An idempotent POST on the wire
+= code http | API-03 · Tier A · The mechanism | An idempotent POST on the wire
 @ API-03
-POST /v1/payments
+POST /v1/payments HTTP/1.1
 Idempotency-Key: 6f1c2a9e-4b1d-4f0e-9a63-2d7c4e8b11f0
 Content-Type: application/json
 
 {"amount": 2000, "currency": "EUR", "source": "card_8812"}
+N: Part eight built the dedup table. Here is what it looks like on the wire. The client generates a random key once per user action, not once per attempt, and sends it in an idempotency key header with the post.
 
-first time:   201 Created   {"id": "pay_41", "status": "succeeded"}
-retry:        201 Created   {"id": "pay_41", "status": "succeeded"}
-              same bytes, replayed
-in progress:  409 Conflict  Retry-After: 1
-other body:   422 Unprocessable: key reused with a different request
-N: Part eight built the dedup table. Here is what it looks like on the wire. The client generates a random key once per user action, and sends it in an idempotency key header with the post. The first time, the server creates the payment and returns created, with its body. A retry with the same key gets exactly the same response, replayed. A retry that arrives while the first is still running gets conflict, with a hint to retry after a second. And the same key with a different body is rejected as a client bug.
+= table | API-03 · Tier A · The mechanism | What each attempt gets back
+Attempt | Response
+The first | `201 Created` with `{"id": "pay_41", "status": "succeeded"}`
+A retry, same key | `201 Created`, **the same bytes**, replayed
+A retry while the first still runs | `409 Conflict`, with `Retry-After: 1`
+The same key with a different body | `422`: the key was reused for a different request
+N: Now what each attempt gets back. The first time, the server creates the payment and returns created, with its body. A retry with the same key gets exactly the same response, replayed. A retry that arrives while the first is still running gets conflict, with a hint to retry after a second. And the same key with a different body is rejected as a client bug.
 
 = panel key | API-03 · Tier A · One level down | Who generates the key, and how long it lives
 The **client** generates it, **once per user intent**, before the first attempt, and reuses it on every retry, including after an app restart: persist it with the pending action.
@@ -301,6 +320,7 @@ V: A create that may be retried carries an idempotency key chosen by the client 
 [pause: 0.8]
 
 ## 11.11 Versioning and compatibility
+N: Next, versions. Which changes break clients, and how to retire an old version.
 
 = table | API-04 · Tier B · The mechanism | What is a breaking change
 @ API-04
@@ -322,20 +342,20 @@ V: Within an API version I only make additive changes. A breaking change becomes
 [pause: 0.8]
 
 ## 11.12 Long-running operations
+N: Next, work that takes minutes: return an operation, not a result.
 
-= code | API-05 · Tier B · The mechanism | Return an operation, not a result
+= code http | API-05 · Tier B · The mechanism | Return an operation, not a result
 @ API-05
-POST /v1/videos:transcode    {"source": "gs://in/a.mov"}
-202 Accepted
-{"name": "operations/op-7781", "done": false,
- "metadata": {"progress_percent": 0}}
+POST /v1/videos:transcode HTTP/1.1
+Content-Type: application/json
 
-GET /v1/operations/op-7781
-{"name": "operations/op-7781", "done": true,
- "response": {"output": "gs://out/a.mp4"}}
+{"source": "gs://in/a.mov"}
 
-also: cancel, list, and a wait call with a deadline
-N: Work that takes minutes cannot hold an HTTP request open. So the call returns an operation instead: a name, done false, and some progress metadata, with status accepted. The client polls the operation, or waits on it with a deadline, until done is true, and then reads either a response or an error. The operation can be listed and cancelled. This is Google's long-running operation pattern, and it means a client crash, a deploy, or a dropped connection loses nothing: the name is enough to come back.
+HTTP/1.1 202 Accepted
+Content-Type: application/json
+
+{"name": "operations/op-7781", "done": false}
+N: Work that takes minutes cannot hold an HTTP request open. So the call returns an operation instead: a name, done false, and some progress metadata, with status accepted. The client polls the operation, or waits on it with a deadline, until done is true, and then reads either a response or an error. The operation can be listed and cancelled. Later, a get on that name returns done true, with the output. This is Google's long-running operation pattern, and it means a client crash, a deploy, or a dropped connection loses nothing: the name is enough to come back.
 
 = panel watch | API-05 · Tier B · The price | The operation is a durable record
 Operations must be **stored**, with an owner and an expiry, and survive the server that created them.
@@ -348,6 +368,7 @@ V: For work longer than a request I return a long-running operation: a durable n
 [pause: 0.8]
 
 ## 11.13 Resumable and multipart upload
+N: Next, uploading a large file over a connection that keeps dropping.
 
 = dia | API-06 · Tier B · The mechanism | Start a session, send chunks, resume from the last byte the server has
 @ API-06
@@ -365,14 +386,15 @@ V: Large uploads go through a resumable session or a multipart upload. After a f
 [pause: 0.8]
 
 ## 11.14 Conditional requests
+N: Next, conditional requests: cheap revalidation, and safe updates without locks.
 
-= code | API-07 · Tier B · The mechanism | ETags for caching and for safe updates
+= table | API-07 · Tier B · The mechanism | ETags for caching and for safe updates
 @ API-07
-GET /v1/docs/42                      ->  200  ETag: "v7"   (body)
-GET /v1/docs/42  If-None-Match: "v7" ->  304 Not Modified (no body)
-
-PATCH /v1/docs/42  If-Match: "v7"    ->  200  ETag: "v8"
-PATCH /v1/docs/42  If-Match: "v7"    ->  412 Precondition Failed: someone else wrote v8
+Request | Condition | Answer
+`GET /v1/docs/42` | none | `200`, `ETag: "v7"`, and the body
+`GET /v1/docs/42` | `If-None-Match: "v7"` | `304 Not Modified`, **no body**: a cheap revalidation
+`PATCH /v1/docs/42` | `If-Match: "v7"` | `200`, `ETag: "v8"`
+`PATCH /v1/docs/42`, later | `If-Match: "v7"` | `412 Precondition Failed`: someone else wrote v8
 N: Conditional requests are part eight's optimistic concurrency on the wire. Every response carries an entity tag, an opaque version, here v seven. A client that already has v seven asks with if-none-match, and gets not modified, with no body: a cheap revalidation. A client that wants to update sends if-match v seven. If the document is still at v seven, the update succeeds and returns v eight. If someone else wrote first, the server answers precondition failed, and the client re-reads and merges.
 
 = panel key | API-07 · Tier B · One level down | Where it pays
@@ -386,6 +408,7 @@ V: Every resource carries an entity tag. Clients revalidate cheaply with if-none
 [pause: 0.8]
 
 ## 11.15 The error and throttling contract
+N: Next, errors that tell the client exactly what to do.
 
 = panel trap | API-08 · Tier A · The failure | Errors that clients cannot act on
 @ API-08
@@ -403,7 +426,7 @@ Status | Meaning | Client should
 503 | **The service** is overloaded or down | Retry with backoff and jitter, within a retry budget
 N: The contract, by status. Four hundred or four twenty-two: the request is wrong, do not retry. Four oh one or four oh three: not authenticated, or not allowed. Refresh credentials once, otherwise stop. Four oh nine: a conflict, re-read or retry shortly. Four twenty-nine: you, this client, are over a limit, so wait for the retry-after time. Five oh three: the service is overloaded or down, so retry with backoff and jitter, within a retry budget, part thirteen.
 
-= code | API-08 · Tier A · One level down | A 429 on the wire
+= code http | API-08 · Tier A · One level down | A 429 on the wire
 HTTP/1.1 429 Too Many Requests
 Retry-After: 7
 RateLimit-Policy: "default";q=100;w=60
@@ -411,8 +434,9 @@ RateLimit: "default";r=0;t=7
 Content-Type: application/json
 
 {"error": {"code": 429, "status": "RESOURCE_EXHAUSTED",
-  "message": "Quota 'writes per minute' exceeded for project p-81",
-  "details": [{"reason": "RATE_LIMIT_EXCEEDED", "quota_limit": "100/min"}]}}
+  "message": "Quota 'writes per minute' exceeded for p-81",
+  "details": [{"reason": "RATE_LIMIT_EXCEEDED",
+               "quota_limit": "100/min"}]}}
 N: One level down: a four twenty-nine on the wire. The status, and a retry-after header saying seven seconds. Rate limit headers describing the policy, a hundred requests per sixty seconds, with zero remaining and a reset in seven. And a structured body: a machine-readable status, resource exhausted in Google's vocabulary, a human message naming the exact quota, and a detail a program can switch on. A well-behaved client reads the header and waits. A badly behaved one is cut off sooner, by the limiter in part twelve.
 
 = panel watch | API-08 · Tier A · The alternative and the price | 429 or 503, and why the difference matters
@@ -426,6 +450,7 @@ V: My error contract tells clients what to do. Bad requests are never retried. F
 [pause: 0.8]
 
 ## 11.16 Tries, radix trees and FSTs
+N: Last, the data structure behind routing tables and autocomplete.
 
 = dia | DS-05 · Tier B · The mechanism | Longest-prefix match for routes and IP ranges
 @ DS-05
@@ -443,6 +468,7 @@ V: For longest-prefix match, routes, IP ranges or autocomplete, I use a trie or 
 [pause: 0.8]
 
 ## 11.17 Recap
+N: Time to gather the whole part onto one page.
 
 = list | Recap | What to be able to explain without notes
 - Failover time for **DNS** versus **anycast**
@@ -456,6 +482,7 @@ V: For longest-prefix match, routes, IP ranges or autocomplete, I use a trie or 
 N: Without notes: DNS and anycast failover times. Layer four and seven, and long connections. Draining in order, and the panic threshold. What stays out of the gateway. Deadlines and the three-hop budget. The four transports. Ten million connections and the reconnect storm. And the contract: cursors, idempotent posts, versions, operations, uploads, entity tags and the throttling response.
 
 ## 11.18 Probe drills
+N: Now the drills. Pause after each question, answer it aloud, then compare.
 
 = probe | Server push for a streamed response: which transport, and why?
 - **Server-sent events**: one direction, plain HTTP, resumes from the last event ID
@@ -488,6 +515,7 @@ C: The process exited before the load balancer had stopped sending it requests. 
 C: That is a self-inflicted outage, because TLS handshakes are expensive and the gateways cannot do ten million in a few seconds. Clients must reconnect with randomised exponential backoff, so the wave spreads over tens of seconds. The servers can send a reconnect delay hint when they shut down, and refuse handshakes beyond capacity cheaply and early, rather than accepting them and timing out.
 
 ## 11.19 Where this shows up
+N: Finally, where the network and the API contract show up in the design problems.
 
 = table | Where this shows up | What each design problem takes from this part
 Problem | Takes

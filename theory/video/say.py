@@ -9,11 +9,13 @@ _S = {
  "etcd":"et-see-dee","Paxos":"Packsos","GitOps":"git-ops","Kubernetes":"koo-ber-net-eez","CoDel":"co-dell","LIFO":"lie-foe","FIFO":"fie-foe","Raft":"raft","ZooKeeper":"zoo-keeper",
  "idempotent":"eye-dem-potent","idempotency":"eye-dem-potency","linearizable":"linear-izable","linearizability":"linear-izability","serializable":"serial-izable","serializability":"serial-izability",
  "HyperLogLog":"hyper-log-log","t-digest":"T-digest","Bigtable":"Big-table","Pub/Sub":"pub sub","2PC":"two-phase commit","OLAP":"oh-lap","KB":"kilobytes","MB":"megabytes","GB":"gigabytes","TB":"terabytes","PB":"petabytes","EB":"exabytes",
- "rota":"rotation","rotas":"rotations", "ACID":"acid","OLTP":"O-L-T-P","JSON":"jay-son","XML":"X-M-L","CSV":"C-S-V","SSI":"S-S-I","GDPR":"G-D-P-R","XA":"X-A","UDP":"U-D-P","NoSQL":"no-sequel","OpenAPI":"open A-P-I",
+ "rota":"rotation","rotas":"rotations", "ACID":"acid","OLTP":"O-L-T-P","JSON":"jay-son","XML":"X-M-L","CSV":"C-S-V","SSI":"S-S-I","GDPR":"G-D-P-R","XA":"X-A","UDP":"U-D-P","NoSQL":"no-sequel","GraphQL":"graph-Q-L","OpenAPI":"open A-P-I",
  "Avro":"Ah-vro","Zab":"zab","Kleppmann":"Klep-man","Kleppmann's":"Klep-man's","memtable":"mem-table","Jepsen":"Jep-sen","Lamport":"Lam-port","Hudi":"hoo-dee","Iceberg":"ice-berg",
  "idempotence":"eye-dem-potence","Idempotence":"Eye-dem-potence","Idempotent":"Eye-dem-potent","Linearizability":"Linear-izability","Linearizable":"Linear-izable","Serializability":"Serial-izability","Serializable":"Serial-izable",
  "MessagePack":"message-pack","Protobuf":"proto-buf","BSON":"B-son","B-trees":"bee-trees","B-tree":"bee-tree","LSM-tree":"L-S-M tree","LSM-trees":"L-S-M trees","SSTable,":"S-S-table,","Bloom":"bloom","Cypher":"sigh-fer","SPARQL":"sparkle","Datalog":"data-log","ETL":"E-T-L","ERD":"E-R-D","VM":"V-M","TTL":"T-T-L","PG":"P-G",
  "InnoDB":"inno-D-B","Kafka":"Kahf-kuh","RPCs":"R-P-Cees","DDSketch":"D-D-sketch","Count-Min":"count min","IPv4":"I-P-v-four","IPv6":"I-P-v-six",
+ "KRaft":"K-raft","URL":"U-R-L","URLs":"U-R-Ls","QR":"Q-R","CQRS":"C-Q-R-S","SQS":"S-Q-S","RabbitMQ":"rabbit M-Q","Elasticsearch":"elastic-search","PostgreSQL":"post-gres-Q-L","Protobuf":"proto-buf","Kinesis":"kin-EE-sis",
  "ms":"milliseconds","vs":"versus","etag":"E-tag","ETag":"E-tag","M/M/1":"M-M-one","N+1":"N plus one","N+2":"N plus two",
+ "auth":"authorisation","auths":"authorisations","Auth":"Authorisation","Auths":"Authorisations","chargeback":"charge-back","chargebacks":"charge-backs","Chargeback":"Charge-back","Chargebacks":"Charge-backs",
 }
 SAY = dict(sorted(_S.items(), key=lambda kv: -len(kv[0])))

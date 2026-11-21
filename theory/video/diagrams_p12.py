@@ -72,7 +72,55 @@ def queue():
     return svg(W, H, b)
 
 
-FIGS = {"p12-boundary": boundary, "p12-local-limit": local_limit, "p12-queue": queue}
+
+# ---------------------------------------------------------------- p12-goodput  (the cost of a reject, as goodput curves)
+def goodput():
+    W, H = 1600, 720
+    L, R, B, T = 150, 1360, 600, 80
+    C = 10000
+    def X(load): return L + (R - L) * load / 12
+    def Y(v): return B - (B - T) * v / 1.1
+    b = [line(L, B, R + 20, B, MUTED, 2, arrow=True), line(L, B, L, T - 20, MUTED, 2, arrow=True)]
+    for k in range(0, 13, 2):
+        b.append(line(X(k), B - 6, X(k), B + 6, MUTED, 2)); b.append(text(X(k), B + 34, f"{k}×", 21, MUTED, "middle"))
+    b.append(text((L + R) / 2, B + 76, "offered load, as a multiple of capacity", 22, MUTED, "middle"))
+    for v, lab in ((0, "0"), (0.5, "5,000"), (1.0, "10,000")):
+        b.append(text(L - 14, Y(v) + 7, lab, 21, MUTED, "end"))
+    b.append(text(L - 14, T - 30, "served a second", 21, MUTED, "start"))
+    b.append(line(L, Y(1.0), R, Y(1.0), "#d0d7de", 2, "8 6"))
+    for r, col, lab in ((0.01, GREEN, "reject costs 1%"), (0.10, AMBER, "reject costs 10%"), (0.50, RED, "reject costs 50%")):
+        pts = []
+        for i in range(0, 241):
+            load = i / 20
+            s = load if load <= 1 else max(0.0, min(1.0, (1 - r * load) / (1 - r)))
+            pts.append((X(load), Y(s)))
+        b.append(poly(pts, col, 5))
+        lx, ly = {0.01: (X(9), Y(0.93) - 26), 0.10: (X(5.6), Y(0.5)), 0.50: (X(1.75), Y(0.55))}[r]
+        b.append(text(lx, ly, lab, 22, col, "start", 800, True))
+    b.append(text(X(2.6), Y(0.08), "at 2× and beyond: all capacity spent saying no", 21, RED, "start", 700, True))
+    return svg(W, H, b)
+
+
+# ---------------------------------------------------------------- p12-maxmin  (max-min fairness as water-filling)
+def maxmin():
+    W, H = 1600, 640
+    B, PX = 540, 4.6
+    def Y(v): return B - v * PX
+    b = [title(40, 50, "Capacity 100. Tenants want 10, 30 and 80.")]
+    tenants = [("A", 10, 10), ("B", 30, 30), ("C", 80, 60)]
+    for i, (name, want, got) in enumerate(tenants):
+        x = 260 + i * 380
+        b.append(rect(x, Y(want), 220, want * PX, "#fff", MUTED, 2.5, 6, "8 6"))
+        b.append(bar(x, Y(got), 220, got * PX, f"gets {got}" if want > got else f"wants {want}, gets {got}", GREEN, 22))
+        if want > got: b.append(text(x + 110, Y(want) - 14, f"wants {want}", 22, MUTED, "middle", 700))
+        b.append(text(x + 110, B + 40, f"tenant {name}", 24, INK, "middle", 700))
+    b.append(line(200, Y(33.3), 1250, Y(33.3), AMBER, 3, "12 8"))
+    b.append(text(1262, Y(33.3) + 8, "equal split: 33 each", 22, AMBER, "start", 700))
+    b.append(line(200, B, 1400, B, MUTED, 2))
+    b.append(text(800, 620, "Fill the smallest demands first; share what is left equally. Nobody can gain without taking from someone smaller.", 22, INK, "middle"))
+    return svg(W, H, b)
+
+FIGS = {"p12-goodput": goodput, "p12-maxmin": maxmin, "p12-boundary": boundary, "p12-local-limit": local_limit, "p12-queue": queue}
 
 if __name__ == "__main__":
     save(FIGS, set(sys.argv[1:]) or None)

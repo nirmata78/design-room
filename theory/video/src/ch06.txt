@@ -5,6 +5,7 @@
 N: Part six, partitioning. As soon as data outgrows one machine it is split, and the way you split it decides which queries are cheap, where the hot spots form, and what moves when the cluster grows. In a round, the partition key is often the single decision the interviewer cares about most, because every later answer depends on it.
 
 ## 6.0 Why this part decides rounds
+N: First, a story about a partition key chosen for the reads, that wrecked the writes.
 
 = panel trap | The opening story | Timestamps as keys, and one shard taking every write
 An event store is range-partitioned by key, and the key is the event's timestamp. Twenty shards, nicely balanced on old data.
@@ -12,10 +13,12 @@ Every new event has the latest timestamp, so every write lands on the **last ran
 Adding shards changes nothing: the newest range is still one range.
 N: An event store is partitioned by key range, and the key is the event's timestamp. Twenty shards, nicely balanced on historical data. But every new event has the newest timestamp, so every write lands on the last range. One shard runs at full load, and nineteen sit idle. Adding more shards changes nothing, because the newest range is still a single range. The partition key was chosen for the reads, and nobody asked what it did to the writes.
 
-= panel note | Assumed reading | What this part does not repeat
-*Designing Data-Intensive Applications*, chapter 6.
-The chapter's comparison of rebalancing strategies across products stays there. This part does the arithmetic, the protocols and the failure cases.
-N: Chapter six of Designing Data-Intensive Applications is assumed. Its comparison of rebalancing strategies across products stays in the book. Here we do the arithmetic, the protocols and the failure cases that an interviewer pushes on.
+= cards c2 | PAR-01 · From the ground up | Partitioning, as a library that outgrew one shelf
+Split by range :: Surnames A to F on shelf one, G to M on shelf two. Easy to browse a range of names, and the shelf for "S" may be crowded.
+Split by hash :: Give each book a number computed from its title and put it on shelf "number modulo 10". Shelves fill evenly, and browsing A to C means visiting every shelf.
+> Each part of the data is a **partition**. Products call it a shard, a range, a tablet, a region or a vnode. It is the same idea.
+N: From the ground up. Partitioning is what a library does when its books no longer fit on one shelf. It can split by range: surnames A to F on shelf one, G to M on shelf two. Browsing a range of names is easy, and the S shelf may be crowded. Or it can split by hash: compute a number from each title, and shelve the book by that number. Shelves fill evenly, and browsing A to C means visiting every shelf. Each part of the data is a partition. Products call it a shard, a range, a tablet or a region. It is the same idea.
+N: As always, green slides start from nothing, and blue slides go to interview depth.
 
 = list | Map of the part | Five groups
 - **Choosing the split**: hash or range; consistent hashing with virtual nodes
@@ -26,6 +29,7 @@ N: Chapter six of Designing Data-Intensive Applications is assumed. Its comparis
 N: Five groups. Choosing the split. Changing it while serving. Uneven load. Finding the data: routing, indexes and cross-shard work. And placement: failure domains, tenants, and the identifiers that end up as partition keys.
 
 ## 6.1 Hash versus range partitioning
+N: We start with the first choice: split the keys by range, or by hash.
 
 = table | PAR-01 · Tier A · The failure | The same data set, partitioned two ways
 @ PAR-01
@@ -63,6 +67,7 @@ Cost: every page asks every shard. If that is the common query, the partition ke
 N: The probe: paginate a range scan across hash shards. Each shard returns its next page in order. The router merges them, like the merge step of a merge sort, and keeps a position per shard. The cursor handed to the client encodes all of those positions, not a single offset. Every page asks every shard, so if this is the common query, the honest answer is that the partition key is wrong for it.
 
 ## 6.2 Consistent hashing with virtual nodes
+N: Next, consistent hashing, and why virtual nodes make it even.
 
 = dia | PAR-02 · Tier A · The failure | Hash modulo N moves almost everything when N changes
 @ PAR-02
@@ -98,6 +103,7 @@ The cache for half the keys is **cold**. Grow in steps of a few nodes, and warm 
 N: The probe: grow from twenty nodes to forty. What moves? Half of all keys, because the new nodes must end up holding half the data. How fast? With ten terabytes in total, five terabytes move, two hundred and fifty gigabytes to each new node. At a throttled fifty megabytes a second, that is about an hour and a half. And the cache: whatever caches by node now misses for half the keys at once. So grow a few nodes at a time, and warm each new node before switching traffic to it.
 
 ## 6.3 Dynamic splitting and merging
+N: Next, changing the split while the data grows: splitting and merging ranges.
 
 = dia | PAR-04 · Tier B · The mechanism | A range splits at its middle key when it grows too big or too busy
 @ PAR-04
@@ -115,6 +121,7 @@ V: Ranges split by size or by load. A split is first a metadata change in a vers
 [pause: 0.8]
 
 ## 6.4 Rebalancing while serving
+N: Next, moving a range from one machine to another, without stopping writes.
 
 = dia | PAR-05 · Tier B · The mechanism | Copy, catch up, switch, clean up
 @ PAR-05
@@ -132,6 +139,7 @@ V: To move a range while serving: copy a snapshot under a throttle, stream the w
 [pause: 0.8]
 
 ## 6.5 Hot keys and hot partitions
+N: Next, the one thing partitioning cannot fix: a single hot key.
 
 = tiles | PAR-06 · Tier A · The failure | One key, and the arithmetic that sinks a shard
 @ PAR-06
@@ -166,6 +174,7 @@ V: Partitioning spreads keys, never a single key. I detect hot keys per shard wi
 [pause: 0.8]
 
 ## 6.6 Request routing
+N: Next, routing. How a request finds the machine that owns its key.
 
 = dia | PAR-07 · Tier A · The mechanism | Three places the shard map can live
 @ PAR-07
@@ -191,6 +200,13 @@ V: Routing can live in any node, a proxy tier, or the client, trading an extra h
 [pause: 0.8]
 
 ## 6.7 Secondary indexes
+N: Next, secondary indexes, when data is split across many machines.
+
+= panel key | PAR-08 · From the ground up | A secondary index, as the index at the back of a book
+The **primary key** finds a row directly: order 9814. That is the book's page number.
+A **secondary index** finds rows by something else: all orders with status *shipped*, all users in Berlin. It is the index at the back, from a word to the pages that mention it.
+Every index is a second copy of some columns, kept in step with every write.
+N: From the ground up. The primary key finds a row directly, like turning to page ninety-eight. A secondary index finds rows by something else: all orders with status shipped, all users in Berlin. It is the index at the back of a book, from a word to every page that mentions it. And like that index, it is a second copy of some of the data, which must be kept in step with every write. When the data is split over many machines, the question is where that second copy lives.
 
 = dia | PAR-08 · Tier B · The mechanism | Index local to each shard, or partitioned by the indexed value
 @ PAR-08
@@ -208,6 +224,7 @@ V: A local secondary index keeps writes on one shard and makes every query scatt
 [pause: 0.8]
 
 ## 6.8 Cross-shard operations
+N: Next, operations that touch several partitions at once, and how to avoid them.
 
 = table | PAR-09 · Tier B · The mechanism | Avoid it first, then pay for it
 @ PAR-09
@@ -229,6 +246,14 @@ V: I choose the partition key so that every operation that must be atomic touche
 [pause: 0.8]
 
 ## 6.9 Failure-domain-aware placement
+N: Next, placement. Which machines may hold copies of the same data.
+
+= cards c4 | PAR-10 · From the ground up | Failure domains: things that fail together
+Machine :: A disk, a power supply, a kernel bug. One server.
+Rack :: One top-of-rack switch, one power strip. Twenty to forty servers at once.
+Zone :: A building, or a set of them, with its own power and cooling. Thousands of servers.
+Region :: A metropolitan area of zones. Lost to a disaster, or a bad global change.
+N: From the ground up, failure domains: the groups of things that fail together. A machine: a disk, a power supply, a kernel bug. A rack: one switch and one power strip, so twenty to forty servers go together. A zone: a building, or several, with its own power and cooling, thousands of servers. And a region: a metropolitan area of zones, lost to a natural disaster or a bad global change. Three copies are only three chances if they sit in three different domains.
 
 = dia | PAR-10 · Tier A · The failure | Three replicas, one rack
 @ PAR-10
@@ -241,17 +266,10 @@ Constraint: replicas of one range in **distinct** domains at the level you must 
 Then balance: **spread** each node's ranges so a failed node's ranges are rebuilt **from many peers in parallel**, not from one.
 N: Failure domains nest: a machine in a rack, a rack in a power and network domain, that in a zone, in a region. The constraint says that replicas of one range sit in distinct domains at whatever level you must survive. Then balance: spread each node's ranges so that its replicas' partners are many different nodes. When it fails, its ranges are rebuilt from many peers in parallel, not from one.
 
-= code | PAR-10 · Tier A · One level down | Why spreading partners speeds repair
-a failed node held 4 TB
-
-partners on 2 other nodes only:
-    rebuild reads from 2 sources, at 100 MB/s each
-    4 TB / 200 MB/s  = 20,000 s  = about 5.6 hours exposed
-
-partners spread over 100 nodes:
-    100 sources, each sending 40 GB at 100 MB/s
-    = 400 s  = under 7 minutes exposed
-N: One level down: why spread the partners? A failed node held four terabytes. If its replicas' partners are only two other nodes, the rebuild reads from two sources, at a hundred megabytes a second each, and takes over five and a half hours. During that time those ranges have one fewer copy. If the partners are spread over a hundred nodes, each sends forty gigabytes in parallel, and the rebuild takes under seven minutes. The window of reduced redundancy, and so the chance of losing data, shrinks by fifty times.
+= dia | PAR-10 · Tier A · One level down | Why spreading partners speeds repair
+p6-repair-fanin
+N: One level down: why spread the partners? A failed node held four terabytes, and its ranges must be copied again from the nodes that hold the other replicas. On the left, if its replicas' partners are only two other nodes, the rebuild reads from two sources, at a hundred megabytes a second each, and takes over five and a half hours. During that time those ranges have one fewer copy.
+N: On the right, the partners are spread over a hundred nodes, and each sends forty gigabytes in parallel, and the rebuild takes under seven minutes. The window of reduced redundancy, and so the chance of losing data, shrinks by fifty times.
 
 = panel watch | PAR-10 · Tier A · The alternative and the price | What spreading costs
 Spreading across **zones** adds cross-zone latency to every quorum write (about 1 to 2 ms) and cross-zone network charges.
@@ -264,6 +282,7 @@ V: I place the replicas of each range in distinct failure domains, at the level 
 [pause: 0.8]
 
 ## 6.10 Multi-tenant partitioning
+N: Next, tenants. How to keep one noisy customer from hurting all the others.
 
 = table | PAR-11 · Tier B · The mechanism | Pooled, siloed, or shuffle-sharded
 @ PAR-11
@@ -273,15 +292,11 @@ Siloed | Nothing: a cell per tenant | That tenant | Most expensive; idle capacit
 Shuffle-sharded | A random subset of nodes per tenant | Only tenants sharing **all** its nodes | Close to pooled
 N: Tenants can be placed three ways. Pooled: every tenant on every node, cheapest, and one bad tenant hurts everyone. Siloed: a separate cell per tenant, so one tenant hurts only itself, at the cost of idle capacity in every silo. And shuffle sharding: each tenant gets a random small subset of the nodes. A noisy tenant overloads its own subset, and only a tenant that shares all of those nodes is fully affected.
 
-= code | PAR-11 · Tier B · One level down | The combinatorics of shuffle sharding
-100 nodes, each tenant assigned 5 of them at random
-
-distinct 5-node sets:  C(100, 5)  = 75,287,520
-
-chance another tenant has exactly my 5 nodes:
-    1 in 75 million
-with 10,000 tenants: expected tenants sharing all 5 with a bad one
-    = 10,000 / 75 million  = about 0.0001
+= math | PAR-11 · Tier B · One level down | The combinatorics of shuffle sharding
+~ 100 nodes; each tenant is assigned 5 of them at random.
+$$ \binom{100}{5} = 75{,}287{,}520 $$ :: distinct sets of five nodes
+$$ P(\text{same five}) \approx 1.3 \times 10^{-8} $$ :: another tenant has exactly my five: one in 75 million
+$$ 10^{4} \times 1.3 \times 10^{-8} \approx 10^{-4} $$ :: of 10,000 tenants, the expected number sharing all five with a bad one
 N: The combinatorics are what make it work. A hundred nodes, five per tenant, chosen at random. There are about seventy-five million distinct sets of five. So the chance that another tenant has exactly my five nodes is one in seventy-five million. Even with ten thousand tenants, the expected number fully sharing a bad tenant's nodes is about one in ten thousand. Most tenants share one or two nodes with it, and the client retries on the others.
 
 = th | PAR-11 · the line to say | Pooled is cheap, siloed contains damage, and shuffle sharding gives near-silo isolation at near-pooled cost.
@@ -289,6 +304,7 @@ V: For tenants I choose between pooled, siloed and shuffle-sharded. Shuffle shar
 [pause: 0.8]
 
 ## 6.11 ID schemes
+N: Next, identifiers. Why the shape of an ID is a performance decision.
 
 = panel trap | DS-11 · Tier A · The failure | An auto-increment ID on a sharded store
 @ DS-11
@@ -297,17 +313,9 @@ Use a sequence per shard instead, and IDs collide across shards.
 Use random 128-bit UUIDs, and inserts scatter across a B-tree index: page splits, cache misses, no order by time.
 N: The failure first. A single database sequence handing out identifiers for every shard is a single point of coordination on every insert. A sequence per shard gives collisions across shards. Random one hundred and twenty-eight bit identifiers have no collisions and no coordination, and every insert lands on a random page of the index, so the index never stays in cache, and nothing is ordered by time. The identifier becomes a key, so its shape is a performance decision.
 
-= code | DS-11 · Tier A · The mechanism | Time plus worker plus sequence, in 64 bits
-| 1 bit | 41 bits: ms since a custom epoch | 10 bits: worker | 12 bits: sequence |
-
-41 bits of ms   = 2^41 ms  = about 69 years
-10 bits         = 1,024 workers
-12 bits         = 4,096 IDs per ms per worker  = about 4 million a second per worker
-
-time-ordered UUID (version 7): 48 bits of ms, then 74 random bits
-leased ranges: a worker takes IDs 1,000,000 to 1,009,999 from a central counter,
-               uses them locally
-N: The common layout is sixty-four bits. One sign bit. Forty-one bits of milliseconds since a custom epoch, which lasts about sixty-nine years. Ten bits of worker identifier, for a thousand and twenty-four workers. Twelve bits of sequence, so four thousand and ninety-six identifiers per millisecond per worker, four million a second. Two alternatives: a time-ordered UUID, version seven, with forty-eight bits of milliseconds and the rest random, which needs no worker assignment. And leased ranges, where a worker takes ten thousand identifiers at a time from a central counter.
+= dia | DS-11 · Tier A · The mechanism | Time plus worker plus sequence, in 64 bits
+p6-id-bits
+N: The common layout is sixty-four bits. One sign bit. Forty-one bits of milliseconds since a custom epoch, which lasts about sixty-nine years. Ten bits of worker identifier, for a thousand and twenty-four workers. Twelve bits of sequence, so four thousand and ninety-six identifiers per millisecond per worker, four million a second. Two alternatives. A time-ordered UUID, version seven, standardised in 2024, with forty-eight bits of milliseconds and the rest random, which needs no worker assignment. And leased ranges, where a worker takes ten thousand identifiers at a time from a central counter.
 
 = panel key | DS-11 · Tier A · One level down | Where each scheme breaks
 **Clock goes backwards**: a time-based generator must refuse, or wait, until the clock passes its last timestamp. Otherwise duplicates.
@@ -326,6 +334,7 @@ V: For identifiers I use time, worker and sequence in sixty-four bits, or a time
 [pause: 0.8]
 
 ## 6.12 Recap
+N: Time to gather the whole part onto one page.
 
 = list | Recap | What to be able to explain without notes
 - **Hash, range, and the compound key** that does both
@@ -339,6 +348,7 @@ V: For identifiers I use time, worker and sequence in sixty-four bits, or a time
 N: Without notes: hash, range, and the compound key. Why modulo N moves almost everything, and consistent hashing about one over N. Virtual nodes in numbers. Splitting and moving a range, with a versioned map and a single short pause. Hot keys, detected and cured by type. Routing, with the owner's check on every request. Failure domains and spread partners, shuffle sharding, and an identifier layout.
 
 ## 6.13 Probe drills
+N: Now the drills. Pause after each question, answer it aloud, then compare.
 
 = probe | Grow from 20 to 40 nodes. What moves, and how fast?
 - **Half** the data moves: the new nodes must end up with half
@@ -371,6 +381,7 @@ C: Nothing bad, if the server checks. Each request carries the map version, or t
 C: On a single database, no. Inserts land at the right edge of the index, which stays in memory. On a range-partitioned store it is the opening story: every insert goes to the last range, one shard takes all writes. I would lead the key with something that spreads, the tenant or a hash of the entity, and keep the time-ordered part second.
 
 ## 6.14 Where this shows up
+N: Finally, where partitioning shows up in the design problems.
 
 = table | Where this shows up | What each design problem takes from this part
 Problem | Takes

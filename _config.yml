@@ -54,6 +54,7 @@ exclude:
   - interview.md
   - sessions/
   - private/
+  - plans/
   - board/
   - pdf-kit/
   - solutions/SD-47-ticket-booking/diagrams/

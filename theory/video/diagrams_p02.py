@@ -281,10 +281,88 @@ def gossip():
     return svg(W, H, b)
 
 
+# ---------------------------------------------------------------- p2-ec-price  (replaces a text block: the E-C price in ms)
+def ec_price():
+    W, H = 1600, 700
+    b = [title(40, 50, "Three replicas, three regions")]
+    LX, LY, BX, BY, CX, CY = 170, 380, 520, 190, 520, 570
+    b.append(line(LX + 90, LY - 30, BX - 90, BY + 30, BLUE, 4)); b.append(text(330, 255, "30 ms", 26, BLUE, "middle", 800, True))
+    b.append(line(LX + 90, LY + 30, CX - 90, CY - 30, AMBER, 4)); b.append(text(330, 525, "80 ms", 26, AMBER, "middle", 800, True))
+    b.append(box(LX - 110, LY - 50, 220, 100, ["Leader", "region A"], BLUE))
+    b.append(box(BX - 110, BY - 50, 220, 100, ["Replica", "region B"], BLUE))
+    b.append(box(CX - 110, CY - 50, 220, 100, ["Replica", "region C"], AMBER))
+    b.append(text(170, 660, "round trips from the leader", 21, MUTED, "start"))
+    X0, PX = 780, 8.6
+    def X(ms): return X0 + ms * PX
+    b.append(title(X0, 50, "What each choice costs, per request"))
+    rows = [(150, "consistent write", "waits for the nearest majority: leader + B"),
+            (330, "consistent read", "one more round to confirm the leader, or a lease"),
+            (510, "low-latency write", "acknowledged locally, replicated behind")]
+    for y, lab, sub in rows:
+        b.append(text(X0, y - 18, lab, 24, INK, "start", 700)); b.append(text(X0, y + 76, sub, 21, MUTED, "start"))
+    b.append(bar(X(0), 150, X(30) - X(0), 46, "30 ms", BLUE, 22))
+    b.append(bar(X(0), 330, X(30) - X(0), 46, "30 ms", BLUE, 22))
+    b.append(text(X(30) + 20, 362, "or about 0 with a lease", 21, GREEN, "start", 700))
+    b.append(bar(X(0), 510, 14, 46, "", GREEN))
+    b.append(text(X(0) + 26, 543, "1 ms", 22, GREEN, "start", 800))
+    b.append(hatchbar(X(10), 510, X(80) - X(10), 46, "hatchred", RED))
+    b.append(text((X(10) + X(80)) / 2, 543, "regions disagree for 80 ms or more", 21, RED, "middle", 700, True))
+    AY = 640
+    b.append(line(X(0), AY, X(85), AY, MUTED, 2, arrow=True))
+    for ms in (0, 30, 80):
+        b.append(line(X(ms), AY - 8, X(ms), AY + 8, MUTED, 2)); b.append(text(X(ms), AY + 34, f"{ms} ms", 21, MUTED, "middle"))
+    return svg(W, H, b)
+
+
+# ---------------------------------------------------------------- p2-heartbeat  (replaces a text block: timeout trade)
+def heartbeat():
+    W, H = 1600, 760
+    def X(t): return 250 + t * 150
+    NY, DY, AX = 170, 400, 600
+    b = [text(40, NY + 8, "Node", 24, INK, "start", 700), text(40, DY + 8, "Detector", 24, INK, "start", 700)]
+    b.append(line(X(0), NY, X(8.6), NY, "#d0d7de", 2)); b.append(line(X(0), DY, X(8.6), DY, "#d0d7de", 2))
+    b.append(hatchbar(X(2.3), NY - 30, X(6.1) - X(2.3), 60))
+    b.append(text((X(2.3) + X(6.1)) / 2, NY - 46, "paused 3.8 s · garbage collection, alive", 22, MUTED, "middle", 700, True))
+    for t in (0, 1, 2, 7, 8):
+        b.append(dot(X(t), NY, 12, BLUE)); b.append(line(X(t), NY + 14, X(t) + 40, DY - 16, BLUE, 2.5, arrow=True))
+    for t in (3, 4, 5):
+        b.append(cross(X(t), NY + 70, 12, AMBER, 4)); b.append(text(X(t), NY + 112, f"missed {t - 2}", 21, AMBER, "middle", 700, True))
+    b.append(box(X(5.3) - 130, DY - 40, 260, 80, ["declared dead", "at about 5.3 s"], RED, size=22))
+    b.append(text(X(5.3), DY + 82, "failover · re-replication · cold cache", 21, RED, "middle", 700, True))
+    b.append(text(X(7.5), NY - 46, "wakes up: it was alive", 21, BLUE, "middle", 700, True))
+    b.append(line(X(0), AX, X(8.6), AX, MUTED, 2, arrow=True))
+    for t in range(0, 9):
+        b.append(line(X(t), AX - 8, X(t), AX + 8, MUTED, 2)); b.append(text(X(t), AX + 34, f"{t} s", 21, MUTED, "middle"))
+    b.append(text(40, 700, "heartbeat every 1 s · dead after 3 missed → detection 3 to 4 s · any pause longer than 3 s is a **false alarm**", 23, INK, "start"))
+    return svg(W, H, b)
+
+
+# ---------------------------------------------------------------- p2-ladder  (the consistency ladder as a staircase)
+def ladder():
+    W, H = 1600, 800
+    rungs = [("Linearizable", "everyone sees a write the instant it completes", "consensus group, reads via the leader", RED),
+             ("Causal", "never an answer before its question", "version vectors, dependency tracking", AMBER),
+             ("Read-your-writes", "you always see your own changes", "session carries its last version", AMBER),
+             ("Monotonic reads", "time never goes backwards for you", "pin the session to one replica", BLUE),
+             ("Bounded staleness", "at most N seconds old", "replica within a lag limit", BLUE),
+             ("Eventual", "the same, some time after writes stop", "asynchronous replication", GREEN)]
+    b = []
+    for i, (name, user, mech, col) in enumerate(rungs):
+        x, y = 190 + i * 118, 40 + i * 122
+        b.append(rect(x, y, 690, 104, FILL[col], col, 2.5, 10))
+        b.append(text(x + 22, y + 40, f"**{name}** · {user}", 22, INK))
+        b.append(text(x + 22, y + 80, mech, 21, MUTED))
+    b.append(line(110, 760, 110, 50, RED, 4, arrow=True))
+    b.append(text(80, 405, "stronger · more replicas agree · slower", 22, RED, "middle", 700, extra=' transform="rotate(-90 80 405)"'))
+    b.append(text(1560, 790, "weaker · cheaper · faster →", 22, GREEN, "end", 700))
+    return svg(W, H, b)
+
+
 FIGS = {"p2-partition": partition, "p2-session-anomalies": session_anomalies, "p2-lin-vs-ser": lin_vs_ser,
         "p2-stale-quorum": stale_quorum, "p2-lww-skew": lww_skew, "p2-version-vector": version_vector,
         "p2-commit-wait": commit_wait, "p2-lost-reply": lost_reply, "p2-dedup": dedup, "p2-pause": pause,
-        "p2-fencing": fencing, "p2-gossip": gossip}
+        "p2-fencing": fencing, "p2-gossip": gossip,
+        "p2-ec-price": ec_price, "p2-heartbeat": heartbeat, "p2-ladder": ladder}
 
 if __name__ == "__main__":
     save(FIGS, sys.argv[1:])

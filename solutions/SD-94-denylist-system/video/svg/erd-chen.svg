@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<path d="M200.0,73.2 L200.0,69.9" fill="none" stroke="#8c959f" stroke-width="1.5"/>
+<path d="M119.8,166.8 L118.9,167.3" fill="none" stroke="#8c959f" stroke-width="1.5"/>
+<path d="M633.2,73.2 L624.8,64.8" fill="none" stroke="#8c959f" stroke-width="1.5"/>
+<path d="M738.5,73.2 L747.3,66.1" fill="none" stroke="#8c959f" stroke-width="1.5"/>
+<path d="M780.0,164.4 L804.6,175.4" fill="none" stroke="#8c959f" stroke-width="1.5"/>
+<path d="M1200.0,73.2 L1200.0,69.9" fill="none" stroke="#8c959f" stroke-width="1.5"/>
+<path d="M1300.0,120.0 L1317.7,120.0" fill="none" stroke="#8c959f" stroke-width="1.5"/>
+<path d="M1200.0,606.8 L1200.0,620.1" fill="none" stroke="#8c959f" stroke-width="1.5"/>
+<path d="M1293.6,513.2 L1353.3,483.4" fill="none" stroke="#8c959f" stroke-width="1.5"/>
+<path d="M200.0,606.8 L200.0,620.1" fill="none" stroke="#8c959f" stroke-width="1.5"/>
+<path d="M300.0,120.0 L335.5,120.0" fill="none" stroke="#3d4752" stroke-width="2.2"/>
+<path d="M544.5,120.0 L580.0,120.0" fill="none" stroke="#3d4752" stroke-width="7"/><path d="M544.5,120.0 L580.0,120.0" fill="none" stroke="#ffffff" stroke-width="3"/>
+<path d="M780.0,120.0 L803.3,120.0" fill="none" stroke="#3d4752" stroke-width="2.2"/>
+<path d="M1076.7,120.0 L1100.0,120.0" fill="none" stroke="#3d4752" stroke-width="2.2"/>
+<path d="M1200.0,513.2 L1200.0,397.2" fill="none" stroke="#3d4752" stroke-width="2.2"/>
+<path d="M1200.0,282.8 L1200.0,166.8" fill="none" stroke="#3d4752" stroke-width="2.2"/>
+<path d="M200.0,166.8 L200.0,282.8" fill="none" stroke="#3d4752" stroke-width="2.2"/>
+<path d="M200.0,397.2 L200.0,513.2" fill="none" stroke="#3d4752" stroke-width="2.2"/>
+<path d="M680.0,653.2 L680.0,457.2" fill="none" stroke="#3d4752" stroke-width="2.2"/>
+<path d="M680.0,342.8 L680.0,166.8" fill="none" stroke="#3d4752" stroke-width="2.2"/>
+<rect x="100.0" y="73.2" width="200.0" height="93.6" fill="#e8f0fa" stroke="#1168bd" stroke-width="2.4"/>
+<text x="200.0" y="129.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="27.3" font-weight="700" fill="#1f2328">LIST</text>
+<rect x="580.0" y="73.2" width="200.0" height="93.6" fill="#e8f0fa" stroke="#1168bd" stroke-width="2.4"/>
+<text x="680.0" y="129.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="27.3" font-weight="700" fill="#1f2328">RULE</text>
+<rect x="1100.0" y="73.2" width="200.0" height="93.6" fill="#e8f0fa" stroke="#1168bd" stroke-width="2.4"/>
+<text x="1200.0" y="129.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="27.3" font-weight="700" fill="#1f2328">VERSION</text>
+<rect x="1100.0" y="513.2" width="200.0" height="93.6" fill="#e8f0fa" stroke="#1168bd" stroke-width="2.4"/>
+<text x="1200.0" y="569.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="27.3" font-weight="700" fill="#1f2328">NODE</text>
+<rect x="80.6" y="513.2" width="238.8" height="93.6" fill="#e8f0fa" stroke="#1168bd" stroke-width="2.4"/>
+<rect x="86.6" y="519.2" width="226.8" height="81.6" fill="none" stroke="#1168bd" stroke-width="1.8"/>
+<text x="200.0" y="569.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="27.3" font-weight="700" fill="#1f2328">AUDIT EVENT</text>
+<rect x="560.6" y="653.2" width="238.8" height="93.6" fill="#e8f0fa" stroke="#1168bd" stroke-width="2.4"/>
+<text x="680.0" y="709.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="27.3" font-weight="700" fill="#1f2328">ALLOW RANGE</text>
+<path d="M440.0,62.8 L544.5,120.0 L440.0,177.2 L335.5,120.0 Z" fill="#fdf3e1" stroke="#a86a12" stroke-width="2.4"/>
+<text x="440.0" y="128.6" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="22.4" font-weight="700" fill="#1f2328">CONTAINS</text>
+<path d="M940.0,62.8 L1076.7,120.0 L940.0,177.2 L803.3,120.0 Z" fill="#fdf3e1" stroke="#a86a12" stroke-width="2.4"/>
+<text x="940.0" y="128.6" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="22.4" font-weight="700" fill="#1f2328">PUBLISHED IN</text>
+<path d="M1200.0,282.8 L1296.4,340.0 L1200.0,397.2 L1103.6,340.0 Z" fill="#fdf3e1" stroke="#a86a12" stroke-width="2.4"/>
+<text x="1200.0" y="348.6" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="22.4" font-weight="700" fill="#1f2328">APPLIES</text>
+<path d="M200.0,282.8 L312.5,340.0 L200.0,397.2 L87.5,340.0 Z" fill="#fdf3e1" stroke="#a86a12" stroke-width="2.4"/>
+<path d="M200.0,287.4 L303.5,340.0 L200.0,392.6 L96.5,340.0 Z" fill="none" stroke="#a86a12" stroke-width="1.8"/>
+<text x="200.0" y="348.6" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="22.4" font-weight="700" fill="#1f2328">LOGGED AS</text>
+<path d="M680.0,342.8 L784.5,400.0 L680.0,457.2 L575.5,400.0 Z" fill="#fdf3e1" stroke="#a86a12" stroke-width="2.4"/>
+<text x="680.0" y="408.6" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="22.4" font-weight="700" fill="#1f2328">PROTECTS</text>
+<ellipse cx="200.0" cy="40.0" rx="74.8" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
+<text x="200.0" y="47.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328" font-weight="700">list_id</text>
+<line x1="156.3" y1="52.9" x2="243.7" y2="52.9" stroke="#1f2328" stroke-width="1.6"/>
+<ellipse cx="80.0" cy="190.0" rx="59.7" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
+<text x="80.0" y="197.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328">class</text>
+<ellipse cx="600.0" cy="40.0" rx="44.6" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
+<text x="600.0" y="47.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328" font-weight="700">key</text>
+<line x1="581.3" y1="52.9" x2="618.7" y2="52.9" stroke="#1f2328" stroke-width="1.6"/>
+<ellipse cx="780.0" cy="40.0" rx="67.2" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
+<text x="780.0" y="47.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328">action</text>
+<ellipse cx="860.0" cy="200.0" rx="97.4" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
+<text x="860.0" y="207.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328">expires_at</text>
+<ellipse cx="1200.0" cy="40.0" rx="89.9" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
+<text x="1200.0" y="47.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328" font-weight="700">version_n</text>
+<line x1="1143.8" y1="52.9" x2="1256.2" y2="52.9" stroke="#1f2328" stroke-width="1.6"/>
+<ellipse cx="1400.0" cy="120.0" rx="82.3" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8" stroke-dasharray="7 5"/>
+<text x="1400.0" y="127.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328">checksum</text>
+<ellipse cx="1200.0" cy="650.0" rx="74.8" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
+<text x="1200.0" y="657.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328" font-weight="700">node_id</text>
+<line x1="1156.3" y1="662.9" x2="1243.7" y2="662.9" stroke="#1f2328" stroke-width="1.6"/>
+<ellipse cx="1400.0" cy="460.0" rx="74.8" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8" stroke-dasharray="7 5"/>
+<text x="1400.0" y="467.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328">applied</text>
+<ellipse cx="200.0" cy="650.0" rx="67.2" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
+<text x="200.0" y="657.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328" font-weight="700">reason</text>
+<line x1="162.6" y1="662.9" x2="237.4" y2="662.9" stroke="#1f2328" stroke-width="1.6" stroke-dasharray="5 4"/>
+<text x="317.8" y="149.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">1</text>
+<text x="562.2" y="149.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">N</text>
+<text x="791.6" y="149.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">N</text>
+<text x="1088.4" y="149.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">1</text>
+<text x="1220.0" y="465.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">N</text>
+<text x="1220.0" y="234.7" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">1</text>
+<text x="180.0" y="234.7" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">1</text>
+<text x="180.0" y="465.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">N</text>
+<text x="700.0" y="565.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">N</text>
+<text x="700.0" y="264.7" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">1</text>
+<rect x="1384" y="682" width="36" height="16" fill="#e8f0fa" stroke="#1168bd" stroke-width="1.6"/>
+<text x="1434" y="695.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">entity</text>
+<rect x="1384" y="709" width="36" height="16" fill="#e8f0fa" stroke="#1168bd" stroke-width="1.6"/>
+<rect x="1388" y="713" width="28" height="8" fill="none" stroke="#1168bd" stroke-width="1.2"/>
+<text x="1434" y="722.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">weak entity</text>
+<path d="M1402,734 L1422,744 L1402,754 L1382,744 Z" fill="#fdf3e1" stroke="#a86a12" stroke-width="1.6"/>
+<text x="1434" y="749.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">relationship</text>
+<path d="M1402,761 L1422,771 L1402,781 L1382,771 Z" fill="#fdf3e1" stroke="#a86a12" stroke-width="1.6"/>
+<path d="M1402,766 L1412,771 L1402,776 L1392,771 Z" fill="none" stroke="#a86a12" stroke-width="1.2"/>
+<text x="1434" y="776.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">identifying relationship</text>
+<ellipse cx="1402" cy="798" rx="20" ry="9" fill="#fff" stroke="#57606a" stroke-width="1.4"/>
+<text x="1434" y="803.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">attribute</text>
+<ellipse cx="1402" cy="825" rx="20" ry="9" fill="#fff" stroke="#57606a" stroke-width="1.4"/>
+<line x1="1393" y1="828" x2="1411" y2="828" stroke="#1f2328" stroke-width="1.4"/>
+<text x="1434" y="830.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">key attribute (underlined)</text>
+<ellipse cx="1402" cy="852" rx="20" ry="9" fill="#fff" stroke="#57606a" stroke-width="1.4"/>
+<ellipse cx="1402" cy="852" rx="15" ry="5" fill="none" stroke="#57606a" stroke-width="1"/>
+<text x="1434" y="857.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">multivalued attribute</text>
+<ellipse cx="1402" cy="879" rx="20" ry="9" fill="#fff" stroke="#57606a" stroke-width="1.4" stroke-dasharray="4 3"/>
+<text x="1434" y="884.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">derived attribute</text>
+<line x1="1382" y1="906" x2="1422" y2="906" stroke="#3d4752" stroke-width="6"/><line x1="1382" y1="906" x2="1422" y2="906" stroke="#fff" stroke-width="2.4"/>
+<text x="1434" y="911.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">total participation (every one takes part)</text>
+<rect x="380" y="800" width="700" height="88.9" rx="6" fill="#fdf3e1" stroke="#a86a12" stroke-width="1.2"/>
+<text x="394" y="830.9" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24.7" fill="#1f2328">A key has at most one live state per list; the</text>
+<text x="394" y="864.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24.7" fill="#1f2328">version of its last change decides it.</text>
+</svg>
