@@ -2,7 +2,7 @@
 
 Two third-party system-design walkthroughs (ShowOffer channel) and one book chapter, kept as **private study copies** and
 decomposed into what we can reuse in our own video kit. **The rules drawn from them are in the project skill
-[`reference-solution-video`](../../.claude/skills/reference-solution-video/GUIDELINES.md)**; this folder is the evidence.
+[`reference-solution`](../../.claude/skills/reference-solution/GUIDELINES.md)**; this folder is the evidence.
 
 | # | Folder | Video | Length | Character |
 |---|---|---|---|---|

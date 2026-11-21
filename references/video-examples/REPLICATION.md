@@ -1,7 +1,7 @@
 # How to replicate the reference style with our own video kit
 
 > **Superseded as the source of rules (2026-11-12).** The decisions taken from this analysis now live in
-> `.claude/skills/reference-solution-video/GUIDELINES.md`. Build-plan tasks 1–3 are done (slide types in the kit's
+> `.claude/skills/reference-solution/GUIDELINES.md`. Build-plan tasks 1–3 are done (slide types in the kit's
 > `video.css`, `scripts/basesvg.py`). The whiteboard skin (§4) was not chosen: house slides with a carried baseline instead.
 > This file stays as the working notes behind those decisions.
 

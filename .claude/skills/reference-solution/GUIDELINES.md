@@ -3,7 +3,7 @@
 The standard for every design-room **reference solution video**: one question from the bank, worked from the
 prompt to the recap, as a candidate would present it to an interviewer. Decided with the author on 2026-11-12.
 It builds on three analysed references (`references/video-examples/`) and on the house video rules
-(`~/.claude/skills/slide-video-kit/STANDARD.md`). Where this file and STANDARD.md disagree on shape or length,
+(`~/.claude/skills/slide-video-kit/STANDARD.md`); the workflow is `SKILL.md` in this folder. Where this file and STANDARD.md disagree on shape or length,
 this file wins for reference-solution videos; picture, sound, caption and QA rules stay as STANDARD.md has them.
 
 ## 1 · What the video is for
