@@ -1,0 +1,180 @@
+{
+  "_doc": "Single source for SD-39's technology choices (compact cut). Read by video/src/stack.py for the 5.1 technology slides, the stack table, the fix-slide 'Rejected' lines and the C4 technology labels, and by `stack.py sync` for the booklet and OUTLINE.md regions. Slide `how` is two sentences; the rest goes in `detail` (booklet only).",
+  "c4": {
+    "api": [
+      "Ride API",
+      "Go on Kubernetes",
+      "Requests, trips."
+    ],
+    "gw": [
+      "Driver gateway",
+      "Go, gRPC streams",
+      "50,000 per pod."
+    ],
+    "geo": [
+      "Location index",
+      "Go, in memory, H3",
+      "Sharded by city."
+    ],
+    "match": [
+      "Matcher",
+      "Go, leader per city",
+      "etcd lease, epoch."
+    ],
+    "trips": [
+      "Trip store",
+      "PostgreSQL, regional",
+      "Conditional claims."
+    ],
+    "log": [
+      "Location log",
+      "Kafka",
+      "Batched history."
+    ]
+  },
+  "stack": [
+    {
+      "id": "geo",
+      "heading": "Location index: an in-memory H3 index, sharded by city",
+      "kicker": "Technology · location index",
+      "title": "An in-memory cell index, overwrite-only, owned per city",
+      "pick": "Go service, H3 resolution 8, in memory",
+      "why": "A location lives four seconds; all 5 M drivers fit in about 1 GB, so shards are for isolation.",
+      "how": "Per city: driver → (cell, position, seq) and cell → drivers. Older sequence numbers are dropped; silent drivers expire after 12 s.",
+      "detail": "H3 resolution 8 cells are about 0.74 km² (edge ≈ 0.46 km); a 2 km search is the k = 2 ring, 19 cells. A cell with more than ~300 drivers is indexed again at resolution 9 so a downtown query reads a few hundred drivers, not thousands. Shards are assigned to cities (big cities split by cell ranges) through a static map in the config service; there are no replicas: a lost shard refills from the next reports within 4 s.",
+      "rejected": [
+        [
+          "Redis GEO",
+          "Members never expire, and every update is a hop to a shared cluster."
+        ],
+        [
+          "PostGIS",
+          "A durable write per update: 1.25 M a second of stale data."
+        ]
+      ],
+      "summary": [
+        "Location index",
+        "in-memory H3, per city",
+        "Redis GEO, PostGIS",
+        "overwrite-only; expiry; 1 GB fits"
+      ],
+      "course": "building-blocks course, part 6 §6.5 (hot keys and hot partitions) and part 17 §17.3 (memory and coordination)",
+      "parts": "6 §6.5, 17 §17.3",
+      "drill": [
+        "A shard dies with 50,000 drivers on it. What breaks, and for how long?",
+        "Matching in that city sees no drivers until they report again: at most one 4 s interval plus reconnect. Nothing durable is lost; the gateway routes updates to the replacement shard, which fills from them.",
+        "no replicas; refilled by the next reports within ~4 s"
+      ]
+    },
+    {
+      "id": "trips",
+      "heading": "Trip store: PostgreSQL, regional, with conditional claims",
+      "kicker": "Technology · trip store",
+      "title": "PostgreSQL: a driver is claimed by one conditional update",
+      "pick": "PostgreSQL per region, synchronous standby",
+      "why": "Claims are thousands a second and must be linearizable: a conditional row update is a compare-and-set.",
+      "how": "`UPDATE driver_state … WHERE state='available' AND version=$v AND epoch current`. One row back: claimed.",
+      "detail": "Trips, offers and driver status live here; locations do not. A synchronous standby in another zone means a fail-over cannot forget a claim. The city epoch column fences a deposed matcher leader.",
+      "rejected": [
+        [
+          "Redis for claims",
+          "Asynchronous replication can lose a claim in a fail-over."
+        ],
+        [
+          "Cassandra LWT",
+          "A Paxos round per claim, and a second store to run."
+        ]
+      ],
+      "summary": [
+        "Trip store",
+        "PostgreSQL, regional",
+        "Redis, Cassandra LWT",
+        "a claim is one conditional update"
+      ],
+      "course": "building-blocks course, part 8 §8.2 (optimistic concurrency and conditional writes) and part 2 §2.11 (leases and fencing)",
+      "parts": "8 §8.2, 2 §2.11"
+    },
+    {
+      "id": "gw",
+      "heading": "Driver gateway: long-lived gRPC streams",
+      "kicker": "Technology · driver gateway",
+      "title": "One stream per driver: locations up, offers down",
+      "pick": "Go on Kubernetes, gRPC bidirectional streams",
+      "why": "An open stream delivers an offer in under a second and carries locations too.",
+      "how": "About 50,000 streams per pod, 100 pods. A driver → pod table lets the matcher push to the right one.",
+      "detail": "Locations are forwarded to the city's index shard and appended to the location log in batches. A pod drain moves streams gradually with a reconnect hint. Mobile reconnects resume with the last sequence number.",
+      "rejected": [
+        [
+          "HTTP polling",
+          "Offers wait for the next poll."
+        ],
+        [
+          "An MQTT broker",
+          "An honest equal; we already run gRPC."
+        ]
+      ],
+      "summary": [
+        "Driver gateway",
+        "gRPC streams",
+        "polling, MQTT",
+        "offers pushed on an open stream"
+      ],
+      "course": "building-blocks course, part 11 §11.6–11.7 (persistent connections)",
+      "parts": "11 §11.6–11.7"
+    },
+    {
+      "id": "match",
+      "heading": "Matcher: one leader per city, behind an etcd lease",
+      "kicker": "Technology · matcher",
+      "title": "A single matcher per city, fenced by an epoch",
+      "pick": "Go service, leader per city via etcd lease",
+      "why": "One writer per city means no racing matchers; the lease epoch fences a deposed leader.",
+      "how": "Every 2 s: shortlist 20 per request, one ETA matrix, a min-cost assignment, claims carrying the epoch.",
+      "detail": "Leases last 5 s; a standby takes over within one lease. The batch window trades up to 2 s of waiting for globally shorter pickups; in quiet cities the tick shortens to 0.5 s.",
+      "rejected": [
+        [
+          "Racing stateless matchers",
+          "Constant claim conflicts and retries."
+        ],
+        [
+          "ZooKeeper",
+          "An honest equal; a second coordination system."
+        ]
+      ],
+      "summary": [
+        "Matcher",
+        "leader per city, etcd",
+        "racing matchers, ZooKeeper",
+        "one writer; epoch fences"
+      ],
+      "course": "building-blocks course, part 4 §4.3 (leader election) and part 2 §2.11 (fencing tokens)",
+      "parts": "4 §4.3, 2 §2.11"
+    }
+  ],
+  "challenges": {
+    "1": [
+      "Redis `SETNX` as the claim",
+      "after a fail-over the asynchronous replica may not have it, and the driver is handed out twice."
+    ],
+    "2": [
+      "A long fixed offer timeout",
+      "it either leaves riders waiting or takes trips from slow but willing drivers; only a heartbeat lease tells the two apart."
+    ],
+    "3": [
+      "Geohash prefixes alone",
+      "neighbours across a prefix boundary share no prefix, and cells distort with latitude."
+    ],
+    "4": [
+      "Replicating the index synchronously",
+      "it doubles 1.25 M writes a second to protect data that is stale in four seconds."
+    ],
+    "5": [
+      "Straight-line distance",
+      "a river, a one-way street or a highway exit turns 200 m into 12 minutes."
+    ],
+    "6": [
+      "Request success rate",
+      "it stays green when riders are told “no drivers” while drivers sit idle nearby."
+    ]
+  }
+}

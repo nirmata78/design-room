@@ -1,0 +1,40 @@
+Nearby drivers sounds like a geometry question. The geometry is the easy half: the hard half is that two riders can be handed the same driver in the same second. A compact reference solution at the Staff bar (L6/L7): theory, a three-version design, an alternate path, and six challenges. 61 minutes, 469 numbered slides.
+
+The thesis: keep where drivers are as fast, overwrite-only, lossy memory, and keep who gets which driver as one exact conditional write, owned by one matcher per city.
+
+IN THIS VIDEO
+• Estimates: 1.25 million location writes a second, about 1 GB in memory, 2,100 claims a second
+• Theory: H3 cells and k-rings, geohash vs S2 vs H3, soft state, fenced conditional claims, leases, batched assignment
+• Six challenges: two riders one driver, the driver who vanishes, boundaries and hot cells, a lost shard, nearest is not closest, and "no drivers" next to idle drivers
+
+HOW TO USE IT
+Run the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first.
+
+CHAPTERS
+0:00 0 Cold open
+2:40 1 Requirements and scope
+6:34 2 Estimates
+9:39 3 Theory
+17:21 4 API and entities
+20:24 5 High-level design
+26:30 5.1 Components and technologies
+31:54 5.2 When you don't need all this
+33:07 6 Bridge
+33:52 7 Challenges
+34:05 7.1 Challenge 1: Two riders, one driver
+37:43 7.2 Challenge 2: The driver who vanishes
+42:09 7.3 Challenge 3: Boundaries and hot cells
+45:46 7.4 Challenge 4: A shard dies
+50:13 7.5 Challenge 5: Nearest is not closest
+54:28 7.6 Challenge 6: “No drivers” next to idle drivers
+58:29 8 Recap
+
+LINKS
+Written reference design: https://github.com/nirmata78/design-room/blob/main/solutions/SD-39-ride-matching/SD-39_Ride_Matching_Reference_Design.md
+Run this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room
+All videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md
+
+ABOUT THIS VIDEO
+This is a scripted walkthrough, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script, diagrams and the written design were produced with Claude Code. Numbers are back-of-the-envelope estimates for the exercise, labelled as given, illustrative or initial targets, not any company's real figures, and this is not any company's actual design. The technical content has not been reviewed by a person.
+
+#SystemDesign #SoftwareEngineering #DistributedSystems
