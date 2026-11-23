@@ -1,6 +1,6 @@
 # Archetype D · Infrastructure & control planes
 
-**SD-24 – SD-35, SD-94.** Slice with `grep -n '^### SD-25' questions/D-infrastructure-control-planes.md`,
+**SD-24 – SD-35, SD-94, SD-98, SD-99, SD-100.** Slice with `grep -n '^### SD-25' questions/D-infrastructure-control-planes.md`,
 then Read with `offset`. Do not read this file whole.
 
 **What this archetype tests as a family:** whether they think in **control plane versus data plane**.
@@ -219,6 +219,12 @@ availability cost of being on every request path.
 **Read aloud:** *"Design a service that runs multi-step workflows reliably — steps that call other
 services, can fail, need retrying, and must not be executed twice when they shouldn't be."*
 
+**Company variant (Google Cloud core):** *"a multi-tenant task orchestrator like Cloud Tasks, 100,000+ tasks a second, priorities,
+retries and strict tenant isolation."* Same question, loaded on **noisy neighbours** (per-tenant token buckets, weighted fair
+queuing, isolated pools for top tiers — SD-25), **lease-based execution** (visibility timeouts, idempotency keys, a dead-letter
+queue) and **time-bucketed delay queues** sharded so the top-of-the-hour cron spike does not land on one range. Placement of
+the work itself is SD-33.
+
 **Crux.** **Durable execution state plus at-least-once step invocation means every step must be
 idempotent** — and the orchestrator cannot promise exactly-once side effects, only exactly-once
 *recorded* progress. Whether they state that honestly is the round.
@@ -325,6 +331,7 @@ cohorted rollout with automatic halt, A/B firmware with watchdog, buffered telem
 the reconnect storm, plans for a 7-year version tail, and prices a field visit into the reliability
 argument.
 
+**Reference solution:** [`solutions/SD-29-device-fleet/`](../solutions/SD-29-device-fleet/) (booklet and compact video).
 
 ---
 
@@ -680,3 +687,143 @@ pull backstop, a propagation SLO, a stated stale and fail-closed policy, staged 
 *Exceptional* — sizes memory and bandwidth with arithmetic, handles the filter's one-sided error and range
 overlap, treats the bad-rule push as the main risk, separates policy from mechanism ownership, and ties the
 propagation SLO to an alert and an error budget.
+
+---
+
+### SD-98 · Reproducible replay & regression-gate platform   [T2 · G★ AI]
+
+**Read aloud:** *"Thousands of engineers want to run new software builds against petabytes of recorded logs — sensor logs,
+production traffic, events — and get results they can trust before a release. Design the platform."*
+
+**Generic form.** Asked as autonomous-driving log replay and simulation, as traffic replay for a new service version, as
+offline evaluation of a new model against recorded inputs. Neighbours: SD-32 (build caching by content hash), SD-28 (DAG
+execution), SD-66 (GPU scheduling). The new part is **determinism as a product guarantee**.
+
+**Crux.** A replay is only worth running if it is **reproducible**: the same pinned inputs and code must give the same
+outputs, so a difference means the *build* changed, not the run. Everything follows from that: content-addressed inputs and
+outputs, memoisation by `(input hash, code version)`, and a gate that compares against a **golden baseline** with a tolerance
+that is itself versioned.
+
+**Numbers if asked:** 20 PB of recorded logs, growing 1 PB a month; 3,000 engineers running about 6 million scenario-runs a
+month; a release gate replays 50,000 scenarios; a scenario averages 5 minutes of log (2–20), about 1 GB a log-minute, and its
+perception stages need about one GPU-minute per log-minute; the gate must answer within 4 hours; compute is the biggest line item.
+
+**Reference solution:** [`solutions/SD-98-replay-platform/`](../solutions/SD-98-replay-platform/) (booklet and compact video).
+
+**Listen for:** a **manifest per run** pinning log segments (by content hash), code and model digests, map/config versions
+and random seeds · **no wall clock and no unordered parallelism** in the replay harness (simulated time, ordered message
+delivery, deterministic reductions) · the job as a **DAG of stages** whose outputs are cached by `hash(inputs, stage code)` —
+a change to planning reuses cached perception outputs · scheduling with priorities and quota per team, preemptible capacity
+for exploratory runs, reserved capacity for release gates · logs in object storage, read by byte range, never copied per job ·
+**diffing** metrics and trajectories against the baseline, with flaky-scenario detection (run twice; a scenario that
+disagrees with itself is quarantined, not a regression) · the gate's decision recorded with the manifest.
+
+**Probes:** *"The same build gives two different results on two runs. Where do you look?"* · *"A perception change lands. How
+much of the 50,000-scenario gate do you actually recompute?"* · *"Who decides a 0.3% change in a safety metric blocks a
+release, and where is that rule stored?"* · *"How do you keep exploratory runs from starving the release gate?"* · *(EM bar)*
+*"Compute doubles next year. What do you cut or buy?"*
+
+**Weak / Strong / Exceptional.** *Weak* — a batch cluster that runs scripts over copied files; results compared by eye.
+*Strong* — pinned manifests, a deterministic harness, a staged DAG with a content-addressed cache, a versioned gate. *Exceptional* —
+treats non-determinism as a detectable defect, sizes the cache hit rate in money, separates release capacity from exploration,
+and makes every gate decision reproducible from its manifest.
+
+
+---
+
+### SD-99 · Outbound webhook & partner event-delivery platform   [T2 · A★ MS FT★]
+
+**Read aloud:** *"Thousands of partner systems — merchants, customers, third parties — want to be told when something
+changes on our side. Design the platform that delivers those notifications reliably."*
+
+**Generic form.** Asked as merchant webhooks for a payments or lending product, as customer callbacks for a SaaS API, as
+partner event subscriptions. Neighbours: SD-12 (our own users, many channels), SD-45 (webhooks *we receive* from
+providers), SD-30 (the edge), SD-28 (retries and durable state). The new part is **delivering into systems we do not
+control**: they are slow, down, duplicate-unaware and sometimes hostile.
+
+**Crux.** **At-least-once delivery with a per-subscriber failure budget.** An event is durable before it is
+acknowledged to the producer; delivery is retried with backoff against endpoints that fail for hours; and one dead
+or slow endpoint must never consume the capacity that other subscribers need. The consumer, not the platform, makes
+the effect exactly-once, so the contract (event id, ordering promise, signature, redelivery) is the product.
+
+**Numbers if asked:** 20,000 subscribed endpoints, 30 M events a day (average 350/s, peak 5,000/s), fan-out of 1–5
+endpoints per event, p99 first-attempt delivery under 5 s for a healthy endpoint, 3% of endpoints unhealthy at any time,
+retries for 72 hours, payload 2 KB, retention of delivery attempts 30 days.
+
+**Listen for:** **outbox or transactional publish** so an event exists if and only if the state change committed ·
+**a durable log or queue per tenant-shard, not one global queue** · **per-endpoint isolation**: concurrency limit,
+rate limit and circuit breaker per subscriber, so a slow endpoint cannot head-of-line block the rest ·
+**retry schedule with exponential backoff and jitter**, a dead-letter store, automatic disabling of a chronically failing
+endpoint with a notice to its owner, and a **manual or API redelivery** ·
+**the consumer contract**: stable event id for dedup, a per-resource sequence or "fetch current state" as the answer to
+ordering, signature with a timestamp and rotating secrets, a documented timeout and success definition ·
+**SSRF defence** on subscriber-supplied URLs (egress proxy, no private ranges, DNS pinning) ·
+**an event catalogue with versioning**, and a replay or pull API as the backstop when a subscriber lost events ·
+**delivery observability for the customer**: a log of attempts with response codes, because "did you send it?" is the
+top support ticket · **fairness**: a noisy producer or a huge backlog does not starve others.
+
+**Probes:** *"One endpoint takes 30 seconds per request. What happens to everyone else?"* · *"An endpoint was down for
+two days and comes back. What does it receive, in what order, and how fast?"* · *"Two events for the same order are
+delivered out of order. Whose problem is that?"* · *"A subscriber registers a URL that points inside our network."* ·
+*"We deployed and lost the last 40 seconds of events."* · *(EM bar)* *"Which of the support tickets would you design away,
+and who owns the subscriber-facing dashboard?"*
+
+**Curveball:** a large partner demands a delivery guarantee of "exactly once" and a 1 s latency SLA.
+
+**Weak / Strong / Exceptional.** *Weak* — the producer calls the partner's URL inline in the request path, or one shared
+queue with a fixed retry count and no isolation. *Strong* — outbox, durable per-shard log, per-endpoint limits and breakers,
+backoff with jitter, DLQ and redelivery, signed payloads with event ids, an attempt log. *Exceptional* — states the contract
+for dedup and ordering explicitly, sizes the retry backlog during an outage with arithmetic, treats SSRF and secret
+rotation as first-class, adds a pull/replay API, and defines the SLO per subscriber class.
+
+**Traps:** promising exactly-once delivery · retrying forever with no disabling policy · ordering guarantees across
+retries without saying what they cost · inline delivery inside the business transaction.
+
+---
+
+### SD-100 · Latency-critical synchronous service under dependency failure   [T2 · FT★ A G]
+
+**Read aloud:** *"A checkout-path service must return a decision in under two seconds. It calls several slower internal
+and third-party services, and it has started timing out under load. Design it, or harden it, so it stays fast and
+safe when its dependencies are not."*
+
+**Generic form.** Asked as the decision service behind a payment or lending flow, a pricing call, an eligibility check.
+Neighbours: SD-82 (the deadline-bound credit decision), SD-87 (a p99 regression), SD-25 (limits), SD-31 (load
+balancing). The new part is the **runtime**: pools, queues and timeouts are the design, not tuning.
+
+**Crux.** **Every dependency call is a bounded resource.** Latency × concurrency decides how many threads and
+connections are held; unbounded queues and unbudgeted retries turn one slow dependency into a full outage. The
+design states a deadline budget, a pool and a failure policy per dependency, and what the user gets when one is gone.
+
+**Numbers if asked:** 1,500 requests/s at peak, 10,000 on a promotion; one request calls 5 dependencies (two
+optional), typical latencies 30–300 ms, one with a long tail up to 3 s; a 2 s end-to-end deadline; instances with 4 cores
+and a 4 GB heap; a relational database with 200 allowed connections across the fleet.
+
+**Listen for:** **Little's law used as arithmetic** (requests in flight = rate × latency, so pool size and instance count
+follow) · **an end-to-end deadline propagated downward**, with a budget per call, not a flat timeout per hop ·
+**separate bounded pools or bulkheads per dependency**, bounded queues that reject rather than grow, and a stated
+policy when full · **timeouts shorter than the caller's, retries only for idempotent calls, with a retry budget, backoff and
+jitter** · **circuit breakers and a defined fallback** (cached or stale value, a degraded decision, a safe default, a
+clear refusal) decided with the business owner · **parallel calls where independent**, optional dependencies dropped first
+under pressure · **connection pools sized fleet-wide**, so instances × pool never exceeds what the database can hold ·
+**load shedding and per-client rate limits at the edge**, with priority for the most valuable traffic · **runtime
+awareness**: allocation rate and pause time, thread-pool saturation, blocking calls on event-loop or request threads, a
+warm-up so a new instance is not hit cold · **signals**: saturation, queue depth, breaker state and per-dependency latency,
+alerting on the SLO and not on CPU · a **load test with injected latency** before launch.
+
+**Probes:** *"One dependency starts answering in 3 seconds instead of 100 ms. Walk me through the next minute."* ·
+*"How many threads and connections do you need at peak, and where did that come from?"* · *"Each of five layers retries
+three times. What happens?"* · *"The database has 200 connections and you autoscale from 10 to 60 instances."* ·
+*"Latency is fine but p99 spikes every few minutes."* · *(EM bar)* *"Who decides the fallback when a credit-bureau-like
+dependency is down — engineering or the business — and where is it written?"*
+
+**Curveball:** the optional dependency becomes required by compliance, overnight.
+
+**Weak / Strong / Exceptional.** *Weak* — sequential calls with the default timeouts, an unbounded queue, retries at every
+layer, a larger instance as the answer. *Strong* — a deadline budget, bulkheads and breakers per dependency, retry budgets,
+parallel calls, shedding, fallbacks agreed with the business, saturation alerts. *Exceptional* — derives pool and
+connection sizes from rate × latency, keeps the fleet-wide database limit in view, treats runtime pauses and cold starts
+as part of the tail, proves it with a fault-injection test, and writes the degraded behaviour as a product decision.
+
+**Traps:** raising timeouts to hide a slow dependency · scaling out into a connection storm · a retry in every layer ·
+a fallback that quietly makes a different, riskier decision.

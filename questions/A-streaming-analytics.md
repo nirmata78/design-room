@@ -1,6 +1,6 @@
 # Archetype A · Ingest, streaming & real-time analytics
 
-**SD-01 – SD-07.** Interviewer: slice with `grep -n '^### SD-0n' questions/A-streaming-analytics.md`
+**SD-01 – SD-07, plus SD-97.** Interviewer: slice with `grep -n '^### SD-0n' questions/A-streaming-analytics.md`
 then Read with `offset`. Do not read this file whole.
 
 **What this archetype tests as a family:** whether they put a durable buffer between producers and
@@ -84,7 +84,7 @@ households" as "unique devices" without asking (a household has several TVs — 
 asks). Choosing exact counting because "1–2% sounds sloppy" without pricing it.
 
 **Deep reference:** [`guides/interviewer-guide.md`](../guides/interviewer-guide.md) §6
-Problem A.
+Problem A. When the counts become money, it is SD-03.
 
 ---
 
@@ -160,76 +160,75 @@ Problem C.
 
 ---
 
-### SD-03 · Ad click aggregation & billing counters   [T1 · G★ M★ A]
+### SD-03 · Event counting & billing rollups (ad clicks, views, API usage)   [T1 · G★ M★ A]
 
-**Read aloud:** *"Design the system that counts ad impressions and clicks and produces the numbers
-advertisers are billed on."*
+**Read aloud:** *"Design the system that counts ad impressions and clicks. Advertisers watch their numbers live on a
+dashboard, and they are billed on the hourly totals."*
 
-**Crux.** These counts are **money**, so the usual "approximate is fine for analytics" answer is
-wrong here — and yet the volume forbids a synchronous transactional write per click. The design must
-reconcile a fast approximate path with an eventually-exact, auditable one, and must be correct under
-retries.
+**Generic form.** This is the bank's one question for **counting events that are money**: ad impressions and clicks, video
+views paid per play, API calls billed per request, metered cloud usage. The company variants change the nouns, never the crux.
+The Google-style phrasing (*"billions of events a minute, sub-second dashboards and exact billing-grade hourly rollups"*) is
+this question; so is *"usage metering for a cloud API"*. SD-01 is the approximate-only sibling (no money), SD-02 the top-K one.
+
+**Crux.** These counts are **money**, so "approximate is fine" is wrong for the bill, and yet the volume forbids a synchronous
+transactional write per event. The design must run a fast, provisional path for the dashboards and an exact, reproducible one
+for the bill, from **one** immutable log, and must stay correct under retries, late events, replays and retroactive
+invalidation.
 
 **If they ask:**
 
 | Question | Answer |
 |---|---|
-| Volume? | 1M clicks/sec peak, 10× that in impressions |
-| Freshness for advertiser dashboards? | A minute or two is fine |
-| Freshness for billing? | Daily is fine, but it must be **exact and auditable** |
-| Duplicates? | The client retries on network failure; the same click can arrive several times |
-| Late data? | Mobile clients buffer offline; events can arrive hours late, occasionally days |
-| Retention? | Raw events 6 months, aggregates 7 years |
-| Fraud? | Out of scope — assume a separate system flags invalid clicks and can **retroactively
-invalidate** them |
+| Volume? | 25 trillion impressions and 250 billion clicks a month (about 10M events/s on average); 30M/s in the evening peak; one prime-time ad can take 2M impressions a second |
+| Freshness for advertiser dashboards? | Within about 10 seconds. If they ask for sub-second: "for one headline number, maybe; not for slice-and-dice" — a strong candidate prices it |
+| Freshness for billing? | Hourly totals, final within two days; must be **exact and auditable** |
+| Duplicates? | The SDK retries on network failure; the same event can arrive several times |
+| Late data? | Mobile clients buffer offline; events arrive hours late, occasionally days. Client clocks are skewed |
+| Retention? | Raw events 6 months (the dispute window is 90 days), aggregates 7 years |
+| Fraud? | Out of scope: a separate system flags invalid traffic and can **retroactively invalidate** events, after invoices went out |
+| Unique reach? | Advertisers want "unique users reached" on the dashboard; approximate is fine there, never on the bill |
 
 **Listen for:**
-- Client-supplied **idempotency key / event ID**, and dedup somewhere durable — with a stated window
-  for how long dedup state is kept and what happens outside it.
-- Durable log first, aggregation second. Never "increment a counter in the DB per click".
-- **Event-time vs processing-time** distinction made explicitly, and the aggregation keyed on event
-  time — otherwise a late batch lands in the wrong day and the invoice is wrong.
-- **Two paths with different guarantees**: fast approximate for dashboards, batch recompute for
-  billing, with the batch result being authoritative and **reconciliation between them monitored.**
-- Idempotent, **replayable** aggregation — recomputing a day must produce the same answer (so
-  aggregation output is keyed and overwritten, not incremented in place).
-- An **immutable audit trail**: for any invoice line, the ability to point at the events behind it.
-- Handling of the **retroactive invalidation** case — the fraud system removing clicks after billing
-  ran, which forces either a correction/adjustment model or delayed finalisation.
-- **← The senior insight:** "exactly once" end-to-end doesn't exist; what exists is **at-least-once
-  delivery plus idempotent, replayable aggregation**, which is *effectively* once. A candidate who
-  says "I'd use exactly-once semantics" and cannot unpack it is name-dropping.
+- An **event ID minted where the event happens** (the SDK, the ad server), and dedup on it somewhere durable — with a stated
+  window and what happens outside it. Strong: the billable-click key is the **impression ID** (one billable click per impression).
+- Durable, partitioned log first, aggregation second. Never "increment a counter in the DB per click".
+- **Event time vs processing time**, made explicit: watermarks, allowed lateness, a cutoff, and what happens after it.
+- **Two runs with different guarantees**: provisional for dashboards, an authoritative re-run for billing — ideally **one
+  aggregation code run twice** (streaming, then bounded over the closed hour), not two codebases (the Lambda-vs-Kappa trade).
+- Idempotent, **replayable** aggregation: outputs keyed and overwritten, never incremented in place.
+- **Hot keys**: one ad at 2M/s must not stall the job — two-stage (combine, then merge) aggregation, sharded counters summed on read.
+- An **immutable audit trail** and **versioned** hourly totals: corrections become new versions and adjustment lines.
+- **← The senior insight:** "exactly once" end-to-end does not exist; **at-least-once delivery plus idempotent, deterministic
+  aggregation over an immutable log** is effectively once. A candidate who says "exactly-once semantics" and cannot unpack it is
+  name-dropping.
 
 **Probe ladder:**
-- *Requirements:* "Which of these numbers has to be exact and which doesn't? Why is that distinction
-  worth building two paths for?"
-- *Estimation:* "1M/s — what does a day of raw events cost you to store, and what does that say about
-  retention tiers?"
-- *Design:* the end-to-end walk · "What's the primary key of your aggregate table, and why?"
-- *Deep dives:* **"The same click arrives three times, two seconds apart, from a retrying client.
-  Walk me through it."** · "A batch of yesterday's events shows up at 6 a.m. today — which day gets
-  billed, and how?" · "Your stream job crashes and you replay four hours. Is the advertiser
-  double-billed?" · "Fraud invalidates 2% of last month's clicks after invoices went out — what
-  happens?"
-- *EM bar:* **"An advertiser calls and says our number is 3% higher than theirs. What do you do, and
-  what did you build in advance to make that answerable?"** (the single best probe on this sheet —
-  it tests auditability, reconciliation and operational thinking at once) · "What's the alert that
-  fires when the two paths diverge?" · "Who is on call for this and what wakes them?"
+- *Requirements:* "Which of these numbers has to be exact, and which doesn't? Why is that worth two runs?"
+- *Estimation:* "30M events a second — what does that rule out, and how much dedup state is that for ten minutes?"
+  (6 GB/s; a database write per event and a global Redis set are out; ~1.8 × 10¹⁰ IDs, ~0.7 TB of keyed state.)
+- *Design:* the end-to-end walk · "What's the primary key of your billing table, and why does it carry a version?"
+- *Deep dives:* **"The same click arrives three times, two seconds apart, from a retrying client. Walk me through it."** ·
+  "A batch of yesterday's events shows up at 6 a.m. today — which hour gets billed?" · "One ad takes 2 million impressions a
+  second during a sports break. What happens to your job?" · "Your stream job crashes and you replay four hours. Is the
+  advertiser double-billed?" · "Fraud invalidates 2% of last month's clicks after invoices went out — what happens?"
+- *EM bar:* **"An advertiser says our number is 3% higher than theirs. What do you do, and what did you build in advance to
+  make that answerable?"** · "What's the alert that fires when the two runs diverge?" · "Who is on call, and what wakes them?"
 
-**Curveball:** *"Finance wants the ability to re-run any historical day and get bit-identical
-numbers, two years later."* Tests whether their aggregation is a pure function of immutable input, or
-whether it depends on mutable config (rate cards, fraud lists) that also needs versioning.
+**Curveball:** *"Finance wants to re-run any historical day and get bit-identical numbers, two years later."* Tests whether the
+aggregation is a pure function of pinned, immutable inputs (event snapshot, rate card version, invalidation list, code
+version), or depends on mutable config.
 
-**Weak / Strong / Exceptional.** *Weak* — `UPDATE counters SET n = n + 1` per click; no dedup; no
-event-time handling; one path for everything. *Strong* — dedup by event ID, durable log, event-time
-windowed aggregation, separate authoritative batch path, replay-safe. *Exceptional* — treats
-reconciliation as a monitored product feature, versions the inputs so history is reproducible,
-designs the adjustment path for retroactive invalidation, and can say what the whole thing costs per
-million clicks.
+**Weak / Strong / Exceptional.** *Weak* — `UPDATE counters SET n = n + 1` per click; no dedup; processing time; one path for
+everything. *Strong* — event IDs and dedup, durable log, event-time windows, an authoritative re-run, replay-safe writes, a
+plan for the hot ad. *Exceptional* — one aggregation code run twice and says why, versions and adjustments for corrections,
+pins every input so history is reproducible, treats reconciliation and canaries as product features, and prices duplicates
+in money.
 
-**Traps.** Deduping in memory in the stream processor only (loses dedup state on restart, exactly
-when replay makes duplicates likely). Assuming the click timestamp from the client is trustworthy —
-it is attacker-controlled and clock-skewed; a strong candidate uses both client and server time.
+**Traps.** Deduping in memory only (lost on restart, exactly when a replay makes duplicates likely). Trusting the client
+timestamp (skewed and attacker-controlled: clamp it against server time). "Exactly-once" from the broker's transactions
+mistaken for end-to-end exactly-once. HyperLogLog on the bill.
+
+**Reference solution:** [`solutions/SD-03-ad-click-aggregation/`](../solutions/SD-03-ad-click-aggregation/) (booklet and video).
 
 
 ---
@@ -376,3 +375,44 @@ ordering story. *Strong* — partitions, replication with an explicit ack policy
 honest delivery semantics, lag monitoring. *Exceptional* — treats the guarantee contract as the
 product, prices the replication factor, designs the multi-tenant quota model, and names build-vs-buy
 explicitly.
+
+---
+
+### SD-97 · Device telemetry & live location map (fleet tracking)   [T2 · G U A]
+
+**Read aloud:** *"Millions of vehicles report their position and health every few seconds. Design the system behind a live
+fleet map for operations, plus a history that can be audited and replayed."*
+
+**Generic form.** A **combination** question, and it is asked that way (autonomous-vehicle fleets, delivery and ride-hailing
+fleets, trackers, phones). It is SD-03's hot/cold split + SD-39's geo index + SD-29's store-and-forward devices, put on one
+board. Run it after those three; it grades whether the candidate can **compose** known parts and say where each seam is.
+
+**Crux.** Two different products off one stream: a **live view that only needs the latest state per device** (overwrite,
+in memory, indexed by space) and an **immutable history** (append, columnar, replayable). Treating the history as the live
+store, or the live store as the history, is the weak answer. The geo index must be bucketed so a dense downtown is many
+cells, not one hot partition.
+
+**Numbers if asked:** 2M vehicles, a position every 2 s while moving (1M updates/s at peak), ~300 B per message plus a
+sensor-health summary every 30 s; the map shows any area with ≤ 2 s staleness; vehicles lose coverage for minutes (tunnels)
+and buffer locally; history kept 2 years for audits and offline replay.
+
+**Listen for:** device → gateway over **MQTT or gRPC streams** with per-device identity · a **durable log keyed by device ID**
+(per-device order), never keyed by area · **latest-state store** (one row per device, overwrite with a sequence number so an
+old buffered fix never overwrites a newer one) · **geo cells** (S2 or H3) as the index, with cell level chosen by density and
+a cell → shard map that splits hot cells · map tiles or viewport queries served from the index, with **server-side
+thinning** at low zoom · the **reconnect flush**: buffered, sequence-numbered batches, deduplicated and applied **in order per
+device**, sent to history at once but to the live view only if newer · cold path: Parquet by day and device-hash for replay
+and ML · backpressure: the device drops or summarises low-value telemetry first, never the safety events.
+
+**Probes:** *"A vehicle leaves a tunnel with three minutes of buffered positions. What does the map show, and what does the
+history get?"* · *"Ten thousand vehicles are downtown at 6 p.m. Where is the hot spot in your design?"* · *"Why not key the
+log by geo cell?"* · *"How do you replay one vehicle's last hour exactly as it happened?"* · *(EM bar)* *"What does the map
+cost per vehicle per month, and what would you cut first?"*
+
+**Weak / Strong / Exceptional.** *Weak* — every update written to one database table and queried by bounding box; history
+and live view the same table. *Strong* — log keyed by device, latest-state overwrite with sequence numbers, a cell index,
+a separate columnar history, an explicit reconnect path. *Exceptional* — sizes cells by density and splits hot ones, thins
+at low zoom, makes reconnect idempotent and order-preserving per device, separates safety events from bulk telemetry, and
+can say which part reuses SD-03, SD-39 and SD-29.
+
+**Reference solution:** [`solutions/SD-97-fleet-telemetry/`](../solutions/SD-97-fleet-telemetry/) (booklet and compact video).
