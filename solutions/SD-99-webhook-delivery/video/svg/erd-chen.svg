@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1930 720" width="1930" height="720">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<g data-k="n:me"><path d="M156.8,81.4 L146.7,70.1" fill="none" stroke="#5f6368" stroke-width="1.5"/></g>
+<g data-k="n:ep"><path d="M727.6,81.4 L720.3,70.5" fill="none" stroke="#5f6368" stroke-width="1.5"/></g>
+<g data-k="n:ep"><path d="M835.6,81.4 L866.9,61.3" fill="none" stroke="#5f6368" stroke-width="1.5"/></g>
+<g data-k="n:ep"><path d="M668.5,178.6 L651.4,187.7" fill="none" stroke="#5f6368" stroke-width="1.5"/></g>
+<g data-k="n:su"><path d="M1386.4,81.4 L1411.6,67.2" fill="none" stroke="#5f6368" stroke-width="1.5"/></g>
+<g data-k="n:ev"><path d="M146.5,508.6 L121.7,531.2" fill="none" stroke="#5f6368" stroke-width="1.5"/></g>
+<g data-k="n:ev"><path d="M263.2,508.6 L293.6,532.0" fill="none" stroke="#5f6368" stroke-width="1.5"/></g>
+<g data-k="n:dl"><path d="M701.7,508.6 L671.8,533.5" fill="none" stroke="#5f6368" stroke-width="1.5"/></g>
+<g data-k="n:dl"><path d="M828.0,508.6 L858.5,530.4" fill="none" stroke="#5f6368" stroke-width="1.5"/></g>
+<g data-k="n:at"><path d="M1270.8,508.6 L1258.3,529.5" fill="none" stroke="#5f6368" stroke-width="1.5"/></g>
+<g data-k="n:at"><path d="M1377.8,508.6 L1419.7,534.8" fill="none" stroke="#5f6368" stroke-width="1.5"/></g>
+<g data-k="n:ow"><path d="M300.0,130.0 L385.0,130.0" fill="none" stroke="#3c4043" stroke-width="2.2"/></g>
+<g data-k="n:ow"><path d="M575.0,130.0 L660.0,130.0" fill="none" stroke="#3c4043" stroke-width="7"/><path d="M575.0,130.0 L660.0,130.0" fill="none" stroke="#ffffff" stroke-width="3"/></g>
+<g data-k="n:ls"><path d="M860.0,130.0 L931.4,130.0" fill="none" stroke="#3c4043" stroke-width="2.2"/></g>
+<g data-k="n:ls"><path d="M1128.6,130.0 L1168.1,130.0" fill="none" stroke="#3c4043" stroke-width="7"/><path d="M1128.6,130.0 L1168.1,130.0" fill="none" stroke="#ffffff" stroke-width="3"/></g>
+<g data-k="n:fo"><path d="M300.0,460.0 L373.0,460.0" fill="none" stroke="#3c4043" stroke-width="2.2"/></g>
+<g data-k="n:fo"><path d="M587.0,460.0 L660.0,460.0" fill="none" stroke="#3c4043" stroke-width="7"/><path d="M587.0,460.0 L660.0,460.0" fill="none" stroke="#ffffff" stroke-width="3"/></g>
+<g data-k="n:tr"><path d="M860.0,460.0 L923.0,460.0" fill="none" stroke="#3c4043" stroke-width="2.2"/></g>
+<g data-k="n:tr"><path d="M1137.0,460.0 L1200.0,460.0" fill="none" stroke="#3c4043" stroke-width="7"/><path d="M1137.0,460.0 L1200.0,460.0" fill="none" stroke="#ffffff" stroke-width="3"/></g>
+<g data-k="n:to"><path d="M760.0,411.4 L760.0,354.4" fill="none" stroke="#3c4043" stroke-width="2.2"/></g>
+<g data-k="n:to"><path d="M760.0,235.6 L760.0,178.6" fill="none" stroke="#3c4043" stroke-width="2.2"/></g>
+<g data-k="n:me"><rect x="100.0" y="81.4" width="200.0" height="97.2" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<text x="200.0" y="140.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="28.4" font-weight="700" fill="#202124">MERCHANT</text></g>
+<g data-k="n:ep"><rect x="660.0" y="81.4" width="200.0" height="97.2" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<text x="760.0" y="140.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="28.4" font-weight="700" fill="#202124">ENDPOINT</text></g>
+<g data-k="n:su"><rect x="1168.1" y="81.4" width="263.8" height="97.2" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<rect x="1174.1" y="87.4" width="251.8" height="85.2" fill="none" stroke="#4285f4" stroke-width="1.8"/>
+<text x="1300.0" y="140.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="28.4" font-weight="700" fill="#202124">SUBSCRIPTION</text></g>
+<g data-k="n:ev"><rect x="100.0" y="411.4" width="200.0" height="97.2" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<text x="200.0" y="470.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="28.4" font-weight="700" fill="#202124">EVENT</text></g>
+<g data-k="n:dl"><rect x="660.0" y="411.4" width="200.0" height="97.2" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<text x="760.0" y="470.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="28.4" font-weight="700" fill="#202124">DELIVERY</text></g>
+<g data-k="n:at"><rect x="1200.0" y="411.4" width="200.0" height="97.2" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<rect x="1206.0" y="417.4" width="188.0" height="85.2" fill="none" stroke="#4285f4" stroke-width="1.8"/>
+<text x="1300.0" y="470.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="28.4" font-weight="700" fill="#202124">ATTEMPT</text></g>
+<g data-k="n:ow"><path d="M480.0,70.6 L575.0,130.0 L480.0,189.4 L385.0,130.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<text x="480.0" y="138.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="23.2" font-weight="700" fill="#202124">OWNS</text></g>
+<g data-k="n:ls"><path d="M1030.0,70.6 L1128.6,130.0 L1030.0,189.4 L931.4,130.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<path d="M1030.0,76.0 L1119.6,130.0 L1030.0,184.0 L940.4,130.0 Z" fill="none" stroke="#b06000" stroke-width="1.8"/>
+<text x="1030.0" y="138.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="23.2" font-weight="700" fill="#202124">LISTENS</text></g>
+<g data-k="n:fo"><path d="M480.0,400.6 L587.0,460.0 L480.0,519.4 L373.0,460.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<text x="480.0" y="468.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="23.2" font-weight="700" fill="#202124">FANS OUT</text></g>
+<g data-k="n:tr"><path d="M1030.0,400.6 L1137.0,460.0 L1030.0,519.4 L923.0,460.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<path d="M1030.0,405.6 L1128.0,460.0 L1030.0,514.4 L932.0,460.0 Z" fill="none" stroke="#b06000" stroke-width="1.8"/>
+<text x="1030.0" y="468.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="23.2" font-weight="700" fill="#202124">TRIED BY</text></g>
+<g data-k="n:to"><path d="M760.0,235.6 L855.0,295.0 L760.0,354.4 L665.0,295.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<text x="760.0" y="303.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="23.2" font-weight="700" fill="#202124">TO</text></g>
+<g data-k="n:me"><ellipse cx="120.0" cy="40.0" rx="108.1" ry="31.0" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="120.0" y="47.8" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="21.6" fill="#202124" font-weight="700">merchant_id</text>
+<line x1="48.7" y1="53.4" x2="191.3" y2="53.4" stroke="#202124" stroke-width="1.6"/></g>
+<g data-k="n:ep"><ellipse cx="700.0" cy="40.0" rx="108.1" ry="31.0" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="700.0" y="47.8" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="21.6" fill="#202124" font-weight="700">endpoint_id</text>
+<line x1="628.7" y1="53.4" x2="771.3" y2="53.4" stroke="#202124" stroke-width="1.6"/></g>
+<g data-k="n:ep"><ellipse cx="900.0" cy="40.0" rx="45.5" ry="31.0" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="900.0" y="47.8" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="21.6" fill="#202124">url</text></g>
+<g data-k="n:ep"><ellipse cx="600.0" cy="215.0" rx="108.1" ry="31.0" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="600.0" y="222.8" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="21.6" fill="#202124">api_version</text></g>
+<g data-k="n:su"><ellipse cx="1460.0" cy="40.0" rx="100.3" ry="31.0" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="1460.0" y="47.8" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="21.6" fill="#202124" font-weight="700">event_type</text>
+<line x1="1395.2" y1="53.4" x2="1524.8" y2="53.4" stroke="#202124" stroke-width="1.6" stroke-dasharray="5 4"/></g>
+<g data-k="n:ev"><ellipse cx="90.0" cy="560.0" rx="84.6" ry="31.0" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="90.0" y="567.8" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="21.6" fill="#202124" font-weight="700">event_id</text>
+<line x1="38.2" y1="573.4" x2="141.8" y2="573.4" stroke="#202124" stroke-width="1.6"/></g>
+<g data-k="n:ev"><ellipse cx="330.0" cy="560.0" rx="84.6" ry="31.0" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="330.0" y="567.8" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="21.6" fill="#202124">loan seq</text></g>
+<g data-k="n:dl"><ellipse cx="640.0" cy="560.0" rx="61.1" ry="31.0" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="640.0" y="567.8" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="21.6" fill="#202124">state</text></g>
+<g data-k="n:dl"><ellipse cx="900.0" cy="560.0" rx="139.4" ry="31.0" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="900.0" y="567.8" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="21.6" fill="#202124">next_attempt_at</text></g>
+<g data-k="n:at"><ellipse cx="1240.0" cy="560.0" rx="100.3" ry="31.0" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="1240.0" y="567.8" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="21.6" fill="#202124" font-weight="700">attempt_no</text>
+<line x1="1175.2" y1="573.4" x2="1304.8" y2="573.4" stroke="#202124" stroke-width="1.6" stroke-dasharray="5 4"/></g>
+<g data-k="n:at"><ellipse cx="1460.0" cy="560.0" rx="69.0" ry="31.0" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="1460.0" y="567.8" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="21.6" fill="#202124">status</text></g>
+<g data-k="n:ow"><text x="342.5" y="160.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.0" font-weight="700" fill="#ea4335">1</text></g>
+<g data-k="n:ow"><text x="617.5" y="160.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.0" font-weight="700" fill="#ea4335">N</text></g>
+<g data-k="n:ls"><text x="895.7" y="160.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.0" font-weight="700" fill="#ea4335">1</text></g>
+<g data-k="n:ls"><text x="1148.3" y="160.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.0" font-weight="700" fill="#ea4335">N</text></g>
+<g data-k="n:fo"><text x="336.5" y="490.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.0" font-weight="700" fill="#ea4335">1</text></g>
+<g data-k="n:fo"><text x="623.5" y="490.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.0" font-weight="700" fill="#ea4335">N</text></g>
+<g data-k="n:tr"><text x="891.5" y="490.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.0" font-weight="700" fill="#ea4335">1</text></g>
+<g data-k="n:tr"><text x="1168.5" y="490.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.0" font-weight="700" fill="#ea4335">N</text></g>
+<g data-k="n:to"><text x="780.0" y="393.2" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.0" font-weight="700" fill="#ea4335">N</text></g>
+<g data-k="n:to"><text x="780.0" y="217.4" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.0" font-weight="700" fill="#ea4335">1</text></g>
+<g data-k="legend"><rect x="1624" y="52" width="36" height="16" fill="#e8f0fe" stroke="#4285f4" stroke-width="1.6"/>
+<text x="1674" y="67.7" font-family="Inter, Roboto, sans-serif" font-size="22" fill="#202124">entity</text>
+<rect x="1624" y="84" width="36" height="16" fill="#e8f0fe" stroke="#4285f4" stroke-width="1.6"/>
+<rect x="1628" y="88" width="28" height="8" fill="none" stroke="#4285f4" stroke-width="1.2"/>
+<text x="1674" y="99.7" font-family="Inter, Roboto, sans-serif" font-size="22" fill="#202124">weak entity</text>
+<path d="M1642,114 L1662,124 L1642,134 L1622,124 Z" fill="#fef7e0" stroke="#b06000" stroke-width="1.6"/>
+<text x="1674" y="131.7" font-family="Inter, Roboto, sans-serif" font-size="22" fill="#202124">relationship</text>
+<path d="M1642,146 L1662,156 L1642,166 L1622,156 Z" fill="#fef7e0" stroke="#b06000" stroke-width="1.6"/>
+<path d="M1642,151 L1652,156 L1642,161 L1632,156 Z" fill="none" stroke="#b06000" stroke-width="1.2"/>
+<text x="1674" y="163.7" font-family="Inter, Roboto, sans-serif" font-size="22" fill="#202124">identifying relationship</text>
+<ellipse cx="1642" cy="188" rx="20" ry="9" fill="#fff" stroke="#5f6368" stroke-width="1.4"/>
+<text x="1674" y="195.7" font-family="Inter, Roboto, sans-serif" font-size="22" fill="#202124">attribute</text>
+<ellipse cx="1642" cy="220" rx="20" ry="9" fill="#fff" stroke="#5f6368" stroke-width="1.4"/>
+<line x1="1633" y1="223" x2="1651" y2="223" stroke="#202124" stroke-width="1.4"/>
+<text x="1674" y="227.7" font-family="Inter, Roboto, sans-serif" font-size="22" fill="#202124">key attribute</text>
+<line x1="1622" y1="252" x2="1662" y2="252" stroke="#3c4043" stroke-width="6"/><line x1="1622" y1="252" x2="1662" y2="252" stroke="#fff" stroke-width="2.4"/>
+<text x="1674" y="259.7" font-family="Inter, Roboto, sans-serif" font-size="22" fill="#202124">total participation</text></g>
+<g data-k="note:0"><rect x="60" y="640" width="900" height="57.7" rx="6" fill="#fef7e0" stroke="#b06000" stroke-width="1.2"/>
+<text x="74" y="672.1" font-family="Inter, Roboto, sans-serif" font-size="25.6" fill="#202124">A delivery is one event to one endpoint; attempts belong to it.</text></g>
+</svg>

@@ -1,0 +1,55 @@
+{
+ "mp4": "webhook-delivery-reference.mp4",
+ "teaser_chapter": null,
+ "thumbnail": {
+  "kicker": "Staff reference solution",
+  "title": "One slow merchant.<br><em>Everyone waits.</em>",
+  "sub": "Webhooks for a lender: an outbox, a queue per endpoint as rows, a cap, a ramp, a signed and versioned contract.",
+  "id": "design-room · SD-99"
+ },
+ "youtube": {
+  "title": "Webhook Delivery System Design: Outbox, Per-Endpoint Isolation, Retries, Signing | Staff Reference",
+  "playlist": "System design reference solutions · design-room (create it once, reuse it)",
+  "tags": [
+   "system design",
+   "system design interview",
+   "webhooks",
+   "webhook delivery",
+   "transactional outbox",
+   "retries with jitter",
+   "bulkhead",
+   "circuit breaker",
+   "ssrf",
+   "hmac signature",
+   "api versioning",
+   "fintech system design",
+   "engineering manager",
+   "staff engineer"
+  ],
+  "description_top": [
+   "Merchants and a partner bank subscribe to a lender's loan and payment events. The first version is one POST inside the booking request, and it fails the first time a merchant's server takes 30 seconds. A full reference solution at the Staff bar (L6/L7), with the manager layer: theory, a three-version design, seven challenges that carry it to version six, a buy-against-build alternative, and the team seams. {DURATION} minutes, {SLIDES} numbered slides, with an interviewer, a candidate and a coach.",
+   "The thesis: we promise at-least-once delivery and give every endpoint its own failure budget. Exactly-once is the consumer's job, and the contract that makes it possible is the product.",
+   "IN THIS VIDEO\n• Estimates from one scale line: 600 calls in flight at the peak, 1,200 for one slow endpoint, 240,000 deliveries after a weekend outage\n• Theory: six mechanisms (outbox, log, a queue per endpoint with a cap, full jitter with a breaker and a ramp, the consumer contract, an egress proxy) and an options matrix\n• Seven challenges: publishing after the commit, one slow endpoint, a two-day outage, duplicates and order, SSRF and forged calls, a producer changing the payload, and \"you never sent it\"\n• Components and technologies one level down, buy against build, and the contracts between teams (AUX)",
+   "HOW TO USE IT\nRun the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first. Slides badged AUX are the manager layer."
+  ],
+  "description_bottom": [
+   "LINKS\nWritten reference design: https://github.com/nirmata78/design-room/blob/main/solutions/SD-99-webhook-delivery/SD-99_Webhook_Delivery_Reference_Design.md\nRun this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room\nAll videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md",
+   "ABOUT THIS VIDEO\nThis is a scripted walkthrough, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script, diagrams and the written design were produced with Claude Code. Numbers are back-of-the-envelope estimates for the exercise, labelled as illustrative or initial targets, not any company's real figures; prices are illustrative orders of magnitude; this is not any company's actual design. The technical content has not been reviewed by a person.",
+   "#SystemDesign #SoftwareEngineering #APIs"
+  ]
+ },
+ "linkedin": {
+  "post": [
+   "One merchant's server takes ten seconds to answer. If your webhook workers are shared, every other merchant waits too.",
+   "I've published a {DURATION}-minute reference solution for the webhook delivery question at the Staff bar, set at a point-of-sale lender: theory, a three-version design, seven challenges, buy against build, and the team seams, on {SLIDES} numbered slides.",
+   "The idea that unlocks it: volume is not the problem. 2,400 deliveries a second is 600 calls in flight. One endpoint at ten seconds needs 1,200. So every endpoint gets its own budget.",
+   "What it goes into:\n→ An outbox, so no event exists without its commit\n→ A queue per endpoint as rows: the row is the queue, the timer and the lock\n→ Full jitter, a breaker and a ramp, so recovery doesn't knock the endpoint over again\n→ The internal event is not the public contract: dated versions and an owning team",
+   "Best on a second pass: pause after each question and answer it first.",
+   "▶ {YOUTUBE_URL}",
+   "It's a scripted walkthrough with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator.",
+   "Who owns the webhook payload in your organisation?",
+   "#SystemDesign #SoftwareEngineering #APIs"
+  ],
+  "first_comment": "Written reference design, stage by stage: https://github.com/nirmata78/design-room/blob/main/solutions/SD-99-webhook-delivery/SD-99_Webhook_Delivery_Reference_Design.md\n\nRun this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room"
+ }
+}

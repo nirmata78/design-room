@@ -1,0 +1,336 @@
+{
+  "_doc": "Single source for SD-99's technology choices; see SD-08/stack.json for the format. `how` is spoken, so it carries no code; keep summary cells under 36 characters.",
+  "c4": {
+    "api": [
+      "Webhooks API",
+      "Go, PostgreSQL",
+      "Endpoints, logs, replay."
+    ],
+    "rel": [
+      "Outbox relay",
+      "Go poller",
+      "Outbox to the log."
+    ],
+    "log": [
+      "Event log",
+      "Kafka, by loan",
+      "Domain events, 7 days."
+    ],
+    "fan": [
+      "Fan-out",
+      "Go consumer group",
+      "Match subscriptions."
+    ],
+    "reg": [
+      "Contract renderer",
+      "schema registry",
+      "Public versions."
+    ],
+    "dst": [
+      "Delivery store",
+      "PostgreSQL, by endpoint",
+      "One row per delivery."
+    ],
+    "dsp": [
+      "Dispatcher",
+      "Go, bulkheads",
+      "Claim, sign, send."
+    ],
+    "hl": [
+      "Endpoint health",
+      "Go control loop",
+      "Breaker, ramp, disable."
+    ],
+    "egr": [
+      "Egress proxy",
+      "Smokescreen",
+      "Public IPs only."
+    ],
+    "att": [
+      "Attempt log",
+      "PostgreSQL by day",
+      "Every try, 30 days."
+    ]
+  },
+  "challenges": {
+    "1": [
+      "A dual write: commit, then publish",
+      "a crash between the two loses the event, or sends one for a change that rolled back."
+    ],
+    "2": [
+      "A Kafka partition, or retry topics, per endpoint",
+      "head-of-line blocking: one slow endpoint stalls everything queued behind it."
+    ],
+    "3": [
+      "A fixed retry count every ten seconds",
+      "synchronised retries knock a recovering endpoint over again, and a two-day outage outlasts any fixed count."
+    ],
+    "4": [
+      "An exactly-once, ordered delivery promise",
+      "impossible into a system we do not control; the consumer de-duplicates by event ID and orders by sequence."
+    ],
+    "5": [
+      "Checking the URL string at registration",
+      "DNS rebinding resolves a public name to a private address at send time; only the egress proxy sees the real address."
+    ],
+    "6": [
+      "Sending the producers' internal events as they are",
+      "every internal refactor becomes a breaking change for twenty thousand merchant integrations."
+    ],
+    "7": [
+      "Alerting on merchants' error rates",
+      "their outages would page us all night; alert on our lag and on success to healthy endpoints."
+    ]
+  },
+  "stack": [
+    {
+      "id": "outbox-relay",
+      "heading": "Outbox relay: no event without a commit",
+      "kicker": "Technology · outbox relay",
+      "title": "The event is a row in the same transaction as the change",
+      "pick": "An outbox table in each producer's PostgreSQL, drained by a Go poller in ID order",
+      "why": "Only one transaction can make “the loan was booked” and “the world will hear about it” a single fact.",
+      "how": "The producer inserts the outbox row in the same transaction as the change. The relay publishes unsent rows in ID order, keyed by loan, and marks them sent only after the log acknowledges.",
+      "detail": "A crash after commit leaves the row, so it is published later; a crash after publishing and before marking publishes it twice, so every consumer de-duplicates by event ID. The relay holds a lease per producer database so only one instance drains it; it alerts on the age of the oldest unsent row, and sent rows are deleted after a day.",
+      "rejected": [
+        [
+          "A dual write: commit, then publish to Kafka",
+          "A crash between the two loses the event, or publishes one for a change that rolled back."
+        ],
+        [
+          "Change data capture with Debezium",
+          "An honest equal: no polling and no extra table, but one more system to run."
+        ]
+      ],
+      "summary": [
+        "Outbox relay",
+        "Outbox + Go poller",
+        "Dual write; Debezium",
+        "One commit, one fact"
+      ],
+      "course": "theory/08 (transactions) and theory/10 (logs and streams)",
+      "parts": "08 10",
+      "drill": [
+        "The relay crashed after Kafka acknowledged but before it marked the row sent. What happens?",
+        "The row is published again on restart: at-least-once. Every consumer, including fan-out, de-duplicates by event ID, so the merchant still gets one delivery. The trap is trying to make the relay exactly-once.",
+        "republished; consumers de-duplicate by event ID"
+      ]
+    },
+    {
+      "id": "event-log",
+      "heading": "Event log: the company's backbone, not ours",
+      "kicker": "Technology · event log",
+      "title": "One durable copy, many readers, replay for seven days",
+      "pick": "Kafka, domain topics keyed by loan ID, seven days of retention",
+      "why": "Funding, servicing and analytics already read these events. Webhooks are one more consumer group, with their own offsets.",
+      "how": "One topic per domain, keyed by loan ID, so one loan's events stay in commit order. Seven days of retention; webhooks are one more consumer group, and its lag is our first indicator.",
+      "detail": "Replication factor three, minimum in-sync replicas two, producers with acks=all. Partition count is set by the producers' peak, not by the number of endpoints.",
+      "rejected": [
+        [
+          "Amazon SQS as the backbone",
+          "No replay after a message is consumed, and no per-key ordering shared by many consumer groups."
+        ],
+        [
+          "RabbitMQ",
+          "Replay and a backlog of days are not what it is built for; each consumer needs its own queue copy."
+        ]
+      ],
+      "summary": [
+        "Event log",
+        "Kafka, by loan",
+        "SQS; RabbitMQ",
+        "Replay, many readers"
+      ],
+      "course": "theory/10 (logs, queues, streams)",
+      "parts": "10"
+    },
+    {
+      "id": "fanout",
+      "heading": "Fan-out: from one event to many deliveries",
+      "kicker": "Technology · fan-out",
+      "title": "Match each event to its subscriptions, write one row per delivery",
+      "pick": "A Go consumer group with an in-memory subscription cache, writing delivery rows in batches",
+      "why": "The event log is ordered by loan; delivery must be isolated by endpoint. Fan-out is where one becomes the other.",
+      "how": "Each consumer matches events to subscriptions from an in-memory cache and inserts one delivery row per match, in batches, unique on event and endpoint. The log offset is committed only after the batch is written.",
+      "detail": "A crash repeats a batch and the unique key absorbs it. The cache is refreshed by subscription change events. The payload is stored once per event, not once per delivery; a per-merchant fair-share limit stops one producer burst from filling every shard at once.",
+      "rejected": [
+        [
+          "One Kafka topic per endpoint",
+          "Twenty thousand topics, created and deleted by self-service registration."
+        ],
+        [
+          "Filtering inside every dispatcher",
+          "Every worker reads every event; isolation by endpoint is lost before it starts."
+        ]
+      ],
+      "summary": [
+        "Fan-out",
+        "Go consumer group",
+        "Topic per endpoint",
+        "Loan order to endpoint rows"
+      ],
+      "course": "theory/10 (logs, queues, streams)",
+      "parts": "10",
+      "drill": [
+        "A merchant adds a subscription while an event for them is in flight. Do they get it?",
+        "The cache is refreshed from subscription change events, so there is a short window. The contract says subscriptions take effect within a minute, and the merchant can replay anything since a timestamp. The trap is promising the instant.",
+        "cache refresh window; stated in the contract; replay covers it"
+      ]
+    },
+    {
+      "id": "delivery-store",
+      "heading": "Delivery store: one row per delivery, the timer is a column",
+      "kicker": "Technology · delivery store",
+      "title": "Per-endpoint state, claimed with a lease",
+      "pick": "PostgreSQL sharded by endpoint ID; claim with SKIP LOCKED and a lease; next_attempt_at is the timer",
+      "why": "Each endpoint needs its own queue, its own delay and its own state for days. Rows in a table give all three without twenty thousand queues.",
+      "how": "A row per delivery, on the shard that owns its endpoint, with its state, next attempt time and lease. Workers claim due rows with skip locked; an expired lease makes a row claimable again.",
+      "detail": "A partial index on next_attempt_at where the state is pending keeps the claim query cheap; delivered rows are summarised in the attempt log and deleted within a day. Four shards carry the 2,400 a second peak with headroom.",
+      "rejected": [
+        [
+          "Kafka retry topics",
+          "Fixed delays, and head-of-line blocking within each partition: one slow endpoint delays everything behind it."
+        ],
+        [
+          "An SQS queue per endpoint",
+          "Twenty thousand queues to manage, and a fifteen-minute ceiling on message delay."
+        ]
+      ],
+      "summary": [
+        "Delivery store",
+        "PostgreSQL by endpoint",
+        "Retry topics; SQS",
+        "A queue per endpoint, as rows"
+      ],
+      "course": "theory/08 (transactions) and theory/06 (partitioning)",
+      "parts": "08 06",
+      "drill": [
+        "Two dispatchers claim at the same moment. Can both send the same delivery?",
+        "No: skip locked gives the row to one of them, and the lease marks it. If that worker dies, the lease expires and another sends it again: at-least-once, which the event ID makes safe. The trap is a distributed lock.",
+        "SKIP LOCKED + lease; expiry means a resend; event ID makes it safe"
+      ]
+    },
+    {
+      "id": "dispatcher",
+      "heading": "Dispatcher: isolation is the product",
+      "kicker": "Technology · dispatcher",
+      "title": "Bulkheads per endpoint, timeouts that end, signatures on every call",
+      "pick": "Go workers: a concurrency cap per endpoint, pools per merchant tier, a breaker per endpoint",
+      "why": "One slow endpoint must never spend the capacity another endpoint needs. The cap is the whole design.",
+      "how": "Workers claim only for endpoints under their in-flight cap, ten by default, in pools split by merchant tier. Every call has a 2 s connect and a 10 s total timeout, is signed, and leaves through the egress proxy.",
+      "detail": "Five consecutive failures open the endpoint's breaker. HTTP keep-alive per endpoint; a 2xx is success, a 410 disables the subscription, 429 and 503 honour Retry-After, everything else is retried. Responses are read to 4 KB at most.",
+      "rejected": [
+        [
+          "One shared worker pool with retries",
+          "A slow endpoint holds every worker: at ten seconds a call, 120 calls a second need 1,200 sockets."
+        ],
+        [
+          "A thread pool per endpoint",
+          "Twenty thousand pools, almost all idle; a cap on in-flight calls gives the same isolation for free."
+        ]
+      ],
+      "summary": [
+        "Dispatcher",
+        "Go, caps, tier pools",
+        "Shared pool; pool each",
+        "Each spends its own budget"
+      ],
+      "course": "theory/13 (reliability patterns) and theory/12 (overload control)",
+      "parts": "13 12",
+      "drill": [
+        "The partner bank's endpoint slows to nine seconds at the peak. What happens to a small merchant's delivery?",
+        "Nothing: the bank's endpoint is capped and sits in its own tier pool, so it queues in its own rows while the small merchant's pool is untouched. The trap is a bigger shared pool.",
+        "cap per endpoint; tier pools; its backlog is its own rows"
+      ]
+    },
+    {
+      "id": "egress",
+      "heading": "Egress proxy: the only door out",
+      "kicker": "Technology · egress proxy",
+      "title": "Resolve, pin, deny private ranges, at send time",
+      "pick": "Smokescreen, an open-source egress proxy, in front of every dispatcher",
+      "why": "A customer-supplied URL is untrusted input that our servers will call. The check must happen on the address actually connected to.",
+      "how": "The proxy resolves the name itself, refuses private, loopback, link-local and metadata addresses, and connects to the address it checked. Dispatchers have no other route out.",
+      "detail": "It runs in its own subnet with network policy denying everything but outbound 443, in every zone, and logs every denial with the endpoint ID for the security team.",
+      "rejected": [
+        [
+          "Checking the URL at registration only",
+          "DNS rebinding: the name resolves to a public address at registration and to a private one at send time."
+        ],
+        [
+          "A firewall allow-list of merchant addresses",
+          "Twenty thousand self-served endpoints on cloud hosts whose addresses change."
+        ]
+      ],
+      "summary": [
+        "Egress proxy",
+        "Smokescreen",
+        "URL check; allow-list",
+        "Check the IP you connect to"
+      ],
+      "course": "theory/16 (security, operating systems)",
+      "parts": "16",
+      "drill": [
+        "A merchant registers a name that resolves to 10.0.0.5 only after you validated it. What stops the call?",
+        "The proxy resolves at send time and refuses private ranges, and it connects to the address it checked, so rebinding has no gap to use. The trap is a stricter regex.",
+        "resolve at send time; deny private ranges; connect to the checked IP"
+      ]
+    },
+    {
+      "id": "attempt-log",
+      "heading": "Attempt log: the answer to “you never sent it”",
+      "kicker": "Technology · attempt log",
+      "title": "Every attempt, its answer and its timing, for thirty days",
+      "pick": "PostgreSQL partitioned by day, then object storage; read by the merchant dashboard",
+      "why": "Support, the merchant and on-call ask the same question: what did we send, when, and what did they answer?",
+      "how": "One row per attempt: status, latency, the first bytes of the answer, the error class. Daily partitions, copied to object storage and dropped after thirty days.",
+      "detail": "About 108 GB a month at 500 bytes a row. Response bodies are truncated to 512 bytes and scrubbed of anything that looks like a credential; the signature header and key ID are kept for debugging.",
+      "rejected": [
+        [
+          "Elasticsearch",
+          "Full-text search is not the question asked; an append-only daily table is cheaper to run."
+        ],
+        [
+          "ClickHouse",
+          "An honest equal at ten times the volume, for analytics across all endpoints; one more system at ours."
+        ]
+      ],
+      "summary": [
+        "Attempt log",
+        "PostgreSQL by day",
+        "Elasticsearch; ClickHouse",
+        "Drop a day, not rows"
+      ],
+      "course": "theory/14 (observability) and theory/07 (storage)",
+      "parts": "14 07"
+    },
+    {
+      "id": "contract-renderer",
+      "heading": "Contract renderer: the public contract is not the internal event",
+      "kicker": "Technology · contract renderer",
+      "title": "One internal event, many public versions",
+      "pick": "A schema registry of public event versions, rendered at fan-out for each endpoint's pinned version",
+      "why": "Producers must be free to change their internal events; merchants must not have to change their integrations when they do.",
+      "how": "Each endpoint is pinned to a dated public version; fan-out renders the internal event into it from a registry of every supported version. A producer's build fails if a supported version stops rendering.",
+      "detail": "Additive fields need no new version; a rename or a removal does. Usage of each version is measured per endpoint, so deprecation is a list of merchants to contact, not a guess.",
+      "rejected": [
+        [
+          "Sending the internal event as it is",
+          "Every internal refactor becomes a breaking change for twenty thousand integrations."
+        ],
+        [
+          "One public payload forever",
+          "It freezes the product; fields that should be renamed or split never can be."
+        ]
+      ],
+      "summary": [
+        "Contract renderer",
+        "Registry, pinned versions",
+        "Internal as is; freeze",
+        "The contract is the product"
+      ],
+      "course": "theory/11 (API contracts) and theory/16 (evolving systems)",
+      "parts": "11 16"
+    }
+  ]
+}

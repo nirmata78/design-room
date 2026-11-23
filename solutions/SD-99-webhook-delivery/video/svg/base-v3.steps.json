@@ -1,0 +1,1 @@
+[["n:pro", "n:mer", "n:rel", "n:log", "n:dsp", "e:p-r", "e:r-l", "e:d-m"], ["n:fan", "m:fan", "e:l-f"], ["n:dst", "m:dst", "e:f-s", "e:s-d"], ["n:att", "m:att", "e:d-a"], ["n:api", "m:api", "e:api-a", "e:api-s"]]
