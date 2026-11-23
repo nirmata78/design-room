@@ -1,0 +1,1 @@
+[["n:author", "m:author"], ["n:reader", "m:reader"], ["n:postsvc", "m:postsvc", "e:e1"], ["n:graph", "m:graph"], ["n:feed", "m:feed", "e:e8", "e:e9", "e:e10"], ["n:postsdb", "m:postsdb", "e:e2", "e:e11"], ["n:ranking", "m:ranking", "e:e14", "e:e15"]]

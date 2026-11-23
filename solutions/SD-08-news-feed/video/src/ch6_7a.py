@@ -28,8 +28,8 @@ S(plain(K(1, "the trace"), "Fifteen minutes for one post", '<pre class="trace"><
  "C: Illustrative numbers, but the shape holds at any fleet size. Even ten times the capacity spends ninety seconds of all of it on one post."])
 
 S(dia(K(1, "the fix"), "Don't fan out celebrities: pull them at read time", "ch1-fix",
-      extra=strip(("fixb", "Mechanism", "The event carries the author's tier. Above the threshold the worker writes one entry to the author's recent list. Readers merge the few celebrities they follow."),
-                  ("whyb", "Property", "L1 for everyone else: the log is no longer held by one author. L2 for readers: a few extra cache reads, budgeted."))), [
+      extra=strip(("fixb", "Mechanism", "Above the line: one entry in the author's recent list; readers merge it."),
+                  ("whyb", "Property", "L1: no author holds the log. L2: readers pay a few budgeted reads."))), [
  "C: The fix. The event carries the author's tier. Above the threshold the worker writes one entry to that author's recent list, the dashed arrow, and is done. On the read path, the feed service merges the recent lists of the celebrities this reader follows. One write instead of a hundred and ten million."], cls="dia")
 
 S(dia(K(1, "sequence"), "One write on publish, a small merge on read", "seq-celebrity"), [
@@ -115,8 +115,8 @@ S(plain(K(3, "the trace"), "The delete loses the race", '<pre class="trace"><spa
  "C: The trace. Ana posts to three million followers and fan-out starts. Forty seconds later she deletes it, a wrong photo, and a delete fan-out starts behind it. Wherever the insert lands after the delete, the post stays. Separately, Ben blocks Cal, and five hundred of Cal's posts are already in Ben's timeline. Both violate S-one."])
 
 S(dia(K(3, "the fix"), "Correctness on the read path; cleanup is cosmetic", "ch3-fix",
-      extra=strip(("fixb", "Mechanism", "Hydration reads each post through the post cache, invalidated on delete, and drops anything deleted or out of audience. The merge drops authors in the reader's block, mute and unfollow set."),
-                  ("whyb", "Property", "S1 is decided at one place, the post's own row, read on every page. The bound is the invalidation time: seconds."))), [
+      extra=strip(("fixb", "Mechanism", "Hydrate via the post cache, dropping deleted or hidden posts."),
+                  ("whyb", "Property", "S1 is decided at the post's own row, on every page; the bound is seconds."))), [
  "C: The fix. Correctness lives on the read path. The delete writes the post's status once, and an invalidation event drops it from the post cache, the dashed arrow. Every page is hydrated through that cache, and anything deleted or out of audience is dropped. The merge drops authors in my block, mute and unfollow set, which the graph keeps small and cached. A background job removes stale I-Ds from timelines later, and that cleanup is cosmetic."], cls="dia")
 
 S(dia(K(3, "sequence"), "One write, filtered on every page", "seq-delete"), [
@@ -149,9 +149,9 @@ S(dia(K(4, "duplicates and gaps"), "Where twice and never come from", "ch4-attac
 S(plain(K(4, "the trace"), "A re-delivered event, and an offset that moves", '<pre class="trace"><span class="t">W3      </span>inserts p9 into 1,000 timelines, <span class="bad">crashes before committing the offset</span>\n<span class="t">W7      </span>re-reads the event: inserts p9 again. In a plain list, <span class="bad">p9 twice</span>\n<span class="t">page 1  </span>reader gets items 0–49 with ?offset=0\n<span class="t">+12     </span>twelve new posts arrive at the top\n<span class="t">page 2  </span>?offset=50 returns old items 38–87: <span class="bad">12 repeated, 12 never shown</span></pre>', q=True, red=True), [
  "C: The trace. Worker three inserts post nine into a thousand timelines and crashes before committing its offset. Worker seven re-reads the event and inserts it again. In a plain list, post nine is there twice. Separately: a reader takes page one with offset zero, twelve new posts arrive at the top, and page two with offset fifty returns items the reader already saw. Twelve repeated, and twelve others never shown."])
 
-S(plain(K(4, "the fix"), "A set keyed by post ID, and a cursor", code(
- 'def make_cursor(last_id, scores):\n    return encode({"s": scores[last_id], "p": last_id})\n\ndef after(cursor, ranked, scores):\n    if cursor is None:\n        return ranked\n    c = decode(cursor)\n    # strictly after the last item shown, whatever arrived above it\n    return [i for i in ranked if (scores[i], i) < (c["s"], c["p"])]', "python") +
-  strip(("whyb", "Property", "A re-delivered insert into a set keyed by post ID changes nothing: duplicates are impossible by data structure. Gaps are bounded by fan-out lag, which is measured."), cols="one")), [
+S(plain(K(4, "the fix"), "A set keyed by post ID, and a cursor", pseudo(
+ 'cursor(last) = encode(score[last], last.id)\n\nafter(cursor, ranked):\n    if no cursor: return ranked\n    (s, p) = decode(cursor)\n    # strictly after the last item shown\n    return [i in ranked where (score[i], i.id) < (s, p)]', hl=(1, 7)) +
+  strip(("whyb", "Property", "A set keyed by post ID absorbs a re-delivery; gaps are bounded by measured fan-out lag."), cols="one")), [
  "C: The fix is two small things. The timeline is a sorted set keyed by post I-D, so a re-delivered insert changes nothing: at-least-once delivery, with an idempotent effect. And pagination uses a cursor holding the last item's score and I-D. The next page is everything strictly after that pair, whatever arrived at the top. The read merge also de-duplicates across the timeline and the celebrity lists.",
  "C: Duplicates become impossible by data structure. Misses are bounded by fan-out lag, which I measure, and for close ties the pull covers a lagging lane."])
 

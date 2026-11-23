@@ -1,0 +1,328 @@
+{
+  "_doc": "Single source for SD-08's technology choices. Read by video/src/stack.py, which feeds the 5.1 technology slides (video/src/ch5_1.py), the stack table, the drill interlude, the fix-slide 'Rejected' lines and the C4 technology labels (video/diagrams.py), and rewrites the marked regions of the booklet (Technologies, one level down) and OUTLINE.md. Edit here, then run video/src/stack.py sync (build-video.sh does it). A drill is [probe, the answer for the booklet, the short form for the slide]. `how` is spoken, so it carries no code; code goes in `detail`. Text is Markdown-lite: `code` and **bold** only.",
+  "c4": {
+    "ps": [
+      "Post service",
+      "Go, stateless",
+      "Post and outbox in one transaction."
+    ],
+    "db": [
+      "Posts DB",
+      "PostgreSQL + Cassandra",
+      "Posts by ID; author index."
+    ],
+    "lg": [
+      "Event log",
+      "Kafka",
+      "Partitioned by author."
+    ],
+    "fo": [
+      "Fan-out workers",
+      "Kafka consumers, Go",
+      "Tiered; idempotent inserts."
+    ],
+    "tl": [
+      "Timeline cache",
+      "Redis Cluster",
+      "Sorted set per viewer."
+    ],
+    "cc": [
+      "Celebrity posts",
+      "Redis, replicated",
+      "Last 100 IDs per author."
+    ],
+    "pc": [
+      "Post cache",
+      "Memcached",
+      "Immutable posts by ID."
+    ],
+    "fs": [
+      "Feed service",
+      "Go, gRPC, stateless",
+      "Merge, filter, rank under a deadline, hydrate."
+    ],
+    "rk": [
+      "Ranking",
+      "Another team's gRPC",
+      "80 ms deadline."
+    ],
+    "gr": [
+      "Social graph",
+      "Another team's service",
+      "Followers, blocks; cached."
+    ]
+  },
+  "stack": [
+    {
+      "id": "posts-db",
+      "heading": "Posts DB: PostgreSQL by post ID, Cassandra for the author index",
+      "kicker": "Technology · posts store",
+      "title": "PostgreSQL by post ID; the author index in Cassandra",
+      "pick": "PostgreSQL 16, sharded by post ID; Cassandra for the author index",
+      "why": "Written once, read by ID, never lost: one transaction for post plus outbox. The author index is a newest-first range per author, which Cassandra does natively.",
+      "how": "Each shard is a PostgreSQL primary with a synchronous standby in another zone; the post row and an outbox row go in one transaction. The author index is a Cassandra table keyed by author, newest first.",
+      "detail": "The author index's clustering key is the time, newest first, so one author's recent posts are a single partition read. Post IDs are time-ordered 64-bit IDs, so a shard's recent posts sit together. The outbox table has `(post_id, payload, published_at)`; the relay marks rows published.",
+      "rejected": [
+        [
+          "One PostgreSQL primary",
+          "Fine at MVP scale. At 600 posts a second plus the reads of 90,000 feed opens, it is one failure domain and one vacuum problem."
+        ],
+        [
+          "DynamoDB for everything",
+          "Good at both access paths, but the post-and-outbox transaction becomes a transactional write across items and tables, and we lose the plain SQL for moderation queries."
+        ],
+        [
+          "Cassandra for posts too",
+          "Leaderless writes suit the index. For the post of record, no multi-row transaction with the outbox means the dual-write bug returns."
+        ]
+      ],
+      "summary": [
+        "Posts DB",
+        "PostgreSQL; Cassandra index",
+        "One primary; DynamoDB",
+        "Post plus outbox in one transaction"
+      ],
+      "course": "theory/03 (partitioning and storage) and theory/04 (replication)",
+      "parts": "03, 04",
+      "drill": [
+        "A post is created and the post service crashes right after the commit. Does the post reach its followers?",
+        "Yes. The outbox row committed with the post, so the relay publishes it when the service or the relay restarts. The trap is a second call to fan-out after the commit, which is a dual write.",
+        "the outbox row committed in the same transaction; the relay publishes it later"
+      ]
+    },
+    {
+      "id": "event-log",
+      "heading": "Event log: Kafka, partitioned by author",
+      "kicker": "Technology · event log",
+      "title": "Kafka, partitioned by author, fed by a change-data-capture relay",
+      "pick": "Kafka, 64 partitions keyed by author, replication factor three",
+      "why": "A replayable log that absorbs bursts and serves many consumers. Keying by author keeps one author's posts in order, and a rebuild is a replay.",
+      "how": "A relay reads the outbox through change data capture and publishes PostCreated, keyed by author. Three brokers across zones, replication factor three, producers wait for all in-sync replicas. Fan-out workers form one consumer group; a second group, for search or notifications, reads the same events without touching the first.",
+      "detail": "Retention is seven days, so a rebuilt consumer replays instead of asking the posts store. Partition count is sized for the fan-out workers, not for the 600 posts a second.",
+      "rejected": [
+        [
+          "RabbitMQ",
+          "A queue: once acknowledged, a message is gone. A rebuilt consumer cannot replay, and a second consumer needs its own queue."
+        ],
+        [
+          "The post service calling fan-out directly",
+          "The dual write: a crash between the two loses the fan-out or fans out a post that rolled back. No replay either."
+        ],
+        [
+          "Pub-Sub or Kinesis",
+          "Honest equals if we are on that cloud. Buy, not build, and the same design."
+        ]
+      ],
+      "summary": [
+        "Event log",
+        "Kafka, keyed by author",
+        "RabbitMQ; direct call",
+        "Replayable; ordered per author"
+      ],
+      "course": "theory/06 (messaging and streams)",
+      "parts": "06",
+      "drill": [
+        "Fan-out was down for two hours. How does it catch up, and does a reader see posts out of order?",
+        "The consumer group resumes from its committed offset and works through the backlog at its own pace. Inserts are idempotent and ordered by post ID in the sorted set, so a late insert lands in the right place. Readers see fresh posts late, not out of order.",
+        "resume from the offset; idempotent inserts sort by post ID"
+      ]
+    },
+    {
+      "id": "timeline-cache",
+      "heading": "Timeline cache: Redis Cluster sorted sets",
+      "kicker": "Technology · timelines",
+      "title": "Redis Cluster: a sorted set of 500 post IDs per viewer",
+      "pick": "Redis Cluster, a sorted set per viewer, partitioned by viewer",
+      "why": "A feed open is one range read. A sorted set gives idempotent inserts, ordering by time and cheap trimming, and losing one is a latency problem, not data loss.",
+      "how": "Each viewer has a sorted set of their 500 newest post IDs, scored by time. The fan-out worker pipelines inserts and trims to 500; one replica per shard. A viewer away for a week has no timeline until they return.",
+      "detail": "About 500 million daily active viewers at 500 IDs of 8 bytes each is a few terabytes across the cluster. `ZADD timeline:{viewer} score post_id`, then `ZREMRANGEBYRANK` to keep 500. Only active users hold a timeline; a returning user is rebuilt by pull.",
+      "rejected": [
+        [
+          "A relational table per viewer",
+          "60,000 inserts a second into an indexed table is write amplification we do not need for something we can rebuild."
+        ],
+        [
+          "A Cassandra row per viewer",
+          "Durable, but every feed open becomes a disk read. Fine as a cold tier, wrong for the hot path."
+        ],
+        [
+          "Memcached",
+          "No sorted structure: every insert becomes a read-modify-write of a whole list, which races under concurrent fan-out."
+        ]
+      ],
+      "summary": [
+        "Timelines",
+        "Redis sorted sets",
+        "SQL table; Cassandra row",
+        "Idempotent insert; one read"
+      ],
+      "course": "theory/05 (caching) and theory/03 (partitioning)",
+      "parts": "05, 03",
+      "drill": [
+        "A Redis shard holding two million timelines is lost. What does a reader see, and how do they come back?",
+        "A replica is promoted, and timelines written in the last seconds may be missing. Readers whose timeline is gone are rebuilt by pull from followees, rate limited, so the posts store is not flattened.",
+        "promote a replica; rebuild the missing timelines by pull, rate limited"
+      ]
+    },
+    {
+      "id": "post-cache",
+      "heading": "Post cache: Memcached by post ID",
+      "kicker": "Technology · post cache",
+      "title": "Memcached: immutable posts by ID, a separate pool",
+      "pick": "Memcached, a separate pool from the timelines",
+      "why": "Posts change rarely and are read by ID in batches of 50, so a plain key-value cache with multi-get is enough. A separate pool means a post-cache problem cannot evict timelines.",
+      "how": "A feed open ends in one multi-get of fifty post IDs. A miss reads the posts store and fills the cache with a lifetime of a day and jitter. An edit or a delete does not rewrite the cache; a delete is filtered on read.",
+      "detail": "Keys are `post:{id}`. The hot set is the last two days of posts, a few hundred gigabytes across the pool.",
+      "rejected": [
+        [
+          "Hydrating from the posts store directly",
+          "Fifty point reads per feed open at 90,000 opens a second is 4.5 million reads a second on the primary store."
+        ],
+        [
+          "The same Redis cluster as the timelines",
+          "One eviction policy and one failure domain for two different jobs. A post-cache stampede would take timelines with it."
+        ]
+      ],
+      "summary": [
+        "Post cache",
+        "Memcached, own pool",
+        "Direct reads; shared Redis",
+        "Multi-get; isolated"
+      ],
+      "course": "theory/05 (caching)",
+      "parts": "05",
+      "drill": [
+        "One post goes viral and every reader's feed contains it. What happens to the one cache key holding it?",
+        "It becomes a hot key: one node answers every hydrate for that post. A small in-process cache on the feed service for the hottest few thousand posts, with a short lifetime, takes the load before it reaches the node.",
+        "an in-process cache for the hottest posts in front of the key"
+      ]
+    },
+    {
+      "id": "fan-out",
+      "heading": "Fan-out workers: Kafka consumers in Go",
+      "kicker": "Technology · fan-out",
+      "title": "Go consumers on Kubernetes: tiered and idempotent",
+      "pick": "Go workers on Kubernetes, scaled on lag",
+      "why": "Fan-out is the 120,000 inserts a second. Idempotent inserts make a retry harmless, and scaling on consumer lag keeps a burst from becoming a delay.",
+      "how": "Workers read PostCreated and check the author's tier. Ordinary: page through followers and insert the post ID into each active follower's timeline. Celebrity: one entry in the celebrity list. The autoscaler follows consumer lag.",
+      "detail": "The worker inserts in pipelines, a page of followers at a time. The insert is a sorted-set add keyed by post ID, so a redelivered event writes the same member. Tier is decided from the follower count with a margin, to stop flapping.",
+      "rejected": [
+        [
+          "Push to every follower, always",
+          "A 100-million-follower post is 100 million inserts: minutes of backlog behind it for everyone else."
+        ],
+        [
+          "Pull for everyone",
+          "Every feed open reads 200 followees' recent posts: 90,000 opens a second times 200 merges."
+        ],
+        [
+          "Spark or Flink for the fan-out",
+          "A stream engine adds state and a cluster for a loop that reads an event and writes pipelines."
+        ]
+      ],
+      "summary": [
+        "Fan-out",
+        "Go consumers, tiered",
+        "Push all; pull all",
+        "Celebrities pulled"
+      ],
+      "course": "theory/06 (messaging) and theory/07 (correctness under failure)",
+      "parts": "06, 07"
+    },
+    {
+      "id": "feed-service",
+      "heading": "Feed service: stateless Go behind gRPC",
+      "kicker": "Technology · feed service",
+      "title": "A stateless feed service with a deadline on every hop",
+      "pick": "Go services on Kubernetes, gRPC inside, a deadline propagated",
+      "why": "The feed open has a 200 millisecond p99 across five dependencies. A deadline passed down every call and a fallback at each hop is how it stays inside the budget.",
+      "how": "The service reads the timeline, reads the celebrity lists of the authors the viewer follows, merges, filters blocked and deleted posts, asks ranking, and hydrates fifty posts. Each downstream call gets what is left of a 200 millisecond budget. If ranking misses its deadline the page is served in time order.",
+      "detail": "Cursor, never an offset: it carries the last score and post ID. Pods scale on feed opens per second.",
+      "rejected": [
+        [
+          "A monolith with the post service",
+          "A slow ranker or a flood of posts would take the read path down with it. Different scaling, different failure domains."
+        ],
+        [
+          "Computing the ranked feed in the background",
+          "Fresh for nobody: the ranker's score depends on the second the viewer opens the app."
+        ]
+      ],
+      "summary": [
+        "Feed service",
+        "Go, gRPC, deadlines",
+        "Monolith",
+        "Degrade, do not fail"
+      ],
+      "course": "theory/08 (reliability and operations)",
+      "parts": "08",
+      "drill": [
+        "Ranking now takes 300 milliseconds. What does the viewer get?",
+        "The feed service's deadline fires at 80 milliseconds for ranking, and it serves the merged timeline in time order. The page is slightly worse and on time.",
+        "the ranking deadline fires; serve time order"
+      ]
+    },
+    {
+      "id": "graph-ranking",
+      "heading": "The graph and ranking: other teams' services",
+      "kicker": "Technology · graph and ranking",
+      "title": "Two services we call and do not own, behind a contract",
+      "pick": "gRPC contracts with a deadline, a cache and a fallback each",
+      "why": "Both are another team's system on another schedule. A contract and a fallback keep their bad day from becoming ours.",
+      "how": "The graph answers followers for fan-out and followees for reads, with blocks. We cache its answers briefly and treat a block as a correctness input, checked on read. Ranking receives about 200 candidates and returns scores inside 80 milliseconds. Each has a circuit breaker and a defined fallback: cached followees for the graph, time order for ranking.",
+      "detail": "The graph's contract is SD-14. A block is applied on read, so the cache lifetime cannot show a blocked author.",
+      "rejected": [
+        [
+          "Rebuilding the graph inside the feed",
+          "A second copy of the follow data that would drift from the first. Own the contract, not the data."
+        ],
+        [
+          "No fallback for ranking",
+          "The feed's availability would be the ranker's availability."
+        ]
+      ],
+      "summary": [
+        "Graph, ranking",
+        "gRPC with fallback",
+        "No fallback",
+        "Their outage is not ours"
+      ],
+      "course": "theory/08 (reliability and operations)",
+      "parts": "08"
+    }
+  ],
+  "challenges": {
+    "1": [
+      "Push to every follower for every author",
+      "a 100-million-follower post is 100 million inserts, and everyone else waits behind them."
+    ],
+    "2": [
+      "One fixed follower-count threshold",
+      "accounts near the line flip between push and pull and get delivered twice or not at all."
+    ],
+    "3": [
+      "Deleting from every follower's timeline",
+      "the delete fans out as wide as the post did; filtering on read makes cleanup cosmetic."
+    ],
+    "4": [
+      "Exactly-once delivery from the broker alone",
+      "the broker cannot see the timeline write; an idempotent insert gives the same result without it."
+    ],
+    "5": [
+      "Replicating every timeline synchronously",
+      "it doubles the write cost of 60,000 inserts a second for data we can rebuild."
+    ],
+    "6": [
+      "Waiting for ranking however long it takes",
+      "the feed's p99 would become the ranker's p99; a deadline and a fallback cap it."
+    ],
+    "7": [
+      "A larger timeline: 2,000 IDs per user",
+      "it multiplies memory by four for the rare returning user, who is better served by a pull."
+    ],
+    "8": [
+      "Dashboards of CPU and error rate",
+      "every box can be green while a post takes ten minutes to appear; probe post to visible."
+    ]
+  }
+}

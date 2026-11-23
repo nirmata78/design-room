@@ -1,7 +1,7 @@
 # SD-08 · News feed / home timeline: reference-solution video
 
-Staff bar (L6/L7), manager layer marked AUX. **Length 73:52**, 18 chapters, **164 numbered slides**, **9,087 spoken words**
-(candidate 83.8 %, interviewer 4.0 %, key line 7.9 %, coach 4.3 %). Built 2026-11-20 in the SD-94 reference format. Scripted
+Staff bar (L6/L7), manager layer marked AUX. **Length 1:31:59**, 19 chapters, **176 numbered slides** in **586 reveal frames**, **10,915 spoken words**
+(candidate 83.1 %, interviewer 4.1 %, key line 6.6 %, coach 6.2 %). Built 2026-11-20 in the SD-94 reference format. Scripted
 walkthrough with synthetic voices; figures are illustrative, not any company's numbers. **The technical content has not been
 reviewed by a person, and the video has not been watched end to end.** It replaces the earlier mock-round videos, which have
 been retired.
@@ -14,23 +14,24 @@ about 10,900 words). Outline and budget: [`OUTLINE.md`](OUTLINE.md).
 | Time | Chapter |
 |---|---|
 | 00:00 | 0 Cold open |
-| 03:07 | 1 Requirements and scope |
-| 08:07 | 2 Estimates |
-| 13:40 | 3 Theory |
-| 22:40 | 4 API and entities |
-| 26:14 | 5 High-level design |
-| 36:24 | 6 Bridge |
-| 37:05 | 7 Challenges |
-| 37:24 | 7.1 Challenge 1: The celebrity post |
-| 41:32 | 7.2 Challenge 2: Where is the line, and who crosses it? |
-| 46:03 | 7.3 Challenge 3: Delete, block, unfollow |
-| 49:39 | 7.4 Challenge 4: Twice, or never |
-| 53:11 | 7.5 Challenge 5: A timeline shard is gone |
-| 57:33 | 7.6 Challenge 6: The ranker takes 300 ms |
-| 61:24 | 7.7 Challenge 7: Catch up on the last 48 hours |
-| 64:55 | 7.8 Challenge 8: How would you know the feed got worse? |
-| 68:54 | 8 Build cost (AUX) |
-| 71:03 | 9 Recap |
+| 03:11 | 1 Requirements and scope |
+| 08:13 | 2 Estimates |
+| 13:50 | 3 Theory |
+| 23:05 | 4 API and entities |
+| 26:44 | 5 High-level design |
+| 37:33 | 5.1 Components and technologies |
+| 51:27 | 6 Bridge |
+| 52:08 | 7 Challenges |
+| 52:27 | 7.1 Challenge 1: The celebrity post |
+| 56:59 | 7.2 Challenge 2: Where is the line, and who crosses it? |
+| 1:01:49 | 7.3 Challenge 3: Delete, block, unfollow |
+| 1:05:44 | 7.4 Challenge 4: Twice, or never |
+| 1:09:36 | 7.5 Challenge 5: A timeline shard is gone |
+| 1:14:20 | 7.6 Challenge 6: The ranker takes 300 ms |
+| 1:18:32 | 7.7 Challenge 7: Catch up on the last 48 hours |
+| 1:22:22 | 7.8 Challenge 8: How would you know the feed got worse? |
+| 1:26:42 | 8 Build cost |
+| 1:28:57 | 9 Recap |
 
 ## The eight challenges
 
@@ -87,3 +88,15 @@ code with a language flag): edit the sources, not `video-slides.html` or the scr
 | 48-hour catch-up curveball | cue sheet | C7 |
 | Rate limiting, authentication, CDN for media | book (wrap-up) | Dismissed aloud in ch. 1 OUT: standard edge concerns, not this question's grade |
 | What changed since the book | — | Ranked feeds with a candidate-generation stage are now the default; "chronological only" is a user setting, which C7 covers |
+
+## Retrofit, 2026-11-22
+
+Brought to the current standard by `RETROFIT.md`: the Google theme (`video.css`, `google-theme.css`), progressive reveal (every table row,
+card, trace event and figure step appears as it is spoken), sidecar captions (`.srt` and `.vtt` beside the MP4, nothing burned in), the
+technology chapter **5.1** generated from `../stack.json` (container view with technologies, one slide per technology with its rejected
+alternatives, the stack on one slide, the drill interlude) and a **Rejected** line on every challenge's fix slide.
+
+**109 of the 176 slides were written before reveal markers existed; their markers were placed automatically** (`dsl.META["automark"]`:
+the narration is cut at sentences and dealt to the reveal units by word overlap). Watch those slides and move a marker by hand where one
+lands badly. Not done in this pass: the C4 context moved to the end of chapter 1, a mechanism map in the theory chapter, extra sequences per
+requirement, component views. The previous sources are kept in `.v1-retrofit-2026-11-22/` until the author has watched this version.

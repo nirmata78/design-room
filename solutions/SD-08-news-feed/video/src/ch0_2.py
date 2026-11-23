@@ -13,12 +13,12 @@ S(dia("Why it is harder than it looks", "A few accounts carry most of the write 
  "C: If I precompute feeds by copying each post into every follower's list, the cost of one post is its author's follower count. For the median author that is nothing. For the account on the bottom row it is a hundred million writes, for one post. The tail decides the architecture, not the average."], cls="dia")
 
 S(plain("Before the design", "What this question grades", table(["Axis", "Weak signal", "Strong signal"], [
-  ["<b>Requirements</b>", "“Posts from friends, sorted by time”", "Asks the follower distribution and finds the tail; asks “twice or never: which is worse?”; numbers on freshness and latency"],
-  ["<b>Correctness</b>", "Copies of posts treated as the truth", "IDs only, hydrated from the source; filters on read; idempotent inserts; a stable cursor"],
-  ["<b>Trade-offs</b>", "Picks push or pull and defends it", "The hybrid with a threshold derived from arithmetic, and what it costs"],
-  ["<b>Depth</b>", "Stops at “add a cache”", "Crossing the threshold with no backfill; rebuild under a stampede; ranking under a deadline"],
-  ["<b>Operations</b>", "Uptime of the feed API", "Freshness as an SLI from synthetic accounts; quality metrics; the memory bill and its lever"]], "bt sm sig") +
-  grade("The word “hybrid” earns nothing on its own. The line, the arithmetic behind it and the crossing rules do.")), [
+  ["<b>Requirements</b>", "“Friends' posts, by time”", "Finds the follower tail; asks “twice or never?”; numbers on freshness"],
+  ["<b>Correctness</b>", "Copies treated as the truth", "IDs hydrated from the source; filter on read; a stable cursor"],
+  ["<b>Trade-offs</b>", "Push or pull, defended", "A hybrid line derived from arithmetic, and its cost"],
+  ["<b>Depth</b>", "Stops at “add a cache”", "Crossing the line; a rebuild stampede; ranking under a deadline"],
+  ["<b>Operations</b>", "Uptime of the feed API", "Freshness from synthetic accounts; the memory bill"]], "bt sm sig") +
+  grade("“Hybrid” earns nothing alone. The line, its arithmetic and the crossing rules do.")), [
  "N: Five axes. The weak signal is a clean push design or a clean pull design, defended well. The strong signal is the arithmetic that puts a line between them, and what happens on the read path to keep the feed correct.",
  "C: I'll keep one question in view the whole way: where does correctness live? Because a feed is full of copies, and copies go stale."])
 
@@ -162,12 +162,12 @@ S(plain("Estimates · a lost shard", "Rebuilds after losing one cache shard", '<
 
 S(plain("Estimates · summary", "Each number, and the decision it drove", table(["Number", "Decision"], [
   ["90,000 opens/s", "serve from memory"],
-  ["18 M reads/s for pure pull", "precompute for most readers; pull is the MVP and the rebuild path"],
+  ["18 M reads/s for pure pull", "precompute; pull is the MVP and the rebuild"],
   ["120,000 → 60,000 inserts/s", "push IDs to active followers only"],
   ["One post, 110 M followers ≈ 15 min", "pull celebrities"],
   ["Line at ~10⁴–10⁵ followers", "a config value, measured"],
   ["4 TB of IDs against 250 TB of bodies", "IDs in the view; hydrate from one cache"],
   ["80 of 200 ms for ranking", "a deadline and a fallback"]], "bt sm") +
-  grade("A number that never changes a decision is decoration. Each row here ends in a design choice.")), [
+  grade("A number that changes no decision is decoration.")), [
  "N: Every number on this slide ends in a decision. That is what the estimation phase is graded on.",
  "C: Serve from memory. Precompute for most, with pull as the first version and the rebuild path. Push only to active followers. Pull the celebrities, with a measured line. I-Ds, not bodies. And a deadline for ranking."])

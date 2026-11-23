@@ -16,7 +16,7 @@ INK, RED, GREEN, BLUE, PURPLE, GREY, AMBER = "#24292f", "#c8341f", "#1f8a4c", "#
 def esc(s): return html.escape(str(s))
 
 # ───────────────────────────── 1 · the carried baseline ──────────────────────────────────────────────
-b = bs.Baseline(1600, 690, size=24)
+b = bs.Baseline(1600, 690, size=26)
 A, B, C, D, E = 20, 360, 700, 1040, 1380          # columns: 150 px between joined boxes
 TOP, MID, BOT, BH = 40, 250, 460, 110
 # write lane (top)
@@ -48,7 +48,7 @@ b.edge("e6", "fanout", "timeline", "insert IDs", src="b:0.6", dst="t:0.6", at=(1
 b.edge("e7", "fanout", "celeb", "one write", src="b:0.25", dst="t:0.5", via=[(1430, 232), (1140, 232)], since=3, kind="async", at=(1290, 222))
 b.edge("e8", "reader", "feed", "GET /feed", **R)
 b.edge("e9", "feed", "reader", "50 items", src="l:0.8", dst="r:0.8", kind="resp")
-b.edge("e10", "feed", "graph", "follows, blocks", src="t:0.5", dst="b:0.5", at=(395, 400))
+b.edge("e10", "feed", "graph", "follows, blocks", src="t:0.5", dst="b:0.5", at=(285, 418))
 b.edge("e11", "feed", "postsdb", "200 author indexes", src="t:0.75", dst="l:0.75", via=[(502, 420), (640, 420), (640, 122.5)], until=1, at=(640, 280))
 b.edge("e12", "feed", "celeb", "merge", src="t:0.75", dst="b:0.25", via=[(502, 412), (1090, 412)], since=3, at=(800, 400))
 b.edge("e13", "feed", "timeline", "read IDs", src="t:0.92", dst="b:0.35", via=[(535, 440), (1450, 440)], since=2, at=(1290, 428))
@@ -121,12 +121,12 @@ bs.budget_bar(OUT / "budget.svg", [("lookups + filter", 20, "cache"), ("ranking 
 
 # ───────────────────────────── 2 · C4 ────────────────────────────────────────────────────────────────
 d = c4.Diagram(1600, 780)
-d.node("au", 60, 80, 320, 160, "person", "Authors", "Person", "About 600 posts a second; a few have 100 M followers.")
-d.node("rd", 60, 480, 320, 160, "person", "Readers", "Person", "500 M a day; about 90,000 feed opens a second at peak.")
-d.node("fs", 640, 270, 360, 210, "system", "News feed system", "Software System", "Publishes posts, keeps bounded timelines, serves a ranked feed in 200 ms.")
-d.node("rk", 1240, 60, 320, 150, "ext", "Ranking service", "External system", "Scores candidates; another team.")
-d.node("gr", 1240, 300, 320, 150, "ext", "Social graph", "External system", "Who follows whom; blocks.")
-d.node("md", 1240, 540, 320, 150, "ext", "Media CDN", "External system", "Images by URL; out of scope.")
+d.node("au", 60, 80, 320, 160, "person", "Authors", "Person", "About 600 posts a second; a few have 100 M followers.", size=24)
+d.node("rd", 60, 480, 320, 160, "person", "Readers", "Person", "500 M a day; about 90,000 feed opens a second at peak.", size=24)
+d.node("fs", 640, 270, 360, 210, "system", "News feed system", "Software System", "Publishes posts, keeps bounded timelines, serves a ranked feed in 200 ms.", size=24)
+d.node("rk", 1240, 60, 320, 150, "ext", "Ranking service", "External system", "Scores candidates; another team.", size=24)
+d.node("gr", 1240, 300, 320, 150, "ext", "Social graph", "External system", "Who follows whom; blocks.", size=24)
+d.node("md", 1240, 540, 320, 150, "ext", "Media CDN", "External system", "Images by URL; out of scope.", size=24)
 d.edge("au", "fs", "Post", "HTTPS", src="r:0.6", dst="l:0.25", at=(500, 220))
 d.edge("rd", "fs", "Open the feed", "HTTPS", src="r:0.4", dst="l:0.75", at=(500, 500))
 d.edge("fs", "rk", "Score ~200 candidates", "80 ms budget", src="r:0.2", dst="l:0.6", at=(1120, 190))
@@ -135,30 +135,41 @@ d.edge("rd", "md", "Fetch images", "HTTPS", src="b:0.5", dst="b:0.5", via=[(220,
 d.legend(40, 760, ("person", "system", "ext"))
 d.save(OUT / "c4-context.svg")
 
-d = c4.Diagram(1600, 950)
-d.boundary(30, 50, 1180, 850, "News feed system", "Software System")
-d.node("ps", 60, 100, 230, 150, "container", "Post service", "Service", "Writes post and outbox in one transaction.", size=20)
-d.node("db", 360, 100, 230, 150, "db", "Posts DB", "Sharded store", "Posts by ID; author index by time.", size=20)
-d.node("lg", 660, 100, 230, 150, "queue", "Event log", "Partitioned by author", "PostCreated, replayable.", size=20)
-d.node("fo", 960, 100, 230, 150, "container", "Fan-out workers", "Consumers", "Route by tier; push IDs to active followers.", size=20)
-d.node("tl", 960, 400, 230, 150, "db", "Timeline cache", "In memory", "500 post IDs per user.", size=20)
-d.node("cc", 660, 400, 230, 150, "db", "Celebrity posts", "In memory, replicated", "Last 100 IDs per author.", size=20)
-d.node("pc", 360, 400, 230, 150, "db", "Post cache", "In memory", "Hydrated posts by ID.", size=20)
-d.node("fs", 60, 640, 530, 170, "container", "Feed service", "Stateless service", "Merge timeline and celebrities, filter, rank under a deadline, hydrate, cursor.", size=20)
-d.node("rk", 1300, 640, 260, 150, "ext", "Ranking", "External", "Scores, 80 ms.")
-d.node("gr", 1300, 300, 260, 150, "ext", "Social graph", "External", "Followers, blocks.")
-d.edge("ps", "db", "post + outbox", "SQL", src="r", dst="l", at=(325, 85))
-d.edge("db", "lg", "outbox relay", "CDC", src="r", dst="l", at=(625, 85))
-d.edge("lg", "fo", "PostCreated", "consume", src="r", dst="l", at=(925, 85))
-d.edge("fo", "tl", "insert IDs", "pipelined", src="b", dst="t", at=(1075, 320))
-d.edge("fo", "cc", "one write", "", src="b:0.2", dst="t:0.6", at=(880, 330))
-d.edge("fo", "gr", "followers", "paged", src="r:0.8", dst="t:0.5", via=[(1430, 220)], at=(1430, 270))
-d.edge("fs", "tl", "timeline", "", src="r:0.2", dst="b:0.5", via=[(1075, 674)], at=(980, 600))
-d.edge("fs", "cc", "celebrities", "", src="t:0.85", dst="b:0.5", via=[(510, 600), (775, 600)], at=(700, 588))
-d.edge("fs", "pc", "hydrate 50", "multi-get", src="t:0.6", dst="b:0.5", at=(430, 600))
-d.edge("fs", "rk", "rank", "deadline", src="r:0.6", dst="l:0.5", at=(950, 730))
-d.legend(40, 930, ("container", "db", "queue", "ext"))
-d.save(OUT / "c4-containers.svg")
+def containers(name):
+    """The container view (C4 level 2), laid out for 1080p (2026-11-22): 24 px titles, every label >= 18 px on the frame."""
+    d = c4.Diagram(1640, 830)
+    d.boundary(20, 6, 1250, 804, "News feed system", "Software System")
+    W, H, S = 270, 170, 24
+    d.node("ps", 50, 100, W, H, "container", "Post service", "Service", "Writes post and outbox in one transaction.", size=S)
+    d.node("db", 360, 100, W, H, "db", "Posts DB", "Sharded store", "Posts by ID; author index by time.", size=S)
+    d.node("lg", 670, 100, W, H, "queue", "Event log", "Partitioned by author", "PostCreated, replayable.", size=S)
+    d.node("fo", 980, 100, W, H, "container", "Fan-out workers", "Consumers", "Route by tier; push IDs to active followers.", size=S)
+    d.node("pc", 360, 370, W, H, "db", "Post cache", "In memory", "Hydrated posts by ID.", size=S)
+    d.node("cc", 670, 370, W, H, "db", "Celebrity posts", "In memory, replicated", "Last 100 IDs per author.", size=S)
+    d.node("tl", 980, 370, W, H, "db", "Timeline cache", "In memory", "500 post IDs per user.", size=S)
+    d.node("fs", 50, 600, 580, 150, "container", "Feed service", "Stateless service", "Merge timeline and celebrities, filter, rank under a deadline, hydrate, cursor.", size=S)
+    d.node("gr", 1330, 370, W, 150, "ext", "Social graph", "External", "Followers, blocks.", size=S)
+    d.node("rk", 1330, 600, W, 150, "ext", "Ranking", "External", "Scores, 80 ms.", size=S)
+    d.edge("ps", "db", "post + outbox", "SQL", src="r", dst="l", at=(340, 66))
+    d.edge("db", "lg", "outbox relay", "CDC", src="r", dst="l", at=(650, 66))
+    d.edge("lg", "fo", "PostCreated", "consume", src="r", dst="l", at=(960, 66))
+    d.edge("fo", "tl", "insert IDs", "pipelined", src="b:0.7", dst="t:0.7", at=(1169, 318))
+    d.edge("fo", "cc", "one write", "", src="b:0.2", dst="t:0.6", at=(925, 318))
+    d.edge("fo", "gr", "followers", "paged", src="r:0.8", dst="t:0.5", via=[(1465, 236)], at=(1465, 300))
+    d.edge("fs", "tl", "timeline", "", src="r:0.2", dst="b:0.5", via=[(1115, 630)], at=(880, 618))
+    d.edge("fs", "cc", "celebrities", "", src="t:0.85", dst="b:0.5", via=[(543, 570), (805, 570)], at=(690, 560))
+    d.edge("fs", "pc", "hydrate 50", "multi-get", src="t:0.55", dst="b:0.3", at=(400, 566))
+    d.edge("fs", "rk", "rank", "deadline", src="r:0.6", dst="l:0.5", at=(1000, 668))
+    d.legend(1330, 110, ("container", "db", "queue", "ext"), vertical=True)
+    d.save(OUT / name)
+
+containers("c4-containers.svg")
+# the same container view with the technologies (labels from ../stack.json)
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / 'src')); import stack
+c4.Diagram.OVERRIDE = {k: (v[1], v[2]) for k, v in stack.C4.items()}
+containers("c4-containers-tech.svg")
+c4.Diagram.OVERRIDE = {}
+
 
 # ───────────────────────────── 3 · sequences ─────────────────────────────────────────────────────────
 def seq(name, parts, steps, **kw):
@@ -281,7 +292,7 @@ seq("seq-probe",
      ("n", "mt", "mt", "mid tier: not visible after 5 min: page, with the tier", "red")])
 
 # ───────────────────────────── 4 · data models ───────────────────────────────────────────────────────
-c = er.Chen(1600, 940, size=26)
+c = er.Chen(1960, 920, size=28)          # wider than tall: the slide is 16:9; the legend gets its own column
 c.entity("u", 300, 380, "USER"); c.entity("p", 1150, 380, "POST"); c.entity("t", 1150, 740, "TIMELINE ENTRY", weak=True)
 c.rel("au", 720, 380, "AUTHORS"); c.rel("fo", 300, 700, "FOLLOWS"); c.rel("bl", 300, 110, "BLOCKS"); c.rel("in", 720, 740, "SEES", identifying=True)
 c.attr("uid", 100, 300, "user_id", of="u", key=True); c.attr("tier", 100, 470, "tier", of="u", derived=True)
@@ -292,8 +303,8 @@ c.link("u", "au", "1"); c.link("au", "p", "N", total=True)
 c.link("u", "fo", "M", src="b", dst="t", role="follower"); c.link("u", "bl", "M", src="t", dst="b")
 c.link("u", "in", "1", src="b:0.8", dst="l"); c.link("in", "t", "N", total=True)
 c.link("p", "t", "1", src="b", dst="t")
-c.legend(1235, 20)
-c.note(420, 850, 1000, "Timeline entries are derived: delete them all and the feed can be rebuilt from posts and follows.")
+c.legend(1640, 70, size=23, gap=36, rows=["rect", "rect2", "dia", "dia2", "oval", "key", "ovald", "dbl"])
+c.note(420, 812, 1000, "Timeline entries are derived: delete them all and the feed can be rebuilt from posts and follows.")
 c.save(OUT / "erd-chen.svg")
 
 e = er.ERD(1600, 820, size=22)

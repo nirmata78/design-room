@@ -1,4 +1,4 @@
-Push or pull? Every book says "both". This video is about what comes after that word: the arithmetic that puts the line near ten thousand followers, what happens to an account that crosses it, how a deleted post leaves millions of copies, and what the feed does when the ranker is slow or a cache shard is gone. A full reference solution at the Staff bar (L6/L7): theory, a three-version design, eight challenges that break it, and the build cost. 74 minutes, 164 numbered slides.
+Push or pull? Every book says "both". This video is about what comes after that word: the arithmetic that puts the line near ten thousand followers, what happens to an account that crosses it, how a deleted post leaves millions of copies, and what the feed does when the ranker is slow or a cache shard is gone. A full reference solution at the Staff bar (L6/L7): theory, a three-version design, eight challenges that break it, and the build cost. 92 minutes, 586 numbered slides.
 
 The thesis: a feed is a materialised view that is cheap to read for almost everyone and impossible to precompute for a few. Push post IDs to the followers of ordinary accounts, pull the celebrities at read time, say where the line is and why, and keep every correctness rule on the read path.
 
@@ -13,23 +13,24 @@ Run the round cold first. Then watch once straight through. On the second pass, 
 
 CHAPTERS
 0:00 0 Cold open
-3:07 1 Requirements and scope
-8:07 2 Estimates
-13:40 3 Theory
-22:40 4 API and entities
-26:14 5 High-level design
-36:24 6 Bridge
-37:05 7 Challenges
-37:24 7.1 Challenge 1: The celebrity post
-41:32 7.2 Challenge 2: Where is the line, and who crosses it?
-46:03 7.3 Challenge 3: Delete, block, unfollow
-49:39 7.4 Challenge 4: Twice, or never
-53:11 7.5 Challenge 5: A timeline shard is gone
-57:33 7.6 Challenge 6: The ranker takes 300 ms
-1:01:24 7.7 Challenge 7: Catch up on the last 48 hours
-1:04:55 7.8 Challenge 8: How would you know the feed got worse?
-1:08:54 8 Build cost
-1:11:03 9 Recap
+3:11 1 Requirements and scope
+8:13 2 Estimates
+13:50 3 Theory
+23:05 4 API and entities
+26:44 5 High-level design
+37:33 5.1 Components and technologies
+51:27 6 Bridge
+52:08 7 Challenges
+52:27 7.1 Challenge 1: The celebrity post
+56:59 7.2 Challenge 2: Where is the line, and who crosses it?
+1:01:49 7.3 Challenge 3: Delete, block, unfollow
+1:05:44 7.4 Challenge 4: Twice, or never
+1:09:36 7.5 Challenge 5: A timeline shard is gone
+1:14:20 7.6 Challenge 6: The ranker takes 300 ms
+1:18:32 7.7 Challenge 7: Catch up on the last 48 hours
+1:22:22 7.8 Challenge 8: How would you know the feed got worse?
+1:26:42 8 Build cost
+1:28:57 9 Recap
 
 LINKS
 Written reference design: https://github.com/nirmata78/design-room/blob/main/solutions/SD-08-news-feed/SD-08_News_Feed_Reference_Design.md

@@ -1,83 +1,80 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 940" width="1600" height="940">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1960 920" width="1960" height="920">
 <rect width="100%" height="100%" fill="#ffffff"/>
-<path d="M200.0,340.0 L152.9,321.1" fill="none" stroke="#8c959f" stroke-width="1.5"/>
-<path d="M200.0,425.0 L141.0,451.5" fill="none" stroke="#8c959f" stroke-width="1.5"/>
-<path d="M379.2,333.2 L473.4,277.6" fill="none" stroke="#8c959f" stroke-width="1.5"/>
-<path d="M1150.0,333.2 L1150.0,249.9" fill="none" stroke="#8c959f" stroke-width="1.5"/>
-<path d="M1250.0,348.0 L1338.2,319.8" fill="none" stroke="#8c959f" stroke-width="1.5"/>
-<path d="M1250.0,412.0 L1345.4,442.5" fill="none" stroke="#8c959f" stroke-width="1.5"/>
-<path d="M1295.1,740.0 L1360.3,740.0" fill="none" stroke="#8c959f" stroke-width="1.5"/>
-<path d="M400.0,380.0 L623.6,380.0" fill="none" stroke="#3d4752" stroke-width="2.2"/>
-<path d="M816.4,380.0 L1050.0,380.0" fill="none" stroke="#3d4752" stroke-width="7"/><path d="M816.4,380.0 L1050.0,380.0" fill="none" stroke="#ffffff" stroke-width="3"/>
-<path d="M300.0,426.8 L300.0,642.8" fill="none" stroke="#3d4752" stroke-width="2.2"/>
-<path d="M300.0,333.2 L300.0,167.2" fill="none" stroke="#3d4752" stroke-width="2.2"/>
-<path d="M360.0,426.8 L625.0,740.0" fill="none" stroke="#3d4752" stroke-width="2.2"/>
-<path d="M815.0,740.0 L1004.9,740.0" fill="none" stroke="#3d4752" stroke-width="7"/><path d="M815.0,740.0 L1004.9,740.0" fill="none" stroke="#ffffff" stroke-width="3"/>
-<path d="M1150.0,426.8 L1150.0,693.2" fill="none" stroke="#3d4752" stroke-width="2.2"/>
-<rect x="200.0" y="333.2" width="200.0" height="93.6" fill="#e8f0fa" stroke="#1168bd" stroke-width="2.4"/>
-<text x="300.0" y="389.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="27.3" font-weight="700" fill="#1f2328">USER</text>
-<rect x="1050.0" y="333.2" width="200.0" height="93.6" fill="#e8f0fa" stroke="#1168bd" stroke-width="2.4"/>
-<text x="1150.0" y="389.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="27.3" font-weight="700" fill="#1f2328">POST</text>
-<rect x="1004.9" y="693.2" width="290.2" height="93.6" fill="#e8f0fa" stroke="#1168bd" stroke-width="2.4"/>
-<rect x="1010.9" y="699.2" width="278.2" height="81.6" fill="none" stroke="#1168bd" stroke-width="1.8"/>
-<text x="1150.0" y="749.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="27.3" font-weight="700" fill="#1f2328">TIMELINE ENTRY</text>
-<path d="M720.0,322.8 L816.4,380.0 L720.0,437.2 L623.6,380.0 Z" fill="#fdf3e1" stroke="#a86a12" stroke-width="2.4"/>
-<text x="720.0" y="388.6" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="22.4" font-weight="700" fill="#1f2328">AUTHORS</text>
-<path d="M300.0,642.8 L396.4,700.0 L300.0,757.2 L203.6,700.0 Z" fill="#fdf3e1" stroke="#a86a12" stroke-width="2.4"/>
-<text x="300.0" y="708.6" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="22.4" font-weight="700" fill="#1f2328">FOLLOWS</text>
-<path d="M300.0,52.8 L395.0,110.0 L300.0,167.2 L205.0,110.0 Z" fill="#fdf3e1" stroke="#a86a12" stroke-width="2.4"/>
-<text x="300.0" y="118.6" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="22.4" font-weight="700" fill="#1f2328">BLOCKS</text>
-<path d="M720.0,682.8 L815.0,740.0 L720.0,797.2 L625.0,740.0 Z" fill="#fdf3e1" stroke="#a86a12" stroke-width="2.4"/>
-<path d="M720.0,688.2 L806.0,740.0 L720.0,791.8 L634.0,740.0 Z" fill="none" stroke="#a86a12" stroke-width="1.8"/>
-<text x="720.0" y="748.6" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="22.4" font-weight="700" fill="#1f2328">SEES</text>
-<ellipse cx="100.0" cy="300.0" rx="74.8" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
-<text x="100.0" y="307.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328" font-weight="700">user_id</text>
-<line x1="56.3" y1="312.9" x2="143.7" y2="312.9" stroke="#1f2328" stroke-width="1.6"/>
-<ellipse cx="100.0" cy="470.0" rx="52.2" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8" stroke-dasharray="7 5"/>
-<text x="100.0" y="477.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328">tier</text>
-<ellipse cx="520.0" cy="250.0" rx="120.0" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
-<text x="520.0" y="257.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328">last_seen_day</text>
-<ellipse cx="1150.0" cy="220.0" rx="74.8" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
-<text x="1150.0" y="227.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328" font-weight="700">post_id</text>
-<line x1="1106.3" y1="232.9" x2="1193.7" y2="232.9" stroke="#1f2328" stroke-width="1.6"/>
-<ellipse cx="1400.0" cy="300.0" rx="82.3" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
-<text x="1400.0" y="307.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328">audience</text>
-<ellipse cx="1400.0" cy="460.0" rx="67.2" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
-<text x="1400.0" y="467.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328">status</text>
-<ellipse cx="1420.0" cy="740.0" rx="59.7" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
-<text x="1420.0" y="747.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328" font-weight="700">score</text>
-<line x1="1388.8" y1="752.9" x2="1451.2" y2="752.9" stroke="#1f2328" stroke-width="1.6" stroke-dasharray="5 4"/>
-<text x="511.8" y="409.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">1</text>
-<text x="933.2" y="409.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">N</text>
-<text x="280.0" y="544.7" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">M</text>
-<text x="322.0" y="482.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="19.2" font-style="italic" fill="#57606a">follower</text>
-<text x="320.0" y="260.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">M</text>
-<text x="477.2" y="606.2" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">1</text>
-<text x="909.9" y="769.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">N</text>
-<text x="1130.0" y="569.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">1</text>
-<rect x="1239" y="12" width="36" height="16" fill="#e8f0fa" stroke="#1168bd" stroke-width="1.6"/>
-<text x="1289" y="25.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">entity</text>
-<rect x="1239" y="39" width="36" height="16" fill="#e8f0fa" stroke="#1168bd" stroke-width="1.6"/>
-<rect x="1243" y="43" width="28" height="8" fill="none" stroke="#1168bd" stroke-width="1.2"/>
-<text x="1289" y="52.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">weak entity</text>
-<path d="M1257,64 L1277,74 L1257,84 L1237,74 Z" fill="#fdf3e1" stroke="#a86a12" stroke-width="1.6"/>
-<text x="1289" y="79.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">relationship</text>
-<path d="M1257,91 L1277,101 L1257,111 L1237,101 Z" fill="#fdf3e1" stroke="#a86a12" stroke-width="1.6"/>
-<path d="M1257,96 L1267,101 L1257,106 L1247,101 Z" fill="none" stroke="#a86a12" stroke-width="1.2"/>
-<text x="1289" y="106.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">identifying relationship</text>
-<ellipse cx="1257" cy="128" rx="20" ry="9" fill="#fff" stroke="#57606a" stroke-width="1.4"/>
-<text x="1289" y="133.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">attribute</text>
-<ellipse cx="1257" cy="155" rx="20" ry="9" fill="#fff" stroke="#57606a" stroke-width="1.4"/>
-<line x1="1248" y1="158" x2="1266" y2="158" stroke="#1f2328" stroke-width="1.4"/>
-<text x="1289" y="160.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">key attribute (underlined)</text>
-<ellipse cx="1257" cy="182" rx="20" ry="9" fill="#fff" stroke="#57606a" stroke-width="1.4"/>
-<ellipse cx="1257" cy="182" rx="15" ry="5" fill="none" stroke="#57606a" stroke-width="1"/>
-<text x="1289" y="187.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">multivalued attribute</text>
-<ellipse cx="1257" cy="209" rx="20" ry="9" fill="#fff" stroke="#57606a" stroke-width="1.4" stroke-dasharray="4 3"/>
-<text x="1289" y="214.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">derived attribute</text>
-<line x1="1237" y1="236" x2="1277" y2="236" stroke="#3d4752" stroke-width="6"/><line x1="1237" y1="236" x2="1277" y2="236" stroke="#fff" stroke-width="2.4"/>
-<text x="1289" y="241.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">total participation (every one takes part)</text>
-<rect x="420" y="850" width="1000" height="88.9" rx="6" fill="#fdf3e1" stroke="#a86a12" stroke-width="1.2"/>
-<text x="434" y="880.9" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24.7" fill="#1f2328">Timeline entries are derived: delete them all and the feed can be rebuilt</text>
-<text x="434" y="914.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24.7" fill="#1f2328">from posts and follows.</text>
+<g data-k="n:u"><path d="M200.0,340.0 L156.3,322.5" fill="none" stroke="#5f6368" stroke-width="1.5"/></g>
+<g data-k="n:u"><path d="M200.0,425.0 L143.3,450.5" fill="none" stroke="#5f6368" stroke-width="1.5"/></g>
+<g data-k="n:u"><path d="M385.3,329.6 L469.9,279.6" fill="none" stroke="#5f6368" stroke-width="1.5"/></g>
+<g data-k="n:p"><path d="M1150.0,329.6 L1150.0,252.2" fill="none" stroke="#5f6368" stroke-width="1.5"/></g>
+<g data-k="n:p"><path d="M1250.0,348.0 L1334.2,321.1" fill="none" stroke="#5f6368" stroke-width="1.5"/></g>
+<g data-k="n:p"><path d="M1250.0,412.0 L1342.1,441.5" fill="none" stroke="#5f6368" stroke-width="1.5"/></g>
+<g data-k="n:t"><path d="M1304.4,740.0 L1357.4,740.0" fill="none" stroke="#5f6368" stroke-width="1.5"/></g>
+<g data-k="n:au"><path d="M400.0,380.0 L619.2,380.0" fill="none" stroke="#3c4043" stroke-width="2.2"/></g>
+<g data-k="n:au"><path d="M820.8,380.0 L1050.0,380.0" fill="none" stroke="#3c4043" stroke-width="7"/><path d="M820.8,380.0 L1050.0,380.0" fill="none" stroke="#ffffff" stroke-width="3"/></g>
+<g data-k="n:fo"><path d="M300.0,430.4 L300.0,638.4" fill="none" stroke="#3c4043" stroke-width="2.2"/></g>
+<g data-k="n:bl"><path d="M300.0,329.6 L300.0,171.6" fill="none" stroke="#3c4043" stroke-width="2.2"/></g>
+<g data-k="n:in"><path d="M360.0,430.4 L625.0,740.0" fill="none" stroke="#3c4043" stroke-width="2.2"/></g>
+<g data-k="n:in"><path d="M815.0,740.0 L995.6,740.0" fill="none" stroke="#3c4043" stroke-width="7"/><path d="M815.0,740.0 L995.6,740.0" fill="none" stroke="#ffffff" stroke-width="3"/></g>
+<g data-k="n:p"><path d="M1150.0,430.4 L1150.0,689.6" fill="none" stroke="#3c4043" stroke-width="2.2"/></g>
+<g data-k="n:u"><rect x="200.0" y="329.6" width="200.0" height="100.8" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<text x="300.0" y="390.6" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="29.4" font-weight="700" fill="#202124">USER</text></g>
+<g data-k="n:p"><rect x="1050.0" y="329.6" width="200.0" height="100.8" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<text x="1150.0" y="390.6" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="29.4" font-weight="700" fill="#202124">POST</text></g>
+<g data-k="n:t"><rect x="995.6" y="689.6" width="308.7" height="100.8" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<rect x="1001.6" y="695.6" width="296.7" height="88.8" fill="none" stroke="#4285f4" stroke-width="1.8"/>
+<text x="1150.0" y="750.6" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="29.4" font-weight="700" fill="#202124">TIMELINE ENTRY</text></g>
+<g data-k="n:au"><path d="M720.0,318.4 L820.8,380.0 L720.0,441.6 L619.2,380.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<text x="720.0" y="389.2" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="24.1" font-weight="700" fill="#202124">AUTHORS</text></g>
+<g data-k="n:fo"><path d="M300.0,638.4 L400.8,700.0 L300.0,761.6 L199.2,700.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<text x="300.0" y="709.2" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="24.1" font-weight="700" fill="#202124">FOLLOWS</text></g>
+<g data-k="n:bl"><path d="M300.0,48.4 L395.0,110.0 L300.0,171.6 L205.0,110.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<text x="300.0" y="119.2" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="24.1" font-weight="700" fill="#202124">BLOCKS</text></g>
+<g data-k="n:in"><path d="M720.0,678.4 L815.0,740.0 L720.0,801.6 L625.0,740.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<path d="M720.0,684.2 L806.0,740.0 L720.0,795.8 L634.0,740.0 Z" fill="none" stroke="#b06000" stroke-width="1.8"/>
+<text x="720.0" y="749.2" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="24.1" font-weight="700" fill="#202124">SEES</text></g>
+<g data-k="n:u"><ellipse cx="100.0" cy="300.0" rx="78.8" ry="32.2" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="100.0" y="308.1" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124" font-weight="700">user_id</text>
+<line x1="53.0" y1="313.9" x2="147.0" y2="313.9" stroke="#202124" stroke-width="1.6"/></g>
+<g data-k="n:u"><ellipse cx="100.0" cy="470.0" rx="54.5" ry="32.2" fill="#ffffff" stroke="#5f6368" stroke-width="1.8" stroke-dasharray="7 5"/>
+<text x="100.0" y="478.1" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124">tier</text></g>
+<g data-k="n:u"><ellipse cx="520.0" cy="250.0" rx="127.6" ry="32.2" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="520.0" y="258.1" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124">last_seen_day</text></g>
+<g data-k="n:p"><ellipse cx="1150.0" cy="220.0" rx="78.8" ry="32.2" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="1150.0" y="228.1" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124" font-weight="700">post_id</text>
+<line x1="1103.0" y1="233.9" x2="1197.0" y2="233.9" stroke="#202124" stroke-width="1.6"/></g>
+<g data-k="n:p"><ellipse cx="1400.0" cy="300.0" rx="87.0" ry="32.2" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="1400.0" y="308.1" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124">audience</text></g>
+<g data-k="n:p"><ellipse cx="1400.0" cy="460.0" rx="70.7" ry="32.2" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="1400.0" y="468.1" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124">status</text></g>
+<g data-k="n:t"><ellipse cx="1420.0" cy="740.0" rx="62.6" ry="32.2" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="1420.0" y="748.1" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124" font-weight="700">score</text>
+<line x1="1386.4" y1="753.9" x2="1453.6" y2="753.9" stroke="#202124" stroke-width="1.6" stroke-dasharray="5 4"/></g>
+<g data-k="n:au"><text x="509.6" y="410.6" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="28.0" font-weight="700" fill="#ea4335">1</text></g>
+<g data-k="n:au"><text x="935.4" y="410.6" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="28.0" font-weight="700" fill="#ea4335">N</text></g>
+<g data-k="n:fo"><text x="280.0" y="545.0" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="28.0" font-weight="700" fill="#ea4335">M</text></g>
+<g data-k="n:fo"><text x="322.0" y="484.6" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="23.5" font-style="italic" fill="#5f6368">follower</text></g>
+<g data-k="n:bl"><text x="320.0" y="261.2" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="28.0" font-weight="700" fill="#ea4335">M</text></g>
+<g data-k="n:in"><text x="477.3" y="608.8" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="28.0" font-weight="700" fill="#ea4335">1</text></g>
+<g data-k="n:in"><text x="905.3" y="770.6" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="28.0" font-weight="700" fill="#ea4335">N</text></g>
+<g data-k="n:p"><text x="1130.0" y="570.6" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="28.0" font-weight="700" fill="#ea4335">1</text></g>
+<g data-k="legend"><rect x="1644" y="62" width="36" height="16" fill="#e8f0fe" stroke="#4285f4" stroke-width="1.6"/>
+<text x="1694" y="78.0" font-family="Inter, Roboto, sans-serif" font-size="23" fill="#202124">entity</text>
+<rect x="1644" y="98" width="36" height="16" fill="#e8f0fe" stroke="#4285f4" stroke-width="1.6"/>
+<rect x="1648" y="102" width="28" height="8" fill="none" stroke="#4285f4" stroke-width="1.2"/>
+<text x="1694" y="114.0" font-family="Inter, Roboto, sans-serif" font-size="23" fill="#202124">weak entity</text>
+<path d="M1662,132 L1682,142 L1662,152 L1642,142 Z" fill="#fef7e0" stroke="#b06000" stroke-width="1.6"/>
+<text x="1694" y="150.1" font-family="Inter, Roboto, sans-serif" font-size="23" fill="#202124">relationship</text>
+<path d="M1662,168 L1682,178 L1662,188 L1642,178 Z" fill="#fef7e0" stroke="#b06000" stroke-width="1.6"/>
+<path d="M1662,173 L1672,178 L1662,183 L1652,178 Z" fill="none" stroke="#b06000" stroke-width="1.2"/>
+<text x="1694" y="186.1" font-family="Inter, Roboto, sans-serif" font-size="23" fill="#202124">identifying relationship</text>
+<ellipse cx="1662" cy="214" rx="20" ry="9" fill="#fff" stroke="#5f6368" stroke-width="1.4"/>
+<text x="1694" y="222.1" font-family="Inter, Roboto, sans-serif" font-size="23" fill="#202124">attribute</text>
+<ellipse cx="1662" cy="250" rx="20" ry="9" fill="#fff" stroke="#5f6368" stroke-width="1.4"/>
+<line x1="1653" y1="253" x2="1671" y2="253" stroke="#202124" stroke-width="1.4"/>
+<text x="1694" y="258.1" font-family="Inter, Roboto, sans-serif" font-size="23" fill="#202124">key attribute</text>
+<ellipse cx="1662" cy="286" rx="20" ry="9" fill="#fff" stroke="#5f6368" stroke-width="1.4" stroke-dasharray="4 3"/>
+<text x="1694" y="294.1" font-family="Inter, Roboto, sans-serif" font-size="23" fill="#202124">derived attribute</text>
+<line x1="1642" y1="322" x2="1682" y2="322" stroke="#3c4043" stroke-width="6"/><line x1="1642" y1="322" x2="1682" y2="322" stroke="#fff" stroke-width="2.4"/>
+<text x="1694" y="330.1" font-family="Inter, Roboto, sans-serif" font-size="23" fill="#202124">total participation</text></g>
+<g data-k="note:0"><rect x="420" y="812" width="1000" height="95.8" rx="6" fill="#fef7e0" stroke="#b06000" stroke-width="1.2"/>
+<text x="434" y="845.2" font-family="Inter, Roboto, sans-serif" font-size="26.6" fill="#202124">Timeline entries are derived: delete them all and the feed can be</text>
+<text x="434" y="881.2" font-family="Inter, Roboto, sans-serif" font-size="26.6" fill="#202124">rebuilt from posts and follows.</text></g>
 </svg>

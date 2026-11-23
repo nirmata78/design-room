@@ -1,0 +1,66 @@
+stack sync: up to date
+automarked 109 legacy slides (hand-place markers to refine): ['ch0_2.py:15', 'ch0_2.py:29', 'ch0_2.py:42', 'ch0_2.py:42', 'ch0_2.py:42', 'ch0_2.py:42'] …
+slides 176 frames 586 words {'C': 9074, 'I': 450, 'V': 716, 'N': 675} total 10915
+by chapter {'0': 413, '1': 601, '2': 696, '3': 1165, '4': 437, '5': 2915, '6': 81, '7': 4033, '8': 251, '9': 323}
+  voice 20/839
+  voice 40/839
+  voice 60/839
+  voice 80/839
+  voice 100/839
+  voice 120/839
+  voice 140/839
+  voice 160/839
+  voice 180/839
+  voice 200/839
+  voice 220/839
+  voice 240/839
+  voice 260/839
+  voice 280/839
+  voice 300/839
+  voice 320/839
+  voice 340/839
+  voice 360/839
+  voice 380/839
+  voice 400/839
+  voice 420/839
+  voice 440/839
+  voice 460/839
+  voice 480/839
+  voice 500/839
+  voice 520/839
+  voice 540/839
+  voice 560/839
+  voice 580/839
+  voice 600/839
+  voice 620/839
+  voice 640/839
+  voice 660/839
+  voice 680/839
+  voice 700/839
+  voice 720/839
+  voice 740/839
+  voice 760/839
+  voice 780/839
+  voice 800/839
+  voice 820/839
+/Users/neo.bsuir/Projects/design-room/solutions/SD-08-news-feed/video/news-feed-reference.mp4  1080p  91:59  19 chapters  586 frames
+  00:00  0 Cold open
+  03:11  1 Requirements and scope
+  08:13  2 Estimates
+  13:50  3 Theory
+  23:05  4 API and entities
+  26:44  5 High-level design
+  37:33  5.1 Components and technologies
+  51:27  6 Bridge
+  52:08  7 Challenges
+  52:27  7.1 Challenge 1: The celebrity post
+  56:59  7.2 Challenge 2: Where is the line, and who crosses it?
+  61:49  7.3 Challenge 3: Delete, block, unfollow
+  65:44  7.4 Challenge 4: Twice, or never
+  69:36  7.5 Challenge 5: A timeline shard is gone
+  74:20  7.6 Challenge 6: The ranker takes 300 ms
+  78:32  7.7 Challenge 7: Catch up on the last 48 hours
+  82:22  7.8 Challenge 8: How would you know the feed got worse?
+  86:42  8 Build cost
+  88:57  9 Recap
+EXIT 0 elapsed 3428s

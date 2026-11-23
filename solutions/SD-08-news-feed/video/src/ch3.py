@@ -61,8 +61,8 @@ S(plain("Theory · 5 of 6 · the options matrix", "Six approaches, one pick", ta
   ("rej", ["B · Pull with a per-reader result cache", "1 read, a merge on a miss", "1", "fine", "freshness, and the miss rate at peak"]),
   ("rej", ["C · Pure push of IDs", "1 read", "followers", "10⁸ inserts", "the first celebrity post"]),
   ("rej", ["D · Pure push of bodies", "1 read, no hydration", "followers × 1 KB", "10⁸ copies", "250 TB; every edit and delete"]),
-  ("pick", ["E · Hybrid: push IDs to active followers, pull celebrities, hydrate, filter on read", "1 read + a small merge", "≤ 10⁴–10⁵", "pulled", "a threshold set wrong and never measured; a power reader"]),
-  ("rej", ["F · Buy a managed activity-feed service", "theirs", "theirs", "theirs", "our ranking and privacy rules; cost at a billion users"])], "bt sm mx")), [
+  ("pick", ["E · Hybrid: push IDs to the active, pull celebrities, filter on read", "1 read + a small merge", "≤ 10⁴–10⁵", "pulled", "a line never measured; a power reader"]),
+  ("rej", ["F · Buy a managed feed service", "theirs", "theirs", "theirs", "our ranking and privacy rules; cost at 10⁹ users"])], "bt xs mx")), [
  "C: Six approaches, each with the failure that rules it out. A, pull with a database join: fails at any real scale. B, pull with a per-reader result cache: fine until freshness and the miss rate at peak bite. It is my first version. C, pure push of I-Ds: fails on the first celebrity post. D, pure push of bodies: two hundred and fifty terabytes, and every edit chases copies.",
  "C: E is the hybrid: push I-Ds to active followers of ordinary authors, pull celebrities, hydrate, and filter on read. It fails if the threshold is set once and never measured, and on a reader who follows hundreds of celebrities, which is challenge two. F, buy a managed feed service: it fails on our own ranking and privacy rules, and on cost at a billion users.",
  "V: I pick E, built after B as the first version.", "[pause: 0.8]"], cls="theory")

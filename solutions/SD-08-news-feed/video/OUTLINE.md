@@ -403,3 +403,21 @@ for seconds of eventual consistency, and every degraded mode — slow ranking, l
 coach 4.3 %. Words per chapter: cold open 413 · requirements 601 · estimates 696 · theory 1,165 · API 437 · design 1,267 ·
 bridge 81 · challenges 3,853 (C1 514, C2 574, C3 420, C4 424, C5 534, C6 454, C7 422, C8 471, intro 40) · build cost 251 ·
 recap 323. Under the 10,700-word plan by about 15 %, mostly in the API chapter and the challenges; every beat is present.
+
+## 5.1 Components and technologies (retrofit, 2026-11-22)
+
+<!-- stack:outline -->
+
+| Container | Choice | How it is built | Rejected | Theory part |
+|---|---|---|---|---|
+| Posts DB | PostgreSQL 16, sharded by post ID; Cassandra for the author index | Each shard is a PostgreSQL primary with a synchronous standby in another zone; the post row and an outbox row go in one transaction | One PostgreSQL primary; DynamoDB for everything; Cassandra for posts too | 03, 04 |
+| Event log | Kafka, 64 partitions keyed by author, replication factor three | A relay reads the outbox through change data capture and publishes PostCreated, keyed by author | RabbitMQ; The post service calling fan-out directly; Pub-Sub or Kinesis | 06 |
+| Timeline cache | Redis Cluster, a sorted set per viewer, partitioned by viewer | Each viewer has a sorted set of their 500 newest post IDs, scored by time | A relational table per viewer; A Cassandra row per viewer; Memcached | 05, 03 |
+| Post cache | Memcached, a separate pool from the timelines | A feed open ends in one multi-get of fifty post IDs | Hydrating from the posts store directly; The same Redis cluster as the timelines | 05 |
+| Fan-out workers | Go workers on Kubernetes, scaled on lag | Workers read PostCreated and check the author's tier | Push to every follower, always; Pull for everyone; Spark or Flink for the fan-out | 06, 07 |
+| Feed service | Go services on Kubernetes, gRPC inside, a deadline propagated | The service reads the timeline, reads the celebrity lists of the authors the viewer follows, merges, filters blocked and deleted posts, asks ranking, and hydrates fifty posts | A monolith with the post service; Computing the ranked feed in the background | 08 |
+| The graph and ranking | gRPC contracts with a deadline, a cache and a fallback each | The graph answers followers for fan-out and followees for reads, with blocks | Rebuilding the graph inside the feed; No fallback for ranking | 08 |
+
+Fix-slide rejections: 1: Push to every follower for every author; 2: One fixed follower-count threshold; 3: Deleting from every follower's timeline; 4: Exactly-once delivery from the broker alone; 5: Replicating every timeline synchronously; 6: Waiting for ranking however long it takes; 7: A larger timeline: 2,000 IDs per user; 8: Dashboards of CPU and error rate.
+
+<!-- /stack:outline -->

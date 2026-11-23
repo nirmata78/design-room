@@ -17,8 +17,8 @@ S(plain(K(5, "the trace"), "The recovery becomes the outage", '<pre class="trace
  "C: The trace. At eight, a shard with five million users' timelines is lost. A fifth of them open within ten minutes: seventeen hundred rebuilds a second, each reading two hundred author indexes, three hundred and forty thousand reads a second. The author index p-ninety-nine goes from five milliseconds to four hundred. And every reader's celebrity merge waits on that same store. One lost shard has become everyone's outage."])
 
 S(dia(K(5, "the fix"), "Rebuild by pull, coalesced, rate-limited, degraded beyond the limit", "ch5-fix",
-      extra=strip(("fixb", "Mechanism", "A miss triggers a rebuild through the pull path, written back to the cache. One rebuild in flight per user. A global rebuild rate limit. Over it: a degraded feed now, a rebuild later."),
-                  ("whyb", "Property", "L3 for the lost users, L2 for everyone else. The blast radius is set by the rate limit, not by how many users open."))), [
+      extra=strip(("fixb", "Mechanism", "A miss rebuilds by pull: one per user, under a global rate limit; over it, a degraded feed."),
+                  ("whyb", "Property", "L3 for the lost users, L2 for the rest: the rate limit sets the blast radius."))), [
  "C: The fix. A timeline miss triggers a rebuild through the pull path, the same code as version one, and writes the result back. The new rebuild box. Requests are coalesced, so one user tapping three times starts one rebuild. A global rate limit caps the load on the author indexes. And anyone over the limit gets a degraded feed immediately: their celebrities plus the recent posts of their top twenty followees by interaction, marked for a full rebuild later."], cls="dia")
 
 S(dia(K(5, "sequence"), "A token for each rebuild; a degraded feed without one", "seq-rebuild"), [
@@ -104,8 +104,8 @@ S(plain(K(7, "the case"), "Why the view can't answer it", table(["Needed for cat
  "C: The case, as a table. Catch-up needs every post from my followees in forty-eight hours, perhaps two thousand. The timeline holds at most five hundred. It needs time order; the timeline is ranked. It needs celebrities; they were never in it. And a returning user has no timeline at all."])
 
 S(dia(K(7, "the fix"), "Go to the source of truth, not into the cache", "ch7-fix",
-      extra=strip(("fixb", "Mechanism", "Catch-up merges the followees' author indexes for the window, the same pull path as the rebuild, in time order, filtered by the same visibility rules, cached per user for minutes."),
-                  ("whyb", "Why it works", "The ranked view keeps its bounds and its cost. The new query costs what it costs, once per use, where its data lives."))), [
+      extra=strip(("fixb", "Mechanism", "Catch-up merges the followees' author indexes for the window, cached per user."),
+                  ("whyb", "Why it works", "The ranked view keeps its bounds; the new query pays its own cost."))), [
  "C: The fix: go to the source of truth. Catch-up merges the followees' author indexes for the window, the green arrow from the feed service to the posts store. It is the same pull path as the rebuild. In time order, paginated by time and post I-D, filtered by the same visibility rules, and cached per user for ten minutes. The ranked feed is untouched."], cls="dia")
 
 S(dia(K(7, "sequence"), "Cached result, or the rebuild path", "seq-catchup"), [
@@ -139,8 +139,8 @@ S(plain(K(8, "the trace"), "A routing bug nobody sees", '<pre class="trace"><spa
  "C: The trace. A change to the tier job marks thirty percent of mid-tier authors as pull, by mistake. No errors. Latency unchanged. Their posts now reach followers only through the read merge, and the merge lists only true celebrities, so they are never shown. Engagement drifts down two percent over a week, and a product manager is the one who notices."])
 
 S(dia(K(8, "the fix"), "Measure the promise: post-to-visible time, per tier", "ch8-fix",
-      extra=strip(("fixb", "Mechanism", "Synthetic authors in every tier post every minute; synthetic followers open the feed and time the post's arrival. That is the freshness SLI, per tier: p95 under 5 s."),
-                  ("whyb", "Why it works", "The probe walks the real path end to end, so a routing mistake shows in one tier within minutes."))), [
+      extra=strip(("fixb", "Mechanism", "Synthetic authors post each minute per tier; followers time the arrival: p95 under 5 s."),
+                  ("whyb", "Why it works", "The probe walks the real path, so a routing bug shows within minutes."))), [
  "C: The fix. Measure the promise. Synthetic authors, one in every tier, post every minute through the real path. Synthetic followers open the feed and time the post's arrival. That is the freshness indicator, per tier, with a target of five seconds at p-ninety-five. In this case, the mid-tier probe stops arriving within minutes of the change."], cls="dia")
 
 S(dia(K(8, "sequence"), "Post, deliver, look, time it", "seq-probe"), [
@@ -151,8 +151,8 @@ S(plain(K(8, "symptom pairs"), "Two metrics, one conclusion", table(["When you s
   ["freshness bad for one tier", "lag flat", "a routing bug: this case"],
   ["ranking fallback up", "ranking p99 normal", "the deadline is misconfigured"],
   ["author-index reads up", "timeline hit rate down", "a rebuild wave: a lost shard"],
-  ["engagement down", "fallback, freshness, empty-feed rate all normal", "a ranking model change; ranking's to own"]], "bt sm") +
-  strip(("whyb", "Quality, not uptime", "Empty-feed rate, fallback rate, share of items from close ties, engagement per session against its seasonal baseline."), cols="one")), [
+  ["engagement down", "fallback, freshness, empty-feed rate all normal", "a ranking model change; ranking's to own"]], "bt xs") +
+  strip(("whyb", "Quality, not uptime", "Empty feeds, fallbacks, close-tie share, engagement."), cols="one")), [
  "C: Then read metrics in pairs. Fan-out lag up with the post rate flat: workers are slow, not traffic. Freshness bad for one tier with lag flat: a routing bug, this case. Fallback up with ranking's latency normal: a misconfigured deadline. Author-index reads up with the timeline hit rate down: a rebuild wave. Engagement down with everything else normal: a model change, and ranking's to own.",
  "C: And quality metrics, not uptime: empty-feed rate, fallback rate, the share of items from close ties, and engagement per session against its seasonal baseline."])
 

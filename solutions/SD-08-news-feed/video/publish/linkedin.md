@@ -7,7 +7,7 @@ Post from a computer, after the YouTube video is public. The link is still pendi
 ```text
 Every news feed answer says "hybrid push and pull". The grade is on the line between them, and nobody draws it.
 
-I've published a 74-minute reference solution for the news feed question at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on 164 numbered slides.
+I've published a 92-minute reference solution for the news feed question at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on 586 numbered slides.
 
 The idea that unlocks it: one celebrity post is a hundred million writes, about fifteen minutes of a whole fan-out fleet. So the line is set from both sides of the arithmetic, crossing it needs no backfill, and correctness (deletes, blocks) lives on the read path, never in the copies.
 
@@ -36,5 +36,5 @@ Written reference design, stage by stage: https://github.com/nirmata78/design-ro
 Run this round yourself, with an AI interviewer that won't help you: https://github.com/nirmata78/design-room
 ```
 
-**Media: attach the reference design.** In the post composer, More (+) → Add a document → `../../SD-08_News_Feed_Reference_Design.pdf` (30 pages, 2.2 MB; limit 300 pages, 100 MB).
+**Media: attach the reference design.** In the post composer, More (+) → Add a document → `../../SD-08_News_Feed_Reference_Design.pdf` (35 pages, 2.2 MB; limit 300 pages, 100 MB).
 Document title, shown on the viewer: **The news feed: a Staff-level reference design**. A post carries one attachment, so the video stays a link in the text, and the document is what shows in the feed.
