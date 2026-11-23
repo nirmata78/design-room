@@ -1,0 +1,21 @@
+"Push a rollback" is the answer that fails the device-fleet question. A device in a crash loop never hears it.
+
+I've published a 62-minute reference solution for a device-fleet control plane at the Staff bar: theory, a three-version design and six challenges, on 481 numbered slides.
+
+The idea that unlocks it: design for the device you can't reach. Publish desired state instead of commands, release in waves that contain every kind of hardware and halt themselves, and let every device return to its last known good on its own.
+
+What it goes into:
+→ A/B slots, a watchdog, and what "healthy" must include
+→ Why 1 % is not a sample
+→ 200,000 devices reconnecting in one minute
+→ Connected is not converged
+
+Best on a second pass: pause after each question and answer it first.
+
+▶ [YouTube link: rerun publish_kit.py with --youtube-url]
+
+It's a scripted walkthrough with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator.
+
+What does your fleet do when an update bricks the device that received it?
+
+#SystemDesign #SoftwareEngineering #DistributedSystems

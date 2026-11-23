@@ -1,0 +1,185 @@
+{
+  "_doc": "Single source for SD-29's technology choices (compact cut). Read by video/src/stack.py for the 5.1 technology slides, the stack table, the fix-slide 'Rejected' lines and the C4 technology labels, and by `stack.py sync` for the booklet and OUTLINE.md regions.",
+  "c4": {
+    "agent": [
+      "Device agent",
+      "C, on the device",
+      "A/B slots, watchdog."
+    ],
+    "gw": [
+      "Device gateway",
+      "EMQX (MQTT), mTLS",
+      "100,000 per node."
+    ],
+    "shadow": [
+      "Shadow store",
+      "PostgreSQL",
+      "Desired, reported, v."
+    ],
+    "recon": [
+      "Reconciler",
+      "Go service",
+      "Nudges the drift."
+    ],
+    "rollout": [
+      "Rollout controller",
+      "Go service",
+      "Waves, halt rules."
+    ],
+    "api": [
+      "Fleet API",
+      "Go on Kubernetes",
+      "Operators, cohorts."
+    ],
+    "tele": [
+      "Telemetry",
+      "Kafka",
+      "Dedup by device seq."
+    ],
+    "metrics": [
+      "Metrics store",
+      "VictoriaMetrics",
+      "By cohort, not device."
+    ]
+  },
+  "stack": [
+    {
+      "id": "gw",
+      "heading": "Device gateway: an MQTT broker cluster with mutual TLS",
+      "kicker": "Technology · device gateway",
+      "title": "MQTT over mutual TLS: one session per device, a certificate per device",
+      "pick": "EMQX cluster, MQTT 5, mTLS",
+      "why": "A small, battery-friendly protocol with persistent sessions and a device identity checked at the handshake.",
+      "how": "About 100,000 connections per node, 20 nodes. Each device presents its factory certificate; topics are scoped to its own ID.",
+      "detail": "MQTT 5 session expiry keeps a device's subscriptions for 7 days across disconnects. The broker forwards reported state and telemetry to Kafka through a bridge, and admits new connections through a per-node token bucket during storms. The desired-state document is served from a cache keyed by version, so a reconnecting device that is already current costs one comparison.",
+      "rejected": [
+        [
+          "HTTP polling",
+          "Every device polls whether or not anything changed."
+        ],
+        [
+          "Kafka on devices",
+          "A server-side log, not a device protocol."
+        ]
+      ],
+      "summary": [
+        "Device gateway",
+        "EMQX (MQTT 5), mTLS",
+        "HTTP polling, Kafka",
+        "light sessions; identity at the handshake"
+      ],
+      "course": "building-blocks course, part 11 §11.6–11.7 (persistent connections) and part 16 §16.1 (authentication)",
+      "parts": "11 §11.6–11.7, 16 §16.1"
+    },
+    {
+      "id": "shadow",
+      "heading": "Shadow store: desired and reported documents in PostgreSQL",
+      "kicker": "Technology · shadow store",
+      "title": "Two documents per device, each with a version",
+      "pick": "PostgreSQL, one row per device",
+      "why": "1 M rows of a few kilobytes is small; conditional updates on a version make every desired-state change a compare-and-set.",
+      "how": "One row per device: desired and reported JSON with versions. Writers use `WHERE desired_v = $read`.",
+      "detail": "About 4 GB in total. The reconciler reads the rows where `desired_v > reported_v` through an index on that difference. History of desired documents is kept in an append-only table for audit and for rollbacks: rolling back is writing an older document as a new version.",
+      "rejected": [
+        [
+          "Redis",
+          "A lost write is a device told something nobody can see."
+        ],
+        [
+          "A replayed change log",
+          "Six weeks offline means four obsolete configs."
+        ]
+      ],
+      "summary": [
+        "Shadow store",
+        "PostgreSQL",
+        "Redis, a change log replayed",
+        "latest desired; versioned compare-and-set"
+      ],
+      "course": "building-blocks course, part 15 §15.2 (desired state and reconciliation) and part 8 §8.2 (conditional writes)",
+      "parts": "15 §15.2, 8 §8.2"
+    },
+    {
+      "id": "artifact",
+      "heading": "Firmware images: signed, on object storage behind a CDN",
+      "kicker": "Technology · firmware delivery",
+      "title": "Signed images, fetched by range, verified on the device",
+      "pick": "Object storage + CDN; images signed offline",
+      "why": "50 TB per release must not cross the gateway; a device-side signature check defeats a compromised CDN.",
+      "how": "The desired document names the URL, size, SHA-256 and an offline signature. The agent fetches by range, resumes, and verifies before writing.",
+      "detail": "Signing keys live in an HSM and sign release manifests in an offline ceremony; devices hold the public key from manufacture. Delta images reduce a typical release from 50 MB to about 8 MB.",
+      "rejected": [
+        [
+          "Images through the brokers",
+          "50 TB crowds out every control message."
+        ],
+        [
+          "Trusting TLS to the CDN",
+          "TLS proves the server, not the image."
+        ]
+      ],
+      "summary": [
+        "Firmware delivery",
+        "CDN + signed images",
+        "via brokers, TLS only",
+        "the device verifies what it runs"
+      ],
+      "course": "building-blocks course, part 7 §7.12 (integrity) and part 16 §16.4 (progressive rollout)",
+      "parts": "7 §7.12, 16 §16.4"
+    },
+    {
+      "id": "tele",
+      "heading": "Telemetry: Kafka into a time-series store, by cohort",
+      "kicker": "Technology · telemetry",
+      "title": "Health aggregated by cohort, never labelled by device",
+      "pick": "Kafka → VictoriaMetrics, cohort labels",
+      "why": "Rollout decisions compare cohorts and waves; a device-ID label would make a million series out of one metric.",
+      "how": "Summaries every 5 minutes with a per-device sequence; repeats dropped; metrics labelled by cohort, firmware and wave.",
+      "detail": "3,300 messages a second, about 3.3 MB/s: small. Dedup state is the last sequence per device, 1 M entries. A device offline for weeks uploads its buffer oldest first at a capped rate.",
+      "rejected": [
+        [
+          "Device ID as a label",
+          "1 M series per metric."
+        ],
+        [
+          "Scraping devices",
+          "Behind NAT and often offline."
+        ]
+      ],
+      "summary": [
+        "Telemetry",
+        "Kafka → VictoriaMetrics",
+        "device labels, scraping",
+        "cohort labels; per-device seq dedup"
+      ],
+      "course": "building-blocks course, part 14 §14.3 (cardinality) and part 10 §10.5 (delivery semantics)",
+      "parts": "14 §14.3, 10 §10.5"
+    }
+  ],
+  "challenges": {
+    "1": [
+      "A server-side rollback command",
+      "a device that crashes on boot never connects to receive it."
+    ],
+    "2": [
+      "Rolling out to a percentage",
+      "1 % is mostly the most common hardware; the rare revision that bricks may not be in it."
+    ],
+    "3": [
+      "Replaying every queued change in order",
+      "a device offline for six weeks applies four obsolete configs to reach the fifth."
+    ],
+    "4": [
+      "Immediate reconnect with a fixed retry",
+      "200,000 devices retry in step and the brokers never recover."
+    ],
+    "5": [
+      "Exactly-once delivery from the broker",
+      "MQTT QoS 2 covers one session; a device replaying its buffer after a reboot is a new session."
+    ],
+    "6": [
+      "Dashboards of connected devices",
+      "a device that connects but runs the wrong firmware looks exactly healthy."
+    ]
+  }
+}
