@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 820" width="1600" height="820">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<g data-k="t:man"><rect x="30" y="40" width="470" height="313" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M30,48 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v38 h-470 z" fill="#ea4335"/>
+<text x="44" y="71.28" font-family="'Roboto Mono', monospace" font-size="23.1" font-weight="700" fill="#fff">manifest</text>
+<rect x="44" y="93.6" width="41.8" height="22.8" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="64.9" y="111.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#C5221F">PK</text>
+<text x="94.8" y="111.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124" font-weight="700">manifest_id</text>
+<text x="486" y="111.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">uuid</text>
+<rect x="31" y="124" width="468" height="38" fill="#f8f9fa"/>
+<text x="94.8" y="149.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">set</text>
+<text x="486" y="149.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">name@version</text>
+<text x="94.8" y="187.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">images</text>
+<text x="486" y="187.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">digests</text>
+<rect x="31" y="200" width="468" height="38" fill="#f8f9fa"/>
+<text x="94.8" y="225.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">models</text>
+<text x="486" y="225.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">sha256s</text>
+<text x="94.8" y="263.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">map_version</text>
+<text x="486" y="263.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">int</text>
+<rect x="31" y="276" width="468" height="38" fill="#f8f9fa"/>
+<text x="94.8" y="301.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">seed</text>
+<text x="486" y="301.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">bigint</text>
+<text x="44" y="337.1" font-family="Inter, Roboto, sans-serif" font-size="18.9" font-style="italic" fill="#5f6368">immutable once written</text></g>
+<g data-k="t:run"><rect x="570" y="40" width="470" height="275" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M570,48 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v38 h-470 z" fill="#4285f4"/>
+<text x="584" y="71.28" font-family="'Roboto Mono', monospace" font-size="23.1" font-weight="700" fill="#fff">run</text>
+<rect x="584" y="93.6" width="41.8" height="22.8" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="604.9" y="111.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#C5221F">PK</text>
+<text x="634.8" y="111.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124" font-weight="700">run_id</text>
+<text x="1026" y="111.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">bigint</text>
+<rect x="571" y="124" width="468" height="38" fill="#f8f9fa"/>
+<rect x="584" y="131.6" width="41.8" height="22.8" rx="3" fill="#e8f0fe" stroke="#4285f4" stroke-width="0.8"/>
+<text x="604.9" y="149.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#1967D2">FK</text>
+<text x="634.8" y="149.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">manifest_id</text>
+<text x="1026" y="149.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">uuid</text>
+<text x="634.8" y="187.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">build</text>
+<text x="1026" y="187.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">text</text>
+<rect x="571" y="200" width="468" height="38" fill="#f8f9fa"/>
+<text x="634.8" y="225.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">kind</text>
+<text x="1026" y="225.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">gate | explore</text>
+<text x="634.8" y="263.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">status</text>
+<text x="1026" y="263.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">text</text>
+<text x="584" y="299.1" font-family="Inter, Roboto, sans-serif" font-size="18.9" font-style="italic" fill="#5f6368">PostgreSQL</text></g>
+<g data-k="t:art"><rect x="1110" y="40" width="460" height="275" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M1110,48 a8,8 0 0 1 8,-8 h444 a8,8 0 0 1 8,8 v38 h-460 z" fill="#5f6368"/>
+<text x="1124" y="71.28" font-family="'Roboto Mono', monospace" font-size="23.1" font-weight="700" fill="#fff">artifact_index</text>
+<rect x="1124" y="93.6" width="41.8" height="22.8" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="1144.9" y="111.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#C5221F">PK</text>
+<text x="1174.8" y="111.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124" font-weight="700">key</text>
+<text x="1556" y="111.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">sha256</text>
+<rect x="1111" y="124" width="458" height="38" fill="#f8f9fa"/>
+<text x="1174.8" y="149.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">blob</text>
+<text x="1556" y="149.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">gs:// path</text>
+<text x="1174.8" y="187.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">producer_run</text>
+<text x="1556" y="187.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">bigint</text>
+<rect x="1111" y="200" width="458" height="38" fill="#f8f9fa"/>
+<text x="1174.8" y="225.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">bytes</text>
+<text x="1556" y="225.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">bigint</text>
+<text x="1174.8" y="263.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">last_used</text>
+<text x="1556" y="263.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">date</text>
+<text x="1124" y="299.1" font-family="Inter, Roboto, sans-serif" font-size="18.9" font-style="italic" fill="#5f6368">Bigtable; blob written first</text></g>
+<g data-k="t:met"><rect x="30" y="470" width="470" height="237" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M30,478 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v38 h-470 z" fill="#202124"/>
+<text x="44" y="501.28" font-family="'Roboto Mono', monospace" font-size="23.1" font-weight="700" fill="#fff">metric</text>
+<rect x="44" y="523.6" width="41.8" height="22.8" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="64.9" y="541.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#C5221F">PK</text>
+<text x="94.8" y="541.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124" font-weight="700">run_id</text>
+<text x="486" y="541.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">bigint</text>
+<rect x="31" y="554" width="468" height="38" fill="#f8f9fa"/>
+<rect x="44" y="561.6" width="41.8" height="22.8" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="64.9" y="579.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#C5221F">PK</text>
+<text x="94.8" y="579.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124" font-weight="700">scenario_id</text>
+<text x="486" y="579.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">bigint</text>
+<rect x="44" y="599.6" width="41.8" height="22.8" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="64.9" y="617.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#C5221F">PK</text>
+<text x="94.8" y="617.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124" font-weight="700">name</text>
+<text x="486" y="617.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">text</text>
+<rect x="31" y="630" width="468" height="38" fill="#f8f9fa"/>
+<text x="94.8" y="655.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">value</text>
+<text x="486" y="655.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">float64</text>
+<text x="44" y="691.1" font-family="Inter, Roboto, sans-serif" font-size="18.9" font-style="italic" fill="#5f6368">ClickHouse; 6 B rows a month</text></g>
+<g data-k="t:gd"><rect x="570" y="470" width="470" height="275" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M570,478 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v38 h-470 z" fill="#4285f4"/>
+<text x="584" y="501.28" font-family="'Roboto Mono', monospace" font-size="23.1" font-weight="700" fill="#fff">gate_decision</text>
+<rect x="584" y="523.6" width="41.8" height="22.8" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="604.9" y="541.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#C5221F">PK</text>
+<text x="634.8" y="541.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124" font-weight="700">decision_id</text>
+<text x="1026" y="541.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">uuid</text>
+<rect x="571" y="554" width="468" height="38" fill="#f8f9fa"/>
+<rect x="584" y="561.6" width="41.8" height="22.8" rx="3" fill="#e8f0fe" stroke="#4285f4" stroke-width="0.8"/>
+<text x="604.9" y="579.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#1967D2">FK</text>
+<text x="634.8" y="579.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">candidate_run</text>
+<text x="1026" y="579.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">bigint</text>
+<rect x="584" y="599.6" width="41.8" height="22.8" rx="3" fill="#e8f0fe" stroke="#4285f4" stroke-width="0.8"/>
+<text x="604.9" y="617.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#1967D2">FK</text>
+<text x="634.8" y="617.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">baseline_run</text>
+<text x="1026" y="617.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">bigint</text>
+<rect x="571" y="630" width="468" height="38" fill="#f8f9fa"/>
+<text x="634.8" y="655.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">policy_version</text>
+<text x="1026" y="655.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">int</text>
+<text x="634.8" y="693.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">verdict</text>
+<text x="1026" y="693.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">pass | block</text>
+<text x="584" y="729.1" font-family="Inter, Roboto, sans-serif" font-size="18.9" font-style="italic" fill="#5f6368">append-only</text></g>
+<g data-k="t:set"><rect x="1110" y="470" width="460" height="237" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M1110,478 a8,8 0 0 1 8,-8 h444 a8,8 0 0 1 8,8 v38 h-460 z" fill="#4285f4"/>
+<text x="1124" y="501.28" font-family="'Roboto Mono', monospace" font-size="23.1" font-weight="700" fill="#fff">scenario_set</text>
+<rect x="1124" y="523.6" width="41.8" height="22.8" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="1144.9" y="541.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#C5221F">PK</text>
+<text x="1174.8" y="541.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124" font-weight="700">name</text>
+<text x="1556" y="541.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">text</text>
+<rect x="1111" y="554" width="458" height="38" fill="#f8f9fa"/>
+<rect x="1124" y="561.6" width="41.8" height="22.8" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="1144.9" y="579.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#C5221F">PK</text>
+<text x="1174.8" y="579.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124" font-weight="700">version</text>
+<text x="1556" y="579.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">int</text>
+<text x="1174.8" y="617.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">scenarios</text>
+<text x="1556" y="617.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">list</text>
+<rect x="1111" y="630" width="458" height="38" fill="#f8f9fa"/>
+<text x="1174.8" y="655.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">chunks</text>
+<text x="1556" y="655.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">sha256 list</text>
+<text x="1124" y="691.1" font-family="Inter, Roboto, sans-serif" font-size="18.9" font-style="italic" fill="#5f6368">a version never changes</text></g>
+<g data-k="r:0"><path d="M570.0,150.0 L500.0,133.9" fill="none" stroke="#5f6368" stroke-width="1.8"/>
+<circle cx="570.0" cy="150.0" r="4" fill="#5f6368"/>
+<text x="557.3" y="141.4" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="19.8" font-weight="700" fill="#ea4335">N</text>
+<circle cx="500.0" cy="133.9" r="4" fill="#5f6368"/>
+<text x="512.7" y="157.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="19.8" font-weight="700" fill="#ea4335">1</text></g>
+<g data-k="r:1"><path d="M805.0,470.0 L805.0,315.0" fill="none" stroke="#5f6368" stroke-width="1.8"/>
+<circle cx="805.0" cy="470.0" r="4" fill="#5f6368"/>
+<text x="818.0" y="461.7" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="19.8" font-weight="700" fill="#ea4335">N</text>
+<circle cx="805.0" cy="315.0" r="4" fill="#5f6368"/>
+<text x="792.0" y="338.7" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="19.8" font-weight="700" fill="#ea4335">2</text></g>
+</svg>

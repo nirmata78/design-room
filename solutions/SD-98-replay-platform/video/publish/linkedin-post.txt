@@ -1,0 +1,21 @@
+"Set the random seed" fixes one of the six ways a replay gives two answers. The grade is on the other five.
+
+I've published a 63-minute reference solution for a log-replay and regression-gate platform at the Staff bar: theory, a three-version design and six challenges, on 473 numbered slides.
+
+The idea that unlocks it: make every run a pure function of a pinned manifest. Then outputs can be cached by the hash of everything that made them, a difference between two builds means the build changed, and the gate can compare pairs instead of guessing at noise.
+
+What it goes into:
+→ Message ordering, GPU atomics and the wall clock
+→ Merkle keys: what a perception change must recompute
+→ Release day against 3,000 engineers
+→ A gate that must prove it can fail
+
+Best on a second pass: pause after each question and answer it first.
+
+▶ [YouTube link: rerun publish_kit.py with --youtube-url]
+
+It's a scripted walkthrough with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator.
+
+How do you know your own regression gate can still fail?
+
+#SystemDesign #SoftwareEngineering #DistributedSystems
