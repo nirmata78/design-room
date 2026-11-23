@@ -384,3 +384,21 @@ budget on what matters and write down what happens when something is late. And r
 | 8 Build cost (AUX) | 3.1 | 380 | 5 |
 | 9 Recap | 3.1 | 380 | 6 |
 | **Total** | **81** | **9,990** | **158** |
+
+## 5.1 Components and technologies (retrofit, 2026-11-22)
+
+<!-- stack:outline -->
+
+| Container | Choice | How it is built | Rejected | Theory part |
+|---|---|---|---|---|
+| Auth store | PostgreSQL 16, partitioned by account, hot set in memory, synchronous standby | Accounts are partitioned by account ID, so the balance, the holds and the network message a decision touches live together | Holds in the core ledger; A cache in front of the ledger; An event log as the source of truth | 03, 07 |
+| Rules in process | A sandboxed expression language in the decision service, a rule set per version | The rule service holds versions of the rule set | Rules as code; A remote rules engine | 08 |
+| Model scorer | A separate gRPC service, a 60 millisecond cut-off, a fail table | The decision service sends the request asynchronously and waits at most sixty milliseconds | Embedding a large model in the decision service; Waiting for the model | 08 |
+| Feature store | Redis Cluster, one key per card per minute, one pipelined round trip | One key per card per minute | Counters from a stream processor; A SQL count over recent transactions | 05 |
+| Event log | Outbox row in the same transaction, Kafka partitioned by account | The decision is written to an outbox row in the same transaction as the hold | Publishing after the commit; Synchronous calls to each consumer | 06 |
+| Auth gateway | Go service, mutual TLS to the processor, message mapping, deduplication | The gateway terminates mutual TLS from the processor, maps each message to our request and keys it by the network's reference | The processor's format through our services; Treating each message as new | 07 |
+| Clearing matcher | Spark batch over clearing files, matching by network reference | The matcher reads the clearing file and matches each line to its hold by the network's reference | Debiting at authorisation; Matching on amount and time | 08 |
+
+Fix-slide rejections: 1: Debiting the balance at authorisation; 2: Reading the balance, then writing it; 3: Treating every network message as new; 4: Waiting for the model; 5: Burst counters from a stream processor; 6: Rules as code, deployed; 7: Dropping advices received while we were down; 8: Dashboards of CPU and memory.
+
+<!-- /stack:outline -->

@@ -1,6 +1,6 @@
 "Check the balance and say yes" is wrong three times over in card authorisation.
 
-I've published a 75-minute reference solution for the card authorisation question, at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on 156 numbered slides.
+I've published a 90-minute reference solution for the card authorisation question, at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on 560 numbered slides.
 
 The idea that unlocks it: an approval is a promise made inside someone else's deadline. It places a hold, not a debit, and the real money moves days later in a file, often for a different amount.
 

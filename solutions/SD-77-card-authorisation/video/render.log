@@ -1,0 +1,68 @@
+stack sync: up to date
+automarked 101 legacy slides (hand-place markers to refine): ['ch0_2.py:16', 'ch0_2.py:29', 'ch0_2.py:42', 'ch0_2.py:42', 'ch0_2.py:42', 'ch0_2.py:42'] …
+slides 168 frames 560 words {'C': 9148, 'I': 514, 'V': 439, 'N': 607} total 10708
+by chapter {'0': 317, '1': 641, '2': 628, '3': 1075, '4': 531, '5': 2494, '6': 84, '7': 4349, '8': 303, '9': 286}
+  voice 20/864
+  voice 40/864
+  voice 60/864
+  voice 80/864
+  voice 100/864
+  voice 120/864
+  voice 140/864
+  voice 160/864
+  voice 180/864
+  voice 200/864
+  voice 220/864
+  voice 240/864
+  voice 260/864
+  voice 280/864
+  voice 300/864
+  voice 320/864
+  voice 340/864
+  voice 360/864
+  voice 380/864
+  voice 400/864
+  voice 420/864
+  voice 440/864
+  voice 460/864
+  voice 480/864
+  voice 500/864
+  voice 520/864
+  voice 540/864
+  voice 560/864
+  voice 580/864
+  voice 600/864
+  voice 620/864
+  voice 640/864
+  voice 660/864
+  voice 680/864
+  voice 700/864
+  voice 720/864
+  voice 740/864
+  voice 760/864
+  voice 780/864
+  voice 800/864
+  voice 820/864
+  voice 840/864
+  voice 860/864
+/Users/neo.bsuir/Projects/design-room/solutions/SD-77-card-authorisation/video/card-authorisation-reference.mp4  1080p  90:19  19 chapters  560 frames
+  00:00  0 Cold open
+  02:32  1 Requirements and scope
+  07:43  2 Estimates
+  12:46  3 Theory
+  21:35  4 API and entities
+  26:03  5 High-level design
+  35:53  5.1 Components and technologies
+  47:06  6 Bridge
+  47:49  7 Challenges
+  48:07  7.1 Challenge 1: The tip
+  53:03  7.2 Challenge 2: Two swipes, one balance
+  57:38  7.3 Challenge 3: The same message twice, and in the wrong order
+  62:02  7.4 Challenge 4: The model is slow tonight
+  67:00  7.5 Challenge 5: A burst, seconds apart
+  71:07  7.6 Challenge 6: A new attack at 2 a.m.
+  75:38  7.7 Challenge 7: We were down for twenty minutes
+  80:46  7.8 Challenge 8: Declines doubled in ten minutes
+  84:51  8 Build cost
+  87:29  9 Recap
+EXIT 0 elapsed 5999s

@@ -7,7 +7,7 @@ Post from a computer, after the YouTube video is public. The link is still pendi
 ```text
 "Check the balance and say yes" is wrong three times over in card authorisation.
 
-I've published a 75-minute reference solution for the card authorisation question, at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on 156 numbered slides.
+I've published a 90-minute reference solution for the card authorisation question, at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on 560 numbered slides.
 
 The idea that unlocks it: an approval is a promise made inside someone else's deadline. It places a hold, not a debit, and the real money moves days later in a file, often for a different amount.
 
@@ -36,5 +36,5 @@ Written reference design, stage by stage: https://github.com/nirmata78/design-ro
 Run this round yourself, with an AI interviewer that won't help you: https://github.com/nirmata78/design-room
 ```
 
-**Media: attach the reference design.** In the post composer, More (+) → Add a document → `../../SD-77_Card_Authorisation_Reference_Design.pdf` (41 pages, 3.4 MB; limit 300 pages, 100 MB).
+**Media: attach the reference design.** In the post composer, More (+) → Add a document → `../../SD-77_Card_Authorisation_Reference_Design.pdf` (46 pages, 3.3 MB; limit 300 pages, 100 MB).
 Document title, shown on the viewer: **Card authorisation: a Staff-level reference design**. A post carries one attachment, so the video stays a link in the text, and the document is what shows in the feed.

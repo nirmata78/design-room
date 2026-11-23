@@ -1,131 +1,131 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 860" width="1600" height="860">
 <rect width="100%" height="100%" fill="#ffffff"/>
-<rect x="30" y="40" width="470" height="275" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
-<path d="M30,48 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v38 h-470 z" fill="#c8341f"/>
-<text x="44" y="71.28" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="23.1" font-weight="700" fill="#fff">account</text>
-<rect x="44" y="93.6" width="34.1" height="22.8" rx="3" fill="#fdecea" stroke="#c8341f" stroke-width="0.8"/>
-<text x="61.0" y="111.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#c8341f">PK</text>
-<text x="85.1" y="111.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328" font-weight="700">account_id</text>
-<text x="486" y="111.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">bigint</text>
-<rect x="31" y="124" width="468" height="38" fill="#f6f8fa"/>
-<text x="85.1" y="149.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">posted_balance</text>
-<text x="486" y="149.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">cents</text>
-<text x="85.1" y="187.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">holds_total</text>
-<text x="486" y="187.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">cents</text>
-<rect x="31" y="200" width="468" height="38" fill="#f6f8fa"/>
-<text x="85.1" y="225.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">version</text>
-<text x="486" y="225.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">int</text>
-<text x="85.1" y="263.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">state</text>
-<text x="486" y="263.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
-<text x="44" y="299.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17.2" font-style="italic" fill="#57606a">auth store; partitioned by account_id</text>
-<rect x="560" y="40" width="480" height="351" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
-<path d="M560,48 a8,8 0 0 1 8,-8 h464 a8,8 0 0 1 8,8 v38 h-480 z" fill="#c8341f"/>
-<text x="574" y="71.28" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="23.1" font-weight="700" fill="#fff">hold</text>
-<rect x="574" y="93.6" width="34.1" height="22.8" rx="3" fill="#fdecea" stroke="#c8341f" stroke-width="0.8"/>
-<text x="591.0" y="111.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#c8341f">PK</text>
-<text x="615.1" y="111.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328" font-weight="700">account_id</text>
-<text x="1026" y="111.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">bigint</text>
-<rect x="561" y="124" width="478" height="38" fill="#f6f8fa"/>
-<rect x="574" y="131.6" width="34.1" height="22.8" rx="3" fill="#fdecea" stroke="#c8341f" stroke-width="0.8"/>
-<text x="591.0" y="149.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#c8341f">PK</text>
-<text x="615.1" y="149.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328" font-weight="700">hold_id</text>
-<text x="1026" y="149.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">bigint</text>
-<rect x="574" y="169.6" width="34.1" height="22.8" rx="3" fill="#eef1f4" stroke="#57606a" stroke-width="0.8"/>
-<text x="591.0" y="187.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#57606a">UQ</text>
-<text x="615.1" y="187.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">network_ref</text>
-<text x="1026" y="187.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
-<rect x="561" y="200" width="478" height="38" fill="#f6f8fa"/>
-<text x="615.1" y="225.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">amount</text>
-<text x="1026" y="225.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">cents</text>
-<text x="615.1" y="263.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">mcc</text>
-<text x="1026" y="263.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">char(4)</text>
-<rect x="561" y="276" width="478" height="38" fill="#f6f8fa"/>
-<text x="615.1" y="301.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">expires_at</text>
-<text x="1026" y="301.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">ts</text>
-<text x="615.1" y="339.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">state</text>
-<text x="1026" y="339.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
-<text x="574" y="375.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17.2" font-style="italic" fill="#57606a">same partition as its account</text>
-<rect x="1100" y="40" width="470" height="275" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
-<path d="M1100,48 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v38 h-470 z" fill="#c8341f"/>
-<text x="1114" y="71.28" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="23.1" font-weight="700" fill="#fff">message</text>
-<rect x="1114" y="93.6" width="34.1" height="22.8" rx="3" fill="#fdecea" stroke="#c8341f" stroke-width="0.8"/>
-<text x="1131.0" y="111.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#c8341f">PK</text>
-<text x="1155.1" y="111.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328" font-weight="700">network_ref</text>
-<text x="1556" y="111.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
-<rect x="1101" y="124" width="468" height="38" fill="#f6f8fa"/>
-<text x="1155.1" y="149.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">account_id</text>
-<text x="1556" y="149.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">bigint</text>
-<text x="1155.1" y="187.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">type</text>
-<text x="1556" y="187.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
-<rect x="1101" y="200" width="468" height="38" fill="#f6f8fa"/>
-<text x="1155.1" y="225.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">result</text>
-<text x="1556" y="225.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
-<text x="1155.1" y="263.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">at</text>
-<text x="1556" y="263.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">ts</text>
-<text x="1114" y="299.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17.2" font-style="italic" fill="#57606a">idempotency; kept past the retry window</text>
-<rect x="30" y="470" width="470" height="237" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
-<path d="M30,478 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v38 h-470 z" fill="#1168bd"/>
-<text x="44" y="501.28" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="23.1" font-weight="700" fill="#fff">card</text>
-<rect x="44" y="523.6" width="34.1" height="22.8" rx="3" fill="#fdecea" stroke="#c8341f" stroke-width="0.8"/>
-<text x="61.0" y="541.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#c8341f">PK</text>
-<text x="85.1" y="541.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328" font-weight="700">token</text>
-<text x="486" y="541.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
-<rect x="31" y="554" width="468" height="38" fill="#f6f8fa"/>
-<rect x="44" y="561.6" width="34.1" height="22.8" rx="3" fill="#fdf3e1" stroke="#a86a12" stroke-width="0.8"/>
-<text x="61.0" y="579.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#a86a12">IX</text>
-<text x="85.1" y="579.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">account_id</text>
-<text x="486" y="579.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">bigint</text>
-<text x="85.1" y="617.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">status</text>
-<text x="486" y="617.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
-<rect x="31" y="630" width="468" height="38" fill="#f6f8fa"/>
-<text x="85.1" y="655.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">limits</text>
-<text x="486" y="655.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">json</text>
-<text x="44" y="691.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17.2" font-style="italic" fill="#57606a">tokens only: the processor holds card numbers</text>
-<rect x="560" y="470" width="480" height="275" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
-<path d="M560,478 a8,8 0 0 1 8,-8 h464 a8,8 0 0 1 8,8 v38 h-480 z" fill="#1168bd"/>
-<text x="574" y="501.28" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="23.1" font-weight="700" fill="#fff">clearing_record</text>
-<rect x="574" y="523.6" width="34.1" height="22.8" rx="3" fill="#fdecea" stroke="#c8341f" stroke-width="0.8"/>
-<text x="591.0" y="541.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#c8341f">PK</text>
-<text x="615.1" y="541.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328" font-weight="700">record_id</text>
-<text x="1026" y="541.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
-<rect x="561" y="554" width="478" height="38" fill="#f6f8fa"/>
-<rect x="574" y="561.6" width="34.1" height="22.8" rx="3" fill="#fdf3e1" stroke="#a86a12" stroke-width="0.8"/>
-<text x="591.0" y="579.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#a86a12">IX</text>
-<text x="615.1" y="579.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">file_id</text>
-<text x="1026" y="579.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
-<rect x="574" y="599.6" width="34.1" height="22.8" rx="3" fill="#fdf3e1" stroke="#a86a12" stroke-width="0.8"/>
-<text x="591.0" y="617.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#a86a12">IX</text>
-<text x="615.1" y="617.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">network_ref</text>
-<text x="1026" y="617.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
-<rect x="561" y="630" width="478" height="38" fill="#f6f8fa"/>
-<text x="615.1" y="655.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">amount</text>
-<text x="1026" y="655.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">cents</text>
-<text x="615.1" y="693.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">hold_id</text>
-<text x="1026" y="693.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">bigint</text>
-<text x="574" y="729.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17.2" font-style="italic" fill="#57606a">the financial truth</text>
-<rect x="1100" y="470" width="470" height="275" rx="8" fill="#ffffff" stroke="#8c959f" stroke-width="1.4"/>
-<path d="M1100,478 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v38 h-470 z" fill="#8c8c8c"/>
-<text x="1114" y="501.28" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="23.1" font-weight="700" fill="#fff">ruleset</text>
-<rect x="1114" y="523.6" width="34.1" height="22.8" rx="3" fill="#fdecea" stroke="#c8341f" stroke-width="0.8"/>
-<text x="1131.0" y="541.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="13.2" font-weight="700" fill="#c8341f">PK</text>
-<text x="1155.1" y="541.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328" font-weight="700">version</text>
-<text x="1556" y="541.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">int</text>
-<rect x="1101" y="554" width="468" height="38" fill="#f6f8fa"/>
-<text x="1155.1" y="579.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">parent</text>
-<text x="1556" y="579.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">int</text>
-<text x="1155.1" y="617.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">rules</text>
-<text x="1556" y="617.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">json</text>
-<rect x="1101" y="630" width="468" height="38" fill="#f6f8fa"/>
-<text x="1155.1" y="655.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">mode</text>
-<text x="1556" y="655.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
-<text x="1155.1" y="693.8" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="18.9" fill="#1f2328">owner</text>
-<text x="1556" y="693.8" text-anchor="end" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="17.2" fill="#57606a">text</text>
-<text x="1114" y="729.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17.2" font-style="italic" fill="#57606a">read by every decision service</text>
-<path d="M560.0,145.3 L500.0,122.5" fill="none" stroke="#5b6672" stroke-width="1.8"/>
-<circle cx="560.0" cy="145.3" r="4" fill="#5b6672"/>
-<text x="549.7" y="135.2" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="19.8" font-weight="700" fill="#c8341f">N</text>
-<circle cx="500.0" cy="122.5" r="4" fill="#5b6672"/>
-<text x="510.3" y="148.0" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="19.8" font-weight="700" fill="#c8341f">1</text>
-<rect x="30" y="760" width="1540" height="47.0" rx="6" fill="#fdf3e1" stroke="#a86a12" stroke-width="1.2"/>
-<text x="44" y="786.1" font-family="Inter, Helvetica, Arial, sans-serif" font-size="20.9" fill="#1f2328">The reserve writes account, hold and message in one transaction, in one partition.</text>
+<rect x="30" y="40" width="470" height="275" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M30,48 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v38 h-470 z" fill="#ea4335"/>
+<text x="44" y="71.28" font-family="'Roboto Mono', monospace" font-size="23.1" font-weight="700" fill="#fff">account</text>
+<rect x="44" y="93.6" width="34.1" height="22.8" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="61.0" y="111.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="13.2" font-weight="700" fill="#C5221F">PK</text>
+<text x="85.1" y="111.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124" font-weight="700">account_id</text>
+<text x="486" y="111.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">bigint</text>
+<rect x="31" y="124" width="468" height="38" fill="#f8f9fa"/>
+<text x="85.1" y="149.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">posted_balance</text>
+<text x="486" y="149.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">cents</text>
+<text x="85.1" y="187.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">holds_total</text>
+<text x="486" y="187.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">cents</text>
+<rect x="31" y="200" width="468" height="38" fill="#f8f9fa"/>
+<text x="85.1" y="225.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">version</text>
+<text x="486" y="225.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">int</text>
+<text x="85.1" y="263.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">state</text>
+<text x="486" y="263.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">text</text>
+<text x="44" y="299.1" font-family="Inter, Roboto, sans-serif" font-size="17.2" font-style="italic" fill="#5f6368">auth store; partitioned by account_id</text>
+<rect x="560" y="40" width="480" height="351" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M560,48 a8,8 0 0 1 8,-8 h464 a8,8 0 0 1 8,8 v38 h-480 z" fill="#ea4335"/>
+<text x="574" y="71.28" font-family="'Roboto Mono', monospace" font-size="23.1" font-weight="700" fill="#fff">hold</text>
+<rect x="574" y="93.6" width="34.1" height="22.8" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="591.0" y="111.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="13.2" font-weight="700" fill="#C5221F">PK</text>
+<text x="615.1" y="111.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124" font-weight="700">account_id</text>
+<text x="1026" y="111.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">bigint</text>
+<rect x="561" y="124" width="478" height="38" fill="#f8f9fa"/>
+<rect x="574" y="131.6" width="34.1" height="22.8" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="591.0" y="149.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="13.2" font-weight="700" fill="#C5221F">PK</text>
+<text x="615.1" y="149.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124" font-weight="700">hold_id</text>
+<text x="1026" y="149.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">bigint</text>
+<rect x="574" y="169.6" width="34.1" height="22.8" rx="3" fill="#f8f9fa" stroke="#5f6368" stroke-width="0.8"/>
+<text x="591.0" y="187.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="13.2" font-weight="700" fill="#5f6368">UQ</text>
+<text x="615.1" y="187.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">network_ref</text>
+<text x="1026" y="187.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">text</text>
+<rect x="561" y="200" width="478" height="38" fill="#f8f9fa"/>
+<text x="615.1" y="225.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">amount</text>
+<text x="1026" y="225.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">cents</text>
+<text x="615.1" y="263.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">mcc</text>
+<text x="1026" y="263.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">char(4)</text>
+<rect x="561" y="276" width="478" height="38" fill="#f8f9fa"/>
+<text x="615.1" y="301.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">expires_at</text>
+<text x="1026" y="301.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">ts</text>
+<text x="615.1" y="339.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">state</text>
+<text x="1026" y="339.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">text</text>
+<text x="574" y="375.1" font-family="Inter, Roboto, sans-serif" font-size="17.2" font-style="italic" fill="#5f6368">same partition as its account</text>
+<rect x="1100" y="40" width="470" height="275" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M1100,48 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v38 h-470 z" fill="#ea4335"/>
+<text x="1114" y="71.28" font-family="'Roboto Mono', monospace" font-size="23.1" font-weight="700" fill="#fff">message</text>
+<rect x="1114" y="93.6" width="34.1" height="22.8" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="1131.0" y="111.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="13.2" font-weight="700" fill="#C5221F">PK</text>
+<text x="1155.1" y="111.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124" font-weight="700">network_ref</text>
+<text x="1556" y="111.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">text</text>
+<rect x="1101" y="124" width="468" height="38" fill="#f8f9fa"/>
+<text x="1155.1" y="149.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">account_id</text>
+<text x="1556" y="149.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">bigint</text>
+<text x="1155.1" y="187.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">type</text>
+<text x="1556" y="187.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">text</text>
+<rect x="1101" y="200" width="468" height="38" fill="#f8f9fa"/>
+<text x="1155.1" y="225.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">result</text>
+<text x="1556" y="225.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">text</text>
+<text x="1155.1" y="263.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">at</text>
+<text x="1556" y="263.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">ts</text>
+<text x="1114" y="299.1" font-family="Inter, Roboto, sans-serif" font-size="17.2" font-style="italic" fill="#5f6368">idempotency; kept past the retry window</text>
+<rect x="30" y="470" width="470" height="237" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M30,478 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v38 h-470 z" fill="#4285f4"/>
+<text x="44" y="501.28" font-family="'Roboto Mono', monospace" font-size="23.1" font-weight="700" fill="#fff">card</text>
+<rect x="44" y="523.6" width="34.1" height="22.8" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="61.0" y="541.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="13.2" font-weight="700" fill="#C5221F">PK</text>
+<text x="85.1" y="541.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124" font-weight="700">token</text>
+<text x="486" y="541.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">text</text>
+<rect x="31" y="554" width="468" height="38" fill="#f8f9fa"/>
+<rect x="44" y="561.6" width="34.1" height="22.8" rx="3" fill="#fef7e0" stroke="#b06000" stroke-width="0.8"/>
+<text x="61.0" y="579.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="13.2" font-weight="700" fill="#b06000">IX</text>
+<text x="85.1" y="579.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">account_id</text>
+<text x="486" y="579.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">bigint</text>
+<text x="85.1" y="617.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">status</text>
+<text x="486" y="617.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">text</text>
+<rect x="31" y="630" width="468" height="38" fill="#f8f9fa"/>
+<text x="85.1" y="655.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">limits</text>
+<text x="486" y="655.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">json</text>
+<text x="44" y="691.1" font-family="Inter, Roboto, sans-serif" font-size="17.2" font-style="italic" fill="#5f6368">tokens only: the processor holds card numbers</text>
+<rect x="560" y="470" width="480" height="275" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M560,478 a8,8 0 0 1 8,-8 h464 a8,8 0 0 1 8,8 v38 h-480 z" fill="#4285f4"/>
+<text x="574" y="501.28" font-family="'Roboto Mono', monospace" font-size="23.1" font-weight="700" fill="#fff">clearing_record</text>
+<rect x="574" y="523.6" width="34.1" height="22.8" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="591.0" y="541.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="13.2" font-weight="700" fill="#C5221F">PK</text>
+<text x="615.1" y="541.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124" font-weight="700">record_id</text>
+<text x="1026" y="541.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">text</text>
+<rect x="561" y="554" width="478" height="38" fill="#f8f9fa"/>
+<rect x="574" y="561.6" width="34.1" height="22.8" rx="3" fill="#fef7e0" stroke="#b06000" stroke-width="0.8"/>
+<text x="591.0" y="579.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="13.2" font-weight="700" fill="#b06000">IX</text>
+<text x="615.1" y="579.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">file_id</text>
+<text x="1026" y="579.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">text</text>
+<rect x="574" y="599.6" width="34.1" height="22.8" rx="3" fill="#fef7e0" stroke="#b06000" stroke-width="0.8"/>
+<text x="591.0" y="617.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="13.2" font-weight="700" fill="#b06000">IX</text>
+<text x="615.1" y="617.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">network_ref</text>
+<text x="1026" y="617.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">text</text>
+<rect x="561" y="630" width="478" height="38" fill="#f8f9fa"/>
+<text x="615.1" y="655.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">amount</text>
+<text x="1026" y="655.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">cents</text>
+<text x="615.1" y="693.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">hold_id</text>
+<text x="1026" y="693.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">bigint</text>
+<text x="574" y="729.1" font-family="Inter, Roboto, sans-serif" font-size="17.2" font-style="italic" fill="#5f6368">the financial truth</text>
+<rect x="1100" y="470" width="470" height="275" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M1100,478 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v38 h-470 z" fill="#5f6368"/>
+<text x="1114" y="501.28" font-family="'Roboto Mono', monospace" font-size="23.1" font-weight="700" fill="#fff">ruleset</text>
+<rect x="1114" y="523.6" width="34.1" height="22.8" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="1131.0" y="541.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="13.2" font-weight="700" fill="#C5221F">PK</text>
+<text x="1155.1" y="541.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124" font-weight="700">version</text>
+<text x="1556" y="541.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">int</text>
+<rect x="1101" y="554" width="468" height="38" fill="#f8f9fa"/>
+<text x="1155.1" y="579.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">parent</text>
+<text x="1556" y="579.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">int</text>
+<text x="1155.1" y="617.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">rules</text>
+<text x="1556" y="617.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">json</text>
+<rect x="1101" y="630" width="468" height="38" fill="#f8f9fa"/>
+<text x="1155.1" y="655.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">mode</text>
+<text x="1556" y="655.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">text</text>
+<text x="1155.1" y="693.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">owner</text>
+<text x="1556" y="693.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="17.2" fill="#5f6368">text</text>
+<text x="1114" y="729.1" font-family="Inter, Roboto, sans-serif" font-size="17.2" font-style="italic" fill="#5f6368">read by every decision service</text>
+<path d="M560.0,145.3 L500.0,122.5" fill="none" stroke="#5f6368" stroke-width="1.8"/>
+<circle cx="560.0" cy="145.3" r="4" fill="#5f6368"/>
+<text x="549.7" y="135.2" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="19.8" font-weight="700" fill="#ea4335">N</text>
+<circle cx="500.0" cy="122.5" r="4" fill="#5f6368"/>
+<text x="510.3" y="148.0" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="19.8" font-weight="700" fill="#ea4335">1</text>
+<rect x="30" y="760" width="1540" height="47.0" rx="6" fill="#fef7e0" stroke="#b06000" stroke-width="1.2"/>
+<text x="44" y="786.1" font-family="Inter, Roboto, sans-serif" font-size="20.9" fill="#202124">The reserve writes account, hold and message in one transaction, in one partition.</text>
 </svg>

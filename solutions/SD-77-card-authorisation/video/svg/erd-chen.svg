@@ -1,119 +1,119 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900">
 <rect width="100%" height="100%" fill="#ffffff"/>
-<path d="M158.4,93.2 L145.6,78.8" fill="none" stroke="#8c959f" stroke-width="1.5"/>
-<path d="M262.4,93.2 L285.7,75.7" fill="none" stroke="#8c959f" stroke-width="1.5"/>
-<path d="M127.2,186.8 L96.7,206.4" fill="none" stroke="#8c959f" stroke-width="1.5"/>
-<path d="M139.2,666.8 L102.6,694.9" fill="none" stroke="#8c959f" stroke-width="1.5"/>
-<path d="M260.8,666.8 L296.3,694.1" fill="none" stroke="#8c959f" stroke-width="1.5"/>
-<path d="M728.8,93.2 L719.3,78.9" fill="none" stroke="#8c959f" stroke-width="1.5"/>
-<path d="M832.8,93.2 L861.7,74.6" fill="none" stroke="#8c959f" stroke-width="1.5"/>
-<path d="M832.8,186.8 L858.0,203.0" fill="none" stroke="#8c959f" stroke-width="1.5"/>
-<path d="M703.8,666.8 L674.0,691.7" fill="none" stroke="#8c959f" stroke-width="1.5"/>
-<path d="M816.2,666.8 L850.4,695.4" fill="none" stroke="#8c959f" stroke-width="1.5"/>
-<path d="M1268.8,93.2 L1259.5,79.2" fill="none" stroke="#8c959f" stroke-width="1.5"/>
-<path d="M1383.2,186.8 L1418.3,206.5" fill="none" stroke="#8c959f" stroke-width="1.5"/>
-<path d="M1340.1,666.8 L1395.0,730.8" fill="none" stroke="#8c959f" stroke-width="1.5"/>
-<path d="M1253.2,666.8 L1228.1,691.9" fill="none" stroke="#8c959f" stroke-width="1.5"/>
-<path d="M300.0,140.0 L375.5,140.0" fill="none" stroke="#3d4752" stroke-width="2.2"/>
-<path d="M584.5,140.0 L660.0,140.0" fill="none" stroke="#3d4752" stroke-width="2.2"/>
-<path d="M200.0,186.8 L200.0,322.8" fill="none" stroke="#3d4752" stroke-width="2.2"/>
-<path d="M200.0,437.2 L200.0,573.2" fill="none" stroke="#3d4752" stroke-width="2.2"/>
-<path d="M760.0,573.2 L760.0,437.2" fill="none" stroke="#3d4752" stroke-width="2.2"/>
-<path d="M760.0,322.8 L760.0,186.8" fill="none" stroke="#3d4752" stroke-width="2.2"/>
-<path d="M860.0,140.0 L933.6,140.0" fill="none" stroke="#3d4752" stroke-width="2.2"/>
-<path d="M1126.4,140.0 L1146.3,140.0" fill="none" stroke="#3d4752" stroke-width="2.2"/>
-<path d="M860.0,620.0 L901.3,620.0" fill="none" stroke="#3d4752" stroke-width="2.2"/>
-<path d="M1158.7,620.0 L1200.0,620.0" fill="none" stroke="#3d4752" stroke-width="7"/><path d="M1158.7,620.0 L1200.0,620.0" fill="none" stroke="#ffffff" stroke-width="3"/>
-<rect x="100.0" y="93.2" width="200.0" height="93.6" fill="#e8f0fa" stroke="#1168bd" stroke-width="2.4"/>
-<text x="200.0" y="149.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="27.3" font-weight="700" fill="#1f2328">ACCOUNT</text>
-<rect x="100.0" y="573.2" width="200.0" height="93.6" fill="#e8f0fa" stroke="#1168bd" stroke-width="2.4"/>
-<text x="200.0" y="629.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="27.3" font-weight="700" fill="#1f2328">CARD</text>
-<rect x="660.0" y="93.2" width="200.0" height="93.6" fill="#e8f0fa" stroke="#1168bd" stroke-width="2.4"/>
-<text x="760.0" y="149.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="27.3" font-weight="700" fill="#1f2328">HOLD</text>
-<rect x="660.0" y="573.2" width="200.0" height="93.6" fill="#e8f0fa" stroke="#1168bd" stroke-width="2.4"/>
-<text x="760.0" y="629.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="27.3" font-weight="700" fill="#1f2328">MESSAGE</text>
-<rect x="1146.3" y="93.2" width="307.4" height="93.6" fill="#e8f0fa" stroke="#1168bd" stroke-width="2.4"/>
-<text x="1300.0" y="149.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="27.3" font-weight="700" fill="#1f2328">CLEARING RECORD</text>
-<rect x="1200.0" y="573.2" width="200.0" height="93.6" fill="#e8f0fa" stroke="#1168bd" stroke-width="2.4"/>
-<rect x="1206.0" y="579.2" width="188.0" height="81.6" fill="none" stroke="#1168bd" stroke-width="1.8"/>
-<text x="1300.0" y="629.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="27.3" font-weight="700" fill="#1f2328">DECISION</text>
-<path d="M480.0,82.8 L584.5,140.0 L480.0,197.2 L375.5,140.0 Z" fill="#fdf3e1" stroke="#a86a12" stroke-width="2.4"/>
-<text x="480.0" y="148.6" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="22.4" font-weight="700" fill="#1f2328">RESERVES</text>
-<path d="M200.0,322.8 L295.0,380.0 L200.0,437.2 L105.0,380.0 Z" fill="#fdf3e1" stroke="#a86a12" stroke-width="2.4"/>
-<text x="200.0" y="388.6" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="22.4" font-weight="700" fill="#1f2328">HAS</text>
-<path d="M760.0,322.8 L856.4,380.0 L760.0,437.2 L663.6,380.0 Z" fill="#fdf3e1" stroke="#a86a12" stroke-width="2.4"/>
-<text x="760.0" y="388.6" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="22.4" font-weight="700" fill="#1f2328">CREATES</text>
-<path d="M1030.0,82.8 L1126.4,140.0 L1030.0,197.2 L933.6,140.0 Z" fill="#fdf3e1" stroke="#a86a12" stroke-width="2.4"/>
-<text x="1030.0" y="148.6" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="22.4" font-weight="700" fill="#1f2328">SETTLES</text>
-<path d="M1030.0,562.8 L1158.7,620.0 L1030.0,677.2 L901.3,620.0 Z" fill="#fdf3e1" stroke="#a86a12" stroke-width="2.4"/>
-<path d="M1030.0,566.8 L1149.7,620.0 L1030.0,673.2 L910.3,620.0 Z" fill="none" stroke="#a86a12" stroke-width="1.8"/>
-<text x="1030.0" y="628.6" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="22.4" font-weight="700" fill="#1f2328">RECORDED AS</text>
-<ellipse cx="120.0" cy="50.0" rx="97.4" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
-<text x="120.0" y="57.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328" font-weight="700">account_id</text>
-<line x1="57.6" y1="62.9" x2="182.4" y2="62.9" stroke="#1f2328" stroke-width="1.6"/>
-<ellipse cx="320.0" cy="50.0" rx="67.2" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
-<text x="320.0" y="57.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328">posted</text>
-<ellipse cx="60.0" cy="230.0" rx="59.7" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
-<text x="60.0" y="237.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328">state</text>
-<ellipse cx="70.0" cy="720.0" rx="59.7" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
-<text x="70.0" y="727.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328" font-weight="700">token</text>
-<line x1="38.8" y1="732.9" x2="101.2" y2="732.9" stroke="#1f2328" stroke-width="1.6"/>
-<ellipse cx="330.0" cy="720.0" rx="67.2" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
-<text x="330.0" y="727.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328">status</text>
-<ellipse cx="700.0" cy="50.0" rx="74.8" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
-<text x="700.0" y="57.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328" font-weight="700">hold_id</text>
-<line x1="656.3" y1="62.9" x2="743.7" y2="62.9" stroke="#1f2328" stroke-width="1.6"/>
-<ellipse cx="900.0" cy="50.0" rx="67.2" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
-<text x="900.0" y="57.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328">amount</text>
-<ellipse cx="900.0" cy="230.0" rx="97.4" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
-<text x="900.0" y="237.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328">expires_at</text>
-<ellipse cx="640.0" cy="720.0" rx="104.9" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
-<text x="640.0" y="727.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328" font-weight="700">network_ref</text>
-<line x1="571.4" y1="732.9" x2="708.6" y2="732.9" stroke="#1f2328" stroke-width="1.6"/>
-<ellipse cx="880.0" cy="720.0" rx="52.2" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
-<text x="880.0" y="727.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328">type</text>
-<ellipse cx="1240.0" cy="50.0" rx="89.9" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
-<text x="1240.0" y="57.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328" font-weight="700">record_id</text>
-<line x1="1183.8" y1="62.9" x2="1296.2" y2="62.9" stroke="#1f2328" stroke-width="1.6"/>
-<ellipse cx="1460.0" cy="230.0" rx="67.2" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
-<text x="1460.0" y="237.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328">amount</text>
-<ellipse cx="1420.0" cy="760.0" rx="112.5" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
-<text x="1420.0" y="767.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328">rule version</text>
-<ellipse cx="1200.0" cy="720.0" rx="82.3" ry="29.9" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
-<text x="1200.0" y="727.5" text-anchor="middle" font-family="DejaVu Sans Mono, Menlo, monospace" font-size="20.8" fill="#1f2328">features</text>
-<text x="337.8" y="169.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">1</text>
-<text x="622.2" y="169.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">N</text>
-<text x="180.0" y="264.7" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">1</text>
-<text x="180.0" y="515.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">N</text>
-<text x="780.0" y="515.1" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">N</text>
-<text x="780.0" y="264.7" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">1</text>
-<text x="896.8" y="169.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">1</text>
-<text x="1136.4" y="169.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">N</text>
-<text x="880.7" y="649.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">1</text>
-<text x="1179.3" y="649.9" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26.0" font-weight="700" fill="#c8341f">1</text>
-<rect x="44" y="792" width="36" height="16" fill="#e8f0fa" stroke="#1168bd" stroke-width="1.6"/>
-<text x="94" y="805.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">entity</text>
-<rect x="44" y="819" width="36" height="16" fill="#e8f0fa" stroke="#1168bd" stroke-width="1.6"/>
-<rect x="48" y="823" width="28" height="8" fill="none" stroke="#1168bd" stroke-width="1.2"/>
-<text x="94" y="832.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">weak entity</text>
-<path d="M62,844 L82,854 L62,864 L42,854 Z" fill="#fdf3e1" stroke="#a86a12" stroke-width="1.6"/>
-<text x="94" y="859.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">relationship</text>
-<path d="M62,871 L82,881 L62,891 L42,881 Z" fill="#fdf3e1" stroke="#a86a12" stroke-width="1.6"/>
-<path d="M62,876 L72,881 L62,886 L52,881 Z" fill="none" stroke="#a86a12" stroke-width="1.2"/>
-<text x="94" y="886.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">identifying relationship</text>
-<ellipse cx="62" cy="908" rx="20" ry="9" fill="#fff" stroke="#57606a" stroke-width="1.4"/>
-<text x="94" y="913.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">attribute</text>
-<ellipse cx="62" cy="935" rx="20" ry="9" fill="#fff" stroke="#57606a" stroke-width="1.4"/>
-<line x1="53" y1="938" x2="71" y2="938" stroke="#1f2328" stroke-width="1.4"/>
-<text x="94" y="940.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">key attribute (underlined)</text>
-<ellipse cx="62" cy="962" rx="20" ry="9" fill="#fff" stroke="#57606a" stroke-width="1.4"/>
-<ellipse cx="62" cy="962" rx="15" ry="5" fill="none" stroke="#57606a" stroke-width="1"/>
-<text x="94" y="967.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">multivalued attribute</text>
-<ellipse cx="62" cy="989" rx="20" ry="9" fill="#fff" stroke="#57606a" stroke-width="1.4" stroke-dasharray="4 3"/>
-<text x="94" y="994.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">derived attribute</text>
-<line x1="42" y1="1016" x2="82" y2="1016" stroke="#3d4752" stroke-width="6"/><line x1="42" y1="1016" x2="82" y2="1016" stroke="#fff" stroke-width="2.4"/>
-<text x="94" y="1021.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#1f2328">total participation (every one takes part)</text>
-<rect x="330" y="800" width="1240" height="88.9" rx="6" fill="#fdf3e1" stroke="#a86a12" stroke-width="1.2"/>
-<text x="344" y="830.9" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24.7" fill="#1f2328">One hold, many messages (auth, incremental, reversal); usually one clearing record, sometimes</text>
-<text x="344" y="864.2" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24.7" fill="#1f2328">several or none.</text>
+<path d="M158.4,93.2 L145.6,78.8" fill="none" stroke="#5f6368" stroke-width="1.5"/>
+<path d="M262.4,93.2 L285.7,75.7" fill="none" stroke="#5f6368" stroke-width="1.5"/>
+<path d="M127.2,186.8 L96.7,206.4" fill="none" stroke="#5f6368" stroke-width="1.5"/>
+<path d="M139.2,666.8 L102.6,694.9" fill="none" stroke="#5f6368" stroke-width="1.5"/>
+<path d="M260.8,666.8 L296.3,694.1" fill="none" stroke="#5f6368" stroke-width="1.5"/>
+<path d="M728.8,93.2 L719.3,78.9" fill="none" stroke="#5f6368" stroke-width="1.5"/>
+<path d="M832.8,93.2 L861.7,74.6" fill="none" stroke="#5f6368" stroke-width="1.5"/>
+<path d="M832.8,186.8 L858.0,203.0" fill="none" stroke="#5f6368" stroke-width="1.5"/>
+<path d="M703.8,666.8 L674.0,691.7" fill="none" stroke="#5f6368" stroke-width="1.5"/>
+<path d="M816.2,666.8 L850.4,695.4" fill="none" stroke="#5f6368" stroke-width="1.5"/>
+<path d="M1268.8,93.2 L1259.5,79.2" fill="none" stroke="#5f6368" stroke-width="1.5"/>
+<path d="M1383.2,186.8 L1418.3,206.5" fill="none" stroke="#5f6368" stroke-width="1.5"/>
+<path d="M1340.1,666.8 L1395.0,730.8" fill="none" stroke="#5f6368" stroke-width="1.5"/>
+<path d="M1253.2,666.8 L1228.1,691.9" fill="none" stroke="#5f6368" stroke-width="1.5"/>
+<path d="M300.0,140.0 L375.5,140.0" fill="none" stroke="#3c4043" stroke-width="2.2"/>
+<path d="M584.5,140.0 L660.0,140.0" fill="none" stroke="#3c4043" stroke-width="2.2"/>
+<path d="M200.0,186.8 L200.0,322.8" fill="none" stroke="#3c4043" stroke-width="2.2"/>
+<path d="M200.0,437.2 L200.0,573.2" fill="none" stroke="#3c4043" stroke-width="2.2"/>
+<path d="M760.0,573.2 L760.0,437.2" fill="none" stroke="#3c4043" stroke-width="2.2"/>
+<path d="M760.0,322.8 L760.0,186.8" fill="none" stroke="#3c4043" stroke-width="2.2"/>
+<path d="M860.0,140.0 L933.6,140.0" fill="none" stroke="#3c4043" stroke-width="2.2"/>
+<path d="M1126.4,140.0 L1146.3,140.0" fill="none" stroke="#3c4043" stroke-width="2.2"/>
+<path d="M860.0,620.0 L901.3,620.0" fill="none" stroke="#3c4043" stroke-width="2.2"/>
+<path d="M1158.7,620.0 L1200.0,620.0" fill="none" stroke="#3c4043" stroke-width="7"/><path d="M1158.7,620.0 L1200.0,620.0" fill="none" stroke="#ffffff" stroke-width="3"/>
+<rect x="100.0" y="93.2" width="200.0" height="93.6" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<text x="200.0" y="149.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.3" font-weight="700" fill="#202124">ACCOUNT</text>
+<rect x="100.0" y="573.2" width="200.0" height="93.6" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<text x="200.0" y="629.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.3" font-weight="700" fill="#202124">CARD</text>
+<rect x="660.0" y="93.2" width="200.0" height="93.6" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<text x="760.0" y="149.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.3" font-weight="700" fill="#202124">HOLD</text>
+<rect x="660.0" y="573.2" width="200.0" height="93.6" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<text x="760.0" y="629.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.3" font-weight="700" fill="#202124">MESSAGE</text>
+<rect x="1146.3" y="93.2" width="307.4" height="93.6" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<text x="1300.0" y="149.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.3" font-weight="700" fill="#202124">CLEARING RECORD</text>
+<rect x="1200.0" y="573.2" width="200.0" height="93.6" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<rect x="1206.0" y="579.2" width="188.0" height="81.6" fill="none" stroke="#4285f4" stroke-width="1.8"/>
+<text x="1300.0" y="629.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.3" font-weight="700" fill="#202124">DECISION</text>
+<path d="M480.0,82.8 L584.5,140.0 L480.0,197.2 L375.5,140.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<text x="480.0" y="148.6" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="22.4" font-weight="700" fill="#202124">RESERVES</text>
+<path d="M200.0,322.8 L295.0,380.0 L200.0,437.2 L105.0,380.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<text x="200.0" y="388.6" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="22.4" font-weight="700" fill="#202124">HAS</text>
+<path d="M760.0,322.8 L856.4,380.0 L760.0,437.2 L663.6,380.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<text x="760.0" y="388.6" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="22.4" font-weight="700" fill="#202124">CREATES</text>
+<path d="M1030.0,82.8 L1126.4,140.0 L1030.0,197.2 L933.6,140.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<text x="1030.0" y="148.6" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="22.4" font-weight="700" fill="#202124">SETTLES</text>
+<path d="M1030.0,562.8 L1158.7,620.0 L1030.0,677.2 L901.3,620.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<path d="M1030.0,566.8 L1149.7,620.0 L1030.0,673.2 L910.3,620.0 Z" fill="none" stroke="#b06000" stroke-width="1.8"/>
+<text x="1030.0" y="628.6" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="22.4" font-weight="700" fill="#202124">RECORDED AS</text>
+<ellipse cx="120.0" cy="50.0" rx="97.4" ry="29.9" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="120.0" y="57.5" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="20.8" fill="#202124" font-weight="700">account_id</text>
+<line x1="57.6" y1="62.9" x2="182.4" y2="62.9" stroke="#202124" stroke-width="1.6"/>
+<ellipse cx="320.0" cy="50.0" rx="67.2" ry="29.9" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="320.0" y="57.5" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="20.8" fill="#202124">posted</text>
+<ellipse cx="60.0" cy="230.0" rx="59.7" ry="29.9" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="60.0" y="237.5" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="20.8" fill="#202124">state</text>
+<ellipse cx="70.0" cy="720.0" rx="59.7" ry="29.9" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="70.0" y="727.5" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="20.8" fill="#202124" font-weight="700">token</text>
+<line x1="38.8" y1="732.9" x2="101.2" y2="732.9" stroke="#202124" stroke-width="1.6"/>
+<ellipse cx="330.0" cy="720.0" rx="67.2" ry="29.9" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="330.0" y="727.5" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="20.8" fill="#202124">status</text>
+<ellipse cx="700.0" cy="50.0" rx="74.8" ry="29.9" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="700.0" y="57.5" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="20.8" fill="#202124" font-weight="700">hold_id</text>
+<line x1="656.3" y1="62.9" x2="743.7" y2="62.9" stroke="#202124" stroke-width="1.6"/>
+<ellipse cx="900.0" cy="50.0" rx="67.2" ry="29.9" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="900.0" y="57.5" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="20.8" fill="#202124">amount</text>
+<ellipse cx="900.0" cy="230.0" rx="97.4" ry="29.9" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="900.0" y="237.5" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="20.8" fill="#202124">expires_at</text>
+<ellipse cx="640.0" cy="720.0" rx="104.9" ry="29.9" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="640.0" y="727.5" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="20.8" fill="#202124" font-weight="700">network_ref</text>
+<line x1="571.4" y1="732.9" x2="708.6" y2="732.9" stroke="#202124" stroke-width="1.6"/>
+<ellipse cx="880.0" cy="720.0" rx="52.2" ry="29.9" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="880.0" y="727.5" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="20.8" fill="#202124">type</text>
+<ellipse cx="1240.0" cy="50.0" rx="89.9" ry="29.9" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="1240.0" y="57.5" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="20.8" fill="#202124" font-weight="700">record_id</text>
+<line x1="1183.8" y1="62.9" x2="1296.2" y2="62.9" stroke="#202124" stroke-width="1.6"/>
+<ellipse cx="1460.0" cy="230.0" rx="67.2" ry="29.9" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="1460.0" y="237.5" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="20.8" fill="#202124">amount</text>
+<ellipse cx="1420.0" cy="760.0" rx="112.5" ry="29.9" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="1420.0" y="767.5" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="20.8" fill="#202124">rule version</text>
+<ellipse cx="1200.0" cy="720.0" rx="82.3" ry="29.9" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="1200.0" y="727.5" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="20.8" fill="#202124">features</text>
+<text x="337.8" y="169.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="26.0" font-weight="700" fill="#ea4335">1</text>
+<text x="622.2" y="169.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="26.0" font-weight="700" fill="#ea4335">N</text>
+<text x="180.0" y="264.7" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="26.0" font-weight="700" fill="#ea4335">1</text>
+<text x="180.0" y="515.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="26.0" font-weight="700" fill="#ea4335">N</text>
+<text x="780.0" y="515.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="26.0" font-weight="700" fill="#ea4335">N</text>
+<text x="780.0" y="264.7" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="26.0" font-weight="700" fill="#ea4335">1</text>
+<text x="896.8" y="169.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="26.0" font-weight="700" fill="#ea4335">1</text>
+<text x="1136.4" y="169.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="26.0" font-weight="700" fill="#ea4335">N</text>
+<text x="880.7" y="649.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="26.0" font-weight="700" fill="#ea4335">1</text>
+<text x="1179.3" y="649.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="26.0" font-weight="700" fill="#ea4335">1</text>
+<rect x="44" y="792" width="36" height="16" fill="#e8f0fe" stroke="#4285f4" stroke-width="1.6"/>
+<text x="94" y="805.2" font-family="Inter, Roboto, sans-serif" font-size="15" fill="#202124">entity</text>
+<rect x="44" y="819" width="36" height="16" fill="#e8f0fe" stroke="#4285f4" stroke-width="1.6"/>
+<rect x="48" y="823" width="28" height="8" fill="none" stroke="#4285f4" stroke-width="1.2"/>
+<text x="94" y="832.2" font-family="Inter, Roboto, sans-serif" font-size="15" fill="#202124">weak entity</text>
+<path d="M62,844 L82,854 L62,864 L42,854 Z" fill="#fef7e0" stroke="#b06000" stroke-width="1.6"/>
+<text x="94" y="859.2" font-family="Inter, Roboto, sans-serif" font-size="15" fill="#202124">relationship</text>
+<path d="M62,871 L82,881 L62,891 L42,881 Z" fill="#fef7e0" stroke="#b06000" stroke-width="1.6"/>
+<path d="M62,876 L72,881 L62,886 L52,881 Z" fill="none" stroke="#b06000" stroke-width="1.2"/>
+<text x="94" y="886.2" font-family="Inter, Roboto, sans-serif" font-size="15" fill="#202124">identifying relationship</text>
+<ellipse cx="62" cy="908" rx="20" ry="9" fill="#fff" stroke="#5f6368" stroke-width="1.4"/>
+<text x="94" y="913.2" font-family="Inter, Roboto, sans-serif" font-size="15" fill="#202124">attribute</text>
+<ellipse cx="62" cy="935" rx="20" ry="9" fill="#fff" stroke="#5f6368" stroke-width="1.4"/>
+<line x1="53" y1="938" x2="71" y2="938" stroke="#202124" stroke-width="1.4"/>
+<text x="94" y="940.2" font-family="Inter, Roboto, sans-serif" font-size="15" fill="#202124">key attribute (underlined)</text>
+<ellipse cx="62" cy="962" rx="20" ry="9" fill="#fff" stroke="#5f6368" stroke-width="1.4"/>
+<ellipse cx="62" cy="962" rx="15" ry="5" fill="none" stroke="#5f6368" stroke-width="1"/>
+<text x="94" y="967.2" font-family="Inter, Roboto, sans-serif" font-size="15" fill="#202124">multivalued attribute</text>
+<ellipse cx="62" cy="989" rx="20" ry="9" fill="#fff" stroke="#5f6368" stroke-width="1.4" stroke-dasharray="4 3"/>
+<text x="94" y="994.2" font-family="Inter, Roboto, sans-serif" font-size="15" fill="#202124">derived attribute</text>
+<line x1="42" y1="1016" x2="82" y2="1016" stroke="#3c4043" stroke-width="6"/><line x1="42" y1="1016" x2="82" y2="1016" stroke="#fff" stroke-width="2.4"/>
+<text x="94" y="1021.2" font-family="Inter, Roboto, sans-serif" font-size="15" fill="#202124">total participation (every one takes part)</text>
+<rect x="330" y="800" width="1240" height="88.9" rx="6" fill="#fef7e0" stroke="#b06000" stroke-width="1.2"/>
+<text x="344" y="830.9" font-family="Inter, Roboto, sans-serif" font-size="24.7" fill="#202124">One hold, many messages (auth, incremental, reversal); usually one clearing record, sometimes</text>
+<text x="344" y="864.2" font-family="Inter, Roboto, sans-serif" font-size="24.7" fill="#202124">several or none.</text>
 </svg>

@@ -1,0 +1,306 @@
+{
+  "_doc": "Single source for SD-77's technology choices; see SD-08/stack.json for the format. `how` is spoken, so it carries no code; keep summary cells under 36 characters.",
+  "c4": {
+    "gwc": [
+      "Auth gateway",
+      "Go, mutual TLS",
+      "Maps network messages."
+    ],
+    "dc": [
+      "Decision service",
+      "Go, stateless",
+      "Rules in process; 100 ms."
+    ],
+    "as": [
+      "Auth store",
+      "PostgreSQL, by account",
+      "Balances, holds, messages."
+    ],
+    "ms": [
+      "Model scorer",
+      "gRPC, 60 ms cut-off",
+      "Late scores ignored."
+    ],
+    "fs": [
+      "Feature store",
+      "Redis Cluster",
+      "Burst counters."
+    ],
+    "rs": [
+      "Rule service",
+      "Go, versioned data",
+      "Backtest, shadow, slice."
+    ],
+    "cm": [
+      "Clearing matcher",
+      "Spark batch",
+      "Match, post, release."
+    ],
+    "el": [
+      "Event log",
+      "Kafka via outbox",
+      "Every decision."
+    ],
+    "cs": [
+      "Alerts and cases",
+      "Kafka consumers",
+      "Texts, cases, archive."
+    ]
+  },
+  "stack": [
+    {
+      "id": "auth-store",
+      "heading": "Auth store: PostgreSQL partitioned by account",
+      "kicker": "Technology · authorisation store",
+      "title": "One partition, one transaction: the hold and the message together",
+      "pick": "PostgreSQL 16, partitioned by account, hot set in memory, synchronous standby",
+      "why": "The decision must reserve atomically, in milliseconds, twelve thousand times a second. Everything it writes belongs to one account, so one partition and one transaction hold it.",
+      "how": "Accounts are partitioned by account ID, so the balance, the holds and the network message a decision touches live together. A decision is one conditional update: a version column on the account makes the second of two simultaneous swipes fail and re-read. The network's reference is a unique key, written with the hold. The hot set fits in memory, and each primary has a synchronous standby in another zone.",
+      "detail": "The core ledger keeps posted money; this store is reconciled with it daily.",
+      "rejected": [
+        [
+          "Holds in the core ledger",
+          "Correct, but its batch windows and tail latency would sit on the authorisation path."
+        ],
+        [
+          "A cache in front of the ledger",
+          "A cache cannot reserve: two readers of the same cached balance both approve."
+        ],
+        [
+          "An event log as the source of truth",
+          "The synchronous check needs the current balance, not a replay."
+        ]
+      ],
+      "summary": [
+        "Auth store",
+        "PostgreSQL, by account",
+        "Core ledger; cache",
+        "One conditional write per decision"
+      ],
+      "course": "theory/03 (partitioning and storage) and theory/07 (correctness under failure)",
+      "parts": "03, 07",
+      "drill": [
+        "Two swipes on one card hit two decision servers in the same millisecond. How many approvals?",
+        "At most what the balance covers. Both write to the account's partition, and the conditional update on the version lets only one succeed; the other re-reads and decides again. The trap is read, decide, then write.",
+        "one partition; a conditional update on the version"
+      ]
+    },
+    {
+      "id": "rules",
+      "heading": "Rules in process: versioned data",
+      "kicker": "Technology · rules",
+      "title": "Rules are data, evaluated in process, swapped atomically",
+      "pick": "A sandboxed expression language in the decision service, a rule set per version",
+      "why": "Rules are cheap to evaluate and must change without a deploy. A remote rules service would add a hop and a failure mode to every decision.",
+      "how": "The rule service holds versions of the rule set. Each decision server fetches a new version, compiles it once and swaps it in atomically. Every evaluation has a time and memory limit, and the version number is written on the decision. A new rule goes through a backtest on yesterday's traffic, then a shadow period where it decides but does not act, then a slice of live traffic.",
+      "detail": "A bad rule is rolled back by switching the version, not by a deploy.",
+      "rejected": [
+        [
+          "Rules as code",
+          "A deploy per change, at two in the morning."
+        ],
+        [
+          "A remote rules engine",
+          "A network hop and a dependency inside a hundred-millisecond budget."
+        ]
+      ],
+      "summary": [
+        "Rules",
+        "In process, versioned data",
+        "Rules as code; remote engine",
+        "Change without a deploy"
+      ],
+      "course": "theory/08 (reliability and operations)",
+      "parts": "08",
+      "drill": [
+        "A new rule blocks ten percent of good transactions in the first minute. What happens?",
+        "The slice stage caps it to a small share of traffic, a gate sees the decline rate move and the rollout halts. The version is switched back. Backtest and shadow come first so it rarely gets here.",
+        "backtest, shadow, a slice; roll back by version"
+      ]
+    },
+    {
+      "id": "scorer",
+      "heading": "Model scorer: a separate service with a cut-off",
+      "kicker": "Technology · model scorer",
+      "title": "A scorer that can be slow without making us slow",
+      "pick": "A separate gRPC service, a 60 millisecond cut-off, a fail table",
+      "why": "The model is the only step that can be slow. Its slowness must not become ours.",
+      "how": "The decision service sends the request asynchronously and waits at most sixty milliseconds. A late score is logged and ignored. A fail-policy table decides without it, by merchant category and amount. Model releases are independent of decision releases. A small model can be embedded, with the same cut-off around it.",
+      "detail": "The table is signed and versioned like rules.",
+      "rejected": [
+        [
+          "Embedding a large model in the decision service",
+          "Model releases become decision releases, and a heavy model competes for the same CPU."
+        ],
+        [
+          "Waiting for the model",
+          "The slowest score sets every customer's wait."
+        ]
+      ],
+      "summary": [
+        "Model scorer",
+        "Separate service, 60 ms",
+        "Embedded; wait",
+        "Slow model, fast answer"
+      ],
+      "course": "theory/08 (reliability and operations)",
+      "parts": "08",
+      "drill": [
+        "The model is slow tonight. What does a cardholder at a till experience?",
+        "Nothing worse: at sixty milliseconds the decision proceeds with the fail table and the rules. Approvals continue, with slightly looser or tighter policy by category.",
+        "cut-off at 60 ms; the fail table decides"
+      ]
+    },
+    {
+      "id": "feature-store",
+      "heading": "Feature store: exact counters in memory",
+      "kicker": "Technology · feature store",
+      "title": "Burst counters exact at decision time, a millisecond each",
+      "pick": "Redis Cluster, one key per card per minute, one pipelined round trip",
+      "why": "Velocity rules need the count of the last few minutes, exact, inside the request path.",
+      "how": "One key per card per minute. A decision increments the current bucket and reads the previous nine in one pipelined round trip, and keys expire on their own. Slower pattern features come from the stream processor and are written back in batches.",
+      "detail": "A lost shard loses counts for a few minutes; the rules treat missing as unknown, not as zero.",
+      "rejected": [
+        [
+          "Counters from a stream processor",
+          "Seconds late: the burst is over before the count lands."
+        ],
+        [
+          "A SQL count over recent transactions",
+          "A millisecond becomes tens."
+        ]
+      ],
+      "summary": [
+        "Feature store",
+        "Redis, per-minute keys",
+        "Stream counters; SQL count",
+        "Exact, in one round trip"
+      ],
+      "course": "theory/05 (caching)",
+      "parts": "05",
+      "drill": [
+        "A card is used four times in ten seconds, at four merchants. Which counter sees it, and when?",
+        "The inline per-minute counter, in the same decision: the fourth swipe reads the count of the previous three. A stream aggregate would be seconds late.",
+        "inline counters in the request path"
+      ]
+    },
+    {
+      "id": "event-log",
+      "heading": "Event log: outbox and Kafka",
+      "kicker": "Technology · event log",
+      "title": "Every decision reaches the archive, alerts and cases, never the answer",
+      "pick": "Outbox row in the same transaction, Kafka partitioned by account",
+      "why": "Consumers must not slow the answer, and none may miss a decision.",
+      "how": "The decision is written to an outbox row in the same transaction as the hold. A relay publishes it to Kafka, keyed by account, at least once. The archive, the alert service and case management are separate consumer groups, each deduplicating by decision ID.",
+      "detail": "The decision carries the rule version and the score, so it can be explained later.",
+      "rejected": [
+        [
+          "Publishing after the commit",
+          "A crash between the two loses the decision for the audit trail."
+        ],
+        [
+          "Synchronous calls to each consumer",
+          "Every consumer's slowness joins the answer."
+        ]
+      ],
+      "summary": [
+        "Event log",
+        "Outbox into Kafka",
+        "Publish after; sync calls",
+        "None can slow the answer"
+      ],
+      "course": "theory/06 (messaging and streams)",
+      "parts": "06"
+    },
+    {
+      "id": "gateway",
+      "heading": "Auth gateway: the network's messages",
+      "kicker": "Technology · auth gateway",
+      "title": "A gateway that speaks the network's protocol and nothing else",
+      "pick": "Go service, mutual TLS to the processor, message mapping, deduplication",
+      "why": "The card network's messages are not our domain model. One place maps them and takes care of repeats and order.",
+      "how": "The gateway terminates mutual TLS from the processor, maps each message to our request and keys it by the network's reference. A repeat of an authorisation is answered from the stored decision. An advice, which is the network telling us a fact, is recorded once even when it would overdraw the account.",
+      "detail": "A reversal arriving before its authorisation is parked briefly and matched.",
+      "rejected": [
+        [
+          "The processor's format through our services",
+          "Every service would need to know the network's quirks."
+        ],
+        [
+          "Treating each message as new",
+          "A repeated message double-holds the balance."
+        ]
+      ],
+      "summary": [
+        "Auth gateway",
+        "Go, mutual TLS, mapping",
+        "Raw format; treat as new",
+        "Repeats and order handled once"
+      ],
+      "course": "theory/07 (correctness under failure)",
+      "parts": "07"
+    },
+    {
+      "id": "clearing",
+      "heading": "Clearing matcher: a batch job",
+      "kicker": "Technology · clearing matcher",
+      "title": "Clearing files matched against holds, then posted",
+      "pick": "Spark batch over clearing files, matching by network reference",
+      "why": "Money moves at clearing, not at authorisation. The files arrive daily and the join is a batch job.",
+      "how": "The matcher reads the clearing file and matches each line to its hold by the network's reference. A match posts the final amount to the core ledger and releases the difference, which handles the tip. An unmatched hold expires after its lifetime. An unmatched clearing line becomes a break with an owner.",
+      "detail": "Count and amount totals are checked per file before matching.",
+      "rejected": [
+        [
+          "Debiting at authorisation",
+          "The final amount is not known: a tip or a fuel pre-authorisation differs."
+        ],
+        [
+          "Matching on amount and time",
+          "Two equal amounts at a cafe in a minute are ambiguous."
+        ]
+      ],
+      "summary": [
+        "Clearing matcher",
+        "Spark batch",
+        "Debit at auth",
+        "Hold now, money at clearing"
+      ],
+      "course": "theory/08 (reliability and operations)",
+      "parts": "08"
+    }
+  ],
+  "challenges": {
+    "1": [
+      "Debiting the balance at authorisation",
+      "the final amount differs by the tip; a hold is placed and clearing moves the money."
+    ],
+    "2": [
+      "Reading the balance, then writing it",
+      "two readers both approve; a conditional write in one partition decides."
+    ],
+    "3": [
+      "Treating every network message as new",
+      "a repeat double-holds the balance; key by the network's reference."
+    ],
+    "4": [
+      "Waiting for the model",
+      "its slowness becomes ours; a budget slice and a fail table cap it."
+    ],
+    "5": [
+      "Burst counters from a stream processor",
+      "they land seconds late, after the burst is over."
+    ],
+    "6": [
+      "Rules as code, deployed",
+      "a deploy per change at two in the morning; versioned data swaps in atomically."
+    ],
+    "7": [
+      "Dropping advices received while we were down",
+      "the network already approved; every advice is recorded once, even if it overdraws."
+    ],
+    "8": [
+      "Dashboards of CPU and memory",
+      "the machines are fine while declines double; watch decisions by reason."
+    ]
+  }
+}

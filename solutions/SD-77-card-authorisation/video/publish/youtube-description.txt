@@ -1,4 +1,4 @@
-Card authorisation looks like the easiest question in a fintech loop: a request arrives, you check the balance, you say yes. It is asked at every level because that answer is wrong in three places at once. This is a full reference solution at the Staff bar (L6/L7): theory, a three-version design, eight challenges that break it, and the build cost. 75 minutes, 156 numbered slides, with an interviewer, a candidate and a coach.
+Card authorisation looks like the easiest question in a fintech loop: a request arrives, you check the balance, you say yes. It is asked at every level because that answer is wrong in three places at once. This is a full reference solution at the Staff bar (L6/L7): theory, a three-version design, eight challenges that break it, and the build cost. 90 minutes, 560 numbered slides, with an interviewer, a candidate and a coach.
 
 The thesis: card authorisation is a promise made inside someone else's deadline. A hold, not a debit. Every network message once, in any order. A written answer for when a step is late. And a ledger that absorbs the decisions the network made for us.
 
@@ -13,23 +13,24 @@ Run the round cold first. Then watch once straight through. On the second pass, 
 
 CHAPTERS
 0:00 0 Cold open
-2:29 1 Requirements and scope
-7:38 2 Estimates
-12:35 3 Theory
-21:09 4 API and entities
-25:29 5 High-level design
-34:46 6 Bridge
-35:30 7 Challenges
-35:48 7.1 Challenge 1: The tip
-40:27 7.2 Challenge 2: Two swipes, one balance
-44:44 7.3 Challenge 3: The same message twice, and in the wrong order
-48:48 7.4 Challenge 4: The model is slow tonight
-53:27 7.5 Challenge 5: A burst, seconds apart
-57:19 7.6 Challenge 6: A new attack at 2 a.m.
-1:01:36 7.7 Challenge 7: We were down for twenty minutes
-1:06:24 7.8 Challenge 8: Declines doubled in ten minutes
-1:10:11 8 Build cost
-1:12:46 9 Recap
+2:32 1 Requirements and scope
+7:43 2 Estimates
+12:46 3 Theory
+21:35 4 API and entities
+26:03 5 High-level design
+35:53 5.1 Components and technologies
+47:06 6 Bridge
+47:49 7 Challenges
+48:07 7.1 Challenge 1: The tip
+53:03 7.2 Challenge 2: Two swipes, one balance
+57:38 7.3 Challenge 3: The same message twice, and in the wrong order
+1:02:02 7.4 Challenge 4: The model is slow tonight
+1:07:00 7.5 Challenge 5: A burst, seconds apart
+1:11:07 7.6 Challenge 6: A new attack at 2 a.m.
+1:15:38 7.7 Challenge 7: We were down for twenty minutes
+1:20:46 7.8 Challenge 8: Declines doubled in ten minutes
+1:24:51 8 Build cost
+1:27:29 9 Recap
 
 LINKS
 Written reference design: https://github.com/nirmata78/design-room/blob/main/solutions/SD-77-card-authorisation/SD-77_Card_Authorisation_Reference_Design.md

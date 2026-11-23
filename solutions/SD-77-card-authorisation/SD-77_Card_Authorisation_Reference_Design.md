@@ -7,8 +7,8 @@ documentclass: article
 fontsize: 10pt
 geometry: a4paper,top=0.7in,bottom=0.75in,left=0.75in,right=0.75in
 colorlinks: true
-linkcolor: blue
-urlcolor: blue
+linkcolor: gblueink
+urlcolor: gblueink
 toc: true
 toc-depth: 2
 numbersections: false
@@ -639,6 +639,143 @@ that moves the amount from hold to posted, so available never jumps; then the le
 record ID, so a crash between the two is repaired by simply running the record again. **Alternatives.** Streaming clearing per record
 (fine where the network offers it; the matching logic is the same). **Verdict:** batch, with the same
 idempotent per-record step a stream would use.
+
+## Technologies, one level down
+
+Every container with the technology it runs on, how it is built, the alternatives rejected and why, and the question an interviewer asks about it. Generated from `stack.json`.
+
+<!-- stack:sections -->
+
+## Auth store: PostgreSQL partitioned by account
+
+*How it is built.* Accounts are partitioned by account ID, so the balance, the holds and the network message a decision touches live together. A decision is one conditional update: a version column on the account makes the second of two simultaneous swipes fail and re-read. The network's reference is a unique key, written with the hold. The hot set fits in memory, and each primary has a synchronous standby in another zone. The core ledger keeps posted money; this store is reconciled with it daily.
+
+*Why PostgreSQL 16, partitioned by account, hot set in memory, synchronous standby:* The decision must reserve atomically, in milliseconds, twelve thousand times a second. Everything it writes belongs to one account, so one partition and one transaction hold it.
+
+*Rejected:*
+
+- **Holds in the core ledger**: Correct, but its batch windows and tail latency would sit on the authorisation path.
+- **A cache in front of the ledger**: A cache cannot reserve: two readers of the same cached balance both approve.
+- **An event log as the source of truth**: The synchronous check needs the current balance, not a replay.
+
+*Course:* theory/03 (partitioning and storage) and theory/07 (correctness under failure).
+
+*Drill.* "Two swipes on one card hit two decision servers in the same millisecond. How many approvals?" At most what the balance covers. Both write to the account's partition, and the conditional update on the version lets only one succeed; the other re-reads and decides again. The trap is read, decide, then write.
+
+## Rules in process: versioned data
+
+*How it is built.* The rule service holds versions of the rule set. Each decision server fetches a new version, compiles it once and swaps it in atomically. Every evaluation has a time and memory limit, and the version number is written on the decision. A new rule goes through a backtest on yesterday's traffic, then a shadow period where it decides but does not act, then a slice of live traffic. A bad rule is rolled back by switching the version, not by a deploy.
+
+*Why A sandboxed expression language in the decision service, a rule set per version:* Rules are cheap to evaluate and must change without a deploy. A remote rules service would add a hop and a failure mode to every decision.
+
+*Rejected:*
+
+- **Rules as code**: A deploy per change, at two in the morning.
+- **A remote rules engine**: A network hop and a dependency inside a hundred-millisecond budget.
+
+*Course:* theory/08 (reliability and operations).
+
+*Drill.* "A new rule blocks ten percent of good transactions in the first minute. What happens?" The slice stage caps it to a small share of traffic, a gate sees the decline rate move and the rollout halts. The version is switched back. Backtest and shadow come first so it rarely gets here.
+
+## Model scorer: a separate service with a cut-off
+
+*How it is built.* The decision service sends the request asynchronously and waits at most sixty milliseconds. A late score is logged and ignored. A fail-policy table decides without it, by merchant category and amount. Model releases are independent of decision releases. A small model can be embedded, with the same cut-off around it. The table is signed and versioned like rules.
+
+*Why A separate gRPC service, a 60 millisecond cut-off, a fail table:* The model is the only step that can be slow. Its slowness must not become ours.
+
+*Rejected:*
+
+- **Embedding a large model in the decision service**: Model releases become decision releases, and a heavy model competes for the same CPU.
+- **Waiting for the model**: The slowest score sets every customer's wait.
+
+*Course:* theory/08 (reliability and operations).
+
+*Drill.* "The model is slow tonight. What does a cardholder at a till experience?" Nothing worse: at sixty milliseconds the decision proceeds with the fail table and the rules. Approvals continue, with slightly looser or tighter policy by category.
+
+## Feature store: exact counters in memory
+
+*How it is built.* One key per card per minute. A decision increments the current bucket and reads the previous nine in one pipelined round trip, and keys expire on their own. Slower pattern features come from the stream processor and are written back in batches. A lost shard loses counts for a few minutes; the rules treat missing as unknown, not as zero.
+
+*Why Redis Cluster, one key per card per minute, one pipelined round trip:* Velocity rules need the count of the last few minutes, exact, inside the request path.
+
+*Rejected:*
+
+- **Counters from a stream processor**: Seconds late: the burst is over before the count lands.
+- **A SQL count over recent transactions**: A millisecond becomes tens.
+
+*Course:* theory/05 (caching).
+
+*Drill.* "A card is used four times in ten seconds, at four merchants. Which counter sees it, and when?" The inline per-minute counter, in the same decision: the fourth swipe reads the count of the previous three. A stream aggregate would be seconds late.
+
+## Event log: outbox and Kafka
+
+*How it is built.* The decision is written to an outbox row in the same transaction as the hold. A relay publishes it to Kafka, keyed by account, at least once. The archive, the alert service and case management are separate consumer groups, each deduplicating by decision ID. The decision carries the rule version and the score, so it can be explained later.
+
+*Why Outbox row in the same transaction, Kafka partitioned by account:* Consumers must not slow the answer, and none may miss a decision.
+
+*Rejected:*
+
+- **Publishing after the commit**: A crash between the two loses the decision for the audit trail.
+- **Synchronous calls to each consumer**: Every consumer's slowness joins the answer.
+
+*Course:* theory/06 (messaging and streams).
+
+## Auth gateway: the network's messages
+
+*How it is built.* The gateway terminates mutual TLS from the processor, maps each message to our request and keys it by the network's reference. A repeat of an authorisation is answered from the stored decision. An advice, which is the network telling us a fact, is recorded once even when it would overdraw the account. A reversal arriving before its authorisation is parked briefly and matched.
+
+*Why Go service, mutual TLS to the processor, message mapping, deduplication:* The card network's messages are not our domain model. One place maps them and takes care of repeats and order.
+
+*Rejected:*
+
+- **The processor's format through our services**: Every service would need to know the network's quirks.
+- **Treating each message as new**: A repeated message double-holds the balance.
+
+*Course:* theory/07 (correctness under failure).
+
+## Clearing matcher: a batch job
+
+*How it is built.* The matcher reads the clearing file and matches each line to its hold by the network's reference. A match posts the final amount to the core ledger and releases the difference, which handles the tip. An unmatched hold expires after its lifetime. An unmatched clearing line becomes a break with an owner. Count and amount totals are checked per file before matching.
+
+*Why Spark batch over clearing files, matching by network reference:* Money moves at clearing, not at authorisation. The files arrive daily and the join is a batch job.
+
+*Rejected:*
+
+- **Debiting at authorisation**: The final amount is not known: a tip or a fuel pre-authorisation differs.
+- **Matching on amount and time**: Two equal amounts at a cafe in a minute are ambiguous.
+
+*Course:* theory/08 (reliability and operations).
+
+<!-- /stack:sections -->
+
+## The stack on one page
+
+<!-- stack:summary -->
+
+| Container | Choice | Rejected | The deciding reason |
+|---|---|---|---|
+| Auth store | PostgreSQL, by account | Core ledger; cache | One conditional write per decision |
+| Rules | In process, versioned data | Rules as code; remote engine | Change without a deploy |
+| Model scorer | Separate service, 60 ms | Embedded; wait | Slow model, fast answer |
+| Feature store | Redis, per-minute keys | Stream counters; SQL count | Exact, in one round trip |
+| Event log | Outbox into Kafka | Publish after; sync calls | None can slow the answer |
+| Auth gateway | Go, mutual TLS, mapping | Raw format; treat as new | Repeats and order handled once |
+| Clearing matcher | Spark batch | Debit at auth | Hold now, money at clearing |
+
+Each fix in Stage 6 rejects one tool by name:
+
+| Deep dive | Rejected | Because |
+|---|---|---|
+| 6.1 | Debiting the balance at authorisation | the final amount differs by the tip; a hold is placed and clearing moves the money. |
+| 6.2 | Reading the balance, then writing it | two readers both approve; a conditional write in one partition decides. |
+| 6.3 | Treating every network message as new | a repeat double-holds the balance; key by the network's reference. |
+| 6.4 | Waiting for the model | its slowness becomes ours; a budget slice and a fail table cap it. |
+| 6.5 | Burst counters from a stream processor | they land seconds late, after the burst is over. |
+| 6.6 | Rules as code, deployed | a deploy per change at two in the morning; versioned data swaps in atomically. |
+| 6.7 | Dropping advices received while we were down | the network already approved; every advice is recorded once, even if it overdraws. |
+| 6.8 | Dashboards of CPU and memory | the machines are fine while declines double; watch decisions by reason. |
+
+<!-- /stack:summary -->
 
 # Stage 6: Deep dives
 

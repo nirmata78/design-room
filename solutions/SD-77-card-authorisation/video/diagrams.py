@@ -154,6 +154,37 @@ d.edge("cm", "cl", "postings", "", src="l", dst="r", at=(330, 700))
 d.legend(40, 915, ("person", "container", "db", "ext"))
 d.save(OUT / "c4-containers.svg")
 
+# the same container view with the technologies (labels from ../stack.json)
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / 'src')); import stack
+c4.Diagram.OVERRIDE = {k: (v[1], v[2]) for k, v in stack.C4.items()}
+d = c4.Diagram(1600, 950)
+d.boundary(330, 50, 1240, 820, "Issuer authorisation", "Software System")
+d.node("np", 30, 330, 270, 160, "ext", "Network + processor", "External", "Requests, advices, files.")
+d.node("cl", 30, 640, 270, 160, "ext", "Core ledger", "Internal", "Posted money.")
+d.node("gwc", 360, 330, 260, 160, "container", "Auth gateway", "Service", "Maps messages; mutual TLS to the processor.", size=21)
+d.node("dc", 660, 330, 260, 160, "container", "Decision service", "Stateless service", "Rules in process; budget; fail table.", size=21)
+d.node("as", 960, 330, 260, 160, "db", "Auth store", "Partitioned by account", "Balances, holds, messages.", size=21)
+d.node("ms", 660, 90, 260, 150, "container", "Model scorer", "Service", "Scores under a cut-off.", size=21)
+d.node("fs", 960, 90, 260, 150, "db", "Feature store", "In-memory", "Burst counters, aggregates.", size=21)
+d.node("rs", 1260, 90, 280, 150, "container", "Rule service", "Service", "Versions, backtest, shadow.", size=21)
+d.node("cm", 360, 640, 260, 160, "container", "Clearing matcher", "Batch service", "Match, post, release, expire.", size=21)
+d.node("el", 660, 640, 260, 160, "queue", "Event log", "Partitioned log", "Every decision, via outbox.", size=21)
+d.node("cs", 960, 640, 260, 160, "container", "Alerts and cases", "Consumers", "Texts, cases, archive.", size=21)
+d.edge("np", "gwc", "ISO 8583", "TLS", src="r", dst="l", at=(330, 310))
+d.edge("gwc", "dc", "decide", "", src="r", dst="l", at=(640, 310))
+d.edge("dc", "as", "reserve", "", src="r", dst="l", at=(940, 310))
+d.edge("dc", "ms", "score", "", src="t", dst="b", at=(745, 285))
+d.edge("dc", "fs", "counters", "", src="t:0.9", dst="b:0.2", at=(930, 270))
+d.edge("rs", "dc", "rule set", "push", src="b:0.3", dst="t:0.97", at=(1290, 285))
+d.edge("dc", "el", "outbox", "async", src="b", dst="t", at=(780, 605))
+d.edge("cm", "as", "release", "", src="t:0.5", dst="b:0.5", via=[(490, 530), (1090, 530)], at=(560, 518))
+d.edge("el", "cs", "events", "async", src="r", dst="l", at=(940, 700))
+d.edge("cm", "cl", "postings", "", src="l", dst="r", at=(330, 700))
+d.legend(40, 915, ("person", "container", "db", "ext"))
+d.save(OUT / "c4-containers-tech.svg")
+c4.Diagram.OVERRIDE = {}
+
+
 # ───────────────────────────── 3 · sequences ─────────────────────────────────────────────────────────
 def seq(name, parts, steps, **kw):
     s = sq.Seq(1500, size=22, row=50, **kw)

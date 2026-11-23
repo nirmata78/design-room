@@ -12,23 +12,24 @@ It replaces problem 3 of the 2026-11-20 fintech series (retired). Written compan
 | Time | Chapter |
 |---|---|
 | 00:00 | 0 Cold open |
-| 02:29 | 1 Requirements and scope |
-| 07:38 | 2 Estimates |
-| 12:35 | 3 Theory |
-| 21:09 | 4 API and entities |
-| 25:29 | 5 High-level design |
-| 34:46 | 6 Bridge |
-| 35:30 | 7 Challenges |
-| 35:48 | 7.1 The tip |
-| 40:27 | 7.2 Two swipes, one balance |
-| 44:44 | 7.3 The same message twice, and in the wrong order |
-| 48:48 | 7.4 The model is slow tonight |
-| 53:27 | 7.5 A burst, seconds apart |
-| 57:19 | 7.6 A new attack at 2 a.m. |
-| 61:36 | 7.7 We were down for twenty minutes |
-| 66:24 | 7.8 Declines doubled in ten minutes |
-| 70:11 | 8 Build cost (AUX) |
-| 72:46 | 9 Recap |
+| 02:32 | 1 Requirements and scope |
+| 07:43 | 2 Estimates |
+| 12:46 | 3 Theory |
+| 21:35 | 4 API and entities |
+| 26:03 | 5 High-level design |
+| 35:53 | 5.1 Components and technologies |
+| 47:06 | 6 Bridge |
+| 47:49 | 7 Challenges |
+| 48:07 | 7.1 Challenge 1: The tip |
+| 53:03 | 7.2 Challenge 2: Two swipes, one balance |
+| 57:38 | 7.3 Challenge 3: The same message twice, and in the wrong order |
+| 1:02:02 | 7.4 Challenge 4: The model is slow tonight |
+| 1:07:00 | 7.5 Challenge 5: A burst, seconds apart |
+| 1:11:07 | 7.6 Challenge 6: A new attack at 2 a.m. |
+| 1:15:38 | 7.7 Challenge 7: We were down for twenty minutes |
+| 1:20:46 | 7.8 Challenge 8: Declines doubled in ten minutes |
+| 1:24:51 | 8 Build cost |
+| 1:27:29 | 9 Recap |
 
 ## The eight challenges
 
@@ -89,3 +90,15 @@ the script. The booklet is assembled from `booklet-src/`. The MP4 stays in this 
 | Card data scope | general canon | Ch. 1 Q6: tokens only; dismissed aloud as a cut |
 | 3-D Secure | cue sheet input list | dismissed: its result arrives as an input field |
 | What changed recently | — | network risk scores arrive with the request as a feature (booklet Stage 7); tokenised cards; sandboxed rule languages such as CEL (booklet appendix F) |
+
+## Retrofit, 2026-11-22
+
+Brought to the current standard by `RETROFIT.md`: the Google theme (`video.css`, `google-theme.css`), progressive reveal (every table row,
+card, trace event and figure step appears as it is spoken), sidecar captions (`.srt` and `.vtt` beside the MP4, nothing burned in), the
+technology chapter **5.1** generated from `../stack.json` (container view with technologies, one slide per technology with its rejected
+alternatives, the stack on one slide, the drill interlude) and a **Rejected** line on every challenge's fix slide.
+
+**101 of the 168 slides were written before reveal markers existed; their markers were placed automatically** (`dsl.META["automark"]`:
+the narration is cut at sentences and dealt to the reveal units by word overlap). Watch those slides and move a marker by hand where one
+lands badly. Not done in this pass: the C4 context moved to the end of chapter 1, a mechanism map in the theory chapter, extra sequences per
+requirement, component views. The previous sources are kept in `.v1-retrofit-2026-11-22/` until the author has watched this version.
