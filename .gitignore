@@ -30,6 +30,8 @@ Gemfile.lock
 # ── PDF kit: local venv, build intermediates, review images ──
 pdf-kit/.venv/
 *.built.html
+*.check.html
+**/video/layout-report.txt
 *_pages/
 
 # ── Mock-interview videos: rebuildable, too large for the repo ──

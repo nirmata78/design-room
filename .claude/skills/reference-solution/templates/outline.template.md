@@ -8,6 +8,11 @@ Target level: staff (manager layer AUX) · Target length: __ min (75–100) · W
 - **Definition to say aloud** (what the system is, every clause load-bearing):
 - **Hook** (why it is harder than it looks):
 
+## Scale line (GUIDELINES §3.1)
+
+Volume per month: · Total over the retention period: · Peak and its cause:
+(every estimate below names which of these it starts from)
+
 ## 0 · What this question grades
 
 | Axis | Weak signal | Strong signal |
@@ -28,8 +33,8 @@ Target level: staff (manager layer AUX) · Target length: __ min (75–100) · W
 
 ## 2 · Estimates
 
-| Number | Arithmetic | Label (illustrative · target · measured) | Decision it drives |
-|---|---|---|---|
+| Number | From (scale line) | Arithmetic | Label (illustrative · target · measured) | Decision it drives |
+|---|---|---|---|---|
 
 ## 3 · Theory
 
@@ -60,27 +65,45 @@ Entities (conceptual), then physical tables and keys:
 
 Baseline spine, left to right (this is also the reveal order):
 C4 context (chapter 1): actors and external systems:
-C4 containers (right after V3): one line per container, what the narration says about it:
+C4 containers = the carried baseline, built V1 → V3 (`since=`); one line per container, what the narration says about it:
+
+Canonical diagram plan (GUIDELINES §7.5): each level drawn in full once; every later slide that shows it, and its delta:
+
+| Slide | Canonical diagram | Delta (new= · badges= · flow= · keep=/attack=/fix=/focus= · OVERRIDE) |
+|---|---|---|
 Flows and sequences, one of each per functional requirement (numbered steps):
 
 ## 5.1 · Components and technologies
 
 C4 component view per in-scope service (components, library or mechanism, timeouts):
 
-| Container | Choice | How it is built (one level down) | Rejected (≥ 2) and why | Theory part |
-|---|---|---|---|---|
+Write the choices into `../stack.json` (SKILL step 2a), not here: `stack.py sync` fills the region below.
+
+<!-- stack:outline -->
+<!-- /stack:outline -->
+
+Drill interlude: which 4–5 boxes, each with its probe (the `drill` field in `stack.json`).
+
+## 5.2 · When you don't need all this (alternate path)
+
+Simpler design (the one box that changes): · How it works, one level down: · What it gives up: · Crossover number (from the
+scale line) and why: · What the narration says when it would switch:
 
 ## 7 · Challenges
 
-One block per challenge, 6–8 in total. The last is observability.
+One block per challenge, 6–10 in total. The last is observability. Versions follow the challenges: V4, V5 … for each fix that
+changes the design.
 
 ### Challenge N · <short name>
 
 - Q (interviewer):
 - Naive answer:
 - Case (IDs, times, numbers):
-- Break (which box):
-- Fix (mechanism) · sequence? code?:
+- Break (which component, inside which container; the C4 component view it is drawn on):
+- Fix (mechanism) · sequence? pseudocode (key lines)?:
+- One level down (what is written or appended; which failure it covers and which it does not; why this tool and not the one under it; when the simpler option is fine):
+- Version after the fix (V4, V5 … or "no change"):
+- Rejected on the fix slide (tool · why; `challenges` in `stack.json`):
 - Why it works (property):
 - "What if the fix fails?":
 - Second fix or honest limit:
