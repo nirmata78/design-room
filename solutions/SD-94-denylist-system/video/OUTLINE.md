@@ -527,3 +527,20 @@ Planned: 86 minutes, 11,437 words, 181 slides. **Actual (script, after the build
 | 8 Build cost | 575 | 7 |
 | 9 Recap | 529 | 8 |
 | **Total** | **11,736** | **168** |
+
+## 5.1 Components and technologies (retrofit, 2026-11-22)
+
+<!-- stack:outline -->
+
+| Container | Choice | How it is built | Rejected | Theory part |
+|---|---|---|---|---|
+| Rule store | PostgreSQL, one primary, a synchronous standby, a counter row per list | Each change is a transaction that locks the list's counter row, increments it and stamps the change with the new version | A replicated log as the primary store; An eventually consistent store | 04 |
+| Compiler | A Go job: a snapshot every N versions, a delta per version, a manifest, a digest chain | On each new version the compiler writes a delta from the previous one, content-addressed by its hash | A full file on a timer; Per-request lookups only | 06 |
+| Origin and relay tree | Object storage as origin; regional, then zone, HTTP caching relays | Artifacts sit in object storage with names that include their hash | Pub-sub as the only path; A configuration fabric we already run | 05 |
+| Enforcement agent | Library in the server, a compact local filter with an exact tier behind it | The agent loads the artifact into a new in-memory set, verifies the digest, then swaps one pointer | A network lookup per request; Editing the set in place | 08 |
+| Control plane | Go service, etcd for fleet state, staged rollout by percentage | A new version is staged to one percent of nodes, then ten, then everyone, with a gate between stages that watches the rejection rate and the error rate | Fan out to the whole fleet at once; Gate by a human approval only | 08 |
+| Policy tool | Web app and Go API, two-person approval, an explain view | Changes are drafted, diffed against the live list, and approved by a second person when they match more than a threshold | Direct database edits; A spreadsheet upload | 08 |
+
+Fix-slide rejections: 1: A push-only stream; 2: Applying changes in arrival order; 3: Fanning out to the whole fleet at once; 4: Making the control plane a dependency of enforcement; 5: The full list in every node's memory; 6: Calling a slow external source on every request; 7: Alerting on server health only.
+
+<!-- /stack:outline -->

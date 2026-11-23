@@ -1,0 +1,70 @@
+stack sync: up to date
+automarked 116 legacy slides (hand-place markers to refine): ['ch0_2.py:15', 'ch0_2.py:29', 'ch0_2.py:42', 'ch0_2.py:42', 'ch0_2.py:42', 'ch0_2.py:42'] …
+slides 186 frames 599 words {'C': 11364, 'I': 563, 'V': 771, 'N': 553} total 13251
+by chapter {'0': 396, '1': 1008, '2': 881, '3': 1468, '4': 802, '5': 2763, '6': 89, '7': 4740, '8': 575, '9': 529}
+  voice 20/925
+  voice 40/925
+  voice 60/925
+  voice 80/925
+  voice 100/925
+  voice 120/925
+  voice 140/925
+  voice 160/925
+  voice 180/925
+  voice 200/925
+  voice 220/925
+  voice 240/925
+  voice 260/925
+  voice 280/925
+  voice 300/925
+  voice 320/925
+  voice 340/925
+  voice 360/925
+  voice 380/925
+  voice 400/925
+  voice 420/925
+  voice 440/925
+  voice 460/925
+  voice 480/925
+  voice 500/925
+  voice 520/925
+  voice 540/925
+  voice 560/925
+  voice 580/925
+  voice 600/925
+  voice 620/925
+  voice 640/925
+  voice 660/925
+  voice 680/925
+  voice 700/925
+  voice 720/925
+  voice 740/925
+  voice 760/925
+  voice 780/925
+  voice 800/925
+  voice 820/925
+  voice 840/925
+  voice 860/925
+  voice 880/925
+  voice 900/925
+  voice 920/925
+/Users/neo.bsuir/Projects/design-room/solutions/SD-94-denylist-system/video/denylist-reference.mp4  1080p  106:49  18 chapters  599 frames
+  00:00  0 Cold open
+  03:04  1 Requirements and scope
+  10:44  2 Estimates
+  18:01  3 Theory
+  29:34  4 API and entities
+  35:40  5 High-level design
+  48:11  5.1 Components and technologies
+  58:19  6 Bridge
+  59:02  7 Challenges
+  59:22  7.1 Challenge 1: The node that was offline
+  64:15  7.2 Challenge 2: Order, duplicates, overlap
+  69:37  7.3 Challenge 3: The bad push
+  76:03  7.4 Challenge 4: Stale or no control plane
+  81:45  7.5 Challenge 5: The list does not fit
+  87:24  7.6 Challenge 6: A slow external source
+  92:18  7.7 Challenge 7: How would you know?
+  97:35  8 Build cost
+  102:22  9 Recap
+EXIT 0 elapsed 5745s

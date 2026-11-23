@@ -7,22 +7,23 @@ Staff bar (L6/L7), manager layer marked AUX. **Length 92:53** (re-cut 2026-11-20
 | Time | Chapter |
 |---|---|
 | 00:00 | 0 Cold open |
-| 03:01 | 1 Requirements and scope |
-| 10:35 | 2 Estimates |
-| 17:44 | 3 Theory |
-| 29:00 | 4 API and entities |
-| 35:07 | 5 High-level design |
-| 47:08 | 6 Bridge |
-| 47:52 | 7 Challenges |
-| 48:12 | 7.1 Challenge 1: The node that was offline |
-| 52:46 | 7.2 Challenge 2: Order, duplicates, overlap |
-| 57:46 | 7.3 Challenge 3: The bad push |
-| 63:51 | 7.4 Challenge 4: Stale or no control plane |
-| 69:11 | 7.5 Challenge 5: The list does not fit |
-| 74:30 | 7.6 Challenge 6: A slow external source |
-| 79:03 | 7.7 Challenge 7: How would you know? |
-| 83:57 | 8 Build cost |
-| 88:38 | 9 Recap |
+| 03:04 | 1 Requirements and scope |
+| 10:44 | 2 Estimates |
+| 18:01 | 3 Theory |
+| 29:34 | 4 API and entities |
+| 35:40 | 5 High-level design |
+| 48:11 | 5.1 Components and technologies |
+| 58:19 | 6 Bridge |
+| 59:02 | 7 Challenges |
+| 59:22 | 7.1 Challenge 1: The node that was offline |
+| 1:04:15 | 7.2 Challenge 2: Order, duplicates, overlap |
+| 1:09:37 | 7.3 Challenge 3: The bad push |
+| 1:16:03 | 7.4 Challenge 4: Stale or no control plane |
+| 1:21:45 | 7.5 Challenge 5: The list does not fit |
+| 1:27:24 | 7.6 Challenge 6: A slow external source |
+| 1:32:18 | 7.7 Challenge 7: How would you know? |
+| 1:37:35 | 8 Build cost |
+| 1:42:22 | 9 Recap |
 
 ## Re-cut 2026-11-20
 
@@ -90,3 +91,14 @@ For the video README, not for the screen. The source map is kept outside the tra
 | Rate limiting, abuse detection, volumetric attack scrubbing | Dismissed aloud in ch. 1 (OUT) with pointers to SD-25 and SD-43 |
 | Buy against build against don't, people and months | Ch. 8 |
 
+## Retrofit, 2026-11-22
+
+Brought to the current standard by `RETROFIT.md`: the Google theme (`video.css`, `google-theme.css`), progressive reveal (every table row,
+card, trace event and figure step appears as it is spoken), sidecar captions (`.srt` and `.vtt` beside the MP4, nothing burned in), the
+technology chapter **5.1** generated from `../stack.json` (container view with technologies, one slide per technology with its rejected
+alternatives, the stack on one slide, the drill interlude) and a **Rejected** line on every challenge's fix slide.
+
+**116 of the 186 slides were written before reveal markers existed; their markers were placed automatically** (`dsl.META["automark"]`:
+the narration is cut at sentences and dealt to the reveal units by word overlap). Watch those slides and move a marker by hand where one
+lands badly. Not done in this pass: the C4 context moved to the end of chapter 1, a mechanism map in the theory chapter, extra sequences per
+requirement, component views. The previous sources are kept in `.v1-retrofit-2026-11-22/` until the author has watched this version.

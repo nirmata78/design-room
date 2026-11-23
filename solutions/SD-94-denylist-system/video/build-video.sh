@@ -5,12 +5,15 @@
 # The slides and the script are generated together from src/*.py (one source, so every frame has a cue).
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"; kit="$HOME/.claude/skills/slide-video-kit/scripts"
+python3 "$here/src/stack.py" sync
 python3 "$here/diagrams.py" >/dev/null
 python3 "$here/src/gen.py"
+rm -rf "$here/frames"
 "$HOME/Projects/design-room/pdf-kit/.venv/bin/python" "$kit/render_slides.py" --html "$here/video-slides.html" --prefix v \
   --svg-dir "$here/svg" --css-dir "$here" --out "$here/frames" >/dev/null 2>&1
 if [[ ${1:-} == --frames ]]; then exit 0; fi
 # Since 2026-11-20: built through the course builder's cached wrapper, which adds sentence beats and the course
 # pronunciation map and caches every synthesised line. The pacing beats are written into the script by src/dsl.py.
 "$HOME/.cache/kokoro-tts/.venv/bin/python" "$HOME/Projects/design-room/theory/video/build_cached.py" "$here/denylist-reference.script.md" \
-  --frames "$here/frames" --out "$here/denylist-reference.mp4" --dissolve 0.3 --chapter-gap 0
+  --frames "$here/frames" --out "$here/denylist-reference.mp4" --dissolve 0.3 --chapter-gap 0 \
+  --captions sidecar --reveal-fade 0.6 --max-minutes 180

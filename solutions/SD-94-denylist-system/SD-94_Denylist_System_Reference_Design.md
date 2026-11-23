@@ -7,8 +7,8 @@ documentclass: article
 fontsize: 10pt
 geometry: a4paper,top=0.7in,bottom=0.75in,left=0.75in,right=0.75in
 colorlinks: true
-linkcolor: blue
-urlcolor: blue
+linkcolor: gblueink
+urlcolor: gblueink
 toc: true
 toc-depth: 2
 numbersections: false
@@ -727,6 +727,127 @@ confirmed by an exact check. Used alone it blocks about 1 percent of clean traff
 
 **Alternatives.** An exact local set (fits at 10 M, not at 100 M IPv6). A cuckoo or quotient filter (can
 delete entries; still one-sided). A shared cache (a network call per request).
+
+## Technologies, one level down
+
+Every container with the technology it runs on, how it is built, the alternatives rejected and why, and the question an interviewer asks about it. Generated from `stack.json`.
+
+<!-- stack:sections -->
+
+## Rule store: PostgreSQL with a counter row
+
+*How it is built.* Each change is a transaction that locks the list's counter row, increments it and stamps the change with the new version. Because the row lock is taken before the commit, version order equals commit order. Every change is also appended to an audit table, with who, why and the approval. Per-key versions let a merge be idempotent and independent of arrival order.
+
+*Why PostgreSQL, one primary, a synchronous standby, a counter row per list:* The only part that must give one total order. Fifty changes a second is tiny for it; the risk is the commit-order race, not throughput.
+
+*Rejected:*
+
+- **A replicated log as the primary store**: More machinery than fifty writes a second needs, and the order is still decided by one leader.
+- **An eventually consistent store**: It cannot give one order, which is the one thing this store is for.
+
+*Course:* theory/04 (replication and consistency).
+
+*Drill.* "Two operators publish at the same moment. How is the order of their changes decided?" Both transactions lock the list's counter row, so one waits. The version number is taken under the lock, so version order is commit order. The trap is stamping the version before the commit.
+
+## Compiler: snapshots, deltas, a digest chain
+
+*How it is built.* On each new version the compiler writes a delta from the previous one, content-addressed by its hash. Every hundredth version it writes a full snapshot. A tiny manifest names the latest version, its digest and the previous digest, so the artifacts form a chain. A node that is behind by less than the delta window applies deltas, and otherwise fetches a snapshot. Snapshots are compact and sorted, so a node can load them without rebuilding.
+
+*Why A Go job: a snapshot every N versions, a delta per version, a manifest, a digest chain:* Every tier can cache an immutable artifact for ever, and every node can verify it before it applies it.
+
+*Rejected:*
+
+- **A full file on a timer**: Four terabytes a push, and no integrity check.
+- **Per-request lookups only**: The list service joins every request's availability.
+
+*Course:* theory/06 (messaging and streams).
+
+*Drill.* "A node was offline for a day. How does it catch up, and how does it know the result is right?" It reads the manifest, sees it is behind by more than the delta window, fetches the latest snapshot, then applies deltas. The digest chain proves the artifacts form a sequence and the digest proves the result.
+
+## Origin and relay tree: object storage and HTTP caches
+
+*How it is built.* Artifacts sit in object storage with names that include their hash. Regional relays, then zone relays, cache them with a very long lifetime. The manifest is the one mutable object, about a hundred bytes, cached for a second or two. Nodes poll the manifest and also accept a push hint, so a change lands in seconds. Manifest age at the node is a metric: a stale manifest is harmless to correctness and exactly how a ban fails to land.
+
+*Why Object storage as origin; regional, then zone, HTTP caching relays:* Immutable, content-addressed files are exactly what object storage and an HTTP cache do well. Five hundred nodes cost one origin fetch.
+
+*Rejected:*
+
+- **Pub-sub as the only path**: A missed message is never repaired, and there is no catch-up.
+- **A configuration fabric we already run**: Adopt it for transport, and keep our compiler, gates and audit.
+
+*Course:* theory/05 (caching).
+
+## Enforcement agent: a library with a local set
+
+*How it is built.* The agent loads the artifact into a new in-memory set, verifies the digest, then swaps one pointer. Check reads the current pointer and never blocks on a swap. A compact filter answers about ninety-nine percent of requests with a definite not listed. A maybe goes to the exact lookup tier through a small cache. If the control plane is unreachable the node keeps its last good set, and a bound says how stale it may become.
+
+*Why Library in the server, a compact local filter with an exact tier behind it:* The check is on every request, so it cannot wait for a network call. The local copy answers, and it is swapped atomically, never edited in place.
+
+*Rejected:*
+
+- **A network lookup per request**: The list service becomes part of every request's availability.
+- **Editing the set in place**: A reader can see a half-applied update.
+
+*Course:* theory/08 (reliability and operations).
+
+*Drill.* "The agent applies a corrupt artifact. What does the serving process see?" Nothing: the digest check fails before the swap, the node keeps the last good set and reports the failure. The trap is verifying after applying.
+
+## Control plane: stages, gates and a kill flag
+
+*How it is built.* A new version is staged to one percent of nodes, then ten, then everyone, with a gate between stages that watches the rejection rate and the error rate. A kill flag halts the rollout and holds every node at its current version. Fleet state, meaning which node runs which version, lives in etcd. A node never depends on the control plane to enforce; it depends on it only to move.
+
+*Why Go service, etcd for fleet state, staged rollout by percentage:* A bad list is everywhere in seconds unless something can stop it. A staged rollout with a gate buys the minutes a person needs.
+
+*Rejected:*
+
+- **Fan out to the whole fleet at once**: One mistyped line is a global outage in twenty seconds.
+- **Gate by a human approval only**: The gate is a minutes-long human step; automated metrics catch the first ten seconds.
+
+*Course:* theory/08 (reliability and operations).
+
+*Drill.* "An operator types slash eight instead of slash twenty-eight. What limits the damage?" The one percent stage: the gate sees the rejection rate jump and halts the rollout before the next stage. The kill flag freezes the rest. The trap is relying on the reviewer.
+
+## Policy tool: review and explain
+
+*How it is built.* Changes are drafted, diffed against the live list, and approved by a second person when they match more than a threshold. The explain view answers why a key was or was not blocked: which rule, which version, who added it and why. Every action lands in the audit table. A dry run shows the matched count before anything publishes.
+
+*Why Web app and Go API, two-person approval, an explain view:* People change the list under pressure. The tool makes a risky change need a second person and makes any verdict explainable afterwards.
+
+*Rejected:*
+
+- **Direct database edits**: No diff, no second person, no audit trail.
+- **A spreadsheet upload**: No validation of a typed range, and no explanation afterwards.
+
+*Course:* theory/08 (reliability and operations).
+
+<!-- /stack:sections -->
+
+## The stack on one page
+
+<!-- stack:summary -->
+
+| Container | Choice | Rejected | The deciding reason |
+|---|---|---|---|
+| Rule store | PostgreSQL, counter row | Log as store; eventual store | One total order |
+| Compiler | Snapshots, deltas, digest chain | Full file; lookups only | Immutable and verifiable |
+| Origin and relays | Object storage; HTTP relays | Pub-sub only | Cache for ever; one origin fetch |
+| Enforcement agent | Library; filter; atomic swap | Per-request lookup; in-place edit | Local, verified, atomic |
+| Control plane | Staged rollout, gates, kill flag | Fan out at once; human gate | Minutes to stop a bad list |
+| Policy tool | Web app, approval, explain | Database edits; spreadsheets | Second person; explain a verdict |
+
+Each fix in Stage 6 rejects one tool by name:
+
+| Deep dive | Rejected | Because |
+|---|---|---|
+| 6.1 | A push-only stream | a missed message is never repaired; polling the manifest catches up. |
+| 6.2 | Applying changes in arrival order | arrival order is not intent order; per-key versions make the merge idempotent. |
+| 6.3 | Fanning out to the whole fleet at once | one mistyped line is global in seconds; stages and a gate bound it. |
+| 6.4 | Making the control plane a dependency of enforcement | its outage would stop enforcement; nodes keep the last good set within a bound. |
+| 6.5 | The full list in every node's memory | it does not fit; a filter in front and an exact tier behind do. |
+| 6.6 | Calling a slow external source on every request | its latency becomes ours; prefer a bulk list, else a bounded cache and a budget. |
+| 6.7 | Alerting on server health only | the fleet can be green while a ban never lands; probe from change to enforcement. |
+
+<!-- /stack:summary -->
 
 # Stage 6: Deep dives
 

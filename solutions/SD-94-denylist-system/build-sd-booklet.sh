@@ -6,9 +6,12 @@
 # PlantUML exits 0 on most errors and draws an error image instead, so the SVG is grepped.
 set -uo pipefail
 cd "$(dirname "$0")"
+export PANGOCAIRO_BACKEND=fc FONTCONFIG_FILE="$HOME/Projects/design-room/pdf-kit/fonts/fonts.conf"   # rsvg-convert finds Inter / Plus Jakarta Sans / Roboto Mono here
 name=${1:?usage: build-sd-booklet.sh <Name> [--no-diagrams]}
 prefix=$(echo "$name" | cut -d_ -f1 | tr -d '-' | tr 'A-Z' 'a-z')
 fail=0
+# technology choices come from stack.json (one source with the video): regenerate the marked Stage 5 regions
+[[ -f stack.json && -f video/src/stack.py ]] && { python3 video/src/stack.py sync || exit 1; }
 if [[ "${2:-}" != "--no-diagrams" ]]; then
   for f in diagrams/$prefix-*.puml; do
     [[ -e "$f" ]] || continue
@@ -34,7 +37,13 @@ done
 # unbalanced ::: fences swallow the rest of the document and still build
 n=$(grep -c '^:::' "$name.md"); (( n % 2 )) && { echo "UNBALANCED ::: fences ($n)"; exit 1; }
 # keep pandoc's warnings visible: a glyph the font lacks vanishes from the PDF with only a warning
+# Google theme: Inter body, Plus Jakarta Sans headings and labels, Roboto Mono code; static files from pdf-kit/fonts (XeTeX cannot use variable fonts)
+FONTS="$HOME/Projects/design-room/pdf-kit/fonts"
 pandoc "$name.md" -o "$name.pdf" --pdf-engine=xelatex -H sd-preamble.tex \
-  --lua-filter sd-callouts.lua --syntax-highlighting=tango 2>&1 \
+  -V mainfont=Inter-Regular.otf -V "mainfontoptions=Path=$FONTS/,BoldFont=Inter-Bold.otf,ItalicFont=Inter-Italic.otf,BoldItalicFont=Inter-BoldItalic.otf" \
+  -V sansfont=PlusJakartaSans-SemiBold.ttf -V "sansfontoptions=Path=$FONTS/google/static/,BoldFont=PlusJakartaSans-Bold.ttf" \
+  -V monofont=RobotoMono-Regular.ttf -V "monofontoptions=Path=$FONTS/google/static/,BoldFont=RobotoMono-Bold.ttf,ItalicFont=RobotoMono-Italic.ttf,Scale=0.88" \
+  -V linkcolor=gblueink -V urlcolor=gblueink -V toccolor=gink \
+  --lua-filter sd-callouts.lua --syntax-highlighting="$HOME/Projects/design-room/pdf-kit/google.theme" 2>&1 \
   | grep -vE "Underfull|Overfull|hbox|vbox" | sort | uniq -c
 pdfinfo "$name.pdf" | awk '/^Pages:/{print "pages", $2}'

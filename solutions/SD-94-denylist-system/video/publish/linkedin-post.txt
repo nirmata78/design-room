@@ -1,6 +1,6 @@
 A denylist looks like a hash set. The hard part is what lets a ban reach every server fast without letting a mistake do the same.
 
-I've published a 93-minute reference solution for the distributed denylist (IP blocking) question, at the Staff bar: theory, a three-version design, seven challenges, and the build cost, on 175 numbered slides.
+I've published a 107-minute reference solution for the distributed denylist (IP blocking) question, at the Staff bar: theory, a three-version design, seven challenges, and the build cost, on 599 numbered slides.
 
 The idea that unlocks it: the check must be local and the list cannot be. The pipe that delivers a ban in ten seconds delivers a mistake in ten seconds, so a push gets the discipline of a binary: versions, a canary gated on block rate, an allowlist that always wins, and a rollback that is a new version.
 

@@ -141,6 +141,31 @@ d.edge("auth", "ing", "mirror", "file", src="b", dst="t", at=(520, 255))
 d.legend(40, 860, ("person", "container", "db", "ext"))
 d.save(OUT / "c4-containers.svg")
 
+# the same container view with the technologies (labels from ../stack.json)
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / 'src')); import stack
+c4.Diagram.OVERRIDE = {k: (v[1], v[2]) for k, v in stack.C4.items()}
+d = c4.Diagram(1600, 900)
+d.boundary(30, 60, 1130, 780, "Denylist system", "Software System")
+d.node("tool", 60, 330, 220, 160, "container", "Policy tool", "Web app + API", "Publish, approve, explain.", size=21)
+d.node("ing", 330, 330, 220, 160, "container", "Ingest + rule store", "Service + database", "Normalise, validate, one version order.", size=21)
+d.node("cmp", 600, 330, 220, 160, "container", "Compiler + origin", "Job + object storage", "Snapshots, deltas, manifests.", size=21)
+d.node("rel", 870, 330, 250, 160, "container", "Relay tree", "Caching services", "Regional, then zone. Push and poll.", size=21, stack=True)
+d.node("ctl", 600, 640, 220, 140, "container", "Control plane", "Service", "Rollout, gates, fleet state.", size=21)
+d.node("node", 1260, 330, 280, 160, "container", "Enforcement agent", "Library in the server", "Local set, atomic swap, verdict.", size=21)
+d.node("srv", 1260, 90, 280, 130, "ext", "Serving process", "External", "Calls Check on each request.")
+d.node("auth", 330, 90, 220, 130, "ext", "External authority", "External", "Bulk list or lookup.")
+d.edge("tool", "ing", "PublishChange", "HTTPS", src="r", dst="l", at=(440, 310))
+d.edge("ing", "cmp", "new version", "SQL, files", src="r", dst="l", at=(710, 310))
+d.edge("cmp", "rel", "artifacts", "object API", src="r", dst="l", at=(985, 310))
+d.edge("rel", "node", "poll, push, delta", "HTTPS", src="r", dst="l", at=(1190, 310))
+d.edge("srv", "node", "Check(key)", "in process", src="b", dst="t", at=(1400, 280))
+d.edge("ctl", "cmp", "stage, halt", "", src="t", dst="b", at=(710, 575))
+d.edge("auth", "ing", "mirror", "file", src="b", dst="t", at=(520, 255))
+d.legend(40, 860, ("person", "container", "db", "ext"))
+d.save(OUT / "c4-containers-tech.svg")
+c4.Diagram.OVERRIDE = {}
+
+
 # ───────────────────────────── 3 · sequences ─────────────────────────────────────────────────────────
 def seq(name, parts, steps, **kw):
     s = sq.Seq(1500, size=22, row=50, **kw)
