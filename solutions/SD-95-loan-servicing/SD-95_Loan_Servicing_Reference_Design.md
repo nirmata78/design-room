@@ -7,8 +7,8 @@ documentclass: article
 fontsize: 10pt
 geometry: a4paper,top=0.7in,bottom=0.75in,left=0.75in,right=0.75in
 colorlinks: true
-linkcolor: blue
-urlcolor: blue
+linkcolor: gblueink
+urlcolor: gblueink
 toc: true
 toc-depth: 2
 numbersections: false
@@ -572,6 +572,173 @@ used. A rule change is a new version, approved by its owner, shadow-tested on ye
 code deploy.
 
 
+## Technologies, one level down
+
+Every container with the technology it runs on, how it is built, the alternatives rejected and why, and the question an interviewer asks about it. Generated from `stack.json`.
+
+## The dispatcher, one level down
+
+![C4 level 3, the dispatcher: the outbox poller claims sends by shard; the day plan sets each rail's rate; a token bucket per rail; the card client sends with our key and turns a timeout into UNKNOWN; the file builder checks counts and totals before the cut-off; the result poster writes to the ledger by key and hands unknowns to the resolver.](diagrams/video-c4-comp-dsp.pdf){width=100%}
+
+The dispatcher is the box challenges 1, 2 and 7 open. The **outbox poller** claims sends by shard with `SKIP
+LOCKED`. The **day plan** sets each rail's rate from windows planned backwards from the cut-off, and the **rail
+budgets** spend it: a token bucket per rail whose rate halves on a throttle response. The **card client** sends
+one call per attempt with our idempotency key and turns a timeout into UNKNOWN, never FAILED. The **file builder**
+checks counts and totals before a file leaves. The **result poster** writes each outcome to the ledger by key in
+one commit and hands every UNKNOWN to the resolver.
+
+<!-- stack:sections -->
+
+## Servicing DB: PostgreSQL for ledger and queue
+
+*How it is built.* Ledger entries are double entry: each transaction's lines sum to zero, checked by a deferred constraint at commit. Payment intents are rows with a state, changed by conditional updates. The due-item queue is a table selected with row locks that skip rows already taken. The outbox row commits with the entry. Tables are partitioned by month, so old months become read-only and cheap. A single logical writer to the ledger removes cross-writer ordering problems; throughput is a few thousand entries a second.
+
+*Why PostgreSQL 16, partitioned by month, one writer to the ledger:* A collection is a state change, a pair of balanced ledger entries and an event. They must commit together, and one writer to the ledger keeps the order simple.
+
+*Rejected:*
+
+- **A message broker as the queue**: A second system to keep consistent with the ledger. The table queue commits with the entry.
+- **Multiple ledger writers**: Ordering, locking and deadlock handling for no throughput we need.
+- **A key-value store**: No multi-row transaction, so balance and intent could disagree.
+
+*Course:* theory/03 (partitioning and storage) and theory/07 (correctness under failure).
+
+*Drill.* "A worker takes a due item and crashes before finishing. What happens to it?" The row lock is released with the transaction; the item is still due and another worker takes it. The idempotent intent key makes a second attempt harmless. The trap is marking taken before doing the work.
+
+## Dispatcher: a token bucket per rail
+
+*How it is built.* The dispatcher takes due intents and spends tokens from the rail's bucket. The day is planned backwards from each rail's cut-off, with the largest and riskiest items first and a jittered spread. Each call carries our reference. If a rail is down the bucket stops, and intents wait instead of retrying in a storm. A card retry and a bank-debit fallback are separate intents with their own keys.
+
+*Why Go worker, a token bucket per rail, a plan of the day:* A bank-debit rail and a card processor have limits, cut-offs and a cost. Firing everything at midnight on the first would break them.
+
+*Rejected:*
+
+- **Firing every due item at once**: The first of the month would breach the bank limit and the processor's rate.
+- **Retrying every failure immediately**: A retry storm on a rail that is already struggling.
+
+*Course:* theory/08 (reliability and operations).
+
+*Drill.* "It is the first of the month and the card processor is down. What does the dispatcher do?" Stop spending that rail's tokens, keep intents waiting, protect the customer from late fees, and resume slowly when it returns. The trap is retrying in a storm.
+
+## Resolver: unknown to final
+
+*How it is built.* The resolver selects unknown intents past a minimum age and asks the rail by our reference. It applies the answer with a conditional update from unknown. Backoff stretches from seconds to hours, and an intent that stays unknown for a day pages a person. The age of the unknown queue is a metric. A late webhook and the resolver cannot both apply; the conditional update decides.
+
+*Why Scheduled worker, inquiry by reference, backoff, an alert at a deadline:* A call that timed out may have moved money. Unknown is a state with an owner, and only an inquiry can end it.
+
+*Rejected:*
+
+- **Retrying the original call**: If it landed, the customer is charged twice.
+- **Marking a timeout as failed**: A debit that succeeded is shown as failed, and the loan is wrong.
+
+*Course:* theory/07 (correctness under failure).
+
+*Drill.* "A debit times out. What is the state and what moves money next?" Unknown. The resolver asks the rail by reference until it answers, and only that answer moves money. The trap is a retry or a failed mark.
+
+## File ingest: raw first, then parse
+
+*How it is built.* Each file is stored raw in object storage with a hash, then parsed by a batch job. Counts and totals are checked against the file's trailer before any line is applied. Each line is matched to an intent by reference, and applying a return is an idempotent ledger transaction. A file that fails a check is quarantined, not half applied. The raw copy lets a fixed parser replay old files.
+
+*Why Object storage for raw files, a batch parser, counts and totals checked first:* Returns arrive weeks later, in files. A parse bug must never lose the original.
+
+*Rejected:*
+
+- **Parsing on arrival**: A bug loses the original, and a half-applied file is hard to unwind.
+- **Streaming each line as it comes**: Files are daily; a stream adds state for no freshness gain.
+
+*Course:* theory/08 (reliability and operations).
+
+## Reconciliation: three-way
+
+*How it is built.* A daily job matches every ledger entry to the rail's settlement line and to the bank statement by reference. Two-way agreement is a match; a line missing on one side, a different amount or a duplicate is a break. Breaks carry an age and an owner, and each resolution is a new ledger entry. A total that differs from the bank's by four hundred dollars is explained line by line, not plugged. Counts and sums are compared first, so a truncated file stops the job.
+
+*Why Batch pipeline over the ledger, the rail's file and the bank's statement, by reference:* The ledger, the rail and the bank are three versions of the truth. Differences are breaks, and each break has an owner.
+
+*Rejected:*
+
+- **Matching on amount and date alone**: Equal payments on the same day are ambiguous.
+- **A monthly reconciliation**: Breaks age for weeks and the month-end close becomes an investigation.
+
+*Course:* theory/08 (reliability and operations).
+
+*Drill.* "Our ledger says four hundred dollars more than the bank. How do you find it?" Match line by line by reference across ledger, rail and bank; the break is a line missing or doubled on one side. Fix it with a new entry. The trap is a plug figure.
+
+## Policy: terms, waterfall and fees as data
+
+*How it is built.* The policy service holds versioned terms: the schedule rules, the waterfall of interest, fees and principal, and the fee table. Every ledger entry records the policy version used. A refund in the middle of a loan is a transaction plus a new schedule version computed from the policy at that date. Risk and legal approve a version; engineering does not edit it.
+
+*Why A rules service, versioned terms, a payment waterfall, a fee table:* Terms, the order in which a payment is applied and fees change with law and product. They must change without a deploy and be reproducible later.
+
+*Rejected:*
+
+- **Terms in code**: A deploy per change, and no way to reproduce what applied on a past date.
+- **Terms in each service**: Two services would apply different rules to one payment.
+
+*Course:* theory/08 (reliability and operations).
+
+## Servicing API: idempotent and quote-aware
+
+*How it is built.* Every write carries an idempotency key under a unique constraint. A payoff quote lists the principal, accrued interest and every intent in flight, with the quote's expiry. A payoff with a debit in flight either waits for the debit to resolve or nets it, and says which. A refund is a ledger transaction with a new schedule version, never an edit. Refunds are limited by a conditional update on the refunded total.
+
+*Why Go service, an idempotency key on every write, payoff quotes that list what is in flight:* Customers and agents retry. A payoff quote that ignores a debit in flight is wrong the moment it is paid.
+
+*Rejected:*
+
+- **Quoting from the ledger balance only**: An in-flight debit changes the answer after the customer pays.
+- **Editing the schedule in place**: History must be append-only, or a dispute cannot be reproduced.
+
+*Course:* theory/07 (correctness under failure).
+
+<!-- /stack:sections -->
+
+## The stack on one page
+
+<!-- stack:summary -->
+
+| Container | Choice | Rejected | The deciding reason |
+|---|---|---|---|
+| Servicing DB | PostgreSQL, one ledger writer | Broker as queue; many writers | State, entries and queue commit together |
+| Dispatcher | Token bucket per rail | Fire at once; retry storm | The day is planned, not fired |
+| Resolver | Inquiry by reference, backoff | Retry call; mark failed | Unknown has an owner and an age |
+| File ingest | Raw first; batch parse | Parse on arrival; stream | Replayable; checked first |
+| Reconciliation | Daily, three-way, by reference | Amount and date; monthly | Every break has an owner |
+| Policy | Versioned data, one service | Terms in code | Reproducible; no deploy |
+| Servicing API | Idempotent; quotes list in-flight | Balance-only quote; in-place edit | Retries safe; quote true |
+
+Each fix in Stage 6 rejects one tool by name:
+
+| Deep dive | Rejected | Because |
+|---|---|---|
+| 6.1 | Treating a timeout as a failure | the debit may have landed; unknown is a state and an inquiry ends it. |
+| 6.2 | Firing every due item at midnight on the first | the bank-debit limit and the rail rate break; plan the day backwards from the cut-off. |
+| 6.3 | Treating settled as final | returns arrive weeks later; RETURNED is a state and a reversal is a transaction. |
+| 6.4 | Editing the schedule in place for a refund | history must be append-only; a refund is a transaction and a new schedule version. |
+| 6.5 | Quoting the payoff from the ledger balance alone | an in-flight debit changes it; the quote lists what is in flight. |
+| 6.6 | Plugging the difference to the bank | the break is a line missing or doubled; match every line three ways by reference. |
+| 6.7 | Retrying a down rail until it returns | a retry storm; pause, resolve, protect the customer, resume slowly. |
+| 6.8 | A month-end report | breaks age for weeks; watch the money funnel and the files daily. |
+
+<!-- /stack:summary -->
+
+## When you don't need all this (the alternate path)
+
+![The alternate path changes one box: the dispatcher becomes one scheduled job.](diagrams/video-alt.pdf){width=90%}
+
+**The simpler design.** Keep the ledger, the state machine with UNKNOWN and RETURNED, file ingest and
+reconciliation. Replace the dispatcher, its rail budgets and its day plan with **one scheduled job** that walks
+the due items in order, one call at a time, and builds the debit file once a day.
+
+**What it gives up.** No rate control: the processor's throttling decides how fast we go. No day plan: a
+rejected file or a burst of retries costs a whole day. What it keeps matters more: unknown and returned are still
+states, and reconciliation still runs.
+
+**The crossover number.** One job at about 10 card charges a second clears 36,000 in an hour; at 20 % on card,
+that is about 180,000 collections due on the busiest day. The scale line has 600,000 on the 1st, which would
+need more than three hours of card window and leave no margin before the cut-off.
+
+> "Below about two hundred thousand collections on the busiest day, I'd ship one scheduled job. I would never ship
+> without UNKNOWN, RETURNED and reconciliation."
+
 # Stage 6: Deep dives
 
 The interviewer picks two or three of these; the video walks all eight. They are ordered so that each fix
@@ -768,6 +935,20 @@ a dispute into a complaint, or worse.
 and the bank returns it with any return. Storing it on the attempt is what lets ingest match a return to
 exactly one attempt, rather than guessing by amount and date.
 :::
+
+**The card rail's version: a dispute.** A card repayment can come back too, by a different clock. The customer
+disputes the charge with their card issuer, sometimes months later, and the processor nets the amount from our
+next payout before we hear about it.
+
+| Step | What we write | Why |
+|---|---|---|
+| Notice | The payment moves SETTLED → DISPUTED; the processor's report shows the debit from our payout | The money already left; the notice may come months after the charge |
+| Ledger | A reversing transaction dated the day of the notice: the loan receivable goes back up, processor clearing goes down | Nothing is edited; the instalment is due again |
+| Customer | No late fee and no automatic re-collection on that instalment while the dispute is open | A disputed amount is not a missed payment; a second charge would turn a dispute into a complaint |
+| Evidence | The signed agreement, the schedule, the authorisation and the receipt, by the network's deadline | Win: the amount is re-posted. Lose: the instalment stays due and follows normal collections |
+| Reconcile | The payout report's dispute line is matched by dispute ID | Otherwise it is the unexplained $100 in 6.6 |
+
+Scale, illustrative: at 0.1 %, the 1st's 120,000 card charges produce about 120 disputes from that one day.
 
 ## 6.4 A refund in the middle of the loan (correctness, changing terms)
 
@@ -1089,6 +1270,17 @@ levers: move customers from card to bank debit where they agree (cheaper per col
 self-inflicted declines (the rail budget), and reduce returns (collect after payday, verify accounts at
 origination).
 
+**The rails watch us too.** Return and dispute rates have thresholds set by the rails themselves; cross one and
+the bank can suspend our ability to collect, an outage no server dashboard shows. The bank-debit thresholds below
+are from public summaries of the network rules (checked November 2026; check again before relying on them).
+
+| Rate (trailing 60 days) | Network threshold | Our alert (initial target) | Usually means |
+|---|---|---|---|
+| Unauthorised debit returns | 0.5 % | 0.25 % | Weak authorisation capture at one merchant or channel |
+| Administrative returns (account closed, not found, invalid) | 3 % | 1.5 % | Account details not verified at origination |
+| All debit returns | 15 % | 8 % | Collection dates before payday; a drift in risk policy |
+| Card disputes | each network's monitoring programme | 0.3 % | A merchant problem that lands on our book |
+
 # Stage 10: The EM layer (auxiliary at Staff)
 
 **Phasing.** V1 (4 engineers, 2 quarters): ledger with projections, schedules, the state machine, the card rail,
@@ -1111,6 +1303,12 @@ shared with the processor.
 | Finance operations | reconciliation tools, breaks | break types and ageing |
 | Risk and legal | retry rules, fees, allocation | policy versions they approve |
 | Compliance | debit authorisations, fee caps | rules by state |
+
+**Contracts with the neighbouring systems.** Servicing starts at `LoanBooked` from origination (SD-82), in a schema
+registry with consumer contract tests in origination's build, and never reads the application tables. It
+publishes `PaymentCollected`, `PaymentReturned`, `RefundApplied` and `LoanPaidOff` through its own outbox; the
+merchant webhook platform (SD-99) and notices consume them. A field is added, never renamed; a breaking change is
+a new event version run side by side until every consumer has moved.
 
 **With half the team:** keep the ledger, the state machine with UNKNOWN and RETURNED, and reconciliation; cut
 due-date spreading, the console (use queries and a spreadsheet for breaks), and the second rail's automation.

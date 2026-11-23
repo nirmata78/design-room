@@ -28,15 +28,14 @@ S(plain(K(1, "the trace"), "$300 for one $150 instalment", '<pre class="trace"><
  "C: The numbers are illustrative, but approvals really do land after the caller has given up."])
 
 S(dia(K(1, "the fix"), "Unknown is a state, and the resolver ends it", "ch1-fix",
-      extra=strip(("fixb", "Mechanism", "Timeout → UNKNOWN. The resolver queries by the same key at 30 s, 2 min, 10 min. Only a definite decline allows attempt 2."),
-                  ("whyb", "Property", "S1: one decision, one key. L2: every unknown has a bounded exit."))), [
+      extra=strip(("fixb", "Mechanism", "Timeout → UNKNOWN. The resolver queries by the same key at 30 s, 2 min, 10 min. Only a definite decline allows attempt 2."), cols="one")), [
  "C: The fix. At the timeout the intent goes to unknown, not failed. Then the new green box: the resolver asks the processor about the same key, after thirty seconds, two minutes and ten minutes. And the rule: resending the same attempt reuses its key, so the processor returns the first result. Only a definite decline lets us open attempt two."], cls="dia")
 
 S(dia(K(1, "sequence"), "The next ten minutes", "seq-unknown"), [
  "C: As a sequence. One: the charge with key attempt one. No answer at ten seconds. Two, highlighted: the intent goes to unknown. Three: the resolver queries by the same key, and four, the processor says approved at three point two seconds. The resolver posts it as settled, through the same ledger key, so it can only be posted once. In the note: if the processor says not found after its safe window, we resend, with the same key."], cls="dia")
 
 S(plain(K(1, "the resolver"), "End every unknown by asking",
-  '<pre class="code"><span class="kw">def</span> resolve(i):                                   <span class="cm"># +30 s, +2 min, +10 min</span>\n    r = rail.query(key=i.key)\n    <span class="kw">if</span> r == <span class="kw">"approved"</span>:  <span class="kw">return</span> ledger.post(i, r, key=i.key)   <span class="cm"># idempotent</span>\n    <span class="kw">if</span> r == <span class="kw">"declined"</span>:  <span class="kw">return</span> db.set(i, <span class="kw">"DECLINED"</span>)          <span class="cm"># attempt 2 allowed</span>\n    <span class="kw">if</span> r == <span class="kw">"not_found"</span> <span class="kw">and</span> i.age &gt; rail.safe_window:\n        <span class="kw">return</span> rail.charge(i.token, i.amount, key=i.key)          <span class="cm"># SAME key</span>\n    schedule_again(i)                                           <span class="cm"># still unknown</span></pre>' +
+  '<pre class="code" data-lang="pseudocode"><span class="kw">def</span> resolve(i):            <span class="cm"># +30 s, +2 min, +10 min</span>\n  r = rail.query(key=i.key)\n  <span class="kw">if</span> r == "approved":\n    <span class="kw">return</span> ledger.post(i, r, key=i.key)  <span class="cm"># idempotent</span>\n  <span class="kw">if</span> r == "declined":\n    <span class="kw">return</span> db.set(i, "DECLINED")    <span class="cm"># attempt 2 allowed</span>\n  <span class="kw">if</span> r == "not_found" and i.age &gt; rail.safe_window:\n    <span class="kw">return</span> rail.charge(i.token, i.amount, key=i.key)\n                                    <span class="cm"># the SAME key</span>\n  schedule_again(i)                 <span class="cm"># still unknown</span></pre>' +
   strip(("whyb", "Why it works", "No path creates a second decision for one attempt. Even a wrong guess resends the same key, which the processor de-duplicates."), cols="one")), [
  "C: The resolver in code. Query by key. Approved: post it, idempotently. Declined: mark it declined, and now a second attempt is allowed. Not found, and older than the processor's safe window: send again, still with the same key. Anything else: ask again later. No path creates a second decision for one attempt, and even a wrong guess resends a key the processor will de-duplicate."])
 
@@ -69,16 +68,14 @@ S(plain(K(2, "the trace"), "A busy night, and a missed cut-off", '<pre class="tr
  "C: And the debit file, built at five to two, fails validation on one bad record. The cut-off passes. Four hundred and eighty thousand collections slip a day."])
 
 S(dia(K(2, "the fix"), "Plan the day backwards from the cut-off", "ch2-fix",
-      extra=strip(("fixb", "Mechanism", "A day plan from the cut-off: debit file submitted 10:30, acknowledged by 11:00. Cards from 06:00 at 90 a second."),
-                  ("whyb", "Property", "L1: attempted before the cut-off. S3: no decline we caused."))), [
+      extra=strip(("fixb", "Mechanism", "A day plan from the cut-off: debit file submitted 10:30, acknowledged by 11:00. Cards from 06:00 at 90 a second."), cols="one")), [
  "C: The fix: plan the day backwards from the cut-off. The new green box, the day plan, hands each rail its budget. The debit file is built at nine, validated, submitted by half past ten, and acknowledged by eleven, three hours before the cut-off, so a rejected file can be fixed and resent. The card window opens at six, at ninety a second."], cls="dia")
 
 S(dia(K(2, "the day"), "The 1st, on one line", "dayplan"), [
  "C: The day on one line. Card charges from six, a hundred and twenty thousand in twenty-two minutes. Soft declines retried around seven. The debit file built from nine and submitted by half past ten. The bank's acknowledgement by eleven. And the red line at two, with three hours of margin in front of it."], cls="dia")
 
 S(plain(K(2, "the claim"), "Workers never collide",
-  '<pre class="code">WITH due AS (\n  SELECT id FROM due_item\n   WHERE due_date = current_date AND status = <span class="kw">\'DUE\'</span> AND shard = $1\n   ORDER BY id LIMIT 500\n   FOR UPDATE SKIP LOCKED)\nUPDATE due_item d SET status = <span class="kw">\'CLAIMED\'</span>, claimed_by = $2, claimed_at = now()\n  FROM due WHERE d.id = due.id\nRETURNING d.id, d.loan_id, d.amount_cents, d.rail;\n<span class="cm">-- same transaction: one intent + one outbox row per claimed row</span></pre>' +
-  strip(("whyb", "Why it works", "A worker that dies before commit releases its locks; one that dies after is swept back. No distributed lock, no broker."), cols="one")), [
+  '<pre class="code" data-lang="sql"><span class="kw">WITH</span> due <span class="kw">AS</span> (\n  <span class="kw">SELECT</span> id <span class="kw">FROM</span> due_item\n   <span class="kw">WHERE</span> due_date = current_date\n     <span class="kw">AND</span> status = <span class="st">\'DUE\'</span> <span class="kw">AND</span> shard = $1\n   <span class="kw">ORDER BY</span> id <span class="kw">LIMIT</span> 500\n   <span class="kw">FOR UPDATE SKIP LOCKED</span>)\n<span class="kw">UPDATE</span> due_item d\n   <span class="kw">SET</span> status = <span class="st">\'CLAIMED\'</span>, claimed_by = $2,\n       claimed_at = now()\n  <span class="kw">FROM</span> due <span class="kw">WHERE</span> d.id = due.id\n<span class="kw">RETURNING</span> d.id, d.loan_id, d.amount_cents, d.rail;\n<span class="cm">-- same commit: one intent + one outbox row each</span></pre>'), [
  "C: The claim in code. Select up to five hundred due rows in one shard, lock them, and skip rows another worker has locked. Mark them claimed in the same statement, and in the same transaction open the intents and outbox rows. A worker that dies before the commit releases its locks. One that dies after is found by the sweeper, which returns claims with no intent. No distributed lock, and no broker."])
 
 S(dia(K(2, "sequence"), "Two workers, one shard", "seq-claim"), [
@@ -112,8 +109,7 @@ S(plain(K(3, "the trace"), "Two returns, two different rules", '<pre class="trac
  "C: Another loan's debit settled on the second. On the eleventh of January, day forty, it returns as R-ten, unauthorised: the customer says they never agreed to it. The naive design retries it automatically. That breaks the rules, and turns a dispute into a complaint."])
 
 S(dia(K(3, "the fix"), "RETURNED is a state, and a reversal is a transaction", "ch3-fix",
-      extra=strip(("fixb", "Mechanism", "SETTLED → RETURNED; a reversal dated the day it arrives; PAID → DUE. Policy decides any retry."),
-                  ("whyb", "Property", "S2: nothing edited. S3: the rules live in one place. L2: a defined exit."))), [
+      extra=strip(("fixb", "Mechanism", "SETTLED → RETURNED; a reversal dated the day it arrives; PAID → DUE. Policy decides any retry."), cols="one")), [
  "C: The fix. Settled moves to returned, a normal state. File ingest posts a reversing transaction, dated the day the return arrived, never editing the original. The instalment goes from paid back to due, with the reason. Then policy decides: insufficient funds may be presented again at most twice, typically timed after payday. Unauthorised is never retried: the customer is contacted, and a new authorisation is needed."], cls="dia")
 
 S(dia(K(3, "sequence"), "One return, end to end", "seq-return"), [
@@ -123,9 +119,24 @@ S(plain(K(3, "the rules"), "Return codes are policy, owned outside engineering",
   ["R01", "insufficient funds", "2 banking days", "re-present at most twice, within 180 days; after payday"],
   ["R02, R03", "account closed, not found", "2 banking days", "stop; ask for a new method"],
   ["R10 and similar", "unauthorised", "up to 60 days", "never retry; new authorisation; dispute review"],
-  ["late fee", "after the grace period", "—", "capped by law where the customer lives; never for our failures"]], "bt sm") +
+  ["late fee", "after the grace period", "—", "capped by law where the customer lives; never for our failures"]], "bt xs") +
   strip(("whyb", "Why it works", "Engineering owns the mechanism; risk and legal own the table. A rule change is a new policy version, not a deploy."), cols="one")), [
  "C: The rules as a table, because they are data. Insufficient funds: back within two banking days, and may be presented again at most twice within a hundred and eighty days. Account closed or not found: stop, and ask for a new payment method. Unauthorised: up to sixty days, never retried. And late fees, which are capped by law where the customer lives, and never charged for our own failures. Engineering owns the mechanism. Risk and legal own this table."])
+
+S(plain(K(3, "the card rail"), "The card version of “it came back”: a dispute", table(["Step", "What we write", "Why"], [
+  ["Notice", "payment SETTLED → DISPUTED; the processor nets it from our payout", "the money already left; months after the charge"],
+  ["Ledger", "a reversal dated today: receivable up, processor clearing down", "nothing edited; the instalment is due again"],
+  ["Customer", "no late fee and no automatic re-collection while disputed", "a disputed amount is not a missed payment"],
+  ["Evidence", "agreement, schedule, authorisation, receipt, by the network's deadline", "win: re-post; lose: stays due, normal collections"],
+  ["Reconcile", "the payout's dispute line matched by dispute ID", "otherwise it is challenge six's break"]], "bt xs") +
+  line("Illustrative: 0.1 % of the 1st's 120,000 card charges is about 120 disputes from one day.", "g")), [
+ "C: The card rail has its own version of it came back: a dispute. Same mechanism, different clock.",
+ "[+]", "C: The notice arrives, sometimes months after the charge, and the processor has already netted the money from our payout. The payment moves from settled to disputed.",
+ "[+]", "C: The ledger gets a reversal dated today: the loan receivable goes back up, processor clearing goes down. Nothing is edited, and the instalment is due again.",
+ "[+]", "C: The customer gets no late fee and no automatic re-collection on that instalment while it is disputed. A disputed amount is not a missed payment.",
+ "[+]", "C: We send evidence by the network's deadline: the agreement, the schedule, the authorisation, the receipt. If we win, we re-post. If we lose, the instalment stays due and follows normal collections.",
+ "[+]", "C: And reconciliation matches the payout's dispute line by dispute I-D, or it becomes the break in challenge six.",
+ "[+]", "C: The scale, illustrative: one in a thousand of the hundred and twenty thousand card charges on the first is about a hundred and twenty disputes from that one day."])
 
 qs("Interviewer · the second-level push", "“Finance wants to recognise the cash on settlement day. Risk wants to wait sixty days. Who wins?”", [
  "I: Finance wants to recognise the cash on settlement day. Risk wants to wait sixty days. Who wins?", "[pause: 2.0]"])
@@ -153,8 +164,7 @@ S(plain(K(4, "the trace"), "Three hundred dollars over-collected", '<pre class="
  "C: The trace. Loan ninety-one hundred is booked in October: twelve hundred dollars in eight payments of a hundred and fifty. Two are paid by November: nine hundred outstanding. On the fourteenth the merchant refunds three hundred, and the balance column drops to six hundred. But the schedule is untouched, and from December to May it collects six times a hundred and fifty: nine hundred dollars. The customer overpaid three hundred, and the customer noticed before we did."])
 
 S(dia(K(4, "the fix"), "A refund is a transaction and a new schedule version", "ch4-fix",
-      extra=strip(("fixb", "Mechanism", "A transaction keyed by the refund ID, and a new schedule version: re-amortise (6 × $100) or shorten (4 × $150)."),
-                  ("whyb", "Property", "S2 and the audit: a version says why. S3: pay what is owed."))), [
+      extra=strip(("fixb", "Mechanism", "A transaction keyed by the refund ID, and a new schedule version: re-amortise (6 × $100) or shorten (4 × $150)."), cols="one")), [
  "C: The fix. In the ledger, the merchant now owes us three hundred, and the loan's principal drops by three hundred, keyed by the merchant's refund I-D. Then policy, the green box, applies the terms. Re-amortise: the six remaining payments become a hundred each. Or shorten: they stay at a hundred and fifty, and the loan ends after four. Which one is a product and legal decision, written in the terms before any code."], cls="dia")
 
 S(plain(K(4, "allocation"), "Where each payment goes, in order", table(["Order", "Bucket", "Why"], [

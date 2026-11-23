@@ -1,0 +1,301 @@
+{
+  "_doc": "Single source for SD-95's technology choices; see SD-08/stack.json for the format. `how` is spoken, so it carries no code; keep summary cells under 36 characters.",
+  "c4": {
+    "api": [
+      "Servicing API",
+      "Go, idempotency keys",
+      "Refunds, payoff quotes."
+    ],
+    "svc": [
+      "Schedule + collect",
+      "Go, state machine",
+      "Due items, intents."
+    ],
+    "db": [
+      "Servicing DB",
+      "PostgreSQL, by month",
+      "Ledger, intents, outbox."
+    ],
+    "dsp": [
+      "Dispatcher",
+      "Go worker, token bucket",
+      "Per-rail rate."
+    ],
+    "pol": [
+      "Policy",
+      "Versioned rules",
+      "Terms, waterfall, fees."
+    ],
+    "ing": [
+      "File ingest",
+      "Batch, raw first",
+      "Returns, settlement."
+    ],
+    "res": [
+      "Resolver",
+      "Scheduled worker",
+      "UNKNOWN to final."
+    ],
+    "rec": [
+      "Reconciliation",
+      "Batch, three-way",
+      "Ledger, rail, bank."
+    ]
+  },
+  "stack": [
+    {
+      "id": "servicing-db",
+      "heading": "Servicing DB: PostgreSQL for ledger and queue",
+      "kicker": "Technology · servicing database",
+      "title": "The ledger and the work queue in one transaction",
+      "pick": "PostgreSQL 16, partitioned by month, one writer to the ledger",
+      "why": "A collection is a state change, a pair of balanced ledger entries and an event. They must commit together, and one writer to the ledger keeps the order simple.",
+      "how": "Ledger entries are double entry: each transaction's lines sum to zero, checked by a deferred constraint at commit. Payment intents are rows with a state, changed by conditional updates. The due-item queue is a table selected with row locks that skip rows already taken. The outbox row commits with the entry. Tables are partitioned by month, so old months become read-only and cheap.",
+      "detail": "A single logical writer to the ledger removes cross-writer ordering problems; throughput is a few thousand entries a second.",
+      "rejected": [
+        [
+          "A message broker as the queue",
+          "A second system to keep consistent with the ledger. The table queue commits with the entry."
+        ],
+        [
+          "Multiple ledger writers",
+          "Ordering, locking and deadlock handling for no throughput we need."
+        ],
+        [
+          "A key-value store",
+          "No multi-row transaction, so balance and intent could disagree."
+        ]
+      ],
+      "summary": [
+        "Servicing DB",
+        "PostgreSQL, one ledger writer",
+        "Broker as queue; many writers",
+        "State, entries and queue commit together"
+      ],
+      "course": "theory/03 (partitioning and storage) and theory/07 (correctness under failure)",
+      "parts": "03, 07",
+      "drill": [
+        "A worker takes a due item and crashes before finishing. What happens to it?",
+        "The row lock is released with the transaction; the item is still due and another worker takes it. The idempotent intent key makes a second attempt harmless. The trap is marking taken before doing the work.",
+        "a lock released on crash; an idempotent intent key"
+      ]
+    },
+    {
+      "id": "dispatcher",
+      "heading": "Dispatcher: a token bucket per rail",
+      "kicker": "Technology · dispatcher",
+      "title": "A worker that spends each rail's limit on purpose",
+      "pick": "Go worker, a token bucket per rail, a plan of the day",
+      "why": "A bank-debit rail and a card processor have limits, cut-offs and a cost. Firing everything at midnight on the first would break them.",
+      "how": "The dispatcher takes due intents and spends tokens from the rail's bucket. The day is planned backwards from each rail's cut-off, with the largest and riskiest items first and a jittered spread. Each call carries our reference. If a rail is down the bucket stops, and intents wait instead of retrying in a storm.",
+      "detail": "A card retry and a bank-debit fallback are separate intents with their own keys.",
+      "rejected": [
+        [
+          "Firing every due item at once",
+          "The first of the month would breach the bank limit and the processor's rate."
+        ],
+        [
+          "Retrying every failure immediately",
+          "A retry storm on a rail that is already struggling."
+        ]
+      ],
+      "summary": [
+        "Dispatcher",
+        "Token bucket per rail",
+        "Fire at once; retry storm",
+        "The day is planned, not fired"
+      ],
+      "course": "theory/08 (reliability and operations)",
+      "parts": "08",
+      "drill": [
+        "It is the first of the month and the card processor is down. What does the dispatcher do?",
+        "Stop spending that rail's tokens, keep intents waiting, protect the customer from late fees, and resume slowly when it returns. The trap is retrying in a storm.",
+        "pause the rail; protect the customer; resume slowly"
+      ]
+    },
+    {
+      "id": "resolver",
+      "heading": "Resolver: unknown to final",
+      "kicker": "Technology · resolver",
+      "title": "A worker that turns unknown into a final answer",
+      "pick": "Scheduled worker, inquiry by reference, backoff, an alert at a deadline",
+      "why": "A call that timed out may have moved money. Unknown is a state with an owner, and only an inquiry can end it.",
+      "how": "The resolver selects unknown intents past a minimum age and asks the rail by our reference. It applies the answer with a conditional update from unknown. Backoff stretches from seconds to hours, and an intent that stays unknown for a day pages a person. The age of the unknown queue is a metric.",
+      "detail": "A late webhook and the resolver cannot both apply; the conditional update decides.",
+      "rejected": [
+        [
+          "Retrying the original call",
+          "If it landed, the customer is charged twice."
+        ],
+        [
+          "Marking a timeout as failed",
+          "A debit that succeeded is shown as failed, and the loan is wrong."
+        ]
+      ],
+      "summary": [
+        "Resolver",
+        "Inquiry by reference, backoff",
+        "Retry call; mark failed",
+        "Unknown has an owner and an age"
+      ],
+      "course": "theory/07 (correctness under failure)",
+      "parts": "07",
+      "drill": [
+        "A debit times out. What is the state and what moves money next?",
+        "Unknown. The resolver asks the rail by reference until it answers, and only that answer moves money. The trap is a retry or a failed mark.",
+        "unknown; inquiry by reference; the answer moves money"
+      ]
+    },
+    {
+      "id": "file-ingest",
+      "heading": "File ingest: raw first, then parse",
+      "kicker": "Technology · file ingest",
+      "title": "Settlement and return files stored raw before they are parsed",
+      "pick": "Object storage for raw files, a batch parser, counts and totals checked first",
+      "why": "Returns arrive weeks later, in files. A parse bug must never lose the original.",
+      "how": "Each file is stored raw in object storage with a hash, then parsed by a batch job. Counts and totals are checked against the file's trailer before any line is applied. Each line is matched to an intent by reference, and applying a return is an idempotent ledger transaction. A file that fails a check is quarantined, not half applied.",
+      "detail": "The raw copy lets a fixed parser replay old files.",
+      "rejected": [
+        [
+          "Parsing on arrival",
+          "A bug loses the original, and a half-applied file is hard to unwind."
+        ],
+        [
+          "Streaming each line as it comes",
+          "Files are daily; a stream adds state for no freshness gain."
+        ]
+      ],
+      "summary": [
+        "File ingest",
+        "Raw first; batch parse",
+        "Parse on arrival; stream",
+        "Replayable; checked first"
+      ],
+      "course": "theory/08 (reliability and operations)",
+      "parts": "08"
+    },
+    {
+      "id": "reconciliation",
+      "heading": "Reconciliation: three-way",
+      "kicker": "Technology · reconciliation",
+      "title": "Ledger, rail and bank matched every day, line by line",
+      "pick": "Batch pipeline over the ledger, the rail's file and the bank's statement, by reference",
+      "why": "The ledger, the rail and the bank are three versions of the truth. Differences are breaks, and each break has an owner.",
+      "how": "A daily job matches every ledger entry to the rail's settlement line and to the bank statement by reference. Two-way agreement is a match; a line missing on one side, a different amount or a duplicate is a break. Breaks carry an age and an owner, and each resolution is a new ledger entry. A total that differs from the bank's by four hundred dollars is explained line by line, not plugged.",
+      "detail": "Counts and sums are compared first, so a truncated file stops the job.",
+      "rejected": [
+        [
+          "Matching on amount and date alone",
+          "Equal payments on the same day are ambiguous."
+        ],
+        [
+          "A monthly reconciliation",
+          "Breaks age for weeks and the month-end close becomes an investigation."
+        ]
+      ],
+      "summary": [
+        "Reconciliation",
+        "Daily, three-way, by reference",
+        "Amount and date; monthly",
+        "Every break has an owner"
+      ],
+      "course": "theory/08 (reliability and operations)",
+      "parts": "08",
+      "drill": [
+        "Our ledger says four hundred dollars more than the bank. How do you find it?",
+        "Match line by line by reference across ledger, rail and bank; the break is a line missing or doubled on one side. Fix it with a new entry. The trap is a plug figure.",
+        "match by reference; fix with a new entry"
+      ]
+    },
+    {
+      "id": "policy",
+      "heading": "Policy: terms, waterfall and fees as data",
+      "kicker": "Technology · policy",
+      "title": "Policy as versioned data, owned by risk and legal",
+      "pick": "A rules service, versioned terms, a payment waterfall, a fee table",
+      "why": "Terms, the order in which a payment is applied and fees change with law and product. They must change without a deploy and be reproducible later.",
+      "how": "The policy service holds versioned terms: the schedule rules, the waterfall of interest, fees and principal, and the fee table. Every ledger entry records the policy version used. A refund in the middle of a loan is a transaction plus a new schedule version computed from the policy at that date.",
+      "detail": "Risk and legal approve a version; engineering does not edit it.",
+      "rejected": [
+        [
+          "Terms in code",
+          "A deploy per change, and no way to reproduce what applied on a past date."
+        ],
+        [
+          "Terms in each service",
+          "Two services would apply different rules to one payment."
+        ]
+      ],
+      "summary": [
+        "Policy",
+        "Versioned data, one service",
+        "Terms in code",
+        "Reproducible; no deploy"
+      ],
+      "course": "theory/08 (reliability and operations)",
+      "parts": "08"
+    },
+    {
+      "id": "servicing-api",
+      "heading": "Servicing API: idempotent and quote-aware",
+      "kicker": "Technology · servicing API",
+      "title": "An API that quotes a payoff and applies refunds safely",
+      "pick": "Go service, an idempotency key on every write, payoff quotes that list what is in flight",
+      "why": "Customers and agents retry. A payoff quote that ignores a debit in flight is wrong the moment it is paid.",
+      "how": "Every write carries an idempotency key under a unique constraint. A payoff quote lists the principal, accrued interest and every intent in flight, with the quote's expiry. A payoff with a debit in flight either waits for the debit to resolve or nets it, and says which. A refund is a ledger transaction with a new schedule version, never an edit.",
+      "detail": "Refunds are limited by a conditional update on the refunded total.",
+      "rejected": [
+        [
+          "Quoting from the ledger balance only",
+          "An in-flight debit changes the answer after the customer pays."
+        ],
+        [
+          "Editing the schedule in place",
+          "History must be append-only, or a dispute cannot be reproduced."
+        ]
+      ],
+      "summary": [
+        "Servicing API",
+        "Idempotent; quotes list in-flight",
+        "Balance-only quote; in-place edit",
+        "Retries safe; quote true"
+      ],
+      "course": "theory/07 (correctness under failure)",
+      "parts": "07"
+    }
+  ],
+  "challenges": {
+    "1": [
+      "Treating a timeout as a failure",
+      "the debit may have landed; unknown is a state and an inquiry ends it."
+    ],
+    "2": [
+      "Firing every due item at midnight on the first",
+      "the bank-debit limit and the rail rate break; plan the day backwards from the cut-off."
+    ],
+    "3": [
+      "Treating settled as final",
+      "returns arrive weeks later; RETURNED is a state and a reversal is a transaction."
+    ],
+    "4": [
+      "Editing the schedule in place for a refund",
+      "history must be append-only; a refund is a transaction and a new schedule version."
+    ],
+    "5": [
+      "Quoting the payoff from the ledger balance alone",
+      "an in-flight debit changes it; the quote lists what is in flight."
+    ],
+    "6": [
+      "Plugging the difference to the bank",
+      "the break is a line missing or doubled; match every line three ways by reference."
+    ],
+    "7": [
+      "Retrying a down rail until it returns",
+      "a retry storm; pause, resolve, protect the customer, resume slowly."
+    ],
+    "8": [
+      "A month-end report",
+      "breaks age for weeks; watch the money funnel and the files daily."
+    ]
+  }
+}

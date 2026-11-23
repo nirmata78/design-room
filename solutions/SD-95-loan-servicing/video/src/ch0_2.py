@@ -17,7 +17,7 @@ S(plain("Before the design", "What this question grades", table(["Axis", "Weak s
   ["<b>Correctness</b>", "A balance column; retry on any error; settled means done", "Double entry with reversals; idempotency at three layers; UNKNOWN and RETURNED as states"],
   ["<b>Trade-offs</b>", "“A message broker for the thundering herd”", "42 a second is nothing; the processor contract and the bank cut-off bind; the broker is optional"],
   ["<b>Depth</b>", "Stops at “retry with backoff”", "Claim with SKIP LOCKED, intent and outbox in one commit; a budget per rail; re-presentment limits; the allocation waterfall"],
-  ["<b>Operations</b>", "API uptime", "UNKNOWN age, the debit file acknowledged, returns by reason code, breaks by age and amount, a ledger that sums to zero"]], "bt sm sig") +
+  ["<b>Operations</b>", "API uptime", "UNKNOWN age, file acknowledged, returns by reason, breaks by age, a ledger that sums to zero"]], "bt xs sig") +
   grade("The sentence that separates candidates: settled is not final for a bank debit. Say it before the interviewer does.")), [
  "N: Five axes. The weak answer is a cron job, a balance column and a retry loop. The strong answer names where the real limits are, and treats unknown and returned as ordinary states.",
  "C: I'll keep one sentence in front of everything: settled is not final for a bank debit. Most of the design follows from taking that seriously."])

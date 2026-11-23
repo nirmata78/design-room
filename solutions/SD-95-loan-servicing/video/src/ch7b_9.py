@@ -17,8 +17,7 @@ S(plain(K(5, "the trace"), "Two quotes, two different mistakes", '<pre class="tr
  "C: Quote B says seven hundred and fifty, counting the debit as paid. The loan is closed and the merchant told. On the fourth, the debit returns for insufficient funds. Now a closed loan owes a hundred and fifty, and nobody has a process for that."])
 
 S(dia(K(5, "the fix"), "The quote lists what is in flight", "ch5-fix",
-      extra=strip(("fixb", "Mechanism", "q-31: $750 now, conditional on the $150 debit. Loan → PAID_PENDING, not CLOSED. A return reopens $150, no late mark."),
-                  ("whyb", "Property", "S1: nothing twice. S3: no penalty for timing. L2: a defined exit."))), [
+      extra=strip(("fixb", "Mechanism", "q-31: $750 now, conditional on the $150 debit. Loan → PAID_PENDING, not CLOSED. A return reopens $150, no late mark."), cols="one")), [
  "C: The fix: a payoff quote is a statement about the future, so it lists what is in flight. Quote q-thirty-one: seven hundred and fifty now, conditional on the hundred and fifty dollar debit clearing, valid until the fifth. Paying it moves the loan to paid-pending, not closed. If the debit clears, the loan closes. If it returns, a hundred and fifty reopens as a single due item, with no late mark."], cls="dia")
 
 S(dia(K(5, "sequence"), "The payoff, as a sequence", "seq-payoff"), [
@@ -59,8 +58,7 @@ S(plain(K(6, "the trace"), "Inside the four hundred", '<pre class="trace"><span 
  "C: And a pair that hides itself: plus a hundred and fifty, a card payment we think settled and the processor never settled. Minus a hundred and fifty, a charge the processor did settle that we hold as declined. That one is a customer charged twice. In the total, those two cancel to zero."])
 
 S(dia(K(6, "the fix"), "Match every line, three ways, by reference", "ch6-fix",
-      extra=strip(("fixb", "Mechanism", "Ledger expectations matched to the processor and the bank by reference, then amount and a 3-day window. Typed breaks, owned and aged."),
-                  ("whyb", "Property", "L3: owned within a day. Nothing is matched by total."))), [
+      extra=strip(("fixb", "Mechanism", "Ledger expectations matched to the processor and the bank by reference, then amount and a 3-day window. Typed breaks, owned and aged."), cols="one")), [
  "C: The fix: match every line, three ways, by reference. The ledger produces what it expects. The processor's report and the bank statement are matched to it by our reference, then by amount within a three-day window. Every difference becomes a typed break: timing, missing in our ledger, missing at the processor, or a wrong amount. Each one gets an owner and an age."], cls="dia")
 
 S(dia(K(6, "sequence"), "Reconciliation, as a sequence", "seq-recon"), [
@@ -101,8 +99,7 @@ S(plain(K(7, "the trace"), "Our outage, their late fees", '<pre class="trace"><s
  "C: The trace. From six to eleven past, fifty-nine thousand four hundred charged at ninety a second. Then the processor goes down with a hundred and eighty in flight, all unknown. Blind retries for nine minutes add nine thousand more timeouts, all unknown. At nine the processor is back, and the workers send everything at once and get throttled again. And on the second, sixty thousand late fees at ten dollars: six hundred thousand dollars charged to customers for our outage."])
 
 S(dia(K(7, "the fix"), "Pause, resolve, protect the customer, resume slowly", "ch7-fix",
-      extra=strip(("fixb", "Mechanism", "Pause the card rail. Resolve the 180 unknowns first. No late fee for our outage. Resume at 50 a second, then ramp."),
-                  ("whyb", "Property", "S1: no blind resend. S3: no fee for our failure. L1: same-day resume."))), [
+      extra=strip(("fixb", "Mechanism", "Pause the card rail. Resolve the 180 unknowns first. No late fee for our outage. Resume at 50 a second, then ramp."), cols="one")), [
  "C: The fix, in order. A breaker opens and the rail switch pauses the card rail: no new attempts. The resolver clears the hundred and eighty unknowns first, before anything is sent again. Policy, agreed in advance: our outage is not your late fee, so the late clock runs from our attempt window, not from the due date. Then resume at fifty a second, and ramp up."], cls="dia")
 
 S(plain(K(7, "the runbook"), "The worst morning, as a runbook", table(["Step", "Who", "Why"], [
@@ -141,8 +138,7 @@ S(plain(K(8, "the trace"), "Twelve thousand debits that never left", '<pre class
  "C: The trace. At half past ten on the first, the debit file goes out with four hundred and eighty thousand entries. Zero errors. At eleven the bank's acknowledgement says twelve thousand were rejected, after a change in an account-number format, and nobody reads it. On the second, twelve thousand customers get late notices for payments we never sent. Finance finds it at close."])
 
 S(dia(K(8, "the fix"), "Watch the money funnel and the files", "ch8-fix",
-      extra=strip(("fixb", "Mechanism", "A funnel per rail: due → sent → acknowledged → settled. File acked by 11:00. UNKNOWN and breaks by age. Nightly invariants."),
-                  ("whyb", "Property", "Alerts on what finance measures, four weeks earlier."))), [
+      extra=strip(("fixb", "Mechanism", "A funnel per rail: due → sent → acknowledged → settled. File acked by 11:00. UNKNOWN and breaks by age. Nightly invariants."), cols="one")), [
  "C: The fix: indicators on the money. A funnel per rail per day: due, claimed, sent, acknowledged, settled, returned. A page if the file isn't acknowledged by eleven. Unknown count and age. Returns by reason code, against their baseline. Breaks by age and amount. And every night, a check that every transaction sums to zero, and every balance equals the sum of its lines."], cls="dia")
 
 S(dia(K(8, "sequence"), "The funnel catches it at eleven", "seq-probe"), [
@@ -157,6 +153,19 @@ S(plain(K(8, "symptom pairs"), "Two metrics, one conclusion", table(["Metric A",
   grade("Reading metrics in pairs is what turns a dashboard into a diagnosis. It is the start of the runbook for “collections look wrong”.")), [
  "C: Then read them in pairs. Sent normal, acknowledged down: the bank rejected entries, so read the file. Unknowns up with latency at the timeout: the processor is slow. Unauthorised returns up, concentrated on one merchant: we are capturing authorisations badly there. Breaks up today with return ingest lagging: ingest is stuck, not the money. And any transaction that doesn't sum to zero: stop posting and page.",
  "N: Pairs like these are the start of a real runbook."])
+
+S(plain(K(8, "the network's lines"), "Return rates, against the thresholds the rails enforce", table(["Rate (trailing 60 days)", "Network threshold", "Our alert", "Usually means"], [
+  ["Unauthorised debit returns", "0.5 % (bank-debit rules)", "0.25 %", "weak authorisation capture at one merchant or channel"],
+  ["Administrative returns (closed, no account)", "3 %", "1.5 %", "account details not verified at origination"],
+  ["All debit returns", "15 %", "8 %", "collection dates before payday; a risk-policy drift"],
+  ["Card disputes", "each network's monitoring programme", "0.3 %", "a merchant problem, not ours alone"]], "bt xs") +
+  grade("Cross one of these lines and the bank can stop us collecting at all. That is an outage no server dashboard shows.")), [
+ "C: One more family of indicators, because the rails watch us too.",
+ "[+]", "C: Unauthorised bank-debit returns: the rules' threshold is half a percent over sixty days. We alert at a quarter. A rise usually means weak authorisation capture at one merchant or channel.",
+ "[+]", "C: Administrative returns, account closed or not found: the threshold is three percent; we alert at one and a half. It means account details weren't verified at origination.",
+ "[+]", "C: All debit returns: fifteen percent; we alert at eight. Usually collection dates set before payday, or a drift in risk policy.",
+ "[+]", "C: And card disputes, against each card network's monitoring programme; we alert at three tenths of a percent.",
+ "[+]", "N: Cross one of these lines and the bank can stop you collecting at all. That is an outage no server dashboard shows."])
 
 qs("Interviewer · the second-level push", "“A policy change misallocates four dollars on thirty thousand loans. Every transaction still sums to zero.”", [
  "I: A policy change misallocates four dollars on thirty thousand loans. Every transaction still sums to zero.", "[pause: 2.0]"])

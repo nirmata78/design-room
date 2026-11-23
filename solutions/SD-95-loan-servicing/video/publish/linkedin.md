@@ -7,7 +7,7 @@ Post from a computer, after the YouTube video is public. The link is still pendi
 ```text
 Your bank debit settled on the 2nd. On the 3rd it came back. "Settled means paid" is where loan servicing designs break.
 
-I've published a 75-minute reference solution for the loan servicing question (instalment loans, BNPL-style) at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on 162 numbered slides.
+I've published a 96-minute reference solution for the loan servicing question (instalment loans, BNPL-style) at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on 590 numbered slides.
 
 The idea that unlocks it: throughput is never the problem here. 600,000 collections on the 1st is 42 a second. The limits are the processor's contract and the bank's cut-off, and the hard part is correctness over months.
 
@@ -36,5 +36,5 @@ Written reference design, stage by stage: https://github.com/nirmata78/design-ro
 Run this round yourself, with an AI interviewer that won't help you: https://github.com/nirmata78/design-room
 ```
 
-**Media: attach the reference design.** In the post composer, More (+) → Add a document → `../../SD-95_Loan_Servicing_Reference_Design.pdf` (34 pages, 2.1 MB; limit 300 pages, 100 MB).
+**Media: attach the reference design.** In the post composer, More (+) → Add a document → `../../SD-95_Loan_Servicing_Reference_Design.pdf` (41 pages, 2.1 MB; limit 300 pages, 100 MB).
 Document title, shown on the viewer: **Instalment loan servicing: a Staff-level reference design**. A post carries one attachment, so the video stays a link in the text, and the document is what shows in the feed.

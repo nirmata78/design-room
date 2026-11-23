@@ -264,3 +264,32 @@ found by hand; one processor holds the card tokens.
 Key-line voice budget: under 5 % of words (≤ 470): definition, thesis twice, eight "if asked" lines of about 35 words.
 
 **Actual (after the build, 2026-11-21): 75:13, 9,238 words (C 88.4 %, I 4.3 %, V 4.3 %, N 3.0 %), 162 slides.** Under the 85-minute plan: chapters 1, 2, 4, 5 and 8 ran shorter than budgeted. Within the 60–90 minute target; the key-line voice is under 5 %.
+
+## 5.1 Components and technologies (retrofit, 2026-11-22)
+
+<!-- stack:outline -->
+
+| Container | Choice | How it is built | Rejected | Theory part |
+|---|---|---|---|---|
+| Servicing DB | PostgreSQL 16, partitioned by month, one writer to the ledger | Ledger entries are double entry: each transaction's lines sum to zero, checked by a deferred constraint at commit | A message broker as the queue; Multiple ledger writers; A key-value store | 03, 07 |
+| Dispatcher | Go worker, a token bucket per rail, a plan of the day | The dispatcher takes due intents and spends tokens from the rail's bucket | Firing every due item at once; Retrying every failure immediately | 08 |
+| Resolver | Scheduled worker, inquiry by reference, backoff, an alert at a deadline | The resolver selects unknown intents past a minimum age and asks the rail by our reference | Retrying the original call; Marking a timeout as failed | 07 |
+| File ingest | Object storage for raw files, a batch parser, counts and totals checked first | Each file is stored raw in object storage with a hash, then parsed by a batch job | Parsing on arrival; Streaming each line as it comes | 08 |
+| Reconciliation | Batch pipeline over the ledger, the rail's file and the bank's statement, by reference | A daily job matches every ledger entry to the rail's settlement line and to the bank statement by reference | Matching on amount and date alone; A monthly reconciliation | 08 |
+| Policy | A rules service, versioned terms, a payment waterfall, a fee table | The policy service holds versioned terms: the schedule rules, the waterfall of interest, fees and principal, and the fee table | Terms in code; Terms in each service | 08 |
+| Servicing API | Go service, an idempotency key on every write, payoff quotes that list what is in flight | Every write carries an idempotency key under a unique constraint | Quoting from the ledger balance only; Editing the schedule in place | 07 |
+
+Fix-slide rejections: 1: Treating a timeout as a failure; 2: Firing every due item at midnight on the first; 3: Treating settled as final; 4: Editing the schedule in place for a refund; 5: Quoting the payoff from the ledger balance alone; 6: Plugging the difference to the bank; 7: Retrying a down rail until it returns; 8: A month-end report.
+
+<!-- /stack:outline -->
+
+## Revision 2026-11-22 (review for a lending / BNPL EM loop)
+
+| Change | Where |
+|---|---|
+| Card disputes on repayments: SETTLED → DISPUTED, reversal dated the notice, no fee or auto re-collection while open, evidence by the network deadline, dispute line reconciled by ID | Challenge 3, new slide; booklet 6.3 |
+| The rails' thresholds as SLIs: unauthorised returns 0.5 %, administrative 3 %, overall 15 % (60 days), card disputes per network programme; our alerts at about half | Challenge 8, new slide; booklet Stage 9 |
+| 5.2 alternate path: one scheduled job instead of the dispatcher; crossover ≈ 180,000 collections on the busiest day | new sub-chapter 5.2; booklet Stage 5 |
+| C4 component view of the dispatcher | 5.1; booklet Stage 5 |
+| Contracts with SD-82 (LoanBooked in) and SD-99 (servicing events out); additive-only event changes | booklet Stage 10 |
+| Layout gate: 57 failures → 0 (C4 views redrawn wide; Chen and physical models re-laid; code ≤ 56 × 12; one strip per fix slide; kit sequence badges enlarged and moved off the labels) | diagrams.py, chapter files, kit |

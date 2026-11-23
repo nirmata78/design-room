@@ -1,7 +1,6 @@
 # SD-95 · Instalment loan servicing: reference-solution video
 
-Staff bar (L6/L7), manager layer marked AUX. **Length 75:13**, 18 chapters, **162 numbered slides**, **9,238 spoken words**
-(candidate 88.4 %, interviewer 4.3 %, key line 4.3 %, coach 3.0 %). Built 2026-11-21 in the SD-94 reference format; it replaces
+Staff bar (L6/L7), manager layer marked AUX. **Length 1:35:42**, 20 chapters, **180 numbered slides** in **590 reveal frames**, **11,470 spoken words** (candidate 87.8 %, interviewer 4.0 %, key line 3.7 %, coach 4.6 %). Built 2026-11-21 in the SD-94 reference format; it replaces
 problem 2 of the 2026-11-20 fintech mock series, which has been retired. Scripted walkthrough with synthetic voices; numbers are
 illustrative, not any company's figures; bank-debit return rules checked against public rule summaries in November 2026; not legal,
 accounting or compliance advice. **The technical content has not been reviewed by a person, and the video has not been watched end
@@ -16,23 +15,25 @@ LinkedIn post). Plan: `OUTLINE.md`.
 | Time | Chapter |
 |---|---|
 | 00:00 | 0 Cold open |
-| 03:11 | 1 Requirements and scope |
-| 08:24 | 2 Estimates |
-| 12:49 | 3 Theory |
-| 22:58 | 4 API and entities |
-| 28:25 | 5 High-level design |
-| 36:16 | 6 Bridge |
-| 37:01 | 7 Challenges |
-| 37:19 | 7.1 Challenge 1: The processor timed out |
-| 41:42 | 7.2 Challenge 2: The morning of the 1st |
-| 46:07 | 7.3 Challenge 3: It settled, then it came back |
-| 50:32 | 7.4 Challenge 4: A refund in the middle of the loan |
-| 54:31 | 7.5 Challenge 5: Paying off with a debit in flight |
-| 58:37 | 7.6 Challenge 6: Four hundred dollars more than the bank |
-| 62:45 | 7.7 Challenge 7: The card processor is down on the 1st |
-| 66:14 | 7.8 Challenge 8: How would you know before month-end? |
-| 70:01 | 8 Build cost (AUX) |
-| 72:30 | 9 Recap |
+| 03:14 | 1 Requirements and scope |
+| 08:29 | 2 Estimates |
+| 13:03 | 3 Theory |
+| 23:27 | 4 API and entities |
+| 29:02 | 5 High-level design |
+| 37:24 | 5.1 Components and technologies |
+| 50:03 | 5.2 When you don't need all this |
+| 51:42 | 6 Bridge |
+| 52:26 | 7 Challenges |
+| 52:45 | 7.1 Challenge 1: The processor timed out |
+| 57:24 | 7.2 Challenge 2: The morning of the 1st |
+| 1:02:08 | 7.3 Challenge 3: It settled, then it came back |
+| 1:08:12 | 7.4 Challenge 4: A refund in the middle of the loan |
+| 1:12:32 | 7.5 Challenge 5: Paying off with a debit in flight |
+| 1:16:56 | 7.6 Challenge 6: Four hundred dollars more than the bank |
+| 1:21:23 | 7.7 Challenge 7: The card processor is down on the 1st |
+| 1:25:08 | 7.8 Challenge 8: How would you know before month-end? |
+| 1:30:15 | 8 Build cost |
+| 1:32:49 | 9 Recap |
 
 ## The eight challenges
 
@@ -91,3 +92,27 @@ Slides and script are generated together from `video/src/*.py` (DSL copied from 
 | Event sourcing | some treatments | Options row C, rejected as the core |
 | Buy a servicing platform | build-vs-buy treatments | Options row E; build cost V0 |
 | Instant payment rails (since 2023) | then-and-now | Theory 3, one line: removes some pending states, not returns or reconciliation |
+
+## Retrofit, 2026-11-22
+
+Brought to the current standard by `RETROFIT.md`: the Google theme (`video.css`, `google-theme.css`), progressive reveal (every table row,
+card, trace event and figure step appears as it is spoken), sidecar captions (`.srt` and `.vtt` beside the MP4, nothing burned in), the
+technology chapter **5.1** generated from `../stack.json` (container view with technologies, one slide per technology with its rejected
+alternatives, the stack on one slide, the drill interlude) and a **Rejected** line on every challenge's fix slide.
+
+**107 of the 174 slides were written before reveal markers existed; their markers were placed automatically** (`dsl.META["automark"]`:
+the narration is cut at sentences and dealt to the reveal units by word overlap). Watch those slides and move a marker by hand where one
+lands badly. Not done in this pass: the C4 context moved to the end of chapter 1, a mechanism map in the theory chapter, extra sequences per
+requirement, component views. The previous sources are kept in `.v1-retrofit-2026-11-22/` until the author has watched this version.
+
+## Review for a lending EM loop, 2026-11-22
+
+Reviewed against an EM-level lending checklist and rebuilt (`.v2-review-2026-11-22/` held the previous sources during the run and has been removed). Changes:
+
+- Challenge 3: card disputes on repayments (SETTLED → DISPUTED, reversal dated the notice, no fee or auto re-collection while open, evidence, reconciliation by dispute ID).
+- Challenge 8: the rails' own thresholds as SLIs (unauthorised debit returns 0.5 %, administrative 3 %, overall 15 % over 60 days; card disputes per network programme), alerts at about half.
+- 5.1: a C4 component view of the dispatcher. 5.2: the alternate path (one scheduled job; crossover ≈ 180,000 collections on the busiest day).
+- Booklet: contracts with SD-82 (LoanBooked in) and SD-99 (servicing events out).
+- Layout gate: 57 failures → **0** (C4 views and both data models re-laid, code ≤ 56 × 12, one strip per fix slide, kit sequence badges enlarged and moved off the labels).
+
+QA of this build: `check_layout.py` 0 failures; `ffprobe` H.264 + AAC 1920×1080, 20 chapters, no subtitle stream; `.srt`/`.vtt` beside the MP4, no line over 42 characters, every VTT cue with a voice span; Whisper check on 20 excerpts found only transcription noise; frames of the new slides read as images. **Not watched end to end.**

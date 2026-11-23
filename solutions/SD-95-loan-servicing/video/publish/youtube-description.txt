@@ -1,4 +1,4 @@
-600,000 repayments are due on the 1st. It sounds like a thundering herd; it is 42 a second. The hard parts of loan servicing are elsewhere: a card charge that times out, a bank debit that settles and comes back 40 days later, a refund that changes the schedule of a live loan, and a month-end where the ledger says $400 more than the bank. A full reference solution at the Staff bar (L6/L7): theory, a three-version design, eight challenges that break it, and the build cost. 75 minutes, 162 numbered slides, with an interviewer, a candidate and a coach.
+600,000 repayments are due on the 1st. It sounds like a thundering herd; it is 42 a second. The hard parts of loan servicing are elsewhere: a card charge that times out, a bank debit that settles and comes back 40 days later, a refund that changes the schedule of a live loan, and a month-end where the ledger says $400 more than the bank. A full reference solution at the Staff bar (L6/L7): theory, a three-version design, eight challenges that break it, and the build cost. 96 minutes, 590 numbered slides, with an interviewer, a candidate and a coach.
 
 The thesis: throughput is never the problem here; correctness over months is. An immutable double-entry ledger, a payment state machine that admits unknown and returned, a scheduler bounded by the payment rail rather than the database, and a daily three-way reconciliation.
 
@@ -13,23 +13,25 @@ Run the round cold first. Then watch once straight through. On the second pass, 
 
 CHAPTERS
 0:00 0 Cold open
-3:11 1 Requirements and scope
-8:24 2 Estimates
-12:49 3 Theory
-22:58 4 API and entities
-28:25 5 High-level design
-36:16 6 Bridge
-37:01 7 Challenges
-37:19 7.1 Challenge 1: The processor timed out
-41:42 7.2 Challenge 2: The morning of the 1st
-46:07 7.3 Challenge 3: It settled, then it came back
-50:32 7.4 Challenge 4: A refund in the middle of the loan
-54:31 7.5 Challenge 5: Paying off with a debit in flight
-58:37 7.6 Challenge 6: Four hundred dollars more than the bank
-1:02:45 7.7 Challenge 7: The card processor is down on the 1st
-1:06:14 7.8 Challenge 8: How would you know before month-end?
-1:10:01 8 Build cost
-1:12:30 9 Recap
+3:14 1 Requirements and scope
+8:29 2 Estimates
+13:03 3 Theory
+23:27 4 API and entities
+29:02 5 High-level design
+37:24 5.1 Components and technologies
+50:03 5.2 When you don't need all this
+51:42 6 Bridge
+52:26 7 Challenges
+52:45 7.1 Challenge 1: The processor timed out
+57:24 7.2 Challenge 2: The morning of the 1st
+1:02:08 7.3 Challenge 3: It settled, then it came back
+1:08:12 7.4 Challenge 4: A refund in the middle of the loan
+1:12:32 7.5 Challenge 5: Paying off with a debit in flight
+1:16:56 7.6 Challenge 6: Four hundred dollars more than the bank
+1:21:23 7.7 Challenge 7: The card processor is down on the 1st
+1:25:08 7.8 Challenge 8: How would you know before month-end?
+1:30:15 8 Build cost
+1:32:49 9 Recap
 
 LINKS
 Written reference design: https://github.com/nirmata78/design-room/blob/main/solutions/SD-95-loan-servicing/SD-95_Loan_Servicing_Reference_Design.md
