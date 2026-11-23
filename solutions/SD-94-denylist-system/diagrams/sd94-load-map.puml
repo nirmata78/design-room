@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam rectangle {
+  BackgroundColor #e8f0fa
+  BorderColor #2f6fb5
+}
+rectangle "Policy tool\n50 changes/s burst" as P
+rectangle "Rule store + compiler\none version order" as R
+rectangle "Origin\nsnapshot 40 MB\ndelta 1.5 KB/s" as O
+rectangle "20 regional relays\n10 zone relays each" as G
+rectangle "100,000 nodes\n10,000 manifest polls/s\n(about 1 MB/s)" as N
+rectangle "Request path\n1 M req/s fleet\n10 req/s per node\nno network call" as Q
+P --> R
+R --> O
+O --> G : 20 x 40 MB = 800 MB
+G --> N : push + poll\ndelta when behind
+N --> Q : in-process check\nunder 10 us
+@enduml

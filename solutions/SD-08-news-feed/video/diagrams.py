@@ -1,498 +1,403 @@
 #!/usr/bin/env python3
-"""C4, sequence and follow-up diagrams for the SD-08 news-feed video → ./svg/*.svg.
-Generators: ~/.claude/skills/slide-video-kit/scripts/{c4svg,seqsvg}.py.  Run: python3 diagrams.py
-Content follows ../../SD-08-news-feed.md; the follow-up diagrams (fu-*) are new for this video."""
-import pathlib, sys
+"""SD-08 news feed: every picture for the reference-solution video and the written design -> ./svg/*.svg.
+One carried baseline (declared once), numbered flows, challenge overlays, C4, sequences, ERDs, figures.
+The v3 mock-round figures are kept in .v3-mock-2026-11-20/ (their palette predates the colour-by-role rule).
+Run: python3 diagrams.py"""
+import html, pathlib, sys
 sys.path.insert(0, str(pathlib.Path.home() / ".claude/skills/slide-video-kit/scripts"))
-import c4svg as c4, seqsvg as sq
-from erdsvg import ERD
+import basesvg as bs
+import c4svg as c4
+import seqsvg as sq
+import erdsvg as er
 
-OUT = pathlib.Path(__file__).resolve().parent / "svg"
-OUT.mkdir(exist_ok=True)
-GREEN, GREEN_BG, RED, RED_BG, BLUE, BLUE_BG = "#2d8a4e", "#e7f4ec", "#c8341f", "#fdecea", "#2f6fb5", "#e8f0fa"
+OUT = pathlib.Path(__file__).resolve().parent / "svg"; OUT.mkdir(exist_ok=True)
+FONT = "Inter, Helvetica, Arial, sans-serif"
+INK, RED, GREEN, BLUE, PURPLE, GREY, AMBER = "#24292f", "#c8341f", "#1f8a4c", "#2f6fb5", "#6b4fc4", "#8c959f", "#d18f1c"
+def esc(s): return html.escape(str(s))
 
-def seq(size=22, row=50):
-    return sq.Seq(1500, size=size, row=row, head=66)
+# ───────────────────────────── 1 · the carried baseline ──────────────────────────────────────────────
+b = bs.Baseline(1600, 690, size=26)
+A, B, C, D, E = 20, 360, 700, 1040, 1380          # columns: 150 px between joined boxes
+TOP, MID, BOT, BH = 40, 250, 460, 110
+# write lane (top)
+b.node("author", A, TOP, 190, BH, "client", "Author", "posts")
+b.node("postsvc", B, TOP, 190, BH, "service", "Post service", "post + outbox")
+b.node("postsdb", C, TOP, 190, BH, "data", "Posts DB", "posts · author index", shape="db")
+b.node("log", D, TOP, 200, BH, "queue", "Event log", "keyed by author", shape="queue", since=2)
+b.node("fanout", E, TOP, 200, BH, "service", "Fan-out", "IDs · active only", since=2)
+# middle row
+b.node("graph", B, MID, 190, BH, "data", "Graph", "follows · blocks", shape="db")
+b.node("celeb", D, MID, 200, BH, "cache", "Celebrity posts", "last 100 IDs", since=3)
+b.node("timeline", E, MID, 200, BH, "cache", "Timelines", "500 IDs per user", since=2)
+# read lane (bottom)
+b.node("reader", A, BOT, 190, BH, "client", "Reader", "opens the app")
+b.node("feed", B, BOT, 190, BH, "service", "Feed service", "merge · filter")
+b.node("ranking", C, BOT, 190, BH, "ext", "Ranking", "another team")
+b.node("postcache", D, BOT, 200, BH, "cache", "Post cache", "bodies by ID", since=2)
+# tags: shown only in a challenge, a flow or the recap
+b.node("synth", A, MID, 190, BH, "ext", "Synthetic users", "post and read", tag="ch8")
+b.node("rebuild", E, BOT, 200, BH, "service", "Rebuild", "pull · coalesce", tag="ch5")
 
-# ── C4 level 1: system context ───────────────────────────────────────────────────────────────────
+R = dict(src="r:0.3", dst="l:0.3")
+b.edge("e1", "author", "postsvc", "POST", **R)
+b.edge("e2", "postsvc", "postsdb", "one txn", **R)
+b.edge("e3", "postsdb", "log", "outbox", **R)
+b.edge("e4", "log", "fanout", "event", **R)
+b.edge("e5", "fanout", "graph", "followers, paged", src="l:0.85", dst="t:0.5", via=[(1310, 133.5), (1310, 205), (455, 205)], at=(880, 193))
+b.edge("e6", "fanout", "timeline", "insert IDs", src="b:0.6", dst="t:0.6", at=(1500, 200))
+b.edge("e7", "fanout", "celeb", "one write", src="b:0.25", dst="t:0.5", via=[(1430, 232), (1140, 232)], since=3, kind="async", at=(1290, 222))
+b.edge("e8", "reader", "feed", "GET /feed", **R)
+b.edge("e9", "feed", "reader", "50 items", src="l:0.8", dst="r:0.8", kind="resp")
+b.edge("e10", "feed", "graph", "follows, blocks", src="t:0.5", dst="b:0.5", at=(285, 418))
+b.edge("e11", "feed", "postsdb", "200 author indexes", src="t:0.75", dst="l:0.75", via=[(502, 420), (640, 420), (640, 122.5)], until=1, at=(640, 280))
+b.edge("e12", "feed", "celeb", "merge", src="t:0.75", dst="b:0.25", via=[(502, 412), (1090, 412)], since=3, at=(800, 400))
+b.edge("e13", "feed", "timeline", "read IDs", src="t:0.92", dst="b:0.35", via=[(535, 440), (1450, 440)], since=2, at=(1290, 428))
+b.edge("e14", "feed", "ranking", "rank", **R)
+b.edge("e15", "ranking", "feed", "scores", src="l:0.75", dst="r:0.75", kind="resp")
+b.edge("e16", "feed", "postcache", "hydrate", src="b:0.8", dst="b:0.5", via=[(512, 600), (1140, 600)], since=2, at=(820, 588))
+b.edge("inv", "postsdb", "postcache", "invalidate", src="r:0.85", dst="l:0.33", via=[(965, 133.5), (965, 496.3)], tag="ch3", kind="async", at=(965, 300))
+b.edge("e17", "feed", "rebuild", "miss: rebuild", src="b:0.3", dst="b:0.35", via=[(417, 630), (1450, 630)], tag="ch5", at=(1100, 618))
+b.edge("e18", "rebuild", "timeline", "write back", src="t:0.6", dst="b:0.6", tag="ch5", at=(1500, 400))
+b.edge("e19", "feed", "postsdb", "48 h", src="t:0.6", dst="l:0.8", via=[(474, 398), (632, 398), (632, 128)], tag="ch7", at=(632, 280))
+b.edge("e20", "synth", "author", "post", src="t:0.5", dst="b:0.5", tag="ch8", kind="async")
+b.edge("e21", "synth", "reader", "read", src="b:0.5", dst="t:0.5", tag="ch8", kind="async")
+
+def sv(name, h, **view):
+    b.h = h
+    b.save(OUT / name, **view)
+NOTE = lambda t, tone: []          # the slide carries the words; the picture stays large
+H = 650
+sv("base-v1.svg", 690, upto=1, legend=True)
+sv("base-v2.svg", 690, upto=2, new=2, legend=True)
+sv("base-v3.svg", 690, upto=3, new=3, legend=True)
+ALL = ["ch3", "ch5", "ch7", "ch8"]
+sv("base-final.svg", 690, upto=3, show=ALL, legend=True)
+sv("map.svg", 690, upto=3, legend=True, attack=["fanout", "celeb", "timeline", "feed", "ranking"], keep=None)
+sv("flow-fr1.svg", H, upto=3, flow=["e1", "e2", "e3", "e4", "e5", "e6"],
+   notes=NOTE("An ordinary author: one transaction, one event, then post IDs into each active follower's timeline.", "blue"))
+sv("flow-fr1c.svg", H, upto=3, flow=["e1", "e2", "e3", "e4", "e7"],
+   notes=NOTE("A celebrity: the same event, and one write to the author's recent list. No fan-out.", "blue"))
+sv("flow-fr2.svg", H, upto=3, flow=["e8", "e13", "e12", "e10", "e14", "e16", "e9"],
+   notes=NOTE("Timeline, celebrity lists, blocks; rank inside a deadline; hydrate the top 50; return with a cursor.", "blue"))
+sv("flow-fr3.svg", H, upto=3, flow=["e8", "e10", "e12"],
+   notes=NOTE("Follow writes one edge. Nothing is backfilled: the next post, or the next read's merge, covers it.", "blue"))
+sv("flow-fr4.svg", H, upto=3, show=["ch3"], flow=["e1", "e2", "inv", "e8", "e16"],
+   notes=NOTE("Delete is one write to the post. The cache entry is dropped; hydration drops the ID on every page.", "blue"))
+sv("ch1-attack.svg", H, upto=2, attack=["fanout"], keep=["log", "fanout", "timeline", "graph"], hot=["e4", "e5", "e6"],
+   notes=NOTE("100 million followers: about 15 minutes of the whole fleet's fan-out, and everyone else waits behind it.", "red"))
+sv("ch1-fix.svg", H, upto=3, fix=["celeb", "fanout"], keep=["log", "fanout", "celeb", "feed", "timeline"], ok=["e7", "e12"],
+   notes=NOTE("Above the threshold: one write to the author's recent list. Readers merge the few celebrities they follow.", "green"))
+sv("ch2-attack.svg", H, upto=3, attack=["fanout"], keep=["fanout", "celeb", "timeline"], hot=["e6", "e7"],
+   notes=NOTE("A fixed number nobody can justify, and an account that crosses it overnight.", "red"))
+sv("ch2-fix.svg", H, upto=3, fix=["fanout", "celeb", "timeline"], keep=["fanout", "celeb", "timeline", "feed"], ok=["e6", "e7", "e12", "e13"],
+   notes=NOTE("The line from both sides of the arithmetic, as config. Crossing needs no backfill: the read merge covers it.", "green"))
+sv("ch3-attack.svg", H, upto=3, attack=["timeline"], keep=["author", "postsvc", "postsdb", "timeline", "feed", "reader"], hot=["e13"],
+   notes=NOTE("The deleted post's ID sits in three million timelines. Correctness stored in copies.", "red"))
+sv("ch3-fix.svg", H, upto=3, show=["ch3"], fix=["feed", "postcache", "graph"], keep=["postsdb", "postcache", "feed", "graph", "reader"], ok=["inv", "e16", "e10"],
+   notes=NOTE("Filter on read: hydrate from the post itself, drop blocked and unfollowed authors. Cleanup is cosmetic.", "green"))
+sv("ch4-attack.svg", H, upto=3, attack=["timeline", "feed"], keep=["fanout", "timeline", "feed", "reader"], hot=["e6", "e9"],
+   notes=NOTE("A re-delivered event inserts twice; an offset page repeats twelve posts and skips twelve.", "red"))
+sv("ch4-fix.svg", H, upto=3, fix=["timeline", "feed"], keep=["fanout", "timeline", "feed", "reader"], ok=["e6", "e9"],
+   notes=NOTE("A set keyed by post ID makes inserts idempotent; a cursor starts after the last item seen.", "green"))
+sv("ch5-attack.svg", H, upto=3, attack=["timeline"], keep=["timeline", "feed", "postsdb", "reader"], hot=["e13"],
+   notes=NOTE("A shard with 5 million users is gone. 1,700 rebuilds a second would mean 340,000 author-index reads a second.", "red"))
+sv("ch5-fix.svg", H, upto=3, show=["ch5"], fix=["rebuild"], keep=["timeline", "feed", "rebuild", "reader"], ok=["e17", "e18"],
+   notes=NOTE("Rebuild by pull, coalesced per user, rate-limited. Over the limit: a degraded feed now, a rebuild later.", "green"))
+sv("ch6-attack.svg", H, upto=3, attack=["ranking"], keep=["feed", "ranking", "reader"], hot=["e14"],
+   notes=NOTE("Ranking p99 goes from 70 ms to 300 ms; the feed waits for it and misses its 200 ms target.", "red"))
+sv("ch6-fix.svg", H, upto=3, fix=["feed", "ranking"], keep=["feed", "ranking", "reader"], ok=["e14", "e15"],
+   notes=NOTE("A hard deadline. On a miss: recency and close ties, or the session's last ranking. The fallback rate has an owner.", "green"))
+sv("ch7-attack.svg", H, upto=3, attack=["timeline"], keep=["timeline", "feed", "reader"], hot=["e13"],
+   notes=NOTE("A bounded, ranked view asked for 48 hours in time order. It does not hold the answer.", "red"))
+sv("ch7-fix.svg", H, upto=3, show=["ch7"], fix=["postsdb"], keep=["postsdb", "feed", "reader"], ok=["e19"],
+   notes=NOTE("Catch-up reads the source of truth, the followees' author indexes, through the rebuild path. Cached for minutes.", "green"))
+sv("ch8-attack.svg", H, upto=3, attack=["fanout"], keep=["fanout", "celeb", "timeline", "feed"],
+   notes=NOTE("Dashboards green. A routing bug made 30 % of mid-tier authors invisible to their followers.", "red"))
+sv("ch8-fix.svg", H, upto=3, show=["ch8"], fix=["synth"], keep=["synth", "author", "reader", "feed", "fanout"], ok=["e20", "e21"],
+   notes=NOTE("Synthetic authors in every tier post every minute; synthetic followers measure post-to-visible time.", "green"))
+bs.budget_bar(OUT / "budget.svg", [("lookups + filter", 20, "cache"), ("ranking deadline", 80, "ext"), ("hydrate", 20, "cache"),
+                                   ("network", 20, "edge")],
+              total=200, unit="ms", title="One feed open, p99 (initial target 200 ms)")
+
+# ───────────────────────────── 2 · C4 ────────────────────────────────────────────────────────────────
 d = c4.Diagram(1600, 780)
-d.node("auth", 40, 60, 320, 150, "person", "Authors", "Person", "~600 posts a second; a few have 100 M followers")
-d.node("read", 40, 520, 320, 150, "person", "Readers · 500 M DAU", "Person", "~75 k feed opens a second at peak")
-d.node("feed", 620, 270, 380, 210, "focus", "News feed system", "Software System",
-       "Publishes posts, keeps bounded timelines, serves a ranked feed in 200 ms")
-d.node("rank", 1240, 60, 320, 150, "ext", "Ranking service", "External System", "scores candidates; owned by another team")
-d.node("graph", 1240, 300, 320, 150, "ext", "Social graph", "External System", "followers and followees, cached")
-d.node("media", 1240, 540, 320, 150, "ext", "Media CDN", "External System", "images served by URL; out of scope")
-d.edge("auth", "feed", "Post", "HTTPS", src="r:0.5", dst="l:0.2", at=(490, 150), width=120)
-d.edge("read", "feed", "Open feed", "HTTPS", src="r:0.5", dst="l:0.8", at=(490, 560), width=130)
-d.edge("feed", "rank", "Score ~200 candidates", "80 ms budget", src="r:0.2", dst="l:0.5", at=(1120, 150), width=220)
-d.edge("feed", "graph", "Who follows whom", "", src="r:0.5", dst="l:0.5", at=(1120, 345), width=190)
-d.edge("read", "media", "Fetch images", "", src="b:0.5", dst="b:0.5", via=[(200, 740), (1400, 740)], at=(800, 740), width=150)
-d.legend(40, 760, ("person", "focus", "ext"))
+d.node("au", 60, 80, 320, 160, "person", "Authors", "Person", "About 600 posts a second; a few have 100 M followers.", size=24)
+d.node("rd", 60, 480, 320, 160, "person", "Readers", "Person", "500 M a day; about 90,000 feed opens a second at peak.", size=24)
+d.node("fs", 640, 270, 360, 210, "system", "News feed system", "Software System", "Publishes posts, keeps bounded timelines, serves a ranked feed in 200 ms.", size=24)
+d.node("rk", 1240, 60, 320, 150, "ext", "Ranking service", "External system", "Scores candidates; another team.", size=24)
+d.node("gr", 1240, 300, 320, 150, "ext", "Social graph", "External system", "Who follows whom; blocks.", size=24)
+d.node("md", 1240, 540, 320, 150, "ext", "Media CDN", "External system", "Images by URL; out of scope.", size=24)
+d.edge("au", "fs", "Post", "HTTPS", src="r:0.6", dst="l:0.25", at=(500, 220))
+d.edge("rd", "fs", "Open the feed", "HTTPS", src="r:0.4", dst="l:0.75", at=(500, 500))
+d.edge("fs", "rk", "Score ~200 candidates", "80 ms budget", src="r:0.2", dst="l:0.6", at=(1120, 190))
+d.edge("fs", "gr", "Followers, followees", "RPC, cached", src="r:0.5", dst="l:0.5", at=(1120, 360))
+d.edge("rd", "md", "Fetch images", "HTTPS", src="b:0.5", dst="b:0.5", via=[(220, 740), (1400, 740)], at=(800, 728))
+d.legend(40, 760, ("person", "system", "ext"))
 d.save(OUT / "c4-context.svg")
 
-# ── C4 level 2: the write path ───────────────────────────────────────────────────────────────────
-d = c4.Diagram(1600, 800)
-d.boundary(240, 20, 1340, 760, "News feed system")
-d.node("cl", 20, 80, 190, 130, "person", "Author", "Person")
-d.node("ps", 300, 70, 260, 150, "container", "Post service", "Container", "writes post + outbox in one transaction")
-d.node("pdb", 300, 330, 260, 150, "db", "Posts DB", "sharded, time-sortable IDs", "source of truth + author index")
-d.node("log", 660, 330, 280, 150, "queue", "Post-created log", "partitioned by author", "replayable; many consumers")
-d.node("fo", 1040, 330, 260, 150, "focus", "Fan-out workers", "Container", "page followers, skip inactive")
-d.node("tl", 1040, 600, 260, 140, "db", "Timeline cache", "Redis-class, by user", "~500 IDs per user")
-d.node("cel", 660, 600, 280, 140, "db", "Celebrity recent posts", "hot cache", "last ~100 IDs per author")
-d.node("g", 1380, 70, 180, 150, "ext", "Social graph", "External")
-d.edge("cl", "ps", "POST", "", src="r:0.5", dst="l:0.5", at=(255, 125), width=60)
-d.edge("ps", "pdb", "txn", "", src="b:0.5", dst="t:0.5", at=(430, 275), width=50)
-d.edge("pdb", "log", "outbox / CDC", "", src="r:0.5", dst="l:0.5", at=(610, 385), width=100)
-d.edge("log", "fo", "normal authors", "", src="r:0.5", dst="l:0.5", at=(990, 385), width=110)
-d.edge("log", "cel", "celebrities", "", src="b:0.5", dst="t:0.5", at=(800, 545), width=100)
-d.edge("fo", "tl", "insert IDs, trim to 500", "", src="b:0.5", dst="t:0.5", at=(1170, 545), width=190)
-d.edge("fo", "g", "followers, paged", "", src="t:0.6", dst="b:0.5", via=[(1196, 280), (1470, 280)], at=(1330, 270), width=140)
-d.note(20, 330, 200, "Store IDs, never bodies: 4 TB, not 250 TB.", size=17, colour=RED, bg=RED_BG)
-d.save(OUT / "c4-containers-write.svg")
+def containers(name):
+    """The container view (C4 level 2), laid out for 1080p (2026-11-22): 24 px titles, every label >= 18 px on the frame."""
+    d = c4.Diagram(1640, 830)
+    d.boundary(20, 6, 1250, 804, "News feed system", "Software System")
+    W, H, S = 270, 170, 24
+    d.node("ps", 50, 100, W, H, "container", "Post service", "Service", "Writes post and outbox in one transaction.", size=S)
+    d.node("db", 360, 100, W, H, "db", "Posts DB", "Sharded store", "Posts by ID; author index by time.", size=S)
+    d.node("lg", 670, 100, W, H, "queue", "Event log", "Partitioned by author", "PostCreated, replayable.", size=S)
+    d.node("fo", 980, 100, W, H, "container", "Fan-out workers", "Consumers", "Route by tier; push IDs to active followers.", size=S)
+    d.node("pc", 360, 370, W, H, "db", "Post cache", "In memory", "Hydrated posts by ID.", size=S)
+    d.node("cc", 670, 370, W, H, "db", "Celebrity posts", "In memory, replicated", "Last 100 IDs per author.", size=S)
+    d.node("tl", 980, 370, W, H, "db", "Timeline cache", "In memory", "500 post IDs per user.", size=S)
+    d.node("fs", 50, 600, 580, 150, "container", "Feed service", "Stateless service", "Merge timeline and celebrities, filter, rank under a deadline, hydrate, cursor.", size=S)
+    d.node("gr", 1330, 370, W, 150, "ext", "Social graph", "External", "Followers, blocks.", size=S)
+    d.node("rk", 1330, 600, W, 150, "ext", "Ranking", "External", "Scores, 80 ms.", size=S)
+    d.edge("ps", "db", "post + outbox", "SQL", src="r", dst="l", at=(340, 66))
+    d.edge("db", "lg", "outbox relay", "CDC", src="r", dst="l", at=(650, 66))
+    d.edge("lg", "fo", "PostCreated", "consume", src="r", dst="l", at=(960, 66))
+    d.edge("fo", "tl", "insert IDs", "pipelined", src="b:0.7", dst="t:0.7", at=(1169, 318))
+    d.edge("fo", "cc", "one write", "", src="b:0.2", dst="t:0.6", at=(925, 318))
+    d.edge("fo", "gr", "followers", "paged", src="r:0.8", dst="t:0.5", via=[(1465, 236)], at=(1465, 300))
+    d.edge("fs", "tl", "timeline", "", src="r:0.2", dst="b:0.5", via=[(1115, 630)], at=(880, 618))
+    d.edge("fs", "cc", "celebrities", "", src="t:0.85", dst="b:0.5", via=[(543, 570), (805, 570)], at=(690, 560))
+    d.edge("fs", "pc", "hydrate 50", "multi-get", src="t:0.55", dst="b:0.3", at=(400, 566))
+    d.edge("fs", "rk", "rank", "deadline", src="r:0.6", dst="l:0.5", at=(1000, 668))
+    d.legend(1330, 110, ("container", "db", "queue", "ext"), vertical=True)
+    d.save(OUT / name)
 
-# ── C4 level 2: the read path ────────────────────────────────────────────────────────────────────
-d = c4.Diagram(1600, 800)
-d.boundary(240, 20, 1060, 690, "News feed system")
-d.node("cl", 20, 300, 190, 140, "person", "Reader", "Person")
-d.node("fs", 300, 290, 300, 160, "focus", "Feed service", "Container", "merge, dedup, filter, rank, hydrate")
-d.node("tl", 700, 60, 280, 130, "db", "Timeline cache", "by user", "~500 IDs")
-d.node("cel", 700, 260, 280, 130, "db", "Celebrity recent posts", "hot cache", "replicated widely")
-d.node("pc", 700, 460, 280, 130, "db", "Post cache", "multi-get", "hydrated bodies")
-d.node("pdb", 1020, 460, 240, 130, "db", "Posts DB", "source of truth")
-d.node("rank", 1360, 160, 200, 140, "ext", "Ranking", "other team", "80 ms deadline")
-d.node("g", 1360, 560, 200, 140, "ext", "Social graph", "External", "followed celebrities")
-d.edge("cl", "fs", "GET /feed", "", src="r:0.5", dst="l:0.5", at=(255, 345), width=90)
-d.edge("fs", "tl", "1 read", "", src="t:0.5", dst="l:0.5", via=[(450, 125)], at=(560, 110), width=70)
-d.edge("fs", "cel", "5–20 reads", "", src="r:0.3", dst="l:0.5", at=(650, 300), width=100)
-d.edge("fs", "pc", "top 50", "", src="b:0.5", dst="l:0.5", via=[(450, 525)], at=(560, 510), width=70)
-d.edge("pc", "pdb", "miss", "", src="r:0.5", dst="l:0.5", at=(1000, 505), width=50)
-d.edge("fs", "rank", "score 200", "", src="r:0.15", dst="l:0.5", via=[(1100, 314), (1100, 230)], at=(1180, 214), width=100)
-d.edge("fs", "g", "followed celebrities", "", src="b:0.8", dst="b:0.5", via=[(540, 730), (1460, 730)], at=(1000, 730), width=190)
-d.note(20, 560, 200, "Ranking slow? Fall back to recency inside the deadline.", size=17, colour=GREEN, bg=GREEN_BG)
-d.save(OUT / "c4-containers-read.svg")
+containers("c4-containers.svg")
+# the same container view with the technologies (labels from ../stack.json)
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / 'src')); import stack
+c4.Diagram.OVERRIDE = {k: (v[1], v[2]) for k, v in stack.C4.items()}
+containers("c4-containers-tech.svg")
+c4.Diagram.OVERRIDE = {}
 
-# ── C4 level 3: inside the feed service ──────────────────────────────────────────────────────────
-d = c4.Diagram(1600, 760)
-d.boundary(240, 20, 960, 720, "Feed service", "Container")
-d.node("cl", 20, 80, 190, 130, "person", "Reader", "Person")
-d.node("asm", 300, 70, 360, 140, "component", "Candidate assembler", "Component", "timeline + celebrity lists, ~200 IDs")
-d.node("flt", 760, 70, 380, 140, "component", "Filter", "Component", "deleted posts, blocks, unfollows")
-d.node("rk", 760, 300, 380, 140, "focus", "Ranking client", "Component", "deadline 80 ms; recency fallback")
-d.node("hyd", 760, 530, 380, 140, "component", "Hydrator", "Component", "multi-get top 50; drop misses")
-d.node("rb", 300, 300, 360, 140, "component", "Rebuilder", "Component", "pull from author indexes; coalesced")
-d.node("cur", 300, 530, 360, 140, "component", "Cursor codec", "Component", "(score, postId): stable pages")
-d.node("rank", 1340, 300, 230, 140, "ext", "Ranking service", "External")
-d.node("pc", 1340, 530, 230, 140, "db", "Post cache", "")
-d.edge("cl", "asm", "GET /feed", "", src="r:0.5", dst="l:0.5", at=(255, 125), width=90)
-d.edge("asm", "flt", "", src="r:0.5", dst="l:0.5")
-d.edge("flt", "rk", "", src="b:0.5", dst="t:0.5")
-d.edge("rk", "hyd", "", src="b:0.5", dst="t:0.5")
-d.edge("rk", "rank", "score", "", src="r:0.5", dst="l:0.5", at=(1240, 355), width=70)
-d.edge("hyd", "pc", "", src="r:0.5", dst="l:0.5")
-d.edge("asm", "rb", "timeline missing", "", src="b:0.5", dst="t:0.5", at=(480, 255), width=160)
-d.edge("hyd", "cur", "", src="l:0.5", dst="r:0.5")
-d.save(OUT / "c4-component-feed.svg")
 
-# ── Sequence: publish by a normal author ─────────────────────────────────────────────────────────
-s = seq()
-for pid, lab, k in [("a", "Author", "person"), ("ps", "Post service", "container"), ("db", "Posts DB + outbox", "db"),
-                    ("log", "Post-created log", "queue"), ("fo", "Fan-out worker", "focus"), ("g", "Social graph", "ext"),
-                    ("tl", "Timeline cache", "db")]:
-    s.part(pid, lab, k)
-s.msg("a", "ps", "POST /posts, idempotency key")
-s.msg("ps", "db", "post + outbox row, one transaction", hl=True)
-s.ret("ps", "a", "201 {postId}")
-s.msg("db", "log", "CDC: PostCreated, key = author", "async")
-s.msg("log", "fo", "consume")
-s.frame("loop", "followers, a page at a time")
-s.msg("fo", "g", "next page of followers")
-s.msg("fo", "fo", "skip inactive for 30 days")
-s.msg("fo", "tl", "insert (postId, author, ts), trim 500", hl=True)
-s.end()
-s.save(OUT / "seq-publish.svg")
+# ───────────────────────────── 3 · sequences ─────────────────────────────────────────────────────────
+def seq(name, parts, steps, **kw):
+    s = sq.Seq(1800, size=23, row=50, **kw)
+    for p in parts: s.part(*p)
+    for st in steps:
+        k = st[0]
+        if k == "m": s.msg(st[1], st[2], st[3], **(st[4] if len(st) > 4 else {}))
+        elif k == "r": s.ret(st[1], st[2], st[3], **(st[4] if len(st) > 4 else {}))
+        elif k == "n": s.note(st[1], st[2], st[3], *(st[4:5]))
+        elif k == "f": s.frame(st[1], st[2])
+        elif k == "e": s.end()
+    s.save(OUT / f"{name}.svg")
 
-# ── Sequence: reading the feed ───────────────────────────────────────────────────────────────────
-s = seq()
-for pid, lab, k in [("r", "Reader", "person"), ("fs", "Feed service", "focus"), ("tl", "Timeline cache", "db"),
-                    ("cel", "Celebrity cache", "db"), ("rk", "Ranking", "ext"), ("pc", "Post cache", "db")]:
-    s.part(pid, lab, k)
-s.msg("r", "fs", "GET /feed?cursor")
-s.msg("fs", "tl", "my timeline: ~500 IDs · ~5 ms")
-s.msg("fs", "cel", "followed celebrities' recent IDs · ~5 ms")
-s.msg("fs", "fs", "merge, dedup, filter, top ~200 by recency", hl=True)
-s.msg("fs", "rk", "score 200, deadline 80 ms")
-s.frame("alt", "ranking late")
-s.msg("fs", "fs", "use recency order")
-s.end()
-s.msg("fs", "pc", "multi-get top 50 · ~20 ms")
-s.ret("fs", "r", "50 items + next cursor · ~110 ms p50", hl=True)
-s.save(OUT / "seq-read.svg")
+seq("seq-publish",
+    [("au", "Author", "person"), ("ps", "Post service", "container"), ("db", "Posts DB", "db"), ("lg", "Event log", "queue"),
+     ("fo", "Fan-out worker", "container"), ("tl", "Timelines", "db")],
+    [("m", "au", "ps", "POST /posts, idempotency key"),
+     ("m", "ps", "db", "one transaction: post row, author index, outbox row"),
+     ("r", "ps", "au", "201, postId"),
+     ("m", "db", "lg", "outbox relay: PostCreated, key = author", dict(kind="async")),
+     ("m", "lg", "fo", "consume", dict(kind="async")),
+     ("n", "fo", "fo", "tier = push; page through followers, skip inactive for 30 days"),
+     ("m", "fo", "tl", "insert (postId, author, time); trim to 500", dict(hl=True)),
+     ("n", "fo", "fo", "commit the log offset last: a crash re-delivers, never loses", "green")])
 
-# ── The fan-out tiers: push, push-to-active, pull ────────────────────────────────────────────────
-d = c4.Diagram(1600, 560)
-tiers = [("n", "Under ~10 k followers", "push", "fan out to every active follower", "container"),
-         ("m", "~10 k to ~100 k", "push, narrower", "only followers active in the last day", "component"),
-         ("c", "Over ~100 k", "pull", "recent posts cached per author, merged at read", "focus")]
-for i, (nid, h, t, desc, k) in enumerate(tiers):
-    d.node(nid, 40 + i * 520, 70, 480, 230, k, h, t, desc, size=27)
-d.note(40, 360, 1520, "The threshold is a config value: where one post's fan-out cost exceeds the extra read cost "
-       "across that author's followers. Start at ten thousand, then measure.", size=22, colour=BLUE, bg=BLUE_BG)
-d.save(OUT / "fanout-tiers.svg")
+seq("seq-read",
+    [("rd", "Reader", "person"), ("fs", "Feed service", "container"), ("tl", "Timeline", "db"), ("cc", "Celebrity posts", "db"),
+     ("rk", "Ranking", "ext"), ("pc", "Post cache", "db")],
+    [("m", "rd", "fs", "GET /feed?cursor"),
+     ("m", "fs", "tl", "my timeline: about 500 IDs, ~5 ms"),
+     ("m", "fs", "cc", "followed celebrities' recent IDs, ~5 ms"),
+     ("n", "fs", "fs", "merge, de-duplicate, drop blocked and muted; top 200 by recency"),
+     ("m", "fs", "rk", "score 200, deadline 80 ms", dict(hl=True)),
+     ("m", "fs", "pc", "multi-get top 50, ~20 ms"),
+     ("n", "fs", "fs", "drop anything deleted or out of audience", "green"),
+     ("r", "fs", "rd", "50 items and a cursor")])
 
-# ── Sequence: celebrity post and read-time merge ─────────────────────────────────────────────────
-s = seq()
-for pid, lab, k in [("c", "Celebrity · 100 M", "person"), ("log", "Post-created log", "queue"),
-                    ("cel", "Celebrity cache", "focus"), ("r", "Reader", "person"), ("fs", "Feed service", "container"),
-                    ("tl", "Timeline cache", "db")]:
-    s.part(pid, lab, k)
-s.msg("c", "log", "post (via post service)")
-s.msg("log", "cel", "append ID to the author's list: one write, not 100 M", hl=True)
-s.note("log", "tl", "No fan-out. 100 M inserts would take ~100 s even at 1 M a second.", "red")
-s.msg("r", "fs", "open feed")
-s.msg("fs", "tl", "my timeline")
-s.msg("fs", "cel", "lists for the celebrities I follow")
-s.msg("fs", "fs", "merge both, dedup by postId", hl=True)
-s.ret("fs", "r", "one ranked feed")
-s.save(OUT / "seq-celebrity.svg")
+seq("seq-celebrity",
+    [("st", "@star, 110 M", "person"), ("lg", "Event log", "queue"), ("fo", "Fan-out worker", "container"), ("cc", "Celebrity posts", "db"),
+     ("rd", "Reader", "person"), ("fs", "Feed service", "container")],
+    [("m", "st", "lg", "PostCreated, tier = pull", dict(kind="async")),
+     ("m", "lg", "fo", "consume", dict(kind="async")),
+     ("m", "fo", "cc", "append postId to @star's list: one write, not 110 million", dict(hl=True)),
+     ("n", "fo", "fo", "the log partition is free again in milliseconds", "green"),
+     ("m", "rd", "fs", "open the feed"),
+     ("m", "fs", "cc", "lists for the 6 celebrities I follow"),
+     ("n", "fs", "fs", "merge with my timeline; de-duplicate by postId", "green"),
+     ("r", "fs", "rd", "one ranked feed")])
 
-# ── Sequence: delete or block, enforced on the read path ─────────────────────────────────────────
-s = seq()
-for pid, lab, k in [("a", "Author", "person"), ("pdb", "Posts DB", "db"), ("pc", "Post cache", "db"),
-                    ("r", "Reader", "person"), ("fs", "Feed service", "focus"), ("job", "Cleanup job", "container"),
-                    ("tl", "Timeline cache", "db")]:
-    s.part(pid, lab, k)
-s.msg("a", "pdb", "DELETE post: one write to the source of truth", hl=True)
-s.msg("pdb", "pc", "CDC: invalidate the post", "async")
-s.msg("r", "fs", "open feed")
-s.msg("fs", "fs", "drop authors I block or unfollowed (small set)")
-s.msg("fs", "pc", "hydrate")
-s.ret("pc", "fs", "miss: deleted, so dropped", hl=True)
-s.msg("job", "tl", "later: remove stale IDs (cosmetic)", "async")
-s.save(OUT / "seq-delete.svg")
+seq("seq-tier",
+    [("gr", "Graph", "ext"), ("tj", "Tier job", "container"), ("fo", "Fan-out worker", "container"), ("tl", "Timelines", "db"), ("cc", "Celebrity posts", "db")],
+    [("n", "gr", "gr", "@newstar: 9,000 followers on Monday, 2 M on Tuesday", "amber"),
+     ("m", "gr", "tj", "follower counts, hourly", dict(kind="async")),
+     ("n", "tj", "tj", "up at 100 k, down only below 50 k: no flapping"),
+     ("m", "tj", "fo", "tier(@newstar) = pull", dict(hl=True)),
+     ("m", "fo", "cc", "new posts: one write each"),
+     ("n", "tl", "tl", "yesterday's pushed IDs stay and age out: no backfill, no removal", "green"),
+     ("n", "cc", "cc", "readers' merge shows the new posts from the first minute", "green")])
 
-# ── Sequence: timeline shard lost, rebuild by pull ───────────────────────────────────────────────
-s = seq()
-for pid, lab, k in [("r", "Readers", "person"), ("fs", "Feed service", "focus"), ("tl", "Timeline cache", "db"),
-                    ("ai", "Author indexes", "db"), ("rl", "Rebuild limiter", "container")]:
-    s.part(pid, lab, k)
-s.msg("r", "fs", "open feed")
-s.msg("fs", "tl", "get timeline")
-s.ret("tl", "fs", "empty: shard lost")
-s.msg("fs", "rl", "rebuild token? (coalesce same user)", hl=True)
-s.frame("alt", "token granted")
-s.msg("fs", "ai", "followees' recent posts, merged")
-s.msg("fs", "tl", "write the rebuilt timeline back")
-s.end()
-s.frame("alt", "rebuild capacity exhausted")
-s.ret("fs", "r", "degraded feed: celebrities + recent", hl=True)
-s.end()
-s.save(OUT / "seq-rebuild.svg")
+seq("seq-delete",
+    [("au", "Author", "person"), ("db", "Posts DB", "db"), ("pc", "Post cache", "db"), ("rd", "Reader", "person"),
+     ("fs", "Feed service", "container"), ("cj", "Cleanup job", "container")],
+    [("m", "au", "db", "DELETE post: one write, status = deleted", dict(hl=True)),
+     ("m", "db", "pc", "invalidate postId", dict(kind="async")),
+     ("m", "rd", "fs", "open the feed"),
+     ("n", "fs", "fs", "drop authors I block, mute or unfollowed (a small set)"),
+     ("m", "fs", "pc", "hydrate"),
+     ("r", "pc", "fs", "miss, then the row says deleted: dropped"),
+     ("n", "pc", "cj", "later, a cleanup job removes stale IDs from timelines: cosmetic", "green")])
 
-# ── Mid-round: the 48-hour chronological catch-up ────────────────────────────────────────────────
-d = c4.Diagram(1600, 600)
-d.node("r", 40, 160, 260, 150, "person", "Reader", "Person", "catch up on 48 hours")
-d.node("fs", 420, 140, 320, 190, "focus", "Catch-up endpoint", "new, in the feed service", "chronological, not ranked")
-d.node("ai", 880, 60, 320, 150, "db", "Author indexes", "source of truth", "followees, last 48 h")
-d.node("cc", 880, 290, 320, 150, "db", "Per-user result cache", "minutes", "")
-d.node("tl", 1300, 160, 260, 150, "ext", "Timeline cache", "untouched", "bounded and ranked")
-d.edge("r", "fs", "", src="r:0.5", dst="l:0.5")
-d.edge("fs", "ai", "merge", "", src="r:0.3", dst="l:0.5", at=(810, 150), width=70)
-d.edge("fs", "cc", "cache", "", src="r:0.7", dst="l:0.5", at=(810, 330), width=70)
-d.note(40, 480, 1520, "The same pull path that rebuilds lost timelines. A heavier read for an occasional feature: "
-       "say the cost aloud.", size=22, colour=BLUE, bg=BLUE_BG)
-d.save(OUT / "midround-48h.svg")
+seq("seq-dedupe",
+    [("w3", "Worker W3", "container"), ("w7", "Worker W7", "container"), ("tl", "Timeline (a set)", "db"), ("rd", "Reader", "person"), ("fs", "Feed service", "container")],
+    [("m", "w3", "tl", "insert p9 into 1,000 timelines"),
+     ("n", "w3", "w3", "crash before committing the offset", "red"),
+     ("m", "w7", "tl", "re-delivered: insert p9 again"),
+     ("n", "tl", "tl", "the set is keyed by postId: no change", "green"),
+     ("m", "rd", "fs", "GET /feed?cursor = (score 0.82, p51)"),
+     ("r", "fs", "rd", "next 50 strictly after p51, from the session's ranked list", dict(hl=True))])
 
-# ── EM: phasing ──────────────────────────────────────────────────────────────────────────────────
-d = c4.Diagram(1600, 560)
-ph = [("a", "Phase 1", "pure pull + caching", "enough at today's scale; one moving part", "container"),
-      ("b", "Phase 2", "push for active users", "when read cost or latency says so", "container"),
-      ("c", "Phase 3", "the celebrity split", "when the first account crosses the threshold", "focus")]
-for i, (nid, t, h, desc, k) in enumerate(ph):
-    d.node(nid, 40 + i * 520, 70, 470, 220, k, h, t, desc, size=27)
-for a, b in zip("ab", "bc"):
-    d.edge(a, b, "", src="r", dst="l", dashed=False)
-d.note(40, 350, 1520, "Each step is triggered by a measured number, not by the diagram. On-call watches freshness "
-       "from day one.", size=22, colour=GREEN, bg=GREEN_BG)
-d.save(OUT / "em-phases.svg")
+seq("seq-rebuild",
+    [("rd", "Readers", "person"), ("fs", "Feed service", "container"), ("tl", "Timeline cache", "db"), ("ai", "Author indexes", "db"), ("rl", "Rebuild limiter", "container")],
+    [("m", "rd", "fs", "open the feed"),
+     ("m", "fs", "tl", "get timeline"),
+     ("r", "tl", "fs", "empty: shard lost"),
+     ("m", "fs", "rl", "rebuild token? (one in flight per user)", dict(hl=True)),
+     ("f", "alt", "token granted"),
+     ("m", "fs", "ai", "followees' recent posts, merged"),
+     ("m", "fs", "tl", "write the rebuilt timeline back"),
+     ("e",),
+     ("f", "alt", "over the limit"),
+     ("r", "fs", "rd", "degraded feed now: celebrities + top-20 followees' recent posts"),
+     ("e",)])
 
-# ── Follow-up 1: the ranking team wants 300 ms ───────────────────────────────────────────────────
-d = c4.Diagram(1600, 560)
-op = [("a", "Say yes", "300 ms in the path", "p99 breaks for everyone; app opens feel slow", "ext"),
-      ("b", "Pre-rank", "on app background", "the new model runs before the open, off the path", "focus"),
-      ("c", "Two-stage", "cheap first, heavy on top 50", "heavy model sees fewer items, within budget", "container"),
-      ("d", "Experiment", "1% holdout, then decide", "engagement against latency, one owner signs off", "container")]
-for i, (nid, h, t, desc, k) in enumerate(op):
-    d.node(nid, 40 + i * 390, 70, 350, 250, k, h, t, desc, size=24)
-d.note(40, 380, 1520, "The budget is a product decision with a number on it. Bring the latency cost and "
-       "the engagement data; let the product owner choose.", size=21, colour=BLUE, bg=BLUE_BG)
-d.save(OUT / "fu-ranking.svg")
+seq("seq-rank",
+    [("fs", "Feed service", "container"), ("rk", "Ranking", "ext"), ("pc", "Post cache", "db"), ("rd", "Reader", "person")],
+    [("m", "fs", "rk", "score 200 candidates, deadline 80 ms"),
+     ("n", "fs", "fs", "80 ms pass with no answer", "red"),
+     ("n", "fs", "fs", "fallback: recency plus close ties, or the session's last ranking", "green"),
+     ("m", "fs", "pc", "hydrate top 50"),
+     ("r", "fs", "rd", "feed in 140 ms; response flagged fallback = true", dict(hl=True)),
+     ("r", "rk", "fs", "late scores arrive: dropped, counted", dict(colour=GREY))])
 
-# ── Follow-up 2: the incident ────────────────────────────────────────────────────────────────────
-d = c4.Diagram(1600, 560)
-tl = [("a", "0–5 min", "detect", "empty-feed rate pages on-call", "focus"),
-      ("b", "5–15 min", "contain", "degraded feed on; rebuild rate capped", "container"),
-      ("c", "15–60 min", "recover", "replace the shard; rebuild by pull, coalesced", "container"),
-      ("d", "next week", "learn", "blameless review; game day; warm standby?", "container")]
-for i, (nid, t, h, desc, k) in enumerate(tl):
-    d.node(nid, 40 + i * 390, 70, 350, 240, k, h, t, desc, size=25)
-for a, b in zip("abc", "bcd"):
-    d.edge(a, b, "", src="r", dst="l", dashed=False)
-d.note(40, 370, 1520, "No data is lost: timelines are rebuildable. The risk is the author index melting under "
-       "the stampede, so the limiter matters more than the fix.", size=21, colour=RED, bg=RED_BG)
-d.save(OUT / "fu-incident.svg")
+seq("seq-catchup",
+    [("rd", "Reader", "person"), ("fs", "Feed service", "container"), ("cu", "Catch-up cache", "db"), ("ai", "Author indexes", "db")],
+    [("m", "rd", "fs", "GET /catchup?since=48h"),
+     ("m", "fs", "cu", "cached result for this user?"),
+     ("r", "cu", "fs", "miss"),
+     ("m", "fs", "ai", "for each followee: posts since t-48h (the rebuild path)", dict(hl=True)),
+     ("n", "fs", "fs", "merge by time; same visibility filter; page by (time, postId)", "green"),
+     ("m", "fs", "cu", "store for 10 minutes"),
+     ("r", "fs", "rd", "first 50, chronological, and a cursor")])
 
-# ── Follow-up 3: pull to hybrid in one quarter ───────────────────────────────────────────────────
-d = c4.Diagram(1600, 560)
-mg = [("a", "Weeks 1–3", "dual write", "fan-out runs in shadow; timelines fill"),
-      ("b", "Weeks 4–6", "compare", "read both, serve pull; diff the top 50"),
-      ("c", "Weeks 7–9", "ramp", "1% → 10% → 100% serve from timelines"),
-      ("d", "Weeks 10–13", "celebrity split", "threshold on; pull path kept for rebuilds")]
-for i, (nid, t, h, desc) in enumerate(mg):
-    d.node(nid, 40 + i * 390, 70, 350, 240, "focus" if i == 3 else "container", h, t, desc, size=25)
-for a, b in zip("abc", "bcd"):
-    d.edge(a, b, "", src="r", dst="l", dashed=False)
-d.note(40, 370, 1520, "Two teams: fan-out and timelines; feed serving. The contract between them is the timeline "
-       "schema, agreed in week one. Every step reversible by a flag.", size=21, colour=BLUE, bg=BLUE_BG)
-d.save(OUT / "fu-migration.svg")
+seq("seq-probe",
+    [("sa", "Synthetic author", "container"), ("fo", "Fan-out", "container"), ("sf", "Synthetic follower", "container"), ("mt", "Metrics", "ext")],
+    [("m", "sa", "fo", "post every minute, one author per tier"),
+     ("m", "fo", "sf", "delivered by the real path", dict(kind="async")),
+     ("m", "sf", "sf", "open the feed every 5 s until the post appears"),
+     ("m", "sf", "mt", "post-to-visible time, per tier"),
+     ("n", "mt", "mt", "mid tier: not visible after 5 min: page, with the tier", "red")])
 
-# ── Follow-up 4: the RAM bill ────────────────────────────────────────────────────────────────────
-d = c4.Diagram(1600, 560)
-lv = [("a", "Slice first", "what grew?", "users, entries per user, or bytes per entry"),
-      ("b", "Inactive users", "biggest lever", "no fan-out, evict their timelines"),
-      ("c", "Shorter lists", "500 → 300", "measure scroll depth first"),
-      ("d", "Smaller rows", "IDs only", "audit for bodies creeping in")]
-for i, (nid, h, t, desc) in enumerate(lv):
-    d.node(nid, 40 + i * 390, 70, 350, 240, "focus" if i == 1 else "container", h, t, desc, size=25)
-d.note(40, 370, 1520, "Report cost per daily active user, not the total. Forecast it with finance each quarter.",
-       size=22, colour=GREEN, bg=GREEN_BG)
-d.save(OUT / "fu-cost.svg")
+# ───────────────────────────── 4 · data models ───────────────────────────────────────────────────────
+c = er.Chen(1960, 920, size=28)          # wider than tall: the slide is 16:9; the legend gets its own column
+c.entity("u", 300, 380, "USER"); c.entity("p", 1150, 380, "POST"); c.entity("t", 1150, 740, "TIMELINE ENTRY", weak=True)
+c.rel("au", 720, 380, "AUTHORS"); c.rel("fo", 300, 700, "FOLLOWS"); c.rel("bl", 300, 110, "BLOCKS"); c.rel("in", 720, 740, "SEES", identifying=True)
+c.attr("uid", 100, 300, "user_id", of="u", key=True); c.attr("tier", 100, 470, "tier", of="u", derived=True)
+c.attr("seen", 520, 250, "last_seen_day", of="u")
+c.attr("pid", 1150, 220, "post_id", of="p", key=True); c.attr("aud", 1400, 300, "audience", of="p"); c.attr("st", 1400, 460, "status", of="p")
+c.attr("sc", 1420, 740, "score", of="t", partial=True)
+c.link("u", "au", "1"); c.link("au", "p", "N", total=True)
+c.link("u", "fo", "M", src="b", dst="t", role="follower"); c.link("u", "bl", "M", src="t", dst="b")
+c.link("u", "in", "1", src="b:0.8", dst="l"); c.link("in", "t", "N", total=True)
+c.link("p", "t", "1", src="b", dst="t")
+c.legend(1640, 70, size=23, gap=36, rows=["rect", "rect2", "dia", "dia2", "oval", "key", "ovald", "dbl"])
+c.note(420, 812, 1000, "Timeline entries are derived: delete them all and the feed can be rebuilt from posts and follows.")
+c.save(OUT / "erd-chen.svg")
 
-# ════════ v2 (2026-10-29): Staff L6/L7 depth ════════
-# ── Load funnel with the arithmetic ──────────────────────────────────────────────────────────────
-d = c4.Diagram(1600, 760)
-L = [("f1", "~75 k reads/s", "feed opens, peak", "500 M DAU × 5 opens ÷ 10⁵ s × 3 peak"),
-     ("f2", "~600 posts/s", "writes", "500 M × 0.1 posts/day ÷ 86,400"),
-     ("f3", "~120 k inserts/s", "timeline fan-out", "600 posts/s × 200 followers"),
-     ("f4", "~60 k inserts/s", "after skipping inactive", "≈ half of followers idle 30+ days"),
-     ("f5", "~5–20 reads", "per open, celebrity lists", "followed celebrities, one small list each"),
-     ("f6", "50 hydrations", "per open, multi-get", "top 50 of ~200 candidates")]
-for i, (nid, h, t, desc) in enumerate(L):
-    x = 40 + (i % 3) * 520; y = 60 + (i // 3) * 330
-    d.node(nid, x, y, 460, 230, "focus" if i in (2, 3) else "container", h, t, desc, size=25)
-d.edge("f1", "f2", "", src="r", dst="l", dashed=False)
-d.edge("f2", "f3", "", src="r", dst="l", dashed=False)
-d.edge("f3", "f4", "", src="b:0.5", dst="t:0.5", via=[(1310, 330), (270, 330)], dashed=False)
-d.edge("f4", "f5", "", src="r", dst="l", dashed=False)
-d.edge("f5", "f6", "", src="r", dst="l", dashed=False)
-d.note(40, 680, 1520, "Writes are small; fan-out multiplies them 200×; skipping inactive users halves that. Reads stay "
-       "cache-only: one timeline, a handful of celebrity lists, one multi-get.", size=20, colour=GREEN, bg=GREEN_BG)
-d.save(OUT / "load-funnel.svg")
+e = er.ERD(1600, 820, size=22)
+e.entity("post", 30, 40, 470, "post", [("post_id", "bigint", "PK"), ("author_id", "bigint", "IX"), ("text", "text", ""),
+         ("media_refs", "text[]", ""), ("audience", "smallint", ""), ("status", "smallint", ""), ("created_at", "ts", "")],
+         kind="focus", caption="source of truth; ID is time-sortable")
+e.entity("ai", 570, 40, 450, "author_index", [("author_id", "bigint", "PK"), ("created_at", "ts", "PK desc"), ("post_id", "bigint", "")],
+         caption="one partition per author: pull, rebuild, catch-up")
+e.entity("fol", 1090, 40, 480, "follow (both directions)", [("user_id", "bigint", "PK"), ("followee_id", "bigint", "PK"), ("since", "ts", "")],
+         kind="ext", caption="owned by the graph service")
+e.entity("tl", 30, 450, 470, "timeline:{viewer}", [("post_id", "member", ""), ("author_id", "packed", ""), ("time", "score", "")],
+         kind="redis", caption="sorted set, at most 500, by viewer")
+e.entity("cc", 570, 450, 450, "celebrity_recent:{author}", [("post_id", "list", ""), ("(last 100)", "", "")],
+         kind="redis", caption="replicated to many cache nodes")
+e.entity("bl", 1090, 450, 480, "blocks:{viewer}", [("user_id", "set", ""), ("(blocks, mutes, unfollowed)", "", "")],
+         kind="redis", caption="small; read on every open")
+e.note(30, 760, 1540, "500 M users × 500 entries × 16 B = 4 TB of timelines. Bodies instead of IDs would be about 250 TB.")
+e.save(OUT / "erd-physical.svg")
 
-# ── Redis key space: how the keys reference each other ───────────────────────────────────────────
-d = ERD(1600, 760, size=22)
-d.entity("tl", 20, 20, 480, "timeline:{u}   ZSET", [("member", "postId·authorId 16 B", ""), ("score", "ts ms (8 B double)", ""),
-         ("size", "≤ 500 · trim by rank", "")], kind="focus", caption="one per active user")
-d.entity("pc", 1080, 20, 500, "post:{id}   HASH", [("author", "user id", ""), ("text", "≤ 2 KB", ""),
-         ("media", "CDN URLs", ""), ("deleted", "0 | 1", "")], kind="redis", caption="hydration cache: MGET 50 at a time")
-d.entity("cf", 20, 340, 480, "celebsFollowed:{u}   SET", [("member", "celebrity author id", ""), ("size", "typically 5–20", "")],
-         kind="redis", caption="which celebrity lists to merge")
-d.entity("ce", 660, 340, 400, "celeb:{a}   LIST", [("item", "postId", ""), ("size", "last ~100 · LTRIM", ""),
-         ("replicas", "read from any of N", "")], kind="redis", caption="one per celebrity author")
-d.entity("bl", 660, 610, 400, "hide:{u}   SET", [("member", "blocked / unfollowed id", "")], kind="redis",
-         caption="subtracted from candidates")
-d.entity("ls", 1080, 610, 500, "lastSeen:{u}   STRING", [("value", "epoch day", "")], kind="redis",
-         caption="read by fan-out to skip the idle")
-d.rel("tl", "pc", "N", "1", src="r:0.38", dst="l:0.33", label="member → post:{postId}", at=(790, 96))
-d.rel("cf", "ce", "N", "1", src="r:0.45", dst="l:0.4", label="→ celeb:{a}", at=(580, 385))
-d.rel("ce", "pc", "N", "1", src="r:0.3", dst="b:0.3", via=[(1230, 400)], label="item → post:{id}", at=(1230, 320))
-d.rel("bl", "ce", "", "", src="t:0.5", dst="b:0.5", label="filters", dashed=True, at=(860, 575))
-d.note(20, 560, 520, "Read path follows the arrows: timeline → post; celebsFollowed → celeb → post. hide removes "
-       "authors from both.", size=19, colour=BLUE, bg=BLUE_BG)
-d.save(OUT / "redis-keys.svg")
+# ───────────────────────────── 5 · figures ───────────────────────────────────────────────────────────
+def svgdoc(w, h, body): return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">'
+                               f'<rect width="{w}" height="{h}" fill="#ffffff"/>{body}</svg>')
+def T(x, y, s, size=24, fill=INK, w=500, anchor="start"):
+    return f'<text x="{x}" y="{y}" text-anchor="{anchor}" font-family="{FONT}" font-size="{size}" font-weight="{w}" fill="{fill}">{esc(s)}</text>'
+def R(x, y, w, h, fill, stroke, dash=False, rx=8, sw=2.2):
+    return (f'<rect x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h:.1f}" rx="{rx}" fill="{fill}" stroke="{stroke}" '
+            f'stroke-width="{sw}"{" stroke-dasharray=\"10 6\"" if dash else ""}/>')
+def L(x1, y1, x2, y2, col=INK, sw=2.4, dash=False):
+    return f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" stroke="{col}" stroke-width="{sw}"{" stroke-dasharray=\"8 6\"" if dash else ""}/>'
 
-# ── Where each Redis key comes from ──────────────────────────────────────────────────────────────
-d = c4.Diagram(1600, 800)
-W = [("fo", 30, 230, "Fan-out worker", "consumer of PostCreated", "branches on authorTier"),
-     ("pf", 300, 100, "Post-cache filler", "in the feed service", "read-through on a miss"),
-     ("gc", 430, 230, "Graph-change consumer", "FollowChanged · BlockChanged", "from the social graph's log"),
-     ("st", 680, 100, "Session tracker", "on every app open", "")]
-for nid, y, h, t, ty, ds in W:
-    d.node(nid, 40, y, 440, h, "container" if nid != "fo" else "focus", t, ty, ds, size=21)
-K = [("k1", 30, "timeline:{u}"), ("k2", 160, "celeb:{a}"), ("k3", 300, "post:{id}"),
-     ("k4", 430, "celebsFollowed:{u}"), ("k5", 560, "hide:{u}"), ("k6", 680, "lastSeen:{u}")]
-for nid, y, t in K:
-    d.node(nid, 1100, y, 460, 100, "db", t, "Redis", "", size=21)
-for a_, b_, lab, ya, yb in [("fo", "k1", "ZADD, trim to 500 · NORMAL / MID", 0.25, 0.5), ("fo", "k2", "LPUSH, LTRIM 100 · CELEB", 0.75, 0.5),
-                            ("pf", "k3", "HSET on miss · DEL on CDC", 0.5, 0.5), ("gc", "k4", "SADD / SREM if followee is CELEB", 0.28, 0.5),
-                            ("gc", "k5", "SADD on block or unfollow", 0.78, 0.5), ("st", "k6", "SET today's epoch day", 0.5, 0.5)]:
-    y0 = dict((w[0], w) for w in W)[a_]; yk = dict((k[0], k) for k in K)[b_]
-    d.edge(a_, b_, lab, "", src=f"r:{ya}", dst=f"l:{yb}", at=(790, yk[1] + 50 - 14), width=440)
-d.save(OUT / "redis-writers.svg")
+def tail():
+    p = [T(40, 44, "Followers per account, log scale, illustrative: the tail decides the design", 28, INK, 800)]
+    x0, W = 330, 1150
+    import math
+    sc = lambda v: x0 + W * math.log10(v) / 8.3
+    rows = [("median account", 200, BLUE, "~200"), ("top 1 %", 1e4, BLUE, "~10,000"), ("top 0.01 %", 1e6, AMBER, "~1 million"), ("the largest", 1.1e8, RED, "110 million")]
+    for i, (lab, v, col, txt) in enumerate(rows):
+        y = 100 + i * 80
+        fill = {BLUE: "#dbeafe", AMBER: "#fdf3e1", RED: "#fdecea"}[col]
+        p += [T(40, y + 34, lab, 25, INK, 700), R(x0, y, sc(v) - x0, 50, fill, col), T(sc(v) + 14, y + 35, txt, 25, col, 800)]
+    for v, lb in ((1e2, "100"), (1e4, "10 k"), (1e6, "1 M"), (1e8, "100 M")):
+        p += [L(sc(v), 90, sc(v), 425, GREY, 1.5, True), T(sc(v), 452, lb, 20, "#57606a", 600, "middle")]
+    p += [T(40, 505, "One post's push cost is its author's follower count. The few accounts on the right decide the architecture.", 25, "#5a1308", 700)]
+    (OUT / "tail.svg").write_text(svgdoc(1600, 540, "".join(p)))
+tail()
 
-# ── ERD: posts, author index, graph ──────────────────────────────────────────────────────────────
-d = ERD(1600, 820, size=22)
-d.entity("p", 20, 20, 500, "posts", [("post_id", "bigint (Snowflake)", "PK"), ("author_id", "bigint", "IX"),
-         ("text", "text", ""), ("media_ids", "bigint[]", ""), ("visibility", "smallint", ""),
-         ("created_at", "timestamp", ""), ("deleted_at", "timestamp", "")], kind="focus",
-         caption="sharded by post_id; time-sortable ID")
-d.entity("ai", 600, 20, 470, "author_posts", [("author_id", "bigint", "PK"), ("created_at", "timestamp desc", "PK"),
-         ("post_id", "bigint", "FK")], caption="wide-column: partition author_id, cluster time")
-d.entity("fo", 600, 320, 470, "followers", [("followee_id", "bigint", "PK"), ("follower_id", "bigint", "PK"),
-         ("since", "timestamp", "")], caption="paged by fan-out workers")
-d.entity("fe", 1150, 320, 440, "followees", [("follower_id", "bigint", "PK"), ("followee_id", "bigint", "PK"),
-         ("is_celebrity", "bool (cached)", "")], caption="both directions stored")
-d.entity("u", 1150, 20, 440, "accounts", [("user_id", "bigint", "PK"), ("follower_count", "int", ""),
-         ("tier", "normal | mid | celeb", ""), ("last_seen_day", "int", "")], caption="tier drives fan-out")
-d.rel("p", "ai", "1", "1", src="r:0.2", dst="l:0.4", label="post_id")
-d.rel("u", "fo", "1", "N", src="b:0.3", dst="r:0.3", via=[(1282, 280), (1110, 280), (1110, 390)], label="followee", at=(1110, 300))
-d.rel("u", "fe", "1", "N", src="b:0.7", dst="t:0.7", label="follower")
-d.note(20, 620, 1570, "Snowflake ID = 41 bits ms timestamp · 10 bits machine · 12 bits sequence: sortable by time without "
-       "a lookup, so a timeline can order by ID. Posts are the only source of truth; timelines and lists are derived and "
-       "rebuildable.", size=20)
-d.save(OUT / "erd.svg")
+def tension():
+    p = [T(40, 44, "Write amplification against read cost, per post, as followers grow (illustrative)", 28, INK, 800)]
+    x0, x1, y0, y1 = 160, 1480, 420, 110
+    p += [L(x0, y0, x1, y0, INK, 2.5), L(x0, y0, x0, y1 - 20, INK, 2.5),
+          T(x0, y0 + 80, "followers of the author, log scale", 22, "#57606a", 600, "start"), T(x0 - 10, y1 - 30, "cost", 22, "#57606a", 600, "start")]
+    import math
+    X = lambda f: x0 + (x1 - x0) * math.log10(f) / 8
+    pts = " ".join(f"{X(10 ** (i / 10)):.0f},{y0 - min(300, 300 * (10 ** (i / 10)) / 1e5):.0f}" for i in range(0, 81))
+    p.append(f'<polyline points="{pts}" fill="none" stroke="{RED}" stroke-width="4"/>')
+    p.append(L(x0, y0 - 60, x1, y0 - 60, BLUE, 4))
+    p += [T(X(1e6) + 20, 140, "push: one insert per follower", 24, RED, 800), T(X(10) , y0 - 74, "pull: a small read on every follower's open", 24, BLUE, 800)]
+    tx = X(1e4)
+    p += [L(tx, y1, tx, y0, AMBER, 3, True), T(tx, y1 - 10, "threshold ≈ 10⁴–10⁵", 24, "#4a3207", 800, "middle")]
+    p += [T(X(30), y0 + 40, "push wins", 24, GREEN, 800, "middle"), T(X(3e6), y0 + 40, "pull wins", 24, GREEN, 800, "middle")]
+    p += [R(160, 520, 1320, 60, "#fdf3e1", AMBER), T(820, 558, "The hybrid follows the lower curve: push below the line, pull above it.", 25, "#4a3207", 800, "middle")]
+    (OUT / "tension.svg").write_text(svgdoc(1600, 610, "".join(p)))
+tension()
 
-# ════════ v3 (2026-10-29, the author's review of v2): terms, Chen ERD, wide-column, outbox/CDC, routing ════════
-from erdsvg import Chen
-# ── Glossary: fan-out on write (push) against fan-in on read (pull) ──────────────────────────────
-d = c4.Diagram(1600, 700)
-d.text(40, 40, "Fan-out on write (push): work when a post is made", size=26, colour="#c8341f", bold=True)
-d.text(840, 40, "Fan-in on read (pull): work when a feed is opened", size=26, colour="#1168bd", bold=True)
-d.node("au", 40, 230, 260, 150, "person", "Author", "posts once", "")
-for i, nm in enumerate(["Follower A", "Follower B", "Follower C"]):
-    d.node(f"t{i}", 470, 80 + i * 170, 290, 130, "db", f"{nm}'s timeline", "precomputed", "", size=20)
-    d.edge("au", f"t{i}", "", src="r:0.5", dst="l:0.5", dashed=False)
-d.node("rd", 1300, 230, 260, 150, "person", "Reader", "opens the feed", "")
-for i, nm in enumerate(["Author X", "Author Y", "Author Z"]):
-    d.node(f"a{i}", 840, 80 + i * 170, 290, 130, "db", f"{nm}'s posts", "author index", "", size=20)
-    d.edge(f"a{i}", "rd", "", src="r:0.5", dst="l:0.5", dashed=False)
-d.note(40, 600, 720, "Cost grows with the author's followers. Reads are one lookup.", size=21, colour=RED, bg=RED_BG)
-d.note(840, 600, 720, "Cost grows with the reader's followees. Writes are one append.", size=21, colour=BLUE, bg=BLUE_BG)
-d.save(OUT / "push-pull.svg")
+def memory():
+    p = [T(40, 44, "Timeline tier memory: IDs against bodies (500 M users × 500 entries)", 28, INK, 800)]
+    x0, W = 380, 1100
+    sc = W / 250
+    rows = [("IDs, 16 B each", 4, GREEN, "4 TB"), ("IDs, three replicas", 12, GREEN, "12 TB"), ("Bodies, ~1 KB each", 250, RED, "250 TB")]
+    for i, (lab, tb, col, txt) in enumerate(rows):
+        y = 100 + i * 90
+        p += [T(40, y + 36, lab, 25, INK, 700), R(x0, y, max(tb * sc, 6), 54, "#e7f4ec" if col == GREEN else "#fdecea", col),
+              T(x0 + max(tb * sc, 6) + 14, y + 37, txt, 25, col, 800)]
+    p += [T(40, 410, "Bodies are 60 times larger, and every edit or delete would have to chase millions of copies.", 25, "#5a1308", 700),
+          T(40, 455, "IDs are hydrated from one post cache: a delete is one write.", 25, "#173d24", 700)]
+    (OUT / "memory.svg").write_text(svgdoc(1600, 500, "".join(p)))
+memory()
 
-# ── The tail: followers per account, log scale ───────────────────────────────────────────────────
-d = ERD(1600, 640, size=22)
-bars = [("median account", 200, "~200 followers", "#2f6fb5"), ("top 1%", 10_000, "~10 k", "#2f6fb5"),
-        ("top 0.01%", 1_000_000, "~1 M", "#a86a12"), ("the largest", 100_000_000, "100 M+", "#c8341f")]
-import math
-X0, SC = 330, 140
-d.text(40, 50, "Followers per account · log scale · illustrative", size=24, colour="#57606a", bold=True)
-for i, (lab, n, val, col) in enumerate(bars):
-    y = 100 + i * 105; w = math.log10(n) * SC
-    d.text(310, y + 48, lab, size=24, colour="#1f2328", bold=True, anchor="end")
-    d.raw(f'<rect x="{X0}" y="{y + 12}" width="{w:.0f}" height="56" rx="6" fill="{col}"/>')
-    d.text(X0 + w + 14, y + 50, val, size=24, colour=col, bold=True)
-for k in range(0, 9, 2):
-    x = X0 + k * SC
-    d.raw(f'<line x1="{x:.0f}" y1="90" x2="{x:.0f}" y2="520" stroke="#d0d7de" stroke-dasharray="4 4"/>')
-    d.text(x, 545, f"10^{k}" if k else "1", size=18, anchor="middle")
-d.note(40, 570, 1520, "One post's push cost = its author's followers. The few accounts on the right decide the design.",
-       size=21, colour=RED, bg=RED_BG)
-d.save(OUT / "tail.svg")
+def rebuildwave():
+    p = [T(40, 44, "A lost shard: rebuilds a second, with and without a limit (illustrative)", 28, INK, 800)]
+    x0, x1, y0, y1 = 160, 1480, 400, 100
+    p += [L(x0, y0, x1, y0, INK, 2.5), L(x0, y0, x0, y1, INK, 2.5), T(x1, y0 + 40, "minutes after the loss", 22, "#57606a", 600, "end")]
+    import math
+    X = lambda m: x0 + (x1 - x0) * m / 60
+    Y = lambda r: y0 - (y0 - y1) * r / 2000
+    unl = " ".join(f"{X(m):.0f},{Y(1700 * math.exp(-m / 12)):.0f}" for m in range(0, 61))
+    p.append(f'<polyline points="{unl}" fill="none" stroke="{RED}" stroke-width="4"/>')
+    p.append(L(X(0), Y(500), X(35), Y(500), GREEN, 4))
+    p += [T(X(2) + 10, Y(1700) + 6, "unlimited: 1,700/s × 200 reads = 340,000 author-index reads/s", 23, RED, 800),
+          T(X(36) + 10, Y(500) + 8, "limited: 500/s (100,000 reads/s), the rest degraded", 23, GREEN, 800)]
+    p += [L(X(0), Y(500), X(0), y0, GREY, 1), T(x0 - 14, Y(500) + 8, "500", 20, "#57606a", 600, "end"), T(x0 - 14, Y(1700) + 8, "1,700", 20, "#57606a", 600, "end")]
+    p += [T(40, 470, "The limit decides the blast radius; the degraded feed keeps the lost users served while they wait.", 25, INK, 700)]
+    (OUT / "rebuild-wave.svg").write_text(svgdoc(1600, 510, "".join(p)))
+rebuildwave()
 
-# ── Conceptual ERD, Chen notation ────────────────────────────────────────────────────────────────
-d = Chen(1600, 860, size=22)
-d.entity("u", 480, 400, "USER", w=240)
-d.entity("p", 1180, 400, "POST", w=240)
-d.entity("t", 1180, 740, "TIMELINE ENTRY", weak=True, w=300)
-d.rel("au", 830, 400, "AUTHORS")
-d.rel("fo", 480, 715, "FOLLOWS", w=220)
-d.rel("bl", 480, 120, "BLOCKS", w=200)
-d.rel("in", 820, 740, "IN FEED OF", identifying=True, w=230)
-d.rel("rf", 1180, 575, "REFERENCES", w=240, h=88)
-d.link("u", "au", "1", card_at=0.55)
-d.link("au", "p", "N", total=True, card_at=0.45)
-d.link("u", "fo", "M", src="b:0.22", role="follower", card_at=0.55, role_at=0.3)
-d.link("u", "fo", "N", src="b:0.78", role="followee", card_at=0.55, role_at=0.3)
-d.link("u", "bl", "M", src="t:0.22", role="blocker", card_at=0.5, role_at=0.25)
-d.link("u", "bl", "N", src="t:0.78", role="blocked", card_at=0.5, role_at=0.25)
-d.link("u", "in", "1", src="r:0.85", card_at=0.5)
-d.link("in", "t", "N", total=True, card_at=0.5)
-d.link("p", "rf", "1", card_at=0.5)
-d.link("rf", "t", "N", total=True, card_at=0.5)
-for aid, cx, cy, lab, kw in [("uid", 175, 245, "user_id", dict(key=True)), ("uh", 150, 335, "handle", {}),
-                             ("ut", 150, 425, "tier", {}), ("ufc", 760, 240, "follower_count", dict(derived=True))]:
-    d.attr(aid, cx, cy, lab, of="u", **kw)
-d.attr("uls", 190, 525, "last_seen_day", of="u")
-for aid, cx, cy, lab, kw in [("pid", 1040, 230, "post_id", dict(key=True)), ("pm", 1330, 230, "media_ids", dict(multi=True)),
-                             ("ptx", 1470, 330, "text", {}), ("pca", 1470, 430, "created_at", {}), ("pdl", 1470, 530, "deleted_at", {})]:
-    d.attr(aid, cx, cy, lab, of="p", **kw)
-d.attr("tpk", 1470, 700, "post_id", of="t", partial=True)
-d.attr("tsc", 1470, 800, "score (ts)", of="t")
-d.attr("fs", 720, 820, "since", of="fo")
-d.legend(20, 628, size=17, gap=26)
-d.save(OUT / "erd-chen.svg")
-
-# ── Wide-column: what a partition is, and why the author index is one ─────────────────────────────
-d = ERD(1600, 820, size=22)
-d.text(40, 44, "author_posts · partition key = author_id (which node) · clustering key = created_at DESC (order inside)",
-       size=22, colour="#1f2328", bold=True, mono=False)
-nodes = [("Node A", [("48213", True), ("90017", False)]), ("Node B", [("31", False), ("777001", False)]),
-         ("Node C", [("5120", False), ("66", False)])]
-for i, (nm, parts) in enumerate(nodes):
-    x = 40 + i * 520
-    d.raw(f'<rect x="{x}" y="80" width="480" height="560" rx="12" fill="#f6f8fa" stroke="#8c959f" stroke-width="1.6"/>')
-    d.text(x + 20, 116, nm, size=22, colour="#57606a", bold=True)
-    for j, (aid, hot) in enumerate(parts):
-        y = 140 + j * 245; col = "#c8341f" if hot else "#1168bd"
-        d.raw(f'<rect x="{x + 20}" y="{y}" width="440" height="225" rx="8" fill="#ffffff" stroke="{col}" stroke-width="{3 if hot else 1.4}"/>')
-        d.raw(f'<rect x="{x + 20}" y="{y}" width="440" height="40" rx="8" fill="{col}"/>')
-        d.text(x + 36, y + 28, f"partition: author_id = {aid}", size=19, colour="#ffffff", bold=True, mono=True)
-        rows = ["10:00:05 → 17905512…", "09:41:12 → 17905433…", "08:02:47 → 17905029…", "…older, newest first"]
-        for k, r in enumerate(rows):
-            d.text(x + 40, y + 74 + k * 40, r, size=19, colour="#1f2328" if k < 3 else "#8c959f", mono=True)
-d.note(40, 660, 1520, "Query: author 48213's posts since 48 h ago = one partition on one node, one sequential read in "
-       "time order. A row store does the same with an index on (author_id, created_at); a wide-column store makes that "
-       "layout the table itself, and spreads partitions over nodes by hash.", size=20, colour=BLUE, bg=BLUE_BG)
-d.save(OUT / "wide-column.svg")
-
-# ── Sequence: transactional outbox, carried by CDC ───────────────────────────────────────────────
-s = seq(size=21, row=52)
-for pid, lab, k in [("ps", "Post service", "container"), ("db", "Posts DB (posts + outbox)", "db"),
-                    ("cdc", "CDC connector", "container"), ("log", "Post-created log", "queue"),
-                    ("fo", "Fan-out workers", "focus"), ("ot", "Search · notifications", "ext")]:
-    s.part(pid, lab, k)
-s.msg("ps", "db", "BEGIN · INSERT posts row")
-s.msg("ps", "db", "INSERT outbox row (PostCreated) · COMMIT", hl=True)
-s.ret("db", "ps", "committed: both rows or neither")
-s.msg("db", "cdc", "commit log (WAL / binlog) streams the outbox insert", "async")
-s.msg("cdc", "log", "publish PostCreated, key = authorId", hl=True)
-s.msg("log", "fo", "consumer group: fan-out")
-s.msg("log", "ot", "consumer groups: search, notifications")
-s.note("ps", "log", "No dual write. Rollback: no event. CDC crash: resume from its log position, at least once.", "green")
-s.save(OUT / "seq-outbox.svg")
-
-# ── Fan-out routing on authorTier ────────────────────────────────────────────────────────────────
-d = c4.Diagram(1600, 800)
-d.node("lg", 40, 300, 280, 150, "queue", "Post-created log", "key = authorId", "", size=21)
-d.node("wk", 420, 285, 320, 180, "focus", "Fan-out worker", "Container", "reads authorTier from the event", size=21)
-d.node("n", 860, 40, 340, 160, "container", "NORMAL", "under ~10 k followers", "push to followers active in 30 days", size=21)
-d.node("m", 860, 295, 340, 160, "container", "MID", "~10 k to ~100 k", "push to followers active today", size=21)
-d.node("c", 860, 550, 340, 160, "container", "CELEB", "over ~100 k", "one LPUSH; no fan-out", size=21)
-d.node("tl", 1320, 160, 250, 160, "db", "timeline:{f}", "Redis", "per follower", size=21)
-d.node("cl", 1320, 550, 250, 160, "db", "celeb:{a}", "Redis", "per author", size=21)
-d.edge("lg", "wk", "consume", "", src="r:0.5", dst="l:0.5", at=(370, 360), width=90)
-d.edge("wk", "n", "", "", src="t:0.5", dst="l:0.5", via=[(580, 120)])
-d.edge("wk", "m", "", "", src="r:0.5", dst="l:0.5")
-d.edge("wk", "c", "", "", src="b:0.5", dst="l:0.5", via=[(580, 630)])
-d.edge("n", "tl", "ZADD", "", src="r:0.5", dst="l:0.3", at=(1260, 105), width=70)
-d.edge("m", "tl", "ZADD", "", src="r:0.5", dst="l:0.75", at=(1260, 360), width=70)
-d.edge("c", "cl", "LPUSH", "", src="r:0.5", dst="l:0.5", at=(1260, 615), width=80)
-d.note(40, 560, 520, "The post service stamps authorTier from accounts.tier at publish. A daily job recomputes tier "
-       "from follower_count, with a gap between up and down thresholds so accounts don't flap.", size=19,
-       colour=BLUE, bg=BLUE_BG)
-d.save(OUT / "fanout-routing.svg")
-
-# ── Follow-up 5: the power reader ────────────────────────────────────────────────────────────────
-d = c4.Diagram(1600, 560)
-op = [("a", "The problem", "5,000 followees, 300 celebs", "300 list reads per open; p99 blows up"),
-      ("b", "Cap the merge", "top-K by affinity", "merge the 30 celebrities they engage with most"),
-      ("c", "Pre-merge", "per heavy reader", "background job folds celeb posts into their timeline"),
-      ("d", "Measure", "who is affected", "~0.1% of readers; their own latency SLO")]
-for i, (nid, h, t, desc) in enumerate(op):
-    d.node(nid, 40 + i * 390, 70, 350, 250, "focus" if i == 2 else "container", h, t, desc, size=24)
-d.note(40, 380, 1520, "The hybrid flips for heavy readers: pull is cheap per celebrity, but not for 300 of them. "
-       "Treat the tail of readers like the tail of authors.", size=21, colour=BLUE, bg=BLUE_BG)
-d.save(OUT / "fu-power-reader.svg")
-print("diagrams →", OUT)
+print(sorted(p.name for p in OUT.glob("*.svg") if p.stat().st_mtime > 0)[:3], len(list(OUT.glob("*.svg"))))

@@ -1,0 +1,64 @@
+stack sync: up to date
+automarked 102 legacy slides (hand-place markers to refine): ['ch0_2.py:15', 'ch0_2.py:29', 'ch0_2.py:42', 'ch0_2.py:42', 'ch0_2.py:42', 'ch0_2.py:42'] …
+slides 172 frames 563 words {'C': 8916, 'I': 430, 'V': 684, 'N': 553} total 10583
+by chapter {'0': 390, '1': 548, '2': 556, '3': 1194, '4': 723, '5': 2603, '6': 80, '7': 3880, '8': 291, '9': 318}
+  voice 20/785
+  voice 40/785
+  voice 60/785
+  voice 80/785
+  voice 100/785
+  voice 120/785
+  voice 140/785
+  voice 160/785
+  voice 180/785
+  voice 200/785
+  voice 220/785
+  voice 240/785
+  voice 260/785
+  voice 280/785
+  voice 300/785
+  voice 320/785
+  voice 340/785
+  voice 360/785
+  voice 380/785
+  voice 400/785
+  voice 420/785
+  voice 440/785
+  voice 460/785
+  voice 480/785
+  voice 500/785
+  voice 520/785
+  voice 540/785
+  voice 560/785
+  voice 580/785
+  voice 600/785
+  voice 620/785
+  voice 640/785
+  voice 660/785
+  voice 680/785
+  voice 700/785
+  voice 720/785
+  voice 740/785
+  voice 760/785
+  voice 780/785
+/Users/neo.bsuir/Projects/design-room/solutions/SD-44-payments-ledger/video/payments-ledger-reference.mp4  1080p  90:08  19 chapters  563 frames
+  00:00  0 Cold open
+  03:04  1 Requirements and scope
+  07:49  2 Estimates
+  12:30  3 Theory
+  22:22  4 API and entities
+  28:06  5 High-level design
+  37:53  5.1 Components and technologies
+  50:10  6 Bridge
+  50:53  7 Challenges
+  51:12  7.1 Challenge 1: The bank timed out
+  56:09  7.2 Challenge 2: Three retries at once
+  60:43  7.3 Challenge 3: A crash between the ledger and the event
+  64:19  7.4 Challenge 4: The hot merchant
+  68:05  7.5 Challenge 5: Refunds, and a chargeback months later
+  72:12  7.6 Challenge 6: 999,998 against 1,000,000
+  76:19  7.7 Challenge 7: A bug double-posted forty thousand entries
+  80:18  7.8 Challenge 8: How would you know before finance does?
+  84:32  8 Build cost
+  87:11  9 Recap
+EXIT 0 elapsed 4909s

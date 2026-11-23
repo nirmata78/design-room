@@ -1,0 +1,234 @@
+{
+ "_doc": "Single source for SD-44's technology choices (compact cut, 2026-11-22). `how` is spoken, so it carries no code; summary cells under 36 characters.",
+ "c4": {
+  "api": [
+   "Payments API",
+   "Go, gRPC and REST",
+   "Keys, validation, 2 s deadline."
+  ],
+  "svc": [
+   "Payment service",
+   "Go, state machine",
+   "Edges are conditional updates."
+  ],
+  "db": [
+   "Ledger database",
+   "PostgreSQL 16",
+   "By merchant. Outbox."
+  ],
+  "adp": [
+   "Processor adapter",
+   "Go, one per processor",
+   "Three error classes."
+  ],
+  "rly": [
+   "Outbox relay + log",
+   "Debezium, Kafka",
+   "Commit order."
+  ],
+  "wh": [
+   "Webhook sender",
+   "Go workers",
+   "Signed, retried."
+  ],
+  "inq": [
+   "Inquiry job",
+   "Scheduled worker",
+   "UNKNOWN to final."
+  ],
+  "rec": [
+   "Reconciliation",
+   "Spark batch",
+   "Expectations, breaks."
+  ]
+ },
+ "stack": [
+  {
+   "id": "payments-db",
+   "heading": "Ledger database: PostgreSQL, partitioned by merchant",
+   "kicker": "Technology · ledger database",
+   "title": "PostgreSQL: one merchant's postings stay in one partition",
+   "pick": "PostgreSQL 16, 64 partitions by merchant, a synchronous standby each",
+   "why": "State, journal and outbox commit together or not at all; a posting never leaves its partition.",
+   "how": "The key is the owner, the merchant, not the account: a capture touches three accounts and would span partitions. Shared accounts, like fee revenue, exist once per partition and are summed for the company view.",
+   "detail": "A deferred constraint checks that debits equal credits at commit. Unique keys on the idempotency key and on the processor reference. 64 logical partitions are mapped to physical primaries, so a rebalance moves a partition, not rows. Accounts are rows: a million one-time accounts are about 100 MB and change nothing in the layout. TigerBeetle is a purpose-built ledger database (Zig, 128-byte accounts and transfers, thousands of transfers per batch on a single leader, strict serialisability): the fastest at plain debits and credits and a natural upgrade for the ledger core past one primary, but it holds only accounts and transfers, so the state machine, keys and outbox still need a database.",
+   "rejected": [
+    [
+     "Partitioning by account",
+     "Every capture becomes a cross-partition transaction."
+    ],
+    [
+     "TigerBeetle, a ledger database",
+     "Fastest at debits and credits, but state, keys and outbox need a database anyway. The upgrade past one primary."
+    ],
+    [
+     "A key-value store, or a log as the truth",
+     "No multi-row transaction, no synchronous refund limit."
+    ]
+   ],
+   "summary": [
+    "Ledger database",
+    "PostgreSQL, by merchant",
+    "Partition by account; TigerBeetle",
+    "A posting stays in one partition"
+   ],
+   "course": "theory/03 (partitioning)",
+   "parts": "03",
+   "figure": "**Partition key, compared**\n\n| Key | Co-locates | A capture (3 accounts) | A balance read | A hot merchant |\n|---|---|---|---|---|\n| Account | one account's entries | cross-partition, every time | one partition | one hot row |\n| Payment | one payment's entries | one partition | scatter over all | spread, but its balance is a sum of all |\n| **Merchant** | everything of one owner | **one partition** | **one partition** | one partition: sub-accounts (challenge 4) |\n| Time | the same period | one partition, all writers | scatter | every writer on the newest partition |"
+  },
+  {
+   "id": "runtime",
+   "heading": "Runtime: Go for the services, and the honest rivals",
+   "kicker": "Technology · language and runtime",
+   "title": "Go: the services wait for a bank, not for the CPU",
+   "pick": "Go services, one static binary each, context deadlines through every call",
+   "why": "Our share of the two seconds is under a hundred milliseconds and the commit dominates it. Any serious runtime meets that; Go is chosen for small memory, a flat tail and one way to carry a deadline.",
+   "how": "The processor takes a second, the commit a few milliseconds, our own code microseconds. So raw speed is not the lever. What matters is a low and flat tail under bursts, memory per replica, a deadline that cancels the whole call chain, and engineers who can run it at three in the morning.",
+   "detail": "Illustrative orders of magnitude from public benchmarks that disagree with each other, so measure on your own load. Service overhead per request: Go 0.1 to 0.5 ms; Java 21+ with virtual threads (Spring Boot or Quarkus) 0.2 to 1 ms warm; Spring WebFlux about the same throughput as virtual threads with much harder code and stack traces, and a JDBC driver blocks anyway; Python async 1 to 3 ms and about a fifth of the per-core throughput under the interpreter lock; Rust 0.05 to 0.3 ms. Memory per instance: Go 30 to 80 MB, JVM 200 to 500 MB, Quarkus native 50 to 100 MB, Python 60 to 150 MB, Rust 10 to 40 MB. Reported comparisons of Go against Java virtual threads range from parity to Go ahead by tens of percent on throughput and several times less memory. Rust pays where microseconds matter, such as a matching engine that never waits on a database, not in a payments service whose time is a bank call and a commit; the cost is hiring and build speed. For a Java team, Java 21+ with virtual threads is an equal choice, and Java 25 removed the main pinning limit.",
+   "rejected": [
+    [
+     "Java 21+ with virtual threads (Spring Boot, Quarkus)",
+     "An equal choice. Within a small factor of Go on throughput, more memory per instance. The right pick for a Java team."
+    ],
+    [
+     "Spring WebFlux",
+     "Reactive code to get what virtual threads now give with plain blocking code."
+    ],
+    [
+     "Python",
+     "One core per process under the GIL, several times less throughput per core, a fatter tail."
+    ],
+    [
+     "Rust",
+     "Fastest and leanest, and not where our time goes. The cost is hiring and build speed."
+    ]
+   ],
+   "summary": [
+    "Services",
+    "Go",
+    "Java virtual threads; Rust",
+    "Memory, tail and deadlines, not speed"
+   ],
+   "course": "theory/02 (concurrency)",
+   "parts": "02"
+  },
+  {
+   "id": "outbox-log",
+   "heading": "Outbox relay and log: Debezium into Kafka",
+   "kicker": "Technology · outbox and event log",
+   "title": "Debezium reads the log the database already writes",
+   "pick": "Outbox table, Debezium (change data capture), Kafka",
+   "why": "Reading the write-ahead log costs the database nothing extra and keeps commit order.",
+   "how": "The outbox row commits with the payment. Debezium, in Kafka Connect, reads the write-ahead log through a replication slot and publishes rows to Kafka in commit order, at least once. The risk: a stalled reader makes the database keep log.",
+   "detail": "Alternatives, in the order I would reach for them. A polling relay, SELECT with SKIP LOCKED then mark published: simplest, no Kafka Connect, adds 100 to 500 ms and a query a second; right below about 1,000 events a second. Debezium Server or the embedded engine: the same capture without Kafka Connect, sinking to a cloud queue. Our own consumer of logical decoding with pgoutput: no framework, but we own slot handling, restarts and schema changes. Managed capture such as AWS DMS or Datastream: fine for analytics, weaker ordering guarantees. A database-native queue such as pgmq or River: no Kafka at all, one system fewer. LISTEN and NOTIFY: lossy, never the only path. Publishing after or before the commit: not atomic.",
+   "rejected": [
+    [
+     "A polling relay",
+     "Right below about 1,000 events a second; here a hot query and 100 ms or more added. It is the alternate path."
+    ],
+    [
+     "Own consumer of logical decoding",
+     "We would own slots, restarts and schema changes."
+    ],
+    [
+     "Managed capture (DMS, Datastream)",
+     "Built for analytics copies; weaker ordering and replay."
+    ]
+   ],
+   "summary": [
+    "Outbox and log",
+    "Debezium into Kafka",
+    "Polling relay; publish after commit",
+    "Commit order, no extra load"
+   ],
+   "course": "theory/06 (messaging)",
+   "parts": "06"
+  },
+  {
+   "id": "adapter",
+   "heading": "Processor adapter: direct processors, with a gateway as another adapter",
+   "kicker": "Technology · processor adapter",
+   "title": "One interface per processor; a gateway is one more adapter",
+   "pick": "A Go adapter per processor behind one port: a reference on every call",
+   "why": "The processor is where unknowns are born. Our own reference per attempt lets us ask about it, and reverse it.",
+   "how": "The port has authorise, capture, void, refund, inquire and read settlement. Each adapter maps the processor's codes into three classes; only the ambiguous one becomes UNKNOWN.",
+   "detail": "Gateway or direct. A gateway gives one API, tokenisation that keeps card data out of our scope, many payment methods, fraud tools and dispute handling, in days. It costs a blended price, about 2.9 percent plus 30 cents at list for cards, and one more hop. Direct processor or acquirer integration prices interchange plus a margin, about 1.8 to 2.4 percent, but needs card-data compliance at the highest level, underwriting, network certification and months of work. Rough break-even, illustrative: a premium of 0.7 percent against a team and audits of about $80,000 a month is about $10 million of card volume a month. Either way the ledger stays ours: a gateway's balance is not our books, and a timeout to a gateway is still an unknown, found again by the idempotency key it supports.",
+   "rejected": [
+    [
+     "A shared generic client",
+     "The ambiguous class gets lost in the lowest common denominator."
+    ],
+    [
+     "A gateway only, at this volume",
+     "About 0.7 % of volume above interchange: tens of millions a year. Right below $10 million a month."
+    ],
+    [
+     "Retrying every timeout",
+     "If the first call landed, the retry charges twice."
+    ]
+   ],
+   "summary": [
+    "Processor adapter",
+    "Go per processor; gateway too",
+    "One generic client; gateway only",
+    "Own reference; price at our volume"
+   ],
+   "course": "theory/07 (failure)",
+   "parts": "07"
+  },
+  {
+   "id": "reconciliation",
+   "heading": "Reconciliation: expectations, matched by reference",
+   "kicker": "Technology · reconciliation",
+   "title": "Match the settlement file to what the ledger expected",
+   "pick": "A Spark batch over the processor files, expectations in PostgreSQL, a break workflow with owners",
+   "why": "A report of totals cannot say which line is wrong. A match by reference can.",
+   "how": "The ledger produces, per processor and day, what it expects to be settled, by reference and net of fees. The raw file is stored unchanged, then joined by reference. Matches become settled; everything else becomes a break with a type, an owner and an age.",
+   "detail": "About 290 million lines a day at a million lines a second is five minutes of batch. Break types: missing at the processor, missing here, amount differs, duplicate.",
+   "rejected": [
+    [
+     "Matching on amount and time alone",
+     "Two same-amount payments in a minute are indistinguishable; match by reference."
+    ],
+    [
+     "Comparing daily totals",
+     "A matching total can hide two offsetting errors; a differing one does not say which line."
+    ]
+   ],
+   "summary": [
+    "Reconciliation",
+    "Spark batch, breaks queue",
+    "Match by amount and time; totals",
+    "Reference match, owned breaks"
+   ],
+   "course": "theory/08 (batch)",
+   "parts": "08"
+  }
+ ],
+ "challenges": {
+  "1": [
+   "Treating a timeout as a decline",
+   "the bank may have charged; a retry double-charges."
+  ],
+  "2": [
+   "Check, then insert, for the idempotency key",
+   "two concurrent requests both pass the check; a unique constraint decides."
+  ],
+  "3": [
+   "Publishing to the broker after the commit",
+   "a crash between the two loses the event for good."
+  ],
+  "4": [
+   "One balance row updated on every payment",
+   "it serialises the hot merchant on one lock; post journal lines and derive balances."
+  ],
+  "5": [
+   "Matching on amount and time alone",
+   "two same-amount payments in a minute are indistinguishable; match by reference."
+  ],
+  "6": [
+   "Alerting on the error rate",
+   "finance finds the break before the dashboard does; measure unmatched count and age."
+  ]
+ }
+}

@@ -1,0 +1,65 @@
+stack sync: up to date
+automarked 107 legacy slides (hand-place markers to refine): ['ch0_2.py:15', 'ch0_2.py:29', 'ch0_2.py:42', 'ch0_2.py:42', 'ch0_2.py:42', 'ch0_2.py:42'] …
+slides 174 frames 551 words {'C': 9457, 'I': 459, 'V': 396, 'N': 502} total 10814
+by chapter {'0': 416, '1': 646, '2': 538, '3': 1295, '4': 687, '5': 2365, '6': 83, '7': 4177, '8': 279, '9': 328}
+  voice 20/819
+  voice 40/819
+  voice 60/819
+  voice 80/819
+  voice 100/819
+  voice 120/819
+  voice 140/819
+  voice 160/819
+  voice 180/819
+  voice 200/819
+  voice 220/819
+  voice 240/819
+  voice 260/819
+  voice 280/819
+  voice 300/819
+  voice 320/819
+  voice 340/819
+  voice 360/819
+  voice 380/819
+  voice 400/819
+  voice 420/819
+  voice 440/819
+  voice 460/819
+  voice 480/819
+  voice 500/819
+  voice 520/819
+  voice 540/819
+  voice 560/819
+  voice 580/819
+  voice 600/819
+  voice 620/819
+  voice 640/819
+  voice 660/819
+  voice 680/819
+  voice 700/819
+  voice 720/819
+  voice 740/819
+  voice 760/819
+  voice 780/819
+  voice 800/819
+/Users/neo.bsuir/Projects/design-room/solutions/SD-95-loan-servicing/video/loan-servicing-reference.mp4  1080p  90:20  19 chapters  551 frames
+  00:00  0 Cold open
+  03:14  1 Requirements and scope
+  08:29  2 Estimates
+  13:03  3 Theory
+  23:27  4 API and entities
+  28:54  5 High-level design
+  37:16  5.1 Components and technologies
+  48:42  6 Bridge
+  49:26  7 Challenges
+  49:45  7.1 Challenge 1: The processor timed out
+  54:24  7.2 Challenge 2: The morning of the 1st
+  59:09  7.3 Challenge 3: It settled, then it came back
+  63:52  7.4 Challenge 4: A refund in the middle of the loan
+  68:12  7.5 Challenge 5: Paying off with a debit in flight
+  72:37  7.6 Challenge 6: Four hundred dollars more than the bank
+  77:04  7.7 Challenge 7: The card processor is down on the 1st
+  80:50  7.8 Challenge 8: How would you know before month-end?
+  84:54  8 Build cost
+  87:28  9 Recap
+EXIT 0 elapsed 5891s

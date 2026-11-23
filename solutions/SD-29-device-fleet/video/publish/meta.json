@@ -1,0 +1,56 @@
+{
+  "mp4": "device-fleet-reference.mp4",
+  "teaser_chapter": null,
+  "thumbnail": {
+    "kicker": "Staff reference solution",
+    "title": "State, not commands.<br><em>Waves</em> that stop.",
+    "sub": "A million devices you cannot touch: shadows, staged rollouts, A/B and a watchdog.",
+    "id": "design-room · SD-29"
+  },
+  "youtube": {
+    "title": "IoT Device Fleet Control Plane System Design: Staff Reference (OTA, Rollouts, Shadows)",
+    "playlist": "System design reference solutions · design-room (create it once, reuse it)",
+    "tags": [
+      "system design",
+      "system design interview",
+      "iot",
+      "device management",
+      "ota updates",
+      "firmware rollout",
+      "device shadow",
+      "mqtt",
+      "staged rollout",
+      "staff engineer",
+      "distributed systems"
+    ],
+    "description_top": [
+      "Pushing configuration to devices sounds like a message queue. But the devices are offline when you need them, untrusted, a truck roll away, and alive for seven years. A compact reference solution at the Staff bar (L6/L7): theory, a three-version design, an alternate path, and six challenges. {DURATION} minutes, {SLIDES} numbered slides.",
+      "The thesis: never send a device a command; publish a desired state it converges to whenever it can. Release in waves that halt themselves, and give every device a last known good it returns to on its own.",
+      "IN THIS VIDEO\n• Estimates: $1.5 M per 1 % bricked, 40,000 TLS handshakes a second in an unjittered storm, 50 TB per release\n• Theory: desired vs reported state, edge vs level triggering, identity per device, waves by cohort, A/B slots with a watchdog, full jitter\n• Six challenges: a config that crashes on boot, the rare hardware revision, six weeks offline, the reconnect storm, telemetry twice, and connected is not converged",
+      "HOW TO USE IT\nRun the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first."
+    ],
+    "description_bottom": [
+      "LINKS\nWritten reference design: https://github.com/nirmata78/design-room/blob/main/solutions/SD-29-device-fleet/SD-29_Device_Fleet_Reference_Design.md\nRun this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room\nAll videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md",
+      "ABOUT THIS VIDEO\nThis is a scripted walkthrough, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script, diagrams and the written design were produced with Claude Code. Numbers are back-of-the-envelope estimates for the exercise, labelled as given, illustrative or initial targets, not any company's real figures, and this is not any company's actual design. The technical content has not been reviewed by a person.",
+      "#SystemDesign #SoftwareEngineering #DistributedSystems"
+    ]
+  },
+  "linkedin": {
+    "post": [
+      "\"Push a rollback\" is the answer that fails the device-fleet question. A device in a crash loop never hears it.",
+      "I've published a {DURATION}-minute reference solution for a device-fleet control plane at the Staff bar: theory, a three-version design and six challenges, on {SLIDES} numbered slides.",
+      "The idea that unlocks it: design for the device you can't reach. Publish desired state instead of commands, release in waves that contain every kind of hardware and halt themselves, and let every device return to its last known good on its own.",
+      "What it goes into:\n→ A/B slots, a watchdog, and what \"healthy\" must include\n→ Why 1 % is not a sample\n→ 200,000 devices reconnecting in one minute\n→ Connected is not converged",
+      "Best on a second pass: pause after each question and answer it first.",
+      "▶ {YOUTUBE_URL}",
+      "It's a scripted walkthrough with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator.",
+      "What does your fleet do when an update bricks the device that received it?",
+      "#SystemDesign #SoftwareEngineering #DistributedSystems"
+    ],
+    "first_comment": "Written reference design, stage by stage: https://github.com/nirmata78/design-room/blob/main/solutions/SD-29-device-fleet/SD-29_Device_Fleet_Reference_Design.md\n\nRun this round yourself, with an AI interviewer that won't help you: https://github.com/nirmata78/design-room",
+    "document": {
+      "pdf": "../../SD-29_Device_Fleet_Reference_Design.pdf",
+      "title": "A device-fleet control plane: a Staff-level reference design"
+    }
+  }
+}

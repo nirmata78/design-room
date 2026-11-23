@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 820" width="1600" height="820">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<g data-k="t:drv"><rect x="30" y="40" width="470" height="313" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M30,48 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v38 h-470 z" fill="#ea4335"/>
+<text x="44" y="71.28" font-family="'Roboto Mono', monospace" font-size="23.1" font-weight="700" fill="#fff">driver_state</text>
+<rect x="44" y="93.6" width="41.8" height="22.8" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="64.9" y="111.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#C5221F">PK</text>
+<text x="94.8" y="111.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124" font-weight="700">driver_id</text>
+<text x="486" y="111.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">bigint</text>
+<rect x="31" y="124" width="468" height="38" fill="#f8f9fa"/>
+<rect x="44" y="131.6" width="41.8" height="22.8" rx="3" fill="#fef7e0" stroke="#b06000" stroke-width="0.8"/>
+<text x="64.9" y="149.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#b06000">IX</text>
+<text x="94.8" y="149.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">city</text>
+<text x="486" y="149.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">int</text>
+<text x="94.8" y="187.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">state</text>
+<text x="486" y="187.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">available | offered | on_trip</text>
+<rect x="31" y="200" width="468" height="38" fill="#f8f9fa"/>
+<text x="94.8" y="225.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">trip_id</text>
+<text x="486" y="225.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">bigint</text>
+<text x="94.8" y="263.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">version</text>
+<text x="486" y="263.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">bigint</text>
+<rect x="31" y="276" width="468" height="38" fill="#f8f9fa"/>
+<text x="94.8" y="301.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">lease_until</text>
+<text x="486" y="301.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">ts</text>
+<text x="44" y="337.1" font-family="Inter, Roboto, sans-serif" font-size="18.9" font-style="italic" fill="#5f6368">claims: one conditional update</text></g>
+<g data-k="t:trip"><rect x="570" y="40" width="470" height="275" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M570,48 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v38 h-470 z" fill="#4285f4"/>
+<text x="584" y="71.28" font-family="'Roboto Mono', monospace" font-size="23.1" font-weight="700" fill="#fff">trip</text>
+<rect x="584" y="93.6" width="41.8" height="22.8" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="604.9" y="111.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#C5221F">PK</text>
+<text x="634.8" y="111.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124" font-weight="700">trip_id</text>
+<text x="1026" y="111.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">bigint</text>
+<rect x="571" y="124" width="468" height="38" fill="#f8f9fa"/>
+<rect x="584" y="131.6" width="41.8" height="22.8" rx="3" fill="#fef7e0" stroke="#b06000" stroke-width="0.8"/>
+<text x="604.9" y="149.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#b06000">IX</text>
+<text x="634.8" y="149.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">rider_id</text>
+<text x="1026" y="149.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">bigint</text>
+<rect x="584" y="169.6" width="41.8" height="22.8" rx="3" fill="#fef7e0" stroke="#b06000" stroke-width="0.8"/>
+<text x="604.9" y="187.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#b06000">IX</text>
+<text x="634.8" y="187.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">driver_id</text>
+<text x="1026" y="187.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">bigint</text>
+<rect x="571" y="200" width="468" height="38" fill="#f8f9fa"/>
+<text x="634.8" y="225.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">state</text>
+<text x="1026" y="225.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">requested … completed</text>
+<text x="634.8" y="263.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">pickup</text>
+<text x="1026" y="263.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">lat, lng</text>
+<text x="584" y="299.1" font-family="Inter, Roboto, sans-serif" font-size="18.9" font-style="italic" fill="#5f6368">PostgreSQL, regional</text></g>
+<g data-k="t:off"><rect x="1110" y="40" width="460" height="275" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M1110,48 a8,8 0 0 1 8,-8 h444 a8,8 0 0 1 8,8 v38 h-460 z" fill="#4285f4"/>
+<text x="1124" y="71.28" font-family="'Roboto Mono', monospace" font-size="23.1" font-weight="700" fill="#fff">offer</text>
+<rect x="1124" y="93.6" width="41.8" height="22.8" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="1144.9" y="111.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#C5221F">PK</text>
+<text x="1174.8" y="111.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124" font-weight="700">offer_id</text>
+<text x="1556" y="111.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">uuid</text>
+<rect x="1111" y="124" width="458" height="38" fill="#f8f9fa"/>
+<rect x="1124" y="131.6" width="41.8" height="22.8" rx="3" fill="#e8f0fe" stroke="#4285f4" stroke-width="0.8"/>
+<text x="1144.9" y="149.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#1967D2">FK</text>
+<text x="1174.8" y="149.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">trip_id</text>
+<text x="1556" y="149.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">bigint</text>
+<text x="1174.8" y="187.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">driver_id</text>
+<text x="1556" y="187.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">bigint</text>
+<rect x="1111" y="200" width="458" height="38" fill="#f8f9fa"/>
+<text x="1174.8" y="225.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">expires_at</text>
+<text x="1556" y="225.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">ts</text>
+<text x="1174.8" y="263.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">outcome</text>
+<text x="1556" y="263.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">text</text>
+<text x="1124" y="299.1" font-family="Inter, Roboto, sans-serif" font-size="18.9" font-style="italic" fill="#5f6368">one row per offer</text></g>
+<g data-k="t:city"><rect x="30" y="470" width="470" height="199" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M30,478 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v38 h-470 z" fill="#5f6368"/>
+<text x="44" y="501.28" font-family="'Roboto Mono', monospace" font-size="23.1" font-weight="700" fill="#fff">city_lease</text>
+<rect x="44" y="523.6" width="41.8" height="22.8" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="64.9" y="541.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#C5221F">PK</text>
+<text x="94.8" y="541.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124" font-weight="700">city</text>
+<text x="486" y="541.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">int</text>
+<rect x="31" y="554" width="468" height="38" fill="#f8f9fa"/>
+<text x="94.8" y="579.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">epoch</text>
+<text x="486" y="579.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">bigint</text>
+<text x="94.8" y="617.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">leader</text>
+<text x="486" y="617.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">text</text>
+<text x="44" y="653.1" font-family="Inter, Roboto, sans-serif" font-size="18.9" font-style="italic" fill="#5f6368">mirrors the etcd lease</text></g>
+<g data-k="t:mem"><rect x="570" y="470" width="470" height="199" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M570,478 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v38 h-470 z" fill="#202124"/>
+<text x="584" y="501.28" font-family="'Roboto Mono', monospace" font-size="23.1" font-weight="700" fill="#fff">in memory, per city shard</text>
+<text x="634.8" y="541.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">driver → cell, lat, lng, seq, t</text>
+<text x="1026" y="541.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">map</text>
+<rect x="571" y="554" width="468" height="38" fill="#f8f9fa"/>
+<text x="634.8" y="579.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">cell → driver set</text>
+<text x="1026" y="579.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">map</text>
+<text x="634.8" y="617.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">expiry</text>
+<text x="1026" y="617.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">12 s</text>
+<text x="584" y="653.1" font-family="Inter, Roboto, sans-serif" font-size="18.9" font-style="italic" fill="#5f6368">never written to disk</text></g>
+<g data-k="t:hist"><rect x="1110" y="470" width="460" height="199" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M1110,478 a8,8 0 0 1 8,-8 h444 a8,8 0 0 1 8,8 v38 h-460 z" fill="#5f6368"/>
+<text x="1124" y="501.28" font-family="'Roboto Mono', monospace" font-size="23.1" font-weight="700" fill="#fff">location log</text>
+<text x="1174.8" y="541.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">driver_id</text>
+<text x="1556" y="541.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">key</text>
+<rect x="1111" y="554" width="458" height="38" fill="#f8f9fa"/>
+<text x="1174.8" y="579.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">t, lat, lng</text>
+<text x="1556" y="579.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368"></text>
+<text x="1174.8" y="617.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">seq</text>
+<text x="1556" y="617.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">bigint</text>
+<text x="1124" y="653.1" font-family="Inter, Roboto, sans-serif" font-size="18.9" font-style="italic" fill="#5f6368">Kafka, batched; history only</text></g>
+<g data-k="r:0"><path d="M1110.0,177.5 L1040.0,177.5" fill="none" stroke="#5f6368" stroke-width="1.8"/>
+<circle cx="1110.0" cy="177.5" r="4" fill="#5f6368"/>
+<text x="1094.0" y="172.2" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="19.8" font-weight="700" fill="#ea4335">N</text>
+<circle cx="1040.0" cy="177.5" r="4" fill="#5f6368"/>
+<text x="1056.0" y="198.2" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="19.8" font-weight="700" fill="#ea4335">1</text></g>
+<g data-k="r:1"><path d="M570.0,205.0 L500.0,227.8" fill="none" stroke="#5f6368" stroke-width="1.8"/>
+<circle cx="570.0" cy="205.0" r="4" fill="#5f6368"/>
+<text x="550.8" y="205.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="19.8" font-weight="700" fill="#ea4335">N</text>
+<circle cx="500.0" cy="227.8" r="4" fill="#5f6368"/>
+<text x="519.2" y="242.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="19.8" font-weight="700" fill="#ea4335">1</text></g>
+</svg>

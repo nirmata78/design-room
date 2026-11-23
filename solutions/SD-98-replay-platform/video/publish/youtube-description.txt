@@ -1,0 +1,40 @@
+Replaying recorded logs against a new build sounds like a batch job. It is only worth running if the same inputs give the same answer, and a release gate is only worth having if it can fail for the right reason. A compact reference solution at the Staff bar (L6/L7): theory, a three-version design, an alternate path, and six challenges. 63 minutes, 473 numbered slides.
+
+The thesis: make every run a pure function of a pinned manifest, so outputs can be cached by content and differences mean something; then gate on paired statistics under a versioned policy.
+
+IN THIS VIDEO
+• Estimates: 250 TB and about 1,040 GPUs for an uncached 50,000-scenario gate, about $1 M a month of compute, 100 TB of cache
+• Theory: six places randomness hides, five mechanisms (pinned manifests, simulated time, Merkle stage keys, paired intervals, quotas)
+• Six challenges: the same build giving two answers, a perception change, release day, a log that does not react, block or pass, and a gate that cannot fail
+
+HOW TO USE IT
+Run the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first.
+
+CHAPTERS
+0:00 0 Cold open
+2:37 1 Requirements and scope
+7:28 2 Estimates
+11:02 3 Theory
+19:16 4 API and entities
+22:26 5 High-level design
+28:30 5.1 Components and technologies
+34:56 5.2 When you don't need all this
+36:10 6 Bridge
+36:56 7 Challenges
+37:13 7.1 Challenge 1: Same build, two answers
+41:37 7.2 Challenge 2: A perception change
+45:38 7.3 Challenge 3: Release day
+49:02 7.4 Challenge 4: The log does not react
+52:40 7.5 Challenge 5: Block or pass?
+56:33 7.6 Challenge 6: The gate passed
+1:00:39 8 Recap
+
+LINKS
+Written reference design: https://github.com/nirmata78/design-room/blob/main/solutions/SD-98-replay-platform/SD-98_Replay_Platform_Reference_Design.md
+Run this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room
+All videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md
+
+ABOUT THIS VIDEO
+This is a scripted walkthrough, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script, diagrams and the written design were produced with Claude Code. Numbers are back-of-the-envelope estimates for the exercise, labelled as given, illustrative or initial targets, not any company's real figures, and this is not any company's actual design. The technical content has not been reviewed by a person.
+
+#SystemDesign #SoftwareEngineering #DistributedSystems

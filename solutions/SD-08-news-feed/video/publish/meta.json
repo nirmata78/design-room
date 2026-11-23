@@ -1,0 +1,56 @@
+{
+  "mp4": "news-feed-reference.mp4",
+  "teaser_chapter": null,
+  "thumbnail": {
+    "kicker": "Staff reference solution",
+    "title": "Push for most.<br><em>Pull</em> the few.",
+    "sub": "A line set by arithmetic, and correctness kept on the read path.",
+    "id": "design-room · SD-08"
+  },
+  "youtube": {
+    "title": "News Feed System Design: Staff-Level Reference Solution (Fan-out, Celebrities, Ranking)",
+    "playlist": "System design reference solutions · design-room (create it once, reuse it)",
+    "tags": [
+      "system design",
+      "system design interview",
+      "news feed",
+      "news feed system design",
+      "fan-out on write",
+      "fan-out on read",
+      "celebrity problem",
+      "timeline",
+      "staff engineer",
+      "distributed systems",
+      "software architecture"
+    ],
+    "description_top": [
+      "Push or pull? Every book says \"both\". This video is about what comes after that word: the arithmetic that puts the line near ten thousand followers, what happens to an account that crosses it, how a deleted post leaves millions of copies, and what the feed does when the ranker is slow or a cache shard is gone. A full reference solution at the Staff bar (L6/L7): theory, a three-version design, eight challenges that break it, and the build cost. {DURATION} minutes, {SLIDES} numbered slides.",
+      "The thesis: a feed is a materialised view that is cheap to read for almost everyone and impossible to precompute for a few. Push post IDs to the followers of ordinary accounts, pull the celebrities at read time, say where the line is and why, and keep every correctness rule on the read path.",
+      "IN THIS VIDEO\n• Estimates as arithmetic: 90,000 opens a second, 18 million reads a second for pure pull, 15 minutes of fan-out for one celebrity post, 4 TB of IDs against 250 TB of bodies\n• Theory: safety and liveness, seven mechanisms, an options matrix with a pick\n• Eight challenges: the celebrity post, where the line is, delete and block, twice or never, a lost shard, a slow ranker, catch-up on 48 hours, and how you would know it got worse\n• The build cost and the pull-to-push migration (marked AUX, the manager layer)",
+      "HOW TO USE IT\nRun the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first. Slides badged AUX are the manager layer: skip them in a Staff round."
+    ],
+    "description_bottom": [
+      "LINKS\nWritten reference design: https://github.com/nirmata78/design-room/blob/main/solutions/SD-08-news-feed/SD-08_News_Feed_Reference_Design.md\nRun this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room\nAll videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md",
+      "ABOUT THIS VIDEO\nThis is a scripted walkthrough, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script, diagrams and the written design were produced with Claude Code. Numbers are back-of-the-envelope estimates for the exercise, labelled as given, illustrative or initial targets, not any company's real figures, and this is not any company's actual design. The technical content has not been reviewed by a person.",
+      "#SystemDesign #SoftwareEngineering #DistributedSystems"
+    ]
+  },
+  "linkedin": {
+    "post": [
+      "Every news feed answer says \"hybrid push and pull\". The grade is on the line between them, and nobody draws it.",
+      "I've published a {DURATION}-minute reference solution for the news feed question at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on {SLIDES} numbered slides.",
+      "The idea that unlocks it: one celebrity post is a hundred million writes, about fifteen minutes of a whole fan-out fleet. So the line is set from both sides of the arithmetic, crossing it needs no backfill, and correctness (deletes, blocks) lives on the read path, never in the copies.",
+      "What it goes into:\n→ Where the threshold sits, and the account that crosses it overnight\n→ Why a delete is one write, not a fan-out\n→ A lost cache shard, and the rebuild that can become the outage\n→ How you'd know the feed got worse with every dashboard green",
+      "Best on a second pass: pause after each question and answer it first.",
+      "▶ {YOUTUBE_URL}",
+      "It's a scripted walkthrough with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator.",
+      "Where would you put the push/pull line for your product, and how would you measure it?",
+      "#SystemDesign #SoftwareEngineering #DistributedSystems"
+    ],
+    "first_comment": "Written reference design, stage by stage: https://github.com/nirmata78/design-room/blob/main/solutions/SD-08-news-feed/SD-08_News_Feed_Reference_Design.md\n\nRun this round yourself, with an AI interviewer that won't help you: https://github.com/nirmata78/design-room",
+    "document": {
+      "pdf": "../../SD-08_News_Feed_Reference_Design.pdf",
+      "title": "The news feed: a Staff-level reference design"
+    }
+  }
+}

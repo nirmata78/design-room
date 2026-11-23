@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 860" width="1600" height="860">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<g data-k="t:app"><rect x="30" y="40" width="470" height="344" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M30,48 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v42 h-470 z" fill="#ea4335"/>
+<text x="44" y="74.0" font-family="'Roboto Mono', monospace" font-size="25.2" font-weight="700" fill="#fff">application</text>
+<rect x="44" y="98.4" width="45.6" height="25.2" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="66.8" y="117.7" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="20.2" font-weight="700" fill="#C5221F">PK</text>
+<text x="98.6" y="118.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124" font-weight="700">id</text>
+<text x="486" y="118.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">text</text>
+<rect x="31" y="132" width="468" height="42" fill="#f8f9fa"/>
+<rect x="44" y="140.4" width="45.6" height="25.2" rx="3" fill="#fef7e0" stroke="#b06000" stroke-width="0.8"/>
+<text x="66.8" y="159.7" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="20.2" font-weight="700" fill="#b06000">IX</text>
+<text x="98.6" y="160.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124">merchant_id</text>
+<text x="486" y="160.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">text</text>
+<text x="98.6" y="202.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124">applicant_tok</text>
+<text x="486" y="202.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">text</text>
+<rect x="31" y="216" width="468" height="42" fill="#f8f9fa"/>
+<text x="98.6" y="244.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124">amount_cents</text>
+<text x="486" y="244.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">int</text>
+<text x="98.6" y="286.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124">status</text>
+<text x="486" y="286.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">text</text>
+<rect x="31" y="300" width="468" height="42" fill="#f8f9fa"/>
+<text x="98.6" y="328.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124">version</text>
+<text x="486" y="328.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">int</text>
+<text x="44" y="367.2" font-family="Inter, Roboto, sans-serif" font-size="20.6" font-style="italic" fill="#5f6368">the state machine; optimistic version</text></g>
+<g data-k="t:dec"><rect x="570" y="40" width="470" height="302" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M570,48 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v42 h-470 z" fill="#4285f4"/>
+<text x="584" y="74.0" font-family="'Roboto Mono', monospace" font-size="25.2" font-weight="700" fill="#fff">decision</text>
+<rect x="584" y="98.4" width="45.6" height="25.2" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="606.8" y="117.7" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="20.2" font-weight="700" fill="#C5221F">PK</text>
+<text x="638.6" y="118.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124" font-weight="700">application_id</text>
+<text x="1026" y="118.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">text</text>
+<rect x="571" y="132" width="468" height="42" fill="#f8f9fa"/>
+<text x="638.6" y="160.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124">outcome</text>
+<text x="1026" y="160.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">text</text>
+<text x="638.6" y="202.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124">reasons</text>
+<text x="1026" y="202.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">text[]</text>
+<rect x="571" y="216" width="468" height="42" fill="#f8f9fa"/>
+<text x="638.6" y="244.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124">versions</text>
+<text x="1026" y="244.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">jsonb</text>
+<text x="638.6" y="286.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124">record_uri</text>
+<text x="1026" y="286.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">text</text>
+<text x="584" y="325.2" font-family="Inter, Roboto, sans-serif" font-size="20.6" font-style="italic" fill="#5f6368">written once, never updated</text></g>
+<g data-k="t:ln"><rect x="1110" y="40" width="460" height="302" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M1110,48 a8,8 0 0 1 8,-8 h444 a8,8 0 0 1 8,8 v42 h-460 z" fill="#4285f4"/>
+<text x="1124" y="74.0" font-family="'Roboto Mono', monospace" font-size="25.2" font-weight="700" fill="#fff">loan</text>
+<rect x="1124" y="98.4" width="45.6" height="25.2" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="1146.8" y="117.7" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="20.2" font-weight="700" fill="#C5221F">PK</text>
+<text x="1178.6" y="118.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124" font-weight="700">id</text>
+<text x="1556" y="118.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">text</text>
+<rect x="1111" y="132" width="458" height="42" fill="#f8f9fa"/>
+<rect x="1124" y="140.4" width="45.6" height="25.2" rx="3" fill="#f8f9fa" stroke="#5f6368" stroke-width="0.8"/>
+<text x="1146.8" y="159.7" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="20.2" font-weight="700" fill="#5f6368">UQ</text>
+<text x="1178.6" y="160.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124">application_id</text>
+<text x="1556" y="160.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">text</text>
+<text x="1178.6" y="202.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124">offer_id</text>
+<text x="1556" y="202.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">text</text>
+<rect x="1111" y="216" width="458" height="42" fill="#f8f9fa"/>
+<text x="1178.6" y="244.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124">disclosure_v</text>
+<text x="1556" y="244.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">text</text>
+<text x="1178.6" y="286.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124">terms</text>
+<text x="1556" y="286.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">jsonb</text>
+<text x="1124" y="325.2" font-family="Inter, Roboto, sans-serif" font-size="20.6" font-style="italic" fill="#5f6368">UNIQUE(application_id): one loan</text></g>
+<g data-k="t:ob"><rect x="30" y="480" width="470" height="260" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M30,488 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v42 h-470 z" fill="#5f6368"/>
+<text x="44" y="514.0" font-family="'Roboto Mono', monospace" font-size="25.2" font-weight="700" fill="#fff">outbox</text>
+<rect x="44" y="538.4" width="45.6" height="25.2" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="66.8" y="557.7" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="20.2" font-weight="700" fill="#C5221F">PK</text>
+<text x="98.6" y="558.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124" font-weight="700">event_id</text>
+<text x="486" y="558.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">text</text>
+<rect x="31" y="572" width="468" height="42" fill="#f8f9fa"/>
+<text x="98.6" y="600.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124">type</text>
+<text x="486" y="600.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">text</text>
+<text x="98.6" y="642.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124">payload</text>
+<text x="486" y="642.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">jsonb</text>
+<rect x="31" y="656" width="468" height="42" fill="#f8f9fa"/>
+<text x="98.6" y="684.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124">published_at</text>
+<text x="486" y="684.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">ts</text>
+<text x="44" y="723.2" font-family="Inter, Roboto, sans-serif" font-size="20.6" font-style="italic" fill="#5f6368">same commit as the loan</text></g>
+<g data-k="t:vc"><rect x="570" y="480" width="470" height="260" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M570,488 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v42 h-470 z" fill="#4285f4"/>
+<text x="584" y="514.0" font-family="'Roboto Mono', monospace" font-size="25.2" font-weight="700" fill="#fff">vendor_call</text>
+<rect x="584" y="538.4" width="45.6" height="25.2" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="606.8" y="557.7" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="20.2" font-weight="700" fill="#C5221F">PK</text>
+<text x="638.6" y="558.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124" font-weight="700">application_id</text>
+<text x="1026" y="558.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">text</text>
+<rect x="571" y="572" width="468" height="42" fill="#f8f9fa"/>
+<rect x="584" y="580.4" width="45.6" height="25.2" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="606.8" y="599.7" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="20.2" font-weight="700" fill="#C5221F">PK</text>
+<text x="638.6" y="600.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124" font-weight="700">vendor · seq</text>
+<text x="1026" y="600.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">text</text>
+<text x="638.6" y="642.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124">outcome</text>
+<text x="1026" y="642.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">text</text>
+<rect x="571" y="656" width="468" height="42" fill="#f8f9fa"/>
+<text x="638.6" y="684.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124">cost_cents · ms</text>
+<text x="1026" y="684.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">int</text>
+<text x="584" y="723.2" font-family="Inter, Roboto, sans-serif" font-size="20.6" font-style="italic" fill="#5f6368">every paid call, with its cost</text></g>
+<g data-k="t:vl"><rect x="1110" y="480" width="460" height="218" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M1110,488 a8,8 0 0 1 8,-8 h444 a8,8 0 0 1 8,8 v42 h-460 z" fill="#202124"/>
+<text x="1124" y="514.0" font-family="'Roboto Mono', monospace" font-size="25.2" font-weight="700" fill="#fff">vault (separate)</text>
+<rect x="1124" y="538.4" width="45.6" height="25.2" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="1146.8" y="557.7" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="20.2" font-weight="700" fill="#C5221F">PK</text>
+<text x="1178.6" y="558.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124" font-weight="700">token</text>
+<text x="1556" y="558.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">text</text>
+<rect x="1111" y="572" width="458" height="42" fill="#f8f9fa"/>
+<text x="1178.6" y="600.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124">ssn · dob · address</text>
+<text x="1556" y="600.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">enc</text>
+<text x="1178.6" y="642.6" font-family="'Roboto Mono', monospace" font-size="20.6" fill="#202124">key_id</text>
+<text x="1556" y="642.6" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="20.2" fill="#5f6368">text</text>
+<text x="1124" y="681.2" font-family="Inter, Roboto, sans-serif" font-size="20.6" font-style="italic" fill="#5f6368">only the vault and adapters</text></g>
+<g data-k="r:0"><path d="M570.0,130.6 L500.0,143.2" fill="none" stroke="#5f6368" stroke-width="1.8"/>
+<circle cx="570.0" cy="130.6" r="4" fill="#5f6368"/>
+<text x="552.0" y="129.0" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="21.6" font-weight="700" fill="#ea4335">1</text>
+<circle cx="500.0" cy="143.2" r="4" fill="#5f6368"/>
+<text x="518.0" y="161.6" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="21.6" font-weight="700" fill="#ea4335">1</text></g>
+<g data-k="r:1"><path d="M1110.0,130.6 L1040.0,130.6" fill="none" stroke="#5f6368" stroke-width="1.8"/>
+<circle cx="1110.0" cy="130.6" r="4" fill="#5f6368"/>
+<text x="1094.0" y="126.0" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="21.6" font-weight="700" fill="#ea4335">0..1</text>
+<circle cx="1040.0" cy="130.6" r="4" fill="#5f6368"/>
+<text x="1056.0" y="152.0" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="21.6" font-weight="700" fill="#ea4335">1</text></g>
+<g data-k="note:0"><rect x="30" y="800" width="1540" height="51.3" rx="6" fill="#fef7e0" stroke="#b06000" stroke-width="1.2"/>
+<text x="44" y="828.5" font-family="Inter, Roboto, sans-serif" font-size="22.8" fill="#202124">The record body (report by reference, feature vector, missing calls) lives in encrypted object storage under record_uri.</text></g>
+</svg>

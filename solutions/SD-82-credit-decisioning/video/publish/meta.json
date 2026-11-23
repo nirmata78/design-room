@@ -1,0 +1,57 @@
+{
+  "mp4": "credit-decisioning-reference.mp4",
+  "teaser_chapter": null,
+  "thumbnail": {
+    "kicker": "Staff reference solution",
+    "title": "Credit in<br><em>three seconds</em>",
+    "sub": "Slow, paid bureaus under one deadline, one atomic booking, and decisions you can replay years later.",
+    "id": "design-room · SD-82"
+  },
+  "youtube": {
+    "title": "Instant Credit (BNPL) System Design: Staff Reference Solution (Slow Bureaus, One Atomic Booking)",
+    "playlist": "System design reference solutions · design-room (create it once, reuse it)",
+    "tags": [
+      "system design",
+      "system design interview",
+      "fintech system design",
+      "bnpl system design",
+      "credit decisioning",
+      "loan origination",
+      "scatter gather",
+      "circuit breaker",
+      "outbox pattern",
+      "idempotency",
+      "staff engineer",
+      "distributed systems"
+    ],
+    "description_top": [
+      "A customer at a counter wants to pay a $1,200 bill in instalments, and you have three seconds to decide. The load is tiny: eight applications a second at the peak. The grade is on everything else. This is a full reference solution at the Staff bar (L6/L7): theory, a three-version design, eight challenges that break it, and the build cost. {DURATION} minutes, {SLIDES} numbered slides, with an interviewer, a candidate and a coach.",
+      "The thesis: instant credit at the counter is a regulated decision under a deadline set by slow, paid vendors, followed by one atomic step. Every degraded path is a credit decision with an owner and a cap, not an engineering default.",
+      "IN THIS VIDEO\n• Estimates that decide: 8 applications a second (one database), $2M a month in bureau pulls (never race them), 3 % of applications reaching the deadline without a bureau (a signed policy, not a catch block)\n• Theory: four safety and three liveness properties, six mechanisms, an options matrix with a pick and an honest equal\n• Eight challenges: a slow bureau, a bureau down for everyone, a phone that drops between accept and the answer, funding that fails after booking, explaining a decline fourteen months later, a new model that approves more, where identity data lives, and how you would know\n• The build cost and the six owners (marked AUX, the manager layer)",
+      "HOW TO USE IT\nRun the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first. Slides badged AUX are the manager layer: skip them in a Staff round."
+    ],
+    "description_bottom": [
+      "LINKS\nWritten reference design: https://github.com/nirmata78/design-room/blob/main/solutions/SD-82-credit-decisioning/SD-82_Credit_Decisioning_Reference_Design.md\nRun this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room\nAll videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md",
+      "ABOUT THIS VIDEO\nThis is a scripted walkthrough, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script, diagrams and the written design were produced with Claude Code. Numbers are back-of-the-envelope estimates for the exercise, labelled as given, derived, illustrative or initial targets, not any lender's real figures, and this is not any company's actual design. Statements about lending rules are general and not legal or compliance advice. The technical content has not been reviewed by a person.",
+      "#SystemDesign #Fintech #DistributedSystems"
+    ]
+  },
+  "linkedin": {
+    "post": [
+      "Eight loan applications a second. Any database takes that. So why does this round fail strong engineers?",
+      "I've published a {DURATION}-minute reference solution for instant credit at the point of sale, at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on {SLIDES} numbered slides.",
+      "The idea that unlocks it: the core is small and boring on purpose, one database and one atomic step. The design lives at the slow edges and in what you keep.",
+      "What it goes into:\n→ Never race two credit bureaus: every pull is paid and may show on the customer's file\n→ \"Our vendor was slow\" is not a decline reason, which is why \"refer\" exists\n→ A credit pull can't be compensated; only funding the merchant can\n→ Shadow mode can't tell you whether newly approved people repay",
+      "Best on a second pass: pause after each question and answer it first.",
+      "▶ {YOUTUBE_URL}",
+      "It's a scripted walkthrough with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator.",
+      "When a vendor is down, who should decide what happens at the counter: engineering, credit risk or compliance?",
+      "#SystemDesign #Fintech #DistributedSystems"
+    ],
+    "first_comment": "Written reference design, stage by stage: https://github.com/nirmata78/design-room/blob/main/solutions/SD-82-credit-decisioning/SD-82_Credit_Decisioning_Reference_Design.md\n\nRun this round yourself, with an AI interviewer that won't help you: https://github.com/nirmata78/design-room",
+    "document": {
+      "pdf": "../../SD-82_Credit_Decisioning_Reference_Design.pdf",
+      "title": "Instant credit at the point of sale: a Staff-level reference design"
+    }
+  }
+}

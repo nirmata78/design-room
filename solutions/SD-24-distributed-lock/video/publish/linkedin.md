@@ -1,0 +1,40 @@
+# LinkedIn kit: Distributed Lock System Design: Staff-Level Reference Solution (fencing tokens, leases, consensus)
+
+Post from a computer, after the YouTube video is public. The link is still pending: rerun with --youtube-url.
+
+**Post** (1339/3000; hook 108 characters, before the "see more" fold): `pbcopy < linkedin-post.txt`
+
+```text
+A distributed lock can be correct at every step and still let two writers through. Here is why, and the fix.
+
+I've published a 99-minute reference solution for the distributed lock question, at the Staff bar: theory, a three-version design, seven challenges, and the build cost, on 575 numbered slides.
+
+The idea that unlocks it: a lock service says who should be working. Only the resource says who is allowed to write. A holder pauses for fifteen seconds, its lease expires, a second holder is granted, and the first one wakes up and writes. The fix is a token that only increases, checked at the resource.
+
+What it goes into:
+→ The pause, and the stale write that arrives before the new holder's first write
+→ A resource that cannot check: idempotency, a proxy, or an honest efficiency lock
+→ Clocks, a partition, and why restoring a snapshot reissues tokens
+→ The cost in people and months
+
+Best on a second pass: pause after each question and answer it first.
+
+▶ [YouTube link: rerun publish_kit.py with --youtube-url]
+
+It's a scripted walkthrough with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator.
+
+Which would you push back on first: a team asking for atomic multi-lock, or one asking for a lock on a partner API?
+
+#SystemDesign #SoftwareEngineering #DistributedSystems
+```
+
+**First comment** (279/1250):
+
+```text
+Written reference design, stage by stage: https://github.com/nirmata78/design-room/blob/main/solutions/SD-24-distributed-lock/SD-24_Distributed_Lock_Reference_Design.md
+
+Run this round yourself, with an AI interviewer that won't help you: https://github.com/nirmata78/design-room
+```
+
+**Media: attach the reference design.** In the post composer, More (+) → Add a document → `../../SD-24_Distributed_Lock_Reference_Design.pdf` (44 pages, 2.1 MB; limit 300 pages, 100 MB).
+Document title, shown on the viewer: **A distributed lock service: a Staff-level reference design**. A post carries one attachment, so the video stays a link in the text, and the document is what shows in the feed.

@@ -1,0 +1,146 @@
+# Episode 8 · Testing for reliability, and software engineering in SRE
+
+Reader transcript generated from `src/ch08.txt`. Voices: **COACH** narrates; **SAY THIS** is the slower key-line voice; **INTERVIEWER** and **CANDIDATE** play the probe drills; **ASIDE** is a fifth voice for traps, stories and the then-and-now panels. `[pause]` is silence in seconds; `[reveal]` is where the rest of the slide fades in. Each section also gets an automatic title card and a one-second pause. On-screen text is shown as quoted lines.
+
+### Slide 1 · SRE course · Episode 8 of 16 · Priority 2 — Testing for reliability, and software engineering in SRE   `[th]`
+> How to quantify confidence in a system, and how an SRE team builds software that stays alive.
+**COACH:** Episode eight. Two topics. Testing, and its main idea that testing is how a team measures confidence. And the software that SRE teams write themselves, using a capacity planning tool as the case study. Both ask the same question: how do you know it works, before the pager tells you it does not?
+**SAY THIS:** If you have not tried it, assume it is broken.
+*[pause: 0.8]*
+
+
+## 8.0 The story that starts it
+
+### Slide 2 · The opening story — A failover that had never failed over   `[cards · c2]`
+> red Untested path :: A database has a standby, and a runbook for failover. Nobody has used either in a year. On the night, the standby is two versions behind.
+> grn Tested path :: The failover runs every month, in production, on a schedule. The failure on the night is a normal Tuesday.
+> > A recovery path you have not exercised is a hope, not a design.
+**ASIDE:** A story. A database has a standby and a runbook for failover. Nobody has used either for a year. On the night it matters, the standby is two versions behind and the runbook mentions a server that no longer exists. In the other world, the failover runs every month, in production, on a schedule, and the night of the real failure is a normal Tuesday. A recovery path you have not exercised is a hope, not a design.
+
+### Slide 3 · What this episode covers — Testing for reliability, and software engineering in SRE   `[panel · note]`
+> Testing for reliability, and software engineering in SRE. Google's separate book on software engineering covers testing sizes in more depth.
+**COACH:** This episode covers testing for reliability, and software engineering in S-R-E. Google's book on software engineering goes further on testing sizes and shifting left.
+
+
+## 8.1 Testing as measuring confidence
+
+### Slide 4 · The central idea — Passing proves little. Failing proves a lot.   `[cards · c2]`
+> amb A passing test :: Reduces uncertainty about a change, but does not prove reliability.
+> red A failing test :: Generally proves the absence of reliability, and costs almost nothing to find.
+> > Tests that pass before and after a change show what stayed equivalent.
+**COACH:** Start with an idea that changes how you see tests. A passing test does not prove reliability. It reduces uncertainty about a change. A failing test, on the other hand, generally proves the absence of reliability, and finding it costs almost nothing. The more tests pass both before and after a change, the more of the system you have shown to be equivalent. Testing is how a team quantifies confidence in the future.
+
+### Slide 5 · The ladder — From a unit test to a probe in production   `[dia]`
+*Diagram:* `svg/e08-test-ladder.svg`
+**COACH:** Tests fall into two families. Traditional tests, before release: unit tests, integration tests, and system tests, which include smoke tests, performance tests and regression tests. Then production tests, which run against the real thing: configuration tests that check what is deployed matches what was intended, stress tests that push the system to find its limit, and canary tests that run a new version on a small slice of traffic. Notice the trade. As you go to the right, tests get more realistic, slower and costlier, and also find the failures that matter most.
+
+### Slide 6 · The line to say — Testing is the cheapest repair.   `[th]`
+**SAY THIS:** Testing is the cheapest form of repair. A bug caught before release takes zero time to repair.
+*[pause: 0.8]*
+
+### Slide 7 · One level down — Testing and mean time to repair   `[table]`
+> Where the bug is caught | Time to repair | Users affected
+> Unit or integration test, before release | Zero: it never ships | None
+> Canary or production test | Minutes: automatic abort or rollback | A small slice
+> Monitoring, after rollout | As fast as the alert and the human | Everyone, until fixed
+> > A testing system can find a bug with zero mean time to repair.
+**COACH:** One level down, the relation between testing and the time it takes to repair. A bug caught by a unit or integration test is repaired in zero time, because it never ships. A bug caught by a canary or production test costs minutes, with an automatic abort or rollback, and affects a small slice. A bug found by monitoring after rollout costs as long as the alert and the human take, and affects everyone until it is fixed. So testing is not separate from operations. It is the cheapest form of repair.
+
+### Slide 8 · Testing at scale — What changes when the thing under test is big   `[panel · key]`
+> Test the tools that test: a flaky test runner destroys trust faster than no tests.
+> Test disaster deliberately: failover, restore, and the loss of a dependency.
+> Speed matters: a slow test suite gets skipped.
+> Expect testing to fail: some bugs will escape, so keep production probes and a fast rollback.
+**COACH:** Now testing at scale. Test the tools that test, because a flaky test runner destroys trust faster than having none. Test disasters deliberately: failover, restore, and the loss of a dependency. Remember that speed matters, because a slow test suite gets skipped. And expect testing to fail anyway. Some bugs will escape, so keep production probes, and a fast rollback.
+
+### Slide 9 · The trap — Tests that always pass   `[panel · trap]`
+> A test that has never failed has never been shown to detect anything.
+> Check that important tests can fail: temporarily break the thing they guard.
+> Count tests by risks covered, not by their number or code coverage alone.
+**ASIDE:** The trap is tests that always pass. A test that has never failed has never been shown to detect anything. Check that your important tests can fail, by temporarily breaking the thing they guard. And count tests by the risks they cover, not just by their number, or by code coverage alone.
+
+### Slide 10 · The line to say — A test is a measurement of confidence, and a rollback is the repair of last resort.   `[th]`
+**SAY THIS:** Testing is how a team measures confidence. A failing test is cheap knowledge. Every path that matters, including recovery, should be exercised before the day it is needed.
+*[pause: 0.8]*
+
+
+## 8.2 Software engineering inside SRE
+
+### Slide 11 · The case study — Intent-based capacity planning   `[dia]`
+*Diagram:* `svg/e08-intent.svg`
+**COACH:** Why should an operations-minded team write software at all? The case study is capacity planning. The traditional method is a spreadsheet: forecast demand, add headroom, order machines. It does not scale, and it cannot say why. The team's answer was to ask for intent instead. The service owner states what the service needs, for example, enough capacity to serve its forecast load, with a given availability, spread across failure domains, with certain latency limits. A solver turns the intent into a concrete allocation. When demand, hardware or the dependencies change, you change the intent and recompute.
+
+### Slide 12 · One level down — What the intent approach buys, and what it requires   `[table]`
+> Gain | Requires
+> The reason for each allocation is written down | Clear, shared definitions of service needs
+> Re-planning is a recomputation, not a project | A model good enough to trust
+> Trade-offs between cost and availability are explicit | Owners willing to state priorities
+> > Lessons on requirements, adoption and team dynamics.
+**COACH:** One level down. The gain is that the reason for every allocation is written down, re-planning becomes a recomputation instead of a project, and the trade-off between cost and availability becomes explicit. The requirements are clear, shared definitions of what a service needs, a model good enough to trust, and owners willing to state priorities. Be honest about the soft part too: raising awareness, driving adoption, and the team dynamics of building a tool.
+
+### Slide 13 · The alternative and the price — Fostering software engineering in an SRE team   `[table]`
+> Choice | Benefit | Cost
+> Build a tool for your own team | Fits exactly, and you own it | You maintain it forever
+> Use a shared platform | Many users, shared cost | Must fit many needs
+> Buy or adopt open source | Fast, proven | Less control, integration work
+> Do nothing | Free today | The toil keeps growing
+> > Protect staffing and development time, or the engineering never happens.
+**COACH:** What are the choices? Build a tool for your own team: it fits exactly, and you maintain it forever. Use a shared platform: many users share the cost, but it must fit many needs. Buy or adopt open source: fast and proven, with less control and some integration work. Or do nothing, which is free today and costs more every quarter. The practical point is to protect staffing and development time, because without it, the engineering never happens.
+
+
+## 8.3 Then and now
+
+### Slide 14 · Since 2016 — Testing grew new layers   `[panel · now]`
+> Contract tests check the agreement between services without running the whole system.
+> Chaos engineering injects failure in a controlled way, in production, with a hypothesis and a stop button.
+> Load and soak tests run in the delivery pipeline, with the results compared to the objective.
+> Synthetic monitoring and feature flags make production a place where you can test safely, in small slices.
+**ASIDE:** What has changed since 2016? Testing grew new layers. Contract tests check the agreement between services without running the whole system. Chaos engineering injects failure in a controlled way, in production, with a hypothesis and a stop button. Load and soak tests run in the delivery pipeline, and the results are compared to the objective. And synthetic monitoring and feature flags make production a place where you can test safely, in small slices. The principle is the old one: exercise the path before the day you need it.
+
+### Slide 15 · Since 2016 — Capacity is now elastic, and cost is a reliability variable   `[panel · now]`
+> Autoscaling replaced much of manual capacity planning, but it adds its own hazard: a feedback loop that can amplify a spike or a failure.
+> Cost visibility by service and team is standard practice, and efficiency is a design input.
+> The intent idea lives on in declarative resource requests and policies.
+**ASIDE:** A second change. Autoscaling replaced much of manual capacity planning, but it adds a hazard of its own, a feedback loop that can amplify a spike or a failure. Cost visibility by service and team is now standard, and efficiency is a design input. And the intent idea lives on, in declarative resource requests and policies: you state what you need, and the platform decides where.
+
+
+## 8.4 Probe drills
+
+### Slide 16 · Interviewer probe — How do you know your disaster recovery works?   `[probe]`
+**INTERVIEWER:** How do you know your disaster recovery works?
+*A strong answer on screen:*
+> - You exercise it, on a schedule, and measure the recovery time and data loss
+> - Test the restore, not just the backup
+> - Include the human steps: who is paged, which runbook
+> - Record what broke, fix it, repeat
+**CANDIDATE:** By exercising it on a schedule and measuring. I restore from backup and check the data, not just that a backup file exists. I include the human steps, who is paged and which runbook they follow, and I measure the recovery time and the data loss against the targets. Whatever breaks becomes an action item, and then I run it again.
+
+### Slide 17 · Interviewer probe — A team wants to add a chaos experiment in production. What do you ask first?   `[probe]`
+**INTERVIEWER:** A team wants to add a chaos experiment in production. What do you ask first?
+*A strong answer on screen:*
+> - What is the hypothesis about steady state?
+> - What is the blast radius, and how do we stop it?
+> - Is monitoring good enough to tell us what happened?
+> - Has it been run in staging first?
+**CANDIDATE:** I ask what the steady state is and what we expect to happen. Then the blast radius and the stop button: how many users can this touch, and how fast can we abort. I ask whether our monitoring can tell what happened, because an experiment we cannot observe teaches nothing. And I ask whether it has been run in a safer environment first. Chaos is an experiment, and an experiment needs a hypothesis.
+
+### Slide 18 · Interviewer probe — Your SRE team wants to spend a quarter building a tool. How do you decide?   `[probe]`
+**INTERVIEWER:** Your SRE team wants to spend a quarter building a tool. How do you decide?
+*A strong answer on screen:*
+> - What toil or risk does it remove, in hours or budget?
+> - Build, reuse or buy? Why can't an existing tool do it?
+> - Who maintains it after the quarter?
+> - Can we ship a thin slice early, and learn?
+**CANDIDATE:** I ask what it removes, in hours or error budget, so that I can compare it to the cost. Then, build, reuse or buy: why can't an existing tool do this? I ask who maintains it after the quarter, because the maintenance is the real cost. And I look for a thin first slice that ships early, so that we learn from real users before the whole quarter is spent.
+
+
+## 8.5 Where this shows up
+
+### Slide 19 · Where this shows up — Read, watch and build next   `[list]`
+> ~ Design-room course part 16 covers testing distributed systems, and the manager layer's build-or-buy decisions.
+> - Episode 5: the pipeline that these tests gate
+> - Episode 13: data integrity, the testing of what you stored
+> - Google's SRE books: the chapters on testing and on software engineering in SRE
+> - Also: Software Engineering at Google, chapter on larger testing
+**COACH:** Next steps. Part sixteen of the design-room course covers testing distributed systems, and the build-or-buy decisions of the manager layer. Episode five covered the pipeline these tests gate, and episode thirteen is data integrity, which is testing what you have stored. Google's free S-R-E books cover both, and Google's book on software engineering has a chapter on larger tests.
+

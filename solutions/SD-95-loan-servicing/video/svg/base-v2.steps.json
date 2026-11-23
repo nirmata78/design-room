@@ -1,0 +1,1 @@
+[["n:cus", "n:org", "n:api", "n:svc", "n:rail", "e:cus-api", "e:api-cus", "e:org-api", "e:api-svc", "e:svc-api"], ["n:db", "m:db", "e:svc-db"], ["n:dsp", "m:dsp", "e:db-dsp", "e:dsp-db", "e:dsp-rail", "e:rail-dsp"]]

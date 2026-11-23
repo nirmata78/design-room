@@ -1,6 +1,6 @@
 # Archetype F · Transactions, payments & commerce
 
-**SD-44 – SD-50, plus the fintech expansion SD-77 – SD-82 and SD-93.** Slice with `grep -n '^### SD-44' questions/F-transactions-payments.md`, then Read
+**SD-44 – SD-50, plus the fintech expansion SD-77 – SD-82, SD-93 and SD-95.** Slice with `grep -n '^### SD-44' questions/F-transactions-payments.md`, then Read
 with `offset`. Do not read this file whole.
 
 **What this archetype tests as a family:** **correctness under retry and partial failure.** Every
@@ -488,6 +488,16 @@ partial shipments). The design is the **authorisation path** plus the **auth ↔
 - **Hot account contention** is mostly absent here (per-card), but **per-cardholder serialisation** of
   concurrent auths on one balance is required.
 - **Audit and dispute support**: every decision and its inputs recorded.
+- **Velocity features in two speeds**: burst counters for the same card **updated inline** (per-minute
+  buckets, read-and-increment in one round trip) — a stream lags by seconds and a burst of fraud is
+  seconds apart; richer aggregates (distinct zip codes per day, merchant decline rate) from the stream.
+  Features logged with the decision so training sees what the model saw.
+- **Rules as versioned data** (a sandboxed expression language), lifecycle **backtest → shadow → slice →
+  enforce**, kill switch, expiry, owner; every decision records its rule-set version; rollback =
+  re-point to the previous version. Knows shadow mode **cannot measure false positives** (labels arrive
+  in 30–90 days) → backtests, fast proxies ("it was me" replies), decline-rate alarms.
+- **Fail policy as a table** (by amount × merchant risk × which component is late) with an **exposure
+  cap per hour**, signed by risk and finance.
 
 **Probe ladder:**
 - *Requirements:* "What's the deadline and what happens if you miss it?" · "What's out of scope?"
@@ -513,6 +523,8 @@ state), treats the clearing file as the financial source of truth, and quantifie
 fail-open decision.
 
 **Traps.** Debiting at authorisation. Assuming one auth = one clearing record. Ignoring stand-in.
+"The network gives 100 ms" (the network's timeout is seconds; set your own p99 target inside the
+processor's deadline). Velocity only from a stream. **Reference solution:** `solutions/SD-77-card-authorisation/` (reference design and video).
 
 ---
 
@@ -695,39 +707,136 @@ with a resolution procedure), and puts kill switches and per-run limits on the o
 
 ---
 
-### SD-82 · Real-time credit decisioning (BNPL / instant lending)   [T2 · FT★ A]
+### SD-82 · Real-time credit decisioning & origination (BNPL / instant lending)   [T1 · FT★ A]
 
-**Read aloud:** *"At checkout, customers can split a purchase into instalments. Design the system that
-decides, in under a second, whether to lend them the money — and then services the loan."*
+**Read aloud:** *"A customer at a merchant's counter scans a QR code to pay a $1,200 bill in
+instalments. Design the system that decides within a few seconds whether to lend, shows the offers,
+and creates the loan when the customer accepts."*
 
-**Crux.** **A regulated, explainable decision under a latency budget**, followed by a long-lived
-financial object. The decision combines bureau data, internal history and models; regulators require
-that every decline can be explained and that the same inputs give the same answer. After approval, the
-**loan servicing** (schedules, collections, late fees, early repayment) is a ledger and state-machine
-problem that lasts months.
+**Crux.** **A regulated, explainable decision under a deadline set by slow, paid vendors**, followed by
+**one atomic step** (accept → book). Throughput is tiny (single-digit applications per second); the
+grade is on the slow edges, on correctness when the phone drops, on reproducible decisions with reasons,
+and on keeping identity data in a small box. Every degraded path (bureau late, model late) is a
+**credit-policy decision with an owner and a cap**, not an engineering default.
 
-**Numbers if asked:** 500 decisions/sec at peak, under 800 ms p99 including a credit-bureau call that
-is sometimes slow, 10M active loans, models retrained monthly, regulators require adverse-action
-reasons and audit of model versions, merchants are paid upfront.
+**If they ask:**
 
-**Listen for:** **decision pipeline**: hard rules → feature assembly (internal + bureau, cached where
-permitted) → model score → policy (limits, pricing) — with a **timeout strategy for the bureau** that
-is a credit-policy decision · **reproducibility**: decisions stored with all inputs, model version and
-policy version · **reason codes** generated from the policy and model for adverse-action notices ·
-**champion/challenger** for models and policies with controlled exposure · **loan as a state machine**
-and **amortisation schedule** in a ledger, with payment retries and collections workflows · **exposure
-limits** per customer and portfolio · **fairness monitoring** across protected groups.
+| Question | Answer |
+|---|---|
+| Volume? | 2M applications/month; Saturday peak ~10× average (≈ 8/s) |
+| Time at the counter? | Offers on screen < 3 s at p95; 10 s is a lost sale |
+| Lender of record? | We decide and service; a partner bank may hold the loan (ask!) |
+| Vendors? | Two credit bureaus (p50 0.6 s, p99 several s, ~1 % errors), identity/fraud vendor, optional bank data |
+| Cost? | ~$1 per bureau pull; identity checks cents |
+| Rules? | Disclosures (APR, schedule) before signing; principal reasons for every decline; records ~7 years |
 
-**Probes:** *"The bureau takes 3 seconds today. Approve, decline, or something else?"* · *"A regulator
-asks why a customer was declined 14 months ago. Reproduce it."* · *"A new model approves 6% more people.
-How do you roll it out safely?"* · *"A customer repays early mid-cycle. What changes in the ledger?"* ·
-*(EM bar)* *"Who signs off a model change — data science, risk, or engineering?"*
+**Listen for:**
+- **One deadline, parallel calls** (scatter-gather), circuit breaker per vendor; optional data (bank
+  data) never awaited at the counter.
+- **No hedged requests to paid vendors** — each pull costs money and may be recorded on the customer's
+  file. A second bureau only on error or open breaker.
+- **The missing-data table**: second bureau / decide without bureau for small known customers under a
+  daily exposure cap / **refer** (finish by text in minutes, merchant sees "pending") / decline with a
+  reason. **← the senior insight: "our vendor was slow" is not an adverse-action reason, so "refer"
+  exists.**
+- **Application as a state machine** in the database, one committed row per transition, optimistic
+  version; idempotency keys on create and accept; `UNIQUE(application_id)` on the loan; **loan + outbox
+  in one transaction**. A credit pull is a recorded fact, **not "compensated"**; only merchant funding
+  (after booking) has a real compensating action.
+- **Decision record**: frozen inputs (bureau report by reference, feature vector, missing calls),
+  versions (model, policy, pricing, disclosure), outputs (offers, ranked reasons, degraded path) — same
+  inputs + versions = same answer years later.
+- **Champion/challenger**: shadow scoring, then a capped slice with an exposure limit; early signals
+  (first payment default) and approval rates by group, because losses arrive in months.
+- **PII vault** with tokenisation; only the vault and vendor adapters see raw SSN; analytics and training
+  see tokens. Knows **card data ≠ SSN rulebook** (card-industry standard vs privacy and lending law).
+- Bureau cost dominates (~$2M/month at 2M pulls); reuse of a recent report where contract and law permit.
 
-**Weak / Strong / Exceptional.** *Weak* — synchronous model call, no versioning, servicing as a cron
-job. *Strong* — budgeted pipeline with bureau fallback policy, versioned reproducible decisions, reason
-codes, champion/challenger, ledger-backed servicing. *Exceptional* — treats every timeout as a risk
-decision with an owner, monitors fairness and drift as SLIs, and separates model, policy and pricing
-versions so each can change independently with audit.
+**Probe ladder:**
+- *Requirements:* "Who is the lender of record?" · "What's out of scope?" (servicing → SD-95, cards → SD-77)
+- *Estimation:* "What does the load tell you about the data store?" (one relational DB) · "What's the biggest cost line?"
+- *Design:* walk one application from QR scan to merchant funding.
+- *Deep dives:* **"The bureau takes 4 s for one call in ten. What does the customer see?"** · "The phone
+  drops after accept and they tap again on the tablet. How many loans?" · "A regulator asks why a customer
+  was declined 14 months ago. Reproduce it." · "A new model approves 6 % more people. Roll it out." ·
+  "Analytics wants application data for a model. What do they get?"
+- *EM/Staff bar:* "Who owns the fallback when the bureau is down — engineering, credit risk or
+  compliance?" · "Which teams, and which contracts between them?"
+
+**Curveball:** *"The bureau is down for everyone for twenty minutes on a Saturday."* Tests breaker +
+policy table + merchant experience + exposure cap, without redesign.
+
+**Weak / Strong / Exceptional.** *Weak* — sequential calls, hedged bureau requests, a saga that
+"compensates" a credit pull, a model score with no versions or reasons. *Strong* — one deadline with a
+policy table for missing data, state machine with an atomic book + outbox, reproducible decision records,
+vault, champion/challenger. *Exceptional* — treats every timeout as a capped credit decision with a named
+owner and a dashboard, separates model, policy and pricing versions, and names fairness and drift as SLIs.
+
+**Traps.** Treating it as a throughput problem. "Approve with partial data" as a code default. "PCI"
+for an SSN. **Reference solution:** `solutions/SD-82-credit-decisioning/` (reference design and video).
+
+---
+
+### SD-95 · Instalment loan servicing: ledger & collections scheduler   [T1 · FT★ A MS]
+
+**Read aloud:** *"Loans are created elsewhere. Design the system that services them for their whole
+life: it schedules repayments, collects them by bank debit or card, handles refunds, late fees and early
+payoff, and reconciles with the bank."*
+
+**Crux.** **Correctness over months with money that moves in days and can come back weeks later.**
+A double-entry ledger that is never edited, a payment state machine with an explicit *unknown* outcome,
+a scheduler whose real limit is the **payment rail** (processor contract, bank file cut-off) rather than
+the database, and daily three-way reconciliation.
+
+**If they ask:**
+
+| Question | Answer |
+|---|---|
+| Portfolio? | 5M active loans, 3–12 monthly instalments |
+| Rails? | Bank debit (ACH) 80 %, card 20 %; card numbers tokenised at the processor |
+| Peak? | Due dates cluster: 600k collections on the 1st |
+| Limits? | Card processor contract 100/s; bank debit files have daily cut-offs |
+| Refunds? | Merchants refund fully or partly at any time |
+| Audit? | Every cent explained for 7 years; month-end close in 2 days |
+
+**Listen for:**
+- **Double entry**: transactions of ≥ 2 lines summing to zero, in integer cents; lines immutable;
+  corrections are reversing transactions. **Balance as a projection updated in the same commit** (with a
+  version), provable from the lines — "never store a balance" is too strict.
+- **Idempotency at three layers**: ledger transaction key (loan, instalment, attempt), the same key sent
+  to the processor, one open intent per instalment. Retry of an attempt reuses its key.
+- **Payment state machine**: scheduled → submitted → pending → settled, plus **UNKNOWN** (timeout →
+  query, never resend with a new key) and **RETURNED** (bank debit returns: NSF within days,
+  unauthorised up to 60 days). **← the senior insight: "settled" is not final for a bank debit.**
+- **Scheduler**: due items by date + shard, claimed with `FOR UPDATE SKIP LOCKED`, intent + outbox in one
+  transaction, dispatcher with a **token bucket per rail**, pause switch per rail; spread due dates at
+  origination. 600k/day ≈ 40/s — the database is the queue; a broker is optional.
+- **Refunds** re-amortise or shorten (a product/legal decision in the terms); **allocation waterfall**
+  (fees → interest → principal → future principal) as a versioned rule; late fees and retry counts are
+  policy with legal limits (re-presentment of an NSF return is limited, typically twice).
+- **Three-way reconciliation** (ledger vs processor vs bank): match by reference then amount + date
+  window; timing differences aged; breaks with an owner.
+
+**Probe ladder:**
+- *Requirements:* "What makes 'paid' final?" · "What's out of scope?" (origination → SD-82)
+- *Estimation:* "600k on the 1st — what's the actual constraint?" · "How big is the ledger after 7 years?"
+- *Design:* walk one instalment from due date to reconciled.
+- *Deep dives:* **"The processor times out on a charge; your worker retries. Was the customer charged
+  twice?"** · "Walk me through the morning of the 1st." · "The merchant refunds $300 after two
+  instalments." · "Month-end: the ledger says $400 more than the bank."
+- *EM/Staff bar:* "The card processor is down on the 1st — runbook?" · "Who may write ledger lines?" ·
+  "Who owns late-fee and retry policy?"
+
+**Curveball:** *"A bank debit that settled 40 days ago comes back as unauthorised."*
+
+**Weak / Strong / Exceptional.** *Weak* — a mutable balance column, a cron job that charges everyone at
+midnight, retries on any error. *Strong* — double entry with reversals, idempotency at every layer,
+UNKNOWN as a state, rate limit per rail, reconciliation. *Exceptional* — balance projections provable
+from lines with a nightly invariant check, ownership split with one writer to the ledger, policy as data
+owned by risk/legal, and a pre-agreed "our outage is not your late fee" rule.
+
+**Traps.** "Thundering herd" framing. Treating SETTLED as final. Editing ledger lines. **Reference
+solution:** `solutions/SD-95-loan-servicing/` (reference design and video). Related: SD-44, SD-50, SD-79, SD-81.
 
 ---
 

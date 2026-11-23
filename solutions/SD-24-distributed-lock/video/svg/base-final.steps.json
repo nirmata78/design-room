@@ -1,0 +1,1 @@
+[["n:client", "m:client"], ["n:gw", "m:gw", "e:c-gw", "e:hb", "e:gw-c"], ["n:shards", "m:shards", "e:gw-s"], ["n:grp", "m:grp", "e:gw-g", "e:g-gw", "e:hb2"], ["n:epoch", "m:epoch", "e:g-e"], ["n:waiters", "m:waiters", "e:g-w"], ["n:metrics", "m:metrics", "e:g-m"], ["n:res", "m:res", "e:w"], ["n:proxy", "m:proxy", "e:c-p", "e:p-r"], ["n:fence", "m:fence", "e:f"]]

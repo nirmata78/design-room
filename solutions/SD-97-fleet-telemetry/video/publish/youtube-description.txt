@@ -1,0 +1,40 @@
+A live map of two million vehicles sounds like one database of positions. It's two products off one stream, and it's built from three questions you may already know: event counting, nearby drivers and a device fleet. A compact reference solution at the Staff bar (L6/L7): theory, a three-version design, an alternate path, and six challenges. 60 minutes, 502 numbered slides.
+
+The thesis: one log keyed by vehicle, read twice: an overwrite view by cell for the map, and an append history by vehicle for replay. Sequence numbers decide what is newer; lanes decide what goes first.
+
+IN THIS VIDEO
+• Estimates: 1 M positions a second, 400 MB of live state, 52 TB of history a month, 9 M messages after a city-wide outage
+• Theory: one log two views, per-vehicle sequence numbers, cells at three resolutions, lanes and backpressure, cell subscriptions, and the seams to SD-03, SD-39 and SD-29
+• Six challenges: out of the tunnel, downtown at six, five thousand viewers, a city coming back online, one vehicle's exact hour, and a map that is stale while everything is green
+
+HOW TO USE IT
+Run the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first.
+
+CHAPTERS
+0:00 0 Cold open
+3:30 1 Requirements and scope
+7:25 2 Estimates
+9:59 3 Theory
+16:15 4 API and entities
+19:02 5 High-level design
+24:08 5.1 Components and technologies
+29:42 5.2 When you don't need all this
+30:52 6 Bridge
+31:37 7 Challenges
+31:56 7.1 Challenge 1: Out of the tunnel
+36:09 7.2 Challenge 2: Downtown at six
+40:02 7.3 Challenge 3: Five thousand viewers
+43:36 7.4 Challenge 4: A city comes back
+47:46 7.5 Challenge 5: One vehicle, one hour
+52:57 7.6 Challenge 6: Forty seconds stale
+57:57 8 Recap
+
+LINKS
+Written reference design: https://github.com/nirmata78/design-room/blob/main/solutions/SD-97-fleet-telemetry/SD-97_Fleet_Telemetry_Reference_Design.md
+Run this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room
+All videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md
+
+ABOUT THIS VIDEO
+This is a scripted walkthrough, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script, diagrams and the written design were produced with Claude Code. Numbers are back-of-the-envelope estimates for the exercise, labelled as given, illustrative or initial targets, not any company's real figures, and this is not any company's actual design. The technical content has not been reviewed by a person.
+
+#SystemDesign #SoftwareEngineering #DistributedSystems

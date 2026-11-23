@@ -1,0 +1,42 @@
+A distributed lock can be correct at every step and still let two writers through. This is a full reference solution for the question at the Staff bar (L6/L7): theory, a three-version design, seven challenges that break it, and the build cost. 99 minutes, 575 numbered slides, with an interviewer, a candidate and a coach.
+
+The thesis: a lock service says who should be working. Only the resource says who is allowed to write. A lease keeps the system live, consensus gives an order, and a fencing token checked at the resource keeps it safe.
+
+IN THIS VIDEO
+• Estimates as arithmetic: the 5,000-name ceiling, four groups, the election budget
+• Theory: safety and liveness, seven mechanisms, an options matrix with a pick
+• Seven challenges: the paused holder, a resource that cannot check, clocks, a partition and a disaster rebuild, the top of the hour, a hot name, and how you would know
+• The build cost, in people and months (marked AUX, the manager layer)
+
+HOW TO USE IT
+Run the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first. Slides badged AUX are the manager layer: skip them in a Staff round.
+
+CHAPTERS
+0:00 0 Cold open
+2:39 1 Requirements and scope
+9:08 2 Estimates
+15:32 3 Theory
+27:49 4 API and entities
+35:05 5 High-level design
+47:12 5.1 Components and technologies
+57:00 6 Bridge
+57:38 7 Challenges
+57:56 7.1 Challenge 1: The paused holder
+1:03:53 7.2 Challenge 2: The resource cannot check
+1:08:32 7.3 Challenge 3: Clocks and leases
+1:12:50 7.4 Challenge 4: Leader loss, partition, group loss
+1:18:40 7.5 Challenge 5: The top of the hour
+1:22:52 7.6 Challenge 6: A hot name, several locks
+1:27:15 7.7 Challenge 7: How would you know?
+1:31:49 8 Build cost
+1:36:32 9 Recap
+
+LINKS
+Written reference design (about 40 pages): https://github.com/nirmata78/design-room/blob/main/solutions/SD-24-distributed-lock/SD-24_Distributed_Lock_Reference_Design.md
+Run this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room
+All videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md
+
+ABOUT THIS VIDEO
+This is a scripted walkthrough, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script, diagrams and the written design were produced with Claude Code. Numbers are back-of-the-envelope estimates for the exercise, labelled as given, illustrative or initial targets, not any company's real figures, and this is not any company's actual design. The technical content has not been reviewed by a person.
+
+#SystemDesign #SoftwareEngineering #DistributedSystems

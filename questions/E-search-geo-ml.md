@@ -277,6 +277,8 @@ as an efficiency lever, and separates ETA from distance honestly.
 **Traps.** Durably storing every location update. Ignoring the claim step entirely (the most common
 failure — the design "works" until two riders collide). Building cross-city generality nobody needs.
 
+**Reference solution:** [`solutions/SD-39-ride-matching/`](../solutions/SD-39-ride-matching/) (booklet and compact video).
+
 ---
 
 ### SD-40 · Maps routing & ETA   [T2 · G★ U]

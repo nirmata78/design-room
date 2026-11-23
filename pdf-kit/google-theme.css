@@ -1,0 +1,52 @@
+/* =====================================================================
+   Google theme · one source of colour and type for every slide, video frame and diagram (2026-11-22)
+   Load it LAST (after style.css, deck.css, video.css): <link rel="stylesheet" href="google-theme.css">
+   build.py / render_slides.py resolve it from the HTML's folder, else from pdf-kit/, and rewrite the font urls to file URIs,
+   so rendering is offline. Fonts: Google Fonts, SIL OFL 1.1, bundled in fonts/google/ (variable files, weights 100-900).
+   Python generators read the same values from ~/.claude/skills/slide-video-kit/scripts/gtheme.py.  Keep the two in step.
+   ===================================================================== */
+@font-face { font-family: "Plus Jakarta Sans"; src: url("fonts/google/PlusJakartaSans-Variable.ttf"); font-weight: 200 800; font-style: normal; }
+@font-face { font-family: "Plus Jakarta Sans"; src: url("fonts/google/PlusJakartaSans-Italic-Variable.ttf"); font-weight: 200 800; font-style: italic; }
+@font-face { font-family: "Inter"; src: url("fonts/google/Inter-Variable.ttf"); font-weight: 100 900; font-style: normal; }
+@font-face { font-family: "Inter"; src: url("fonts/google/Inter-Italic-Variable.ttf"); font-weight: 100 900; font-style: italic; }
+@font-face { font-family: "Roboto Mono"; src: url("fonts/google/RobotoMono-Variable.ttf"); font-weight: 100 700; font-style: normal; }
+@font-face { font-family: "Roboto Mono"; src: url("fonts/google/RobotoMono-Italic-Variable.ttf"); font-weight: 100 700; font-style: italic; }
+/* editorial pairing: DM Sans titles + Source Sans 3 body (opt in with class="editorial" on <body>) */
+@font-face { font-family: "DM Sans"; src: url("fonts/google/DMSans-Variable.ttf"); font-weight: 100 1000; font-style: normal; }
+@font-face { font-family: "Source Sans 3"; src: url("fonts/google/SourceSans3-Variable.ttf"); font-weight: 200 900; font-style: normal; }
+@font-face { font-family: "Source Sans 3"; src: url("fonts/google/SourceSans3-Italic-Variable.ttf"); font-weight: 200 900; font-style: italic; }
+
+:root {
+  /* brand accents: fills, rules, strokes, chart series, motion accents */
+  --g-blue: #4285F4; --g-red: #EA4335; --g-yellow: #FBBC05; --g-green: #34A853;
+  /* neutrals */
+  --g-white: #FFFFFF; --g-soft: #F8F9FA; --g-ink: #202124; --g-ink-hi: #141413; --g-muted: #5F6368;
+  /* hairlines (borders only, never text) */
+  --g-rule: #DADCE0; --g-hair: #E8EAED;
+  /* text-on-light: the Google 700/800 shades of the four accents. The brand hex fails 4.5:1 as small text on white
+     (blue 3.6, red 3.6, green 3.0, yellow 1.7), so small coloured TEXT uses these; fills, rules and strokes use the brand hex. */
+  --g-blue-ink: #1967D2; --g-red-ink: #C5221F; --g-green-ink: #188038; --g-yellow-ink: #B06000;
+  /* tints for panels (one step off white) */
+  --g-blue-bg: #E8F0FE; --g-red-bg: #FCE8E6; --g-green-bg: #E6F4EA; --g-yellow-bg: #FEF7E0;
+
+  /* type roles */
+  --display: "Plus Jakarta Sans", "Google Sans", Roboto, sans-serif;     /* titles, H1, H2, big numbers: 700 / 600 */
+  --body: Inter, Roboto, sans-serif;                                      /* body, tables, captions, UI: 400 / 500 */
+  --mono: "Roboto Mono", monospace;                                       /* code, keys, wire formats only */
+
+  /* the names the older sheets use, now pointing at the theme */
+  --ink: var(--g-ink); --muted: var(--g-muted); --faint: var(--g-muted); --rule: var(--g-rule); --hair: var(--g-hair);
+  --line: var(--g-rule); --soft: var(--g-soft); --paper: var(--g-soft);
+  --accent: var(--g-blue); --blue: var(--g-blue); --blue-bg: var(--g-blue-bg);
+  --red: var(--g-red); --red-bg: var(--g-red-bg); --green: var(--g-green); --green-bg: var(--g-green-bg);
+  --amber: var(--g-yellow); --amber-bg: var(--g-yellow-bg); --now: var(--g-yellow-bg);
+  --violet: var(--g-blue-ink); --violet-bg: var(--g-blue-bg);       /* no purple in the palette: theory and grading use deep blue */
+  --serif: var(--body);                                              /* legacy alias: prose is Inter now */
+  --sans: var(--body);
+}
+body.editorial { --display: "DM Sans", "Space Grotesk", sans-serif; --body: "Source Sans 3", "IBM Plex Sans", sans-serif; }
+
+html, body { background: var(--g-white); color: var(--g-ink); }
+body { font-family: var(--body); }
+code, pre, .mono { font-family: var(--mono); }
+h1, h2, h3 { font-family: var(--display); }

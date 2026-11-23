@@ -1,0 +1,56 @@
+{
+  "mp4": "distributed-lock-reference.mp4",
+  "teaser_chapter": null,
+  "thumbnail": {
+    "kicker": "Staff reference solution",
+    "title": "A lock is<br><em>not</em> enough",
+    "sub": "Leases, consensus, fencing tokens, and the resource that has the last word.",
+    "id": "design-room · SD-24"
+  },
+  "youtube": {
+    "title": "Distributed Lock System Design: Staff-Level Reference Solution (fencing tokens, leases, consensus)",
+    "playlist": "System design reference solutions · design-room (create it once, reuse it)",
+    "tags": [
+      "system design",
+      "system design interview",
+      "distributed lock",
+      "distributed locking",
+      "fencing token",
+      "lease",
+      "raft",
+      "consensus",
+      "staff engineer",
+      "distributed systems",
+      "software architecture"
+    ],
+    "description_top": [
+      "A distributed lock can be correct at every step and still let two writers through. This is a full reference solution for the question at the Staff bar (L6/L7): theory, a three-version design, seven challenges that break it, and the build cost. {DURATION} minutes, {SLIDES} numbered slides, with an interviewer, a candidate and a coach.",
+      "The thesis: a lock service says who should be working. Only the resource says who is allowed to write. A lease keeps the system live, consensus gives an order, and a fencing token checked at the resource keeps it safe.",
+      "IN THIS VIDEO\n• Estimates as arithmetic: the 5,000-name ceiling, four groups, the election budget\n• Theory: safety and liveness, seven mechanisms, an options matrix with a pick\n• Seven challenges: the paused holder, a resource that cannot check, clocks, a partition and a disaster rebuild, the top of the hour, a hot name, and how you would know\n• The build cost, in people and months (marked AUX, the manager layer)",
+      "HOW TO USE IT\nRun the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first. Slides badged AUX are the manager layer: skip them in a Staff round."
+    ],
+    "description_bottom": [
+      "LINKS\nWritten reference design (about 40 pages): https://github.com/nirmata78/design-room/blob/main/solutions/SD-24-distributed-lock/SD-24_Distributed_Lock_Reference_Design.md\nRun this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room\nAll videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md",
+      "ABOUT THIS VIDEO\nThis is a scripted walkthrough, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script, diagrams and the written design were produced with Claude Code. Numbers are back-of-the-envelope estimates for the exercise, labelled as given, illustrative or initial targets, not any company's real figures, and this is not any company's actual design. The technical content has not been reviewed by a person.",
+      "#SystemDesign #SoftwareEngineering #DistributedSystems"
+    ]
+  },
+  "linkedin": {
+    "post": [
+      "A distributed lock can be correct at every step and still let two writers through. Here is why, and the fix.",
+      "I've published a {DURATION}-minute reference solution for the distributed lock question, at the Staff bar: theory, a three-version design, seven challenges, and the build cost, on {SLIDES} numbered slides.",
+      "The idea that unlocks it: a lock service says who should be working. Only the resource says who is allowed to write. A holder pauses for fifteen seconds, its lease expires, a second holder is granted, and the first one wakes up and writes. The fix is a token that only increases, checked at the resource.",
+      "What it goes into:\n→ The pause, and the stale write that arrives before the new holder's first write\n→ A resource that cannot check: idempotency, a proxy, or an honest efficiency lock\n→ Clocks, a partition, and why restoring a snapshot reissues tokens\n→ The cost in people and months",
+      "Best on a second pass: pause after each question and answer it first.",
+      "▶ {YOUTUBE_URL}",
+      "It's a scripted walkthrough with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator.",
+      "Which would you push back on first: a team asking for atomic multi-lock, or one asking for a lock on a partner API?",
+      "#SystemDesign #SoftwareEngineering #DistributedSystems"
+    ],
+    "first_comment": "Written reference design, stage by stage: https://github.com/nirmata78/design-room/blob/main/solutions/SD-24-distributed-lock/SD-24_Distributed_Lock_Reference_Design.md\n\nRun this round yourself, with an AI interviewer that won't help you: https://github.com/nirmata78/design-room",
+    "document": {
+      "pdf": "../../SD-24_Distributed_Lock_Reference_Design.pdf",
+      "title": "A distributed lock service: a Staff-level reference design"
+    }
+  }
+}

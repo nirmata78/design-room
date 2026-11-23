@@ -1,0 +1,56 @@
+{
+  "mp4": "denylist-reference.mp4",
+  "teaser_chapter": null,
+  "thumbnail": {
+    "kicker": "Staff reference solution",
+    "title": "A ban lands.<br><em>A mistake</em> should not.",
+    "sub": "Versioned lists, a local check, a bound on staleness, and a release discipline.",
+    "id": "design-room · SD-94"
+  },
+  "youtube": {
+    "title": "Distributed Denylist (IP Blocking) Design: Staff-Level Reference Solution",
+    "playlist": "System design reference solutions · design-room (create it once, reuse it)",
+    "tags": [
+      "system design",
+      "system design interview",
+      "denylist",
+      "ip blocking",
+      "blocklist",
+      "config distribution",
+      "staged rollout",
+      "bloom filter",
+      "staff engineer",
+      "distributed systems",
+      "software architecture"
+    ],
+    "description_top": [
+      "A denylist looks like a hash set and a lookup. The hard part is everything around it: how a ban reaches 100,000 servers in seconds, what a server does when it cannot hear about new bans, and what stops one wrong line from blocking everyone. This is a full reference solution at the Staff bar (L6/L7): theory, a three-version design, seven challenges that break it, and the build cost. {DURATION} minutes, {SLIDES} numbered slides, with an interviewer, a candidate and a coach.",
+      "The thesis: the check must be local and the list cannot be. So the design is the distance between them: a version every node can verify, a stated bound on how stale a node may be, and the discipline of a release, because the pipe that delivers a ban in ten seconds delivers a mistake in ten seconds.",
+      "IN THIS VIDEO\n• Estimates as arithmetic: 40 MB per node, 4 TB against 800 MB of fan-out, 10,000 manifest polls a second, 18 seconds against a 30-second target\n• Theory: safety and liveness (a missing ban and a wrong block), seven mechanisms, an options matrix with a pick\n• Seven challenges: a node that was offline, order and overlap, a bad push, stale or no control plane, a list that does not fit, a slow external source, and how you would know\n• The build cost, in people and months (marked AUX, the manager layer)",
+      "HOW TO USE IT\nRun the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first. Slides badged AUX are the manager layer: skip them in a Staff round."
+    ],
+    "description_bottom": [
+      "LINKS\nWritten reference design (about 39 pages): https://github.com/nirmata78/design-room/blob/main/solutions/SD-94-denylist-system/SD-94_Denylist_System_Reference_Design.md\nRun this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room\nAll videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md",
+      "ABOUT THIS VIDEO\nThis is a scripted walkthrough, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script, diagrams and the written design were produced with Claude Code. Numbers are back-of-the-envelope estimates for the exercise, labelled as given, illustrative or initial targets, not any company's real figures, and this is not any company's actual design. The technical content has not been reviewed by a person.",
+      "#SystemDesign #SoftwareEngineering #DistributedSystems"
+    ]
+  },
+  "linkedin": {
+    "post": [
+      "A denylist looks like a hash set. The hard part is what lets a ban reach every server fast without letting a mistake do the same.",
+      "I've published a {DURATION}-minute reference solution for the distributed denylist (IP blocking) question, at the Staff bar: theory, a three-version design, seven challenges, and the build cost, on {SLIDES} numbered slides.",
+      "The idea that unlocks it: the check must be local and the list cannot be. The pipe that delivers a ban in ten seconds delivers a mistake in ten seconds, so a push gets the discipline of a binary: versions, a canary gated on block rate, an allowlist that always wins, and a rollback that is a new version.",
+      "What it goes into:\n→ A node two hours behind, and what a poll actually fetches\n→ A stale node: stale is not open, and who signs the bound\n→ A list too big for memory: why a Bloom filter alone blocks real users\n→ The cost in people and months",
+      "Best on a second pass: pause after each question and answer it first.",
+      "▶ {YOUTUBE_URL}",
+      "It's a scripted walkthrough with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator.",
+      "When a node cannot reach the update service, should it fail open, fail closed, or neither? Who should sign that decision?",
+      "#SystemDesign #SoftwareEngineering #DistributedSystems"
+    ],
+    "first_comment": "Written reference design, stage by stage: https://github.com/nirmata78/design-room/blob/main/solutions/SD-94-denylist-system/SD-94_Denylist_System_Reference_Design.md\n\nRun this round yourself, with an AI interviewer that won't help you: https://github.com/nirmata78/design-room",
+    "document": {
+      "pdf": "../../SD-94_Denylist_System_Reference_Design.pdf",
+      "title": "A distributed denylist system: a Staff-level reference design"
+    }
+  }
+}

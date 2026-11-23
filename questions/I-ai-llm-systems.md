@@ -279,6 +279,12 @@ synchronously to object storage. Measuring utilisation instead of goodput.
 **Read aloud:** *"Design a vector search service: billions of embeddings, queried with a vector and
 filters, returning the nearest results in tens of milliseconds."*
 
+**Company variant (autonomous driving, multimodal):** *"engineers search petabytes of camera and LiDAR for 'a pedestrian stepping
+out behind a double-parked truck in rain' within seconds."* The same index, plus a **two-stage ingest** (trigger-based sampling —
+hard braking, disengagements, anomalies — then asynchronous GPU embedding), **filtered ANN without recall collapse** (pre-filter
+by partition, or filter-aware graph search, not post-filtering a top-100), and **storage tiering**: vectors and metadata on SSD
+shards, raw video in object storage read by byte range.
+
 **Crux.** **Approximate nearest-neighbour search trades recall for latency and memory**, and the index
 structures that are fast (graph-based) are memory-hungry and awkward to update, while the compact ones
 (quantised, partitioned) lose recall. Filters break most ANN indexes. The design is about **choosing

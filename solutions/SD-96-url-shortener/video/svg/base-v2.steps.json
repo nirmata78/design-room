@@ -1,0 +1,1 @@
+[["n:user", "n:redir", "n:store", "e:u-r2", "e:r-u1"], ["n:cache", "m:cache", "e:r-c", "e:c-r", "e:c-s", "e:s-c"], ["n:create", "m:create", "e:u-cr", "e:cr-s"], ["n:alloc", "m:alloc", "e:cr-a"]]

@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 820" width="1600" height="820">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<g data-k="t:post"><rect x="30" y="40" width="470" height="351" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M30,48 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v38 h-470 z" fill="#ea4335"/>
+<text x="44" y="71.28" font-family="'Roboto Mono', monospace" font-size="23.1" font-weight="700" fill="#fff">post</text>
+<rect x="44" y="93.6" width="41.8" height="22.8" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="64.9" y="111.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#C5221F">PK</text>
+<text x="94.8" y="111.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124" font-weight="700">post_id</text>
+<text x="486" y="111.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">bigint</text>
+<rect x="31" y="124" width="468" height="38" fill="#f8f9fa"/>
+<rect x="44" y="131.6" width="41.8" height="22.8" rx="3" fill="#fef7e0" stroke="#b06000" stroke-width="0.8"/>
+<text x="64.9" y="149.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#b06000">IX</text>
+<text x="94.8" y="149.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">author_id</text>
+<text x="486" y="149.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">bigint</text>
+<text x="94.8" y="187.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">text</text>
+<text x="486" y="187.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">text</text>
+<rect x="31" y="200" width="468" height="38" fill="#f8f9fa"/>
+<text x="94.8" y="225.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">media_refs</text>
+<text x="486" y="225.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">text[]</text>
+<text x="94.8" y="263.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">audience</text>
+<text x="486" y="263.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">smallint</text>
+<rect x="31" y="276" width="468" height="38" fill="#f8f9fa"/>
+<text x="94.8" y="301.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">status</text>
+<text x="486" y="301.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">smallint</text>
+<text x="94.8" y="339.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">created_at</text>
+<text x="486" y="339.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">ts</text>
+<text x="44" y="375.1" font-family="Inter, Roboto, sans-serif" font-size="18.9" font-style="italic" fill="#5f6368">source of truth; ID is time-sortable</text></g>
+<g data-k="t:ai"><rect x="570" y="40" width="450" height="199" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M570,48 a8,8 0 0 1 8,-8 h434 a8,8 0 0 1 8,8 v38 h-450 z" fill="#4285f4"/>
+<text x="584" y="71.28" font-family="'Roboto Mono', monospace" font-size="23.1" font-weight="700" fill="#fff">author_index</text>
+<rect x="584" y="93.6" width="41.8" height="22.8" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="604.9" y="111.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#C5221F">PK</text>
+<text x="634.8" y="111.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124" font-weight="700">author_id</text>
+<text x="1006" y="111.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">bigint</text>
+<rect x="571" y="124" width="448" height="38" fill="#f8f9fa"/>
+<rect x="584" y="131.6" width="92.2" height="22.8" rx="3" fill="#f8f9fa" stroke="#5f6368" stroke-width="0.8"/>
+<text x="630.1" y="149.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#5f6368">PK desc</text>
+<text x="685.2" y="149.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124" font-weight="700">created_at</text>
+<text x="1006" y="149.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">ts</text>
+<text x="634.8" y="187.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">post_id</text>
+<text x="1006" y="187.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">bigint</text>
+<text x="584" y="223.1" font-family="Inter, Roboto, sans-serif" font-size="18.9" font-style="italic" fill="#5f6368">one partition per author: pull, rebuild, catch-up</text></g>
+<g data-k="t:fol"><rect x="1090" y="40" width="480" height="199" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M1090,48 a8,8 0 0 1 8,-8 h464 a8,8 0 0 1 8,8 v38 h-480 z" fill="#5f6368"/>
+<text x="1104" y="71.28" font-family="'Roboto Mono', monospace" font-size="23.1" font-weight="700" fill="#fff">follow (both directions)</text>
+<rect x="1104" y="93.6" width="41.8" height="22.8" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="1124.9" y="111.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#C5221F">PK</text>
+<text x="1154.8" y="111.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124" font-weight="700">user_id</text>
+<text x="1556" y="111.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">bigint</text>
+<rect x="1091" y="124" width="478" height="38" fill="#f8f9fa"/>
+<rect x="1104" y="131.6" width="41.8" height="22.8" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="1124.9" y="149.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="18.5" font-weight="700" fill="#C5221F">PK</text>
+<text x="1154.8" y="149.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124" font-weight="700">followee_id</text>
+<text x="1556" y="149.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">bigint</text>
+<text x="1154.8" y="187.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">since</text>
+<text x="1556" y="187.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">ts</text>
+<text x="1104" y="223.1" font-family="Inter, Roboto, sans-serif" font-size="18.9" font-style="italic" fill="#5f6368">owned by the graph service</text></g>
+<g data-k="t:tl"><rect x="30" y="450" width="470" height="199" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M30,458 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v38 h-470 z" fill="#202124"/>
+<text x="44" y="481.28" font-family="'Roboto Mono', monospace" font-size="23.1" font-weight="700" fill="#fff">timeline:{viewer}</text>
+<text x="94.8" y="521.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">post_id</text>
+<text x="486" y="521.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">member</text>
+<rect x="31" y="534" width="468" height="38" fill="#f8f9fa"/>
+<text x="94.8" y="559.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">author_id</text>
+<text x="486" y="559.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">packed</text>
+<text x="94.8" y="597.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">time</text>
+<text x="486" y="597.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">score</text>
+<text x="44" y="633.1" font-family="Inter, Roboto, sans-serif" font-size="18.9" font-style="italic" fill="#5f6368">sorted set, at most 500, by viewer</text></g>
+<g data-k="t:cc"><rect x="570" y="450" width="450" height="161" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M570,458 a8,8 0 0 1 8,-8 h434 a8,8 0 0 1 8,8 v38 h-450 z" fill="#202124"/>
+<text x="584" y="481.28" font-family="'Roboto Mono', monospace" font-size="23.1" font-weight="700" fill="#fff">celebrity_recent:{author}</text>
+<text x="634.8" y="521.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">post_id</text>
+<text x="1006" y="521.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">list</text>
+<rect x="571" y="534" width="448" height="38" fill="#f8f9fa"/>
+<text x="634.8" y="559.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">(last 100)</text>
+<text x="1006" y="559.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368"></text>
+<text x="584" y="595.1" font-family="Inter, Roboto, sans-serif" font-size="18.9" font-style="italic" fill="#5f6368">replicated to many cache nodes</text></g>
+<g data-k="t:bl"><rect x="1090" y="450" width="480" height="161" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M1090,458 a8,8 0 0 1 8,-8 h464 a8,8 0 0 1 8,8 v38 h-480 z" fill="#202124"/>
+<text x="1104" y="481.28" font-family="'Roboto Mono', monospace" font-size="23.1" font-weight="700" fill="#fff">blocks:{viewer}</text>
+<text x="1154.8" y="521.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">user_id</text>
+<text x="1556" y="521.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368">set</text>
+<rect x="1091" y="534" width="478" height="38" fill="#f8f9fa"/>
+<text x="1154.8" y="559.8" font-family="'Roboto Mono', monospace" font-size="18.9" fill="#202124">(blocks, mutes, unfollowed)</text>
+<text x="1556" y="559.8" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="18.5" fill="#5f6368"></text>
+<text x="1104" y="595.1" font-family="Inter, Roboto, sans-serif" font-size="18.9" font-style="italic" fill="#5f6368">small; read on every open</text></g>
+<g data-k="note:0"><rect x="30" y="760" width="1540" height="47.0" rx="6" fill="#fef7e0" stroke="#b06000" stroke-width="1.2"/>
+<text x="44" y="786.1" font-family="Inter, Roboto, sans-serif" font-size="20.9" fill="#202124">500 M users × 500 entries × 16 B = 4 TB of timelines. Bodies instead of IDs would be about 250 TB.</text></g>
+</svg>

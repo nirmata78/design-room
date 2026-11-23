@@ -1,0 +1,56 @@
+{
+  "mp4": "ticket-reference.mp4",
+  "teaser_chapter": null,
+  "thumbnail": {
+    "kicker": "Staff reference solution",
+    "title": "A million fans.<br><em>Fifty thousand</em> seats.",
+    "sub": "An atomic claim, a hold that expires, and a payment that may never answer.",
+    "id": "design-room · SD-47"
+  },
+  "youtube": {
+    "title": "Ticket Booking System Design (Seat Reservation Under Contention): Staff-Level Reference Solution",
+    "playlist": "System design reference solutions · design-room (create it once, reuse it)",
+    "tags": [
+      "system design",
+      "system design interview",
+      "ticket booking",
+      "seat reservation",
+      "virtual waiting room",
+      "high contention",
+      "idempotency",
+      "payments",
+      "staff engineer",
+      "distributed systems",
+      "software architecture"
+    ],
+    "description_top": [
+      "A seat looks like a row with a boolean. The hard part is everything around it: a million people reaching it in the same second, a human who needs three minutes to pay, and a payment provider that sometimes does not answer. This is a full reference solution at the Staff bar (L6/L7): theory, a three-version design, eight challenges that break it, and the build cost. {DURATION} minutes, {SLIDES} numbered slides, with an interviewer, a candidate and a coach.",
+      "The thesis: this is not a booking system, it is a rejection system. Fifty thousand seats cannot be shared with a million people, so the design converts a stampede into a stream, and gives every seat one place where its state lives and one atomic way to change it.",
+      "IN THIS VIDEO\n• Estimates as arithmetic: 2 % of fans get a ticket, 33,000 contended writes a second without a line, 2,000 admissions a minute from Little's law, a 6.25 KB seat map\n• Theory: safety and liveness (a seat sold twice, and a seat stuck in limbo), seven mechanisms, an options matrix with a pick\n• Eight challenges: two fans on one seat, a hold that outlives its owner, a hold that expires while the payment succeeds, a million at the door, a fair line and bots, the seat map, requirements that arrive mid-sale, and how you would know it is broken\n• The build cost, in people and months (marked AUX, the manager layer)",
+      "HOW TO USE IT\nRun the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first. Slides badged AUX are the manager layer: skip them in a Staff round."
+    ],
+    "description_bottom": [
+      "LINKS\nWritten reference design: https://github.com/nirmata78/design-room/blob/main/solutions/SD-47-ticket-booking/SD-47_Ticket_Booking_Reference_Design.md\nRun this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room\nAll videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md",
+      "ABOUT THIS VIDEO\nThis is a scripted walkthrough, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script, diagrams and the written design were produced with Claude Code. Numbers are back-of-the-envelope estimates for the exercise, labelled as given, illustrative or initial targets, not any company's real figures, and this is not any company's actual design. The technical content has not been reviewed by a person.",
+      "#SystemDesign #SoftwareEngineering #DistributedSystems"
+    ]
+  },
+  "linkedin": {
+    "post": [
+      "A seat looks like a row with a boolean. The hard part is the million people and the payment around it.",
+      "I've published a {DURATION}-minute reference solution for ticket booking under contention (fifty thousand seats, a million fans), at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on {SLIDES} numbered slides.",
+      "The idea that unlocks it: this is a rejection system. Only 2 % of fans can succeed, so the design converts a stampede into a stream: a waiting room that admits people at a rate the shop can serve, a seat with three states, and a claim that is one statement and not two.",
+      "What it goes into:\n→ Two fans on one seat, mechanically\n→ A hold that expires while the payment is still thinking, and why a timeout is not a decline\n→ A fair line, and what bots do to first-come\n→ How you would know it is broken when the dashboard is green",
+      "Best on a second pass: pause after each question and answer it first.",
+      "▶ {YOUTUBE_URL}",
+      "It's a scripted walkthrough with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator.",
+      "When a hold expires and the payment then succeeds, do you refund, or extend the hold? What does your product owner prefer?",
+      "#SystemDesign #SoftwareEngineering #DistributedSystems"
+    ],
+    "first_comment": "Written reference design, chapter by chapter: https://github.com/nirmata78/design-room/blob/main/solutions/SD-47-ticket-booking/SD-47_Ticket_Booking_Reference_Design.md\n\nRun this round yourself, with an AI interviewer that won't help you: https://github.com/nirmata78/design-room",
+    "document": {
+      "pdf": "../../SD-47_Ticket_Booking_Reference_Design.pdf",
+      "title": "Ticket booking under contention: a Staff-level reference design"
+    }
+  }
+}

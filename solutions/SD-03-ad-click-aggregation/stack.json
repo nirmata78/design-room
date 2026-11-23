@@ -1,0 +1,228 @@
+{
+  "_doc": "Single source for SD-03's technology choices. Read by video/src/stack.py, which feeds the 5.1 technology slides, the stack table, the fix-slide 'Rejected' lines and the C4 technology labels (video/diagrams.py), and rewrites the marked regions of the booklet (Stage 5) and OUTLINE.md. Edit here, then run video/src/stack.py sync (build-video.sh and build-sd-booklet.sh do it). Text is Markdown-lite: `code` and **bold** only. A slide's `how` is two or three sentences; the rest goes in `detail` (booklet only). The compact cut has no drill interlude, so no entry carries a slide drill; the booklet keeps the probes in `drill`.",
+  "c4": {
+    "col": [
+      "Collector",
+      "Go on Kubernetes",
+      "acks=all; a spool."
+    ],
+    "log": [
+      "Event log",
+      "Kafka, 1,024 partitions",
+      "Keyed by event ID."
+    ],
+    "stream": [
+      "Live aggregator",
+      "Flink, streaming",
+      "Dedup, combine, windows."
+    ],
+    "live": [
+      "Live store",
+      "ClickHouse",
+      "By version."
+    ],
+    "lake": [
+      "Event lake",
+      "Iceberg on GCS",
+      "Parquet, by hour."
+    ],
+    "batch": [
+      "Billing job",
+      "Flink, batch mode",
+      "Same code, at close."
+    ],
+    "bill": [
+      "Billing tables",
+      "Iceberg, versioned",
+      "Hour × version."
+    ],
+    "api": [
+      "Reporting API",
+      "Go on Kubernetes",
+      "Open hours live, closed final."
+    ]
+  },
+  "stack": [
+    {
+      "id": "collector",
+      "heading": "Collector: a stateless Go service with a disk spool",
+      "kicker": "Technology · collector",
+      "title": "A stateless collector that says yes only when the log has it",
+      "pick": "Go on Kubernetes, behind an L4 load balancer",
+      "why": "It does three things and nothing else: validate, stamp the server time, append. Stateless, so it scales on CPU; the ack means durable.",
+      "how": "Batches of up to 500 events, produced to Kafka with `acks=all` and the idempotent producer; `202` only after the ack. If Kafka is unreachable: a bounded disk spool for ten minutes, then `503`.",
+      "detail": "The collector never generates an event ID and never deduplicates: the ID is minted by the SDK or the ad server when the event happens, and dedup is downstream. It adds `server_ts` and the collector ID. Client time is kept as `client_ts`; the event time is the client time when it lies within 72 hours before and 5 minutes after the server time, and the server time otherwise, with a `clamped` flag. Producer settings: `linger.ms=20`, `batch.size` 256 KB, zstd compression, `enable.idempotence=true`. The spool is an append-only file per pod, replayed in order on reconnect; a pod that dies with a non-empty spool is drained by its replacement from the same persistent volume.",
+      "rejected": [
+        [
+          "Warehouse streaming inserts",
+          "Ties ingest to the store's quotas, and leaves no replayable log."
+        ],
+        [
+          "Access logs shipped by an agent",
+          "The client hears yes before the event is durable."
+        ]
+      ],
+      "summary": [
+        "Collector",
+        "Go, stateless, disk spool",
+        "warehouse streaming inserts",
+        "the ack means the log has it"
+      ],
+      "course": "building-blocks course, part 11 §11.10 (idempotent writes) and part 12 §12.5 (load shedding)",
+      "parts": "11 §11.10, 12 §12.5",
+      "drill": [
+        "Kafka is down for four minutes. What do the SDKs and the collectors do?",
+        "The collector spools to local disk and keeps answering 202 for up to ten minutes; past that it answers 503 and the SDK keeps its own buffer and retries with the same event IDs. Nothing acknowledged is lost; duplicates from the retries are removed downstream.",
+        "spool, then 503; the SDK keeps the IDs; dedup downstream"
+      ]
+    },
+    {
+      "id": "log",
+      "heading": "Event log: Kafka, keyed by event ID",
+      "kicker": "Technology · event log",
+      "title": "Kafka: 1,024 partitions, keyed by event ID, three days on the brokers",
+      "pick": "Kafka, 1,024 partitions, RF 3 over 3 zones",
+      "why": "A replayable log is the one copy everything is derived from; keyed by event ID, load is even and a retry lands beside its original.",
+      "how": "Topic `events.raw`: partition = hash(event ID) mod 1,024, RF 3 over three zones, `min.insync.replicas=2`. Brokers keep three days.",
+      "detail": "Brokers keep three days (about 390 TB compressed, with replicas); replays older than that read the lake. Keying by ad would put a 2-million-a-second ad on one partition; keying by event ID spreads it and keeps a retry on the same partition as its original, which the stream's dedup uses. Six gigabytes a second at peak, three replicas, is 18 GB/s of broker writes: about 80 brokers at 250 MB/s each (illustrative). Consumer groups: the live aggregator, the lake sink. Tiered storage is possible but not relied on. RabbitMQ was also rejected: a queue, not a log, so a consumed message is gone and there is nothing to replay.",
+      "rejected": [
+        [
+          "Google Pub/Sub",
+          "An honest equal on Google Cloud; rejected for per-key placement and portability."
+        ],
+        [
+          "Amazon Kinesis",
+          "1 MB/s a shard: about 6,000 shards to manage at 6 GB/s."
+        ]
+      ],
+      "summary": [
+        "Event log",
+        "Kafka, keyed by event ID",
+        "Pub/Sub (equal), Kinesis",
+        "replayable; even load; retries co-located"
+      ],
+      "course": "building-blocks course, part 10 §10.2–10.5 (inside a partitioned log, delivery semantics)",
+      "parts": "10 §10.2–10.5"
+    },
+    {
+      "id": "stream",
+      "heading": "Live aggregator: Flink, streaming",
+      "kicker": "Technology · live aggregator",
+      "title": "Flink: deduplicate, combine, then count by event time",
+      "pick": "Apache Flink, 512 subtasks, RocksDB state",
+      "why": "Keyed state with a TTL, event-time windows, and checkpoints that hold state and offsets together. The same job runs in batch mode for the bill.",
+      "how": "Dedup keyed by event ID (TTL 10 min), a per-subtask combiner flushed every second, then ad × minute windows: early results every 2 s, final on the watermark. Checkpoints every 30 s.",
+      "detail": "The watermark is the minimum over partitions of (largest event time seen minus 2 minutes); an idle partition is excluded after 30 seconds so it cannot hold the watermark back. Allowed lateness is one hour: a late event updates its minute again; anything later goes to a side output that only counts late events (the lake has them anyway). Unique reach is a HyperLogLog sketch per campaign and minute, merged across minutes on read. The sink writes rows with a version (window end, emit sequence) so a re-emitted minute replaces the old row. Dataflow (Apache Beam) is an honest equal on Google Cloud: the same model as a service; rejected only to keep one engine for both runs on any cloud.",
+      "rejected": [
+        [
+          "Kafka Streams",
+          "Re-keying to the ad writes a repartition topic: another 6 GB/s through the brokers."
+        ],
+        [
+          "Spark Structured Streaming",
+          "A near-equal; micro-batches eat into the 10 s budget."
+        ]
+      ],
+      "summary": [
+        "Live aggregator",
+        "Flink, event time",
+        "Kafka Streams, Spark",
+        "state TTL, watermarks, one engine for both runs"
+      ],
+      "course": "building-blocks course, part 10 §10.11–10.13 (event time, stateful processing, Lambda and Kappa)",
+      "parts": "10 §10.11–10.13",
+      "drill": [
+        "Your watermark stops moving. What happened, and what do the dashboards show?",
+        "Usually one idle or stuck partition: the watermark is a minimum. Idle partitions are excluded after 30 seconds; a stuck one shows as lag on that partition. Early firings keep the dashboard moving, marked provisional, while on-time results wait.",
+        "a minimum over partitions; idle timeout; early firings"
+      ]
+    },
+    {
+      "id": "live",
+      "heading": "Live store: ClickHouse, replacing by version",
+      "kicker": "Technology · live store",
+      "title": "ClickHouse: minute rows that are replaced, never incremented",
+      "pick": "ClickHouse, ReplacingMergeTree, 2 replicas a shard",
+      "why": "Columnar scans answer a dashboard in milliseconds; a row keyed by what it counts, with a version, makes a re-emitted minute a replacement.",
+      "how": "`live_minute ORDER BY (campaign_id, ad_id, minute, shard)` with a `version` column, inserted in batches. Reads take the latest version per key and sum the shards.",
+      "detail": "Sharded across nodes by campaign so one advertiser's dashboard hits one shard. A hot ad writes up to 16 rows a minute (one per combiner shard); the read sums them. Merges collapse replaced rows in the background; until then `argMax` by version (or `FINAL` on small ranges) gives the right answer. Closed hours are also loaded from the billing tables into `final_hour`, so one query serves both. Bigtable was also rejected: fast row reads, but no aggregation queries, so every dashboard becomes a scan in the API.",
+      "rejected": [
+        [
+          "Apache Druid / Pinot",
+          "Honest equals; more moving parts for no property we need."
+        ],
+        [
+          "Redis counters",
+          "An increment is not replay-safe, and history does not fit in memory."
+        ]
+      ],
+      "summary": [
+        "Live store",
+        "ClickHouse",
+        "Druid/Pinot (equal), Redis",
+        "replace by version; columnar slice-and-dice"
+      ],
+      "course": "building-blocks course, part 14 §14.9 (columnar storage) and part 8 §8.10 (split counters)",
+      "parts": "14 §14.9, 8 §8.10"
+    },
+    {
+      "id": "lake",
+      "heading": "Event lake and billing tables: Iceberg on object storage",
+      "kicker": "Technology · lake and billing tables",
+      "title": "Iceberg tables: snapshots to pin, partitions to overwrite",
+      "pick": "Apache Iceberg on GCS, Parquet + zstd",
+      "why": "Each commit is a snapshot with an ID, so a run pins what it read, and replacing an hour is atomic.",
+      "how": "`events` partitioned by event hour, 0.6 PB a month. `billing_hour` keyed by (campaign, ad, hour, version); each run commits version n + 1 with its manifest.",
+      "detail": "The lake sink (a Flink job) commits files every five minutes; late events for an old hour are new files in that hour's partition, stamped with the ingest time, so \"hour H as of the cutoff\" is a snapshot, not a guess. Raw events are kept six months (the dispute window is 90 days) and then expired by snapshot expiry; billing tables are kept seven years (about 15 TB). The billing job is the live aggregator's code run in Flink's batch mode over one hour: the same dedup, combine and window operators, with all data present. BigQuery as the system of record was also considered: a good choice on Google Cloud, rejected here for the per-query cost of re-running months and to keep the truth in open files.",
+      "rejected": [
+        [
+          "Plain Parquet folders",
+          "No atomic overwrite and no snapshot: a reader can see half an hour."
+        ],
+        [
+          "Delta Lake",
+          "An honest equal; Iceberg chosen for engine-neutral tables."
+        ]
+      ],
+      "summary": [
+        "Lake + billing",
+        "Iceberg on GCS",
+        "Hive folders, Delta (equal)",
+        "snapshots to pin; atomic overwrite"
+      ],
+      "course": "building-blocks course, part 7 §7.7 (multi-version storage) and part 10 §10.13 (batch and stream)",
+      "parts": "7 §7.7, 10 §10.13",
+      "drill": [
+        "Finance wants last March re-run and bit-identical. What makes that possible?",
+        "The March manifests: each names the Iceberg snapshot of the events, the rate-card version, the invalidation-list snapshot and the job's image digest. Re-running that image over those snapshots gives the same rows, because the job uses no wall clock, sums integers, and sorts before it reduces.",
+        "pinned snapshot, rate card, invalidations, image digest"
+      ]
+    }
+  ],
+  "challenges": {
+    "1": [
+      "Kafka exactly-once (idempotent producer and transactions)",
+      "it removes a producer's own retry inside one session; an SDK retry over HTTP is a new request, and only dedup on the event ID removes it."
+    ],
+    "2": [
+      "Processing-time windows",
+      "they bill a phone's Tuesday-evening impressions in Wednesday's 6 a.m. hour."
+    ],
+    "3": [
+      "Redis `INCRBY` on one counter key",
+      "one key is one shard's thread, about 100,000 operations a second against 2 million, and a replay increments again."
+    ],
+    "4": [
+      "Flink's two-phase-commit sink alone",
+      "it makes one run's output atomic; a second run from four hours earlier still adds on top unless the write replaces by key."
+    ],
+    "5": [
+      "Updating billed rows in place",
+      "the invoice then matches no stored version, and the audit trail ends at the edit."
+    ],
+    "6": [
+      "Lag and CPU dashboards",
+      "they stay green while the pipeline counts wrong; only conservation checks and canaries see a wrong number."
+    ]
+  }
+}

@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1960 900" width="1960" height="900">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<g data-k="n:dev"><path d="M200.0,91.4 L200.0,81.0" fill="none" stroke="#5f6368" stroke-width="1.5"/></g>
+<g data-k="n:dev"><path d="M300.0,99.1 L369.0,70.9" fill="none" stroke="#5f6368" stroke-width="1.5"/></g>
+<g data-k="n:coh"><path d="M700.0,91.4 L700.0,81.0" fill="none" stroke="#5f6368" stroke-width="1.5"/></g>
+<g data-k="n:des"><path d="M143.3,608.6 L92.8,651.9" fill="none" stroke="#5f6368" stroke-width="1.5"/></g>
+<g data-k="n:rep"><path d="M700.0,608.6 L700.0,649.0" fill="none" stroke="#5f6368" stroke-width="1.5"/></g>
+<g data-k="n:img"><path d="M1300.0,560.0 L1391.0,560.0" fill="none" stroke="#5f6368" stroke-width="1.5"/></g>
+<g data-k="n:rel"><path d="M1300.0,140.0 L1398.8,140.0" fill="none" stroke="#5f6368" stroke-width="1.5"/></g>
+<g data-k="n:in"><path d="M300.0,140.0 L355.0,140.0" fill="none" stroke="#3c4043" stroke-width="2.2"/></g>
+<g data-k="n:in"><path d="M545.0,140.0 L600.0,140.0" fill="none" stroke="#3c4043" stroke-width="2.2"/></g>
+<g data-k="n:tgt"><path d="M800.0,140.0 L851.4,140.0" fill="none" stroke="#3c4043" stroke-width="2.2"/></g>
+<g data-k="n:tgt"><path d="M1048.6,140.0 L1100.0,140.0" fill="none" stroke="#3c4043" stroke-width="2.2"/></g>
+<g data-k="n:has"><path d="M200.0,188.6 L200.0,290.6" fill="none" stroke="#3c4043" stroke-width="2.2"/></g>
+<g data-k="n:has"><path d="M200.0,409.4 L200.0,511.4" fill="none" stroke="#3c4043" stroke-width="7"/><path d="M200.0,409.4 L200.0,511.4" fill="none" stroke="#ffffff" stroke-width="3"/></g>
+<g data-k="n:rp"><path d="M323.0,560.0 L351.4,560.0" fill="none" stroke="#3c4043" stroke-width="2.2"/></g>
+<g data-k="n:rp"><path d="M548.6,560.0 L568.1,560.0" fill="none" stroke="#3c4043" stroke-width="7"/><path d="M548.6,560.0 L568.1,560.0" fill="none" stroke="#ffffff" stroke-width="3"/></g>
+<g data-k="n:ships"><path d="M1200.0,188.6 L1200.0,290.6" fill="none" stroke="#3c4043" stroke-width="2.2"/></g>
+<g data-k="n:ships"><path d="M1200.0,409.4 L1200.0,511.4" fill="none" stroke="#3c4043" stroke-width="2.2"/></g>
+<g data-k="n:dev"><rect x="100.0" y="91.4" width="200.0" height="97.2" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<text x="200.0" y="150.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="28.4" font-weight="700" fill="#202124">DEVICE</text></g>
+<g data-k="n:coh"><rect x="600.0" y="91.4" width="200.0" height="97.2" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<text x="700.0" y="150.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="28.4" font-weight="700" fill="#202124">COHORT</text></g>
+<g data-k="n:des"><rect x="77.0" y="511.4" width="246.0" height="97.2" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<rect x="83.0" y="517.4" width="234.0" height="85.2" fill="none" stroke="#4285f4" stroke-width="1.8"/>
+<text x="200.0" y="570.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="28.4" font-weight="700" fill="#202124">DESIRED DOC</text></g>
+<g data-k="n:rep"><rect x="568.1" y="511.4" width="263.8" height="97.2" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<rect x="574.1" y="517.4" width="251.8" height="85.2" fill="none" stroke="#4285f4" stroke-width="1.8"/>
+<text x="700.0" y="570.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="28.4" font-weight="700" fill="#202124">REPORTED DOC</text></g>
+<g data-k="n:rel"><rect x="1100.0" y="91.4" width="200.0" height="97.2" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<text x="1200.0" y="150.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="28.4" font-weight="700" fill="#202124">RELEASE</text></g>
+<g data-k="n:img"><rect x="1100.0" y="511.4" width="200.0" height="97.2" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<text x="1200.0" y="570.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="28.4" font-weight="700" fill="#202124">IMAGE</text></g>
+<g data-k="n:in"><path d="M450.0,80.6 L545.0,140.0 L450.0,199.4 L355.0,140.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<text x="450.0" y="148.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="23.2" font-weight="700" fill="#202124">IN</text></g>
+<g data-k="n:tgt"><path d="M950.0,80.6 L1048.6,140.0 L950.0,199.4 L851.4,140.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<text x="950.0" y="148.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="23.2" font-weight="700" fill="#202124">TARGETS</text></g>
+<g data-k="n:has"><path d="M200.0,290.6 L295.0,350.0 L200.0,409.4 L105.0,350.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<path d="M200.0,296.2 L286.0,350.0 L200.0,403.8 L114.0,350.0 Z" fill="none" stroke="#b06000" stroke-width="1.8"/>
+<text x="200.0" y="358.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="23.2" font-weight="700" fill="#202124">WANTS</text></g>
+<g data-k="n:rp"><path d="M450.0,500.6 L548.6,560.0 L450.0,619.4 L351.4,560.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<path d="M450.0,506.0 L539.6,560.0 L450.0,614.0 L360.4,560.0 Z" fill="none" stroke="#b06000" stroke-width="1.8"/>
+<text x="450.0" y="568.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="23.2" font-weight="700" fill="#202124">REPORTS</text></g>
+<g data-k="n:ships"><path d="M1200.0,290.6 L1295.0,350.0 L1200.0,409.4 L1105.0,350.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<text x="1200.0" y="358.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="23.2" font-weight="700" fill="#202124">SHIPS</text></g>
+<g data-k="n:dev"><ellipse cx="200.0" cy="50.0" rx="92.5" ry="31.0" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="200.0" y="57.8" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="21.6" fill="#202124" font-weight="700">device_id</text>
+<line x1="141.7" y1="63.4" x2="258.3" y2="63.4" stroke="#202124" stroke-width="1.6"/></g>
+<g data-k="n:dev"><ellipse cx="420.0" cy="50.0" rx="69.0" ry="31.0" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="420.0" y="57.8" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="21.6" fill="#202124">hw_rev</text></g>
+<g data-k="n:coh"><ellipse cx="700.0" cy="50.0" rx="69.0" ry="31.0" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="700.0" y="57.8" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="21.6" fill="#202124" font-weight="700">cohort</text>
+<line x1="661.1" y1="63.4" x2="738.9" y2="63.4" stroke="#202124" stroke-width="1.6"/></g>
+<g data-k="n:des"><ellipse cx="60.0" cy="680.0" rx="76.8" ry="31.0" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="60.0" y="687.8" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="21.6" fill="#202124" font-weight="700">version</text>
+<line x1="14.6" y1="693.4" x2="105.4" y2="693.4" stroke="#202124" stroke-width="1.6" stroke-dasharray="5 4"/></g>
+<g data-k="n:rep"><ellipse cx="700.0" cy="680.0" rx="76.8" ry="31.0" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="700.0" y="687.8" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="21.6" fill="#202124" font-weight="700">version</text>
+<line x1="654.6" y1="693.4" x2="745.4" y2="693.4" stroke="#202124" stroke-width="1.6" stroke-dasharray="5 4"/></g>
+<g data-k="n:img"><ellipse cx="1460.0" cy="560.0" rx="69.0" ry="31.0" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="1460.0" y="567.8" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="21.6" fill="#202124" font-weight="700">sha256</text>
+<line x1="1421.1" y1="573.4" x2="1498.9" y2="573.4" stroke="#202124" stroke-width="1.6"/></g>
+<g data-k="n:rel"><ellipse cx="1460.0" cy="140.0" rx="61.1" ry="31.0" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="1460.0" y="147.8" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="21.6" fill="#202124">waves</text></g>
+<g data-k="n:in"><text x="327.5" y="170.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.0" font-weight="700" fill="#ea4335">N</text></g>
+<g data-k="n:in"><text x="572.5" y="170.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.0" font-weight="700" fill="#ea4335">1</text></g>
+<g data-k="n:tgt"><text x="825.7" y="170.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.0" font-weight="700" fill="#ea4335">N</text></g>
+<g data-k="n:tgt"><text x="1074.3" y="170.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.0" font-weight="700" fill="#ea4335">M</text></g>
+<g data-k="n:has"><text x="180.0" y="249.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.0" font-weight="700" fill="#ea4335">1</text></g>
+<g data-k="n:has"><text x="180.0" y="470.7" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.0" font-weight="700" fill="#ea4335">N</text></g>
+<g data-k="n:rp"><text x="558.3" y="590.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.0" font-weight="700" fill="#ea4335">N</text></g>
+<g data-k="n:ships"><text x="1180.0" y="249.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.0" font-weight="700" fill="#ea4335">1</text></g>
+<g data-k="n:ships"><text x="1180.0" y="470.7" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.0" font-weight="700" fill="#ea4335">1</text></g>
+<g data-k="legend"><rect x="1664" y="292" width="36" height="16" fill="#e8f0fe" stroke="#4285f4" stroke-width="1.6"/>
+<text x="1714" y="308.1" font-family="Inter, Roboto, sans-serif" font-size="23" fill="#202124">entity</text>
+<rect x="1664" y="328" width="36" height="16" fill="#e8f0fe" stroke="#4285f4" stroke-width="1.6"/>
+<rect x="1668" y="332" width="28" height="8" fill="none" stroke="#4285f4" stroke-width="1.2"/>
+<text x="1714" y="344.1" font-family="Inter, Roboto, sans-serif" font-size="23" fill="#202124">weak entity</text>
+<path d="M1682,362 L1702,372 L1682,382 L1662,372 Z" fill="#fef7e0" stroke="#b06000" stroke-width="1.6"/>
+<text x="1714" y="380.1" font-family="Inter, Roboto, sans-serif" font-size="23" fill="#202124">relationship</text>
+<path d="M1682,398 L1702,408 L1682,418 L1662,408 Z" fill="#fef7e0" stroke="#b06000" stroke-width="1.6"/>
+<path d="M1682,403 L1692,408 L1682,413 L1672,408 Z" fill="none" stroke="#b06000" stroke-width="1.2"/>
+<text x="1714" y="416.1" font-family="Inter, Roboto, sans-serif" font-size="23" fill="#202124">identifying relationship</text>
+<ellipse cx="1682" cy="444" rx="20" ry="9" fill="#fff" stroke="#5f6368" stroke-width="1.4"/>
+<text x="1714" y="452.1" font-family="Inter, Roboto, sans-serif" font-size="23" fill="#202124">attribute</text>
+<ellipse cx="1682" cy="480" rx="20" ry="9" fill="#fff" stroke="#5f6368" stroke-width="1.4"/>
+<line x1="1673" y1="483" x2="1691" y2="483" stroke="#202124" stroke-width="1.4"/>
+<text x="1714" y="488.1" font-family="Inter, Roboto, sans-serif" font-size="23" fill="#202124">key attribute</text>
+<line x1="1662" y1="516" x2="1702" y2="516" stroke="#3c4043" stroke-width="6"/><line x1="1662" y1="516" x2="1702" y2="516" stroke="#fff" stroke-width="2.4"/>
+<text x="1714" y="524.0" font-family="Inter, Roboto, sans-serif" font-size="23" fill="#202124">total participation</text></g>
+</svg>

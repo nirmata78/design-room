@@ -35,3 +35,6 @@ into these pages instead of re-teaching.
    model answer to the question you just did.
 3. **Before a loop**, re-read the *Traps* at the end of each chapter — they are the claims that break
    under a follow-up question.
+
+**Video course.** [`video/`](video/README.md) is a seventeen-part narrated course, about 7¾ hours, that takes the
+concepts behind these chapters to Staff depth; its `INDEX.md` maps each concept to a part and a timestamp.

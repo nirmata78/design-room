@@ -1,0 +1,21 @@
+Every news feed answer says "hybrid push and pull". The grade is on the line between them, and nobody draws it.
+
+I've published a 92-minute reference solution for the news feed question at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on 586 numbered slides.
+
+The idea that unlocks it: one celebrity post is a hundred million writes, about fifteen minutes of a whole fan-out fleet. So the line is set from both sides of the arithmetic, crossing it needs no backfill, and correctness (deletes, blocks) lives on the read path, never in the copies.
+
+What it goes into:
+→ Where the threshold sits, and the account that crosses it overnight
+→ Why a delete is one write, not a fan-out
+→ A lost cache shard, and the rebuild that can become the outage
+→ How you'd know the feed got worse with every dashboard green
+
+Best on a second pass: pause after each question and answer it first.
+
+▶ [YouTube link: rerun publish_kit.py with --youtube-url]
+
+It's a scripted walkthrough with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator.
+
+Where would you put the push/pull line for your product, and how would you measure it?
+
+#SystemDesign #SoftwareEngineering #DistributedSystems

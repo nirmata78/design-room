@@ -1,0 +1,218 @@
+id	name	tier	part	form
+EST-01	Time and size constants	A	1	full
+EST-02	Load shape	A	1	full
+EST-03	Storage sizing	A	1	full
+EST-04	Machine envelope	A	1	full
+EST-05	Latency ladder	A	1	full
+EST-06	Availability maths	A	1	full
+EST-07	Durability maths	B	1	full
+EST-08	Queueing intuition	A	1	full
+EST-09	Fan-out and tail latency	B	1	full
+EST-10	Bandwidth and transfer time	B	1	full
+EST-12	Cost modelling	B	1	full
+FND-01	CAP, stated correctly	A	2	full
+FND-02	PACELC	A	2	full
+FND-03	Consistency-model ladder	A	2	full
+FND-04	Linearizability vs serializability	A	2	full
+FND-05	Safety vs liveness; FLP	B	2	full
+FND-06	Failure models	B	2	full
+FND-07	Physical clocks	A	2	full
+FND-08	Logical clocks	B	2	full
+FND-09	Hybrid and bounded clocks	B	2	full
+FND-10	Idempotency and "exactly-once"	A	2	full
+FND-11	Ordering guarantees	A	2	full
+FND-12	Quorums	A	2	full
+FND-13	Leases and fencing tokens	A	2	full
+FND-15	Failure detection	B	2	full
+FND-16	Gossip dissemination	B	2	full
+CON-01	Paxos, single decree	B	3	full
+CON-02	Multi-Paxos	B	3	full
+CON-03	Raft core	A	3	full
+CON-04	Raft in production	B	3	full
+CON-05	Linearizable reads	B	3	full
+CON-06	Multi-Raft	B	3	full
+CON-14	Quorum placement across regions	B	3	full
+FND-14	State-machine replication	B	3	full
+CON-07	Chubby model	B	4	full
+CON-09	etcd primitives	B	4	full
+CON-10	Leader election as a pattern	A	4	full
+CON-11	Locks: efficiency vs correctness	A	4	full
+CON-12	Membership and service discovery	A	4	full
+CON-13	Configuration distribution	A	4	full
+REP-01	Single-leader replication	A	5	full
+REP-02	Multi-leader replication	B	5	full
+REP-03	Leaderless (Dynamo-style)	B	5	full
+REP-04	Read repair and anti-entropy	B	5	full
+REP-06	Primary–backup with leases	B	5	full
+REP-07	Log shipping	B	5	full
+REP-08	Change data capture and the outbox	A	5	full
+REP-09	Conflict resolution	B	5	full
+REP-10	Replication lag	A	5	full
+REP-11	Geo topologies	A	5	full
+REP-12	Snapshot plus log catch-up	B	5	full
+REP-13	RPO, RTO and failover orchestration	A	5	full
+REP-14	Tombstones	B	5	full
+DS-04	Merkle tree	B	5	full
+PAR-01	Hash vs range partitioning	A	6	full
+PAR-02	Consistent hashing with virtual nodes	A	6	full
+PAR-04	Dynamic splitting and merging	B	6	full
+PAR-05	Rebalancing while serving	B	6	full
+PAR-06	Hot keys and hot partitions	A	6	full
+PAR-07	Request routing	A	6	full
+PAR-08	Secondary indexes	B	6	full
+PAR-09	Cross-shard operations	B	6	full
+PAR-10	Failure-domain-aware placement	A	6	full
+PAR-11	Multi-tenant partitioning	B	6	full
+DS-11	ID schemes	A	6	full
+STO-01	Write-ahead log and fsync	A	7	full
+STO-02	B-tree engines	B	7	full
+STO-03	LSM-tree engines	A	7	full
+STO-04	LSM read path	B	7	full
+STO-05	Multi-version storage (MVCC)	B	7	full
+STO-08	Blob layout	B	7	full
+STO-09	Erasure coding	B	7	full
+STO-10	Integrity	B	7	full
+STO-11	Repair and reconstruction	B	7	full
+STO-13	Garbage collection of orphans	B	7	full
+STO-14	Choosing a data model	A	7	full
+STO-15	Indexing basics	A	7	full
+STO-16	Backups and snapshots	B	7	full
+DS-01	Bloom / cuckoo filter	A	7	full
+DS-07	Skip list / sorted set	B	7	full
+TXN-01	Isolation levels and anomalies	A	8	full
+TXN-02	Optimistic concurrency / conditional writes	A	8	full
+TXN-03	Pessimistic locking	A	8	full
+TXN-04	Snapshot reads	B	8	full
+TXN-05	Two-phase commit	A	8	full
+TXN-06	Two-phase commit over consensus groups	B	8	full
+TXN-08	Sagas	A	8	full
+TXN-09	Idempotency keys and dedup tables	A	8	full
+TXN-10	Reservation pattern	A	8	full
+TXN-12	Escrow / split counters	B	8	full
+CAC-01	Caching patterns	A	9	full
+CAC-02	Eviction policies	A	9	full
+CAC-03	Expiry	A	9	full
+CAC-04	Invalidation	A	9	full
+CAC-05	Stampede control	A	9	full
+CAC-06	Stale-set race and leases	B	9	full
+CAC-07	Hot keys and big values	B	9	full
+CAC-08	Multi-tier caching	B	9	full
+CAC-09	Negative caching and penetration	B	9	full
+CAC-10	Hit-ratio maths	A	9	full
+CAC-11	Cold start and node loss	B	9	full
+MSG-01	Queue vs log	A	10	full
+MSG-02	Partitioned log internals	B	10	full
+MSG-03	Log replication	B	10	full
+MSG-04	Consumer groups	B	10	full
+MSG-05	Delivery semantics	A	10	full
+MSG-06	Ordering	A	10	full
+MSG-07	Ack deadlines, redelivery, dead letters	A	10	full
+MSG-08	Backpressure and lag	A	10	full
+MSG-09	Delayed and priority delivery	B	10	full
+MSG-10	Fan-out	A	10	full
+MSG-11	Event time, windows, watermarks	B	10	full
+MSG-12	Stateful stream processing	B	10	full
+MSG-13	Lambda vs Kappa	B	10	full
+MSG-15	Schema evolution	B	10	full
+DS-02	HyperLogLog	B	10	full
+DS-03	Count-Min Sketch and heavy hitters	B	10	full
+DS-10	Quantile sketches	B	10	full
+NET-01	DNS, GeoDNS, anycast	A	11	full
+NET-02	L4 vs L7 load balancing	A	11	read
+NET-03	Health checks and draining	A	11	read
+NET-04	API gateway / reverse proxy	A	11	full
+NET-07	RPC semantics	A	11	full
+NET-08	Polling, long polling, SSE, WebSocket	A	11	full
+NET-09	Persistent-connection tiers	B	11	full
+API-01	API style	A	11	full
+API-02	Pagination	A	11	full
+API-03	Idempotent writes	A	11	full
+API-04	Versioning and compatibility	B	11	full
+API-05	Long-running operations	B	11	full
+API-06	Resumable and multipart upload	B	11	full
+API-07	Conditional requests	B	11	full
+API-08	Error and throttling contract	A	11	full
+DS-05	Trie / radix tree / FST	B	11	full
+RL-01	Token bucket	A	12	full
+RL-03	Window counters	A	12	full
+RL-04	Distributed enforcement	A	12	full
+RL-05	Concurrency limits	B	12	full
+RL-06	Load shedding and criticality	A	12	read
+RL-07	Client-side adaptive throttling	B	12	read
+RL-08	Fairness	B	12	full
+RL-09	Fail-open vs fail-closed	A	12	full
+RL-10	Admission control and queue discipline	B	12	full
+REL-01	Timeouts and deadlines	A	13	full
+REL-02	Retries	A	13	read
+REL-03	Circuit breaker	A	13	full
+REL-04	Bulkheads and cells	A	13	full
+REL-05	Hedged requests	B	13	full
+REL-06	Graceful degradation	A	13	full
+REL-07	Static stability	A	13	full
+REL-08	Redundancy and failure domains	A	13	full
+REL-09	Cascading and metastable failures	B	13	read
+REL-10	Thundering herds	A	13	full
+REL-11	Reconciliation and invariant audits	A	13	full
+REL-12	Dependency hygiene	B	13	full
+REL-13	Capacity and autoscaling	B	13	full
+REL-14	Disaster recovery	B	13	full
+OBS-01	Metric model and cardinality	B	14	full
+OBS-02	Percentiles and sketches	A	14	full
+OBS-03	Push vs pull collection	B	14	full
+OBS-04	Roll-ups and retention	B	14	full
+OBS-05	Alerting	A	14	read
+OBS-06	Logging pipelines	B	14	full
+OBS-08	SLI, SLO, error budget	A	14	read
+OBS-09	Golden signals	A	14	read
+STO-06	Columnar storage	B	14	full
+STO-07	Time-series compression	B	14	full
+DS-06	Inverted index	B	14	full
+SCH-01	Desired state and reconciliation	A	15	full
+SCH-02	Placement	B	15	full
+SCH-03	Priority, quota, preemption	B	15	full
+SCH-05	Node liveness and eviction	B	15	full
+SCH-06	Timers at scale	B	15	full
+SCH-07	Task leasing	A	15	full
+SCH-08	Durable workflows	B	15	full
+OPS-04	Control plane vs data plane	A	15	full
+DS-08	Heaps and timing wheels	B	15	full
+SEC-01	Authentication	A	16	full
+SEC-04	Tenant isolation	A	16	full
+SEC-07	Abuse resistance	B	16	full
+OPS-01	Progressive rollout	A	16	read
+OPS-02	Online migration	A	16	full
+OPS-03	Version skew	B	16	full
+OPS-05	Background vs foreground work	A	16	full
+OPS-07	Kill switches and safe limits	A	16	full
+OPS-08	Testing distributed systems	B	16	read
+OPS-09	Multi-region operation	A	16	full
+OPS-10	Cost and efficiency ownership	B	16	full
+EM-01	Scope and phases	A	16	full
+EM-02	Team shape	A	16	full
+EM-03	Build, reuse or buy	A	16	full
+EM-04	Risk register	A	16	full
+EM-05	SLOs as a contract	A	16	full
+EM-06	Client adoption and migration	B	16	full
+EM-07	Operational readiness	A	16	read
+BLK-01	DNS and anycast front door	block	17	full
+BLK-02	L4 load balancer	block	17	full
+BLK-03	L7 proxy / API gateway	block	17	full
+BLK-05	Real-time gateway	block	17	full
+BLK-06	Relational database	block	17	full
+BLK-07	Distributed SQL	block	17	full
+BLK-08	Wide-column store	block	17	full
+BLK-09	Leaderless key-value store	block	17	full
+BLK-10	Embedded storage engine	block	17	full
+BLK-11	Object / blob store	block	17	full
+BLK-12	In-memory cache	block	17	full
+BLK-13	Coordination service	block	17	full
+BLK-14	Partitioned log	block	17	full
+BLK-15	Message queue / pub-sub service	block	17	full
+BLK-16	Stream processor	block	17	full
+BLK-17	Batch processor	block	17	full
+BLK-18	Columnar warehouse / OLAP	block	17	full
+BLK-20	Time-series database	block	17	full
+BLK-21	Workflow engine	block	17	full
+BLK-22	Cluster manager	block	17	full
+BLK-24	Config / feature-flag service	block	17	full
+BLK-26	Tracing and logging backends	block	17	full

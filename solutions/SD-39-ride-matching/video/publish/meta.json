@@ -1,0 +1,56 @@
+{
+  "mp4": "ride-matching-reference.mp4",
+  "teaser_chapter": null,
+  "thumbnail": {
+    "kicker": "Staff reference solution",
+    "title": "Fast where.<br><em>Exact</em> who.",
+    "sub": "Nearby drivers: an in-memory cell index, and one fenced claim per driver.",
+    "id": "design-room · SD-39"
+  },
+  "youtube": {
+    "title": "Ride Matching / Nearby Drivers System Design: Staff Reference (Geo Index, Claims, Leases)",
+    "playlist": "System design reference solutions · design-room (create it once, reuse it)",
+    "tags": [
+      "system design",
+      "system design interview",
+      "uber system design",
+      "ride matching",
+      "nearby drivers",
+      "geospatial index",
+      "h3",
+      "geohash",
+      "distributed locks",
+      "staff engineer",
+      "distributed systems"
+    ],
+    "description_top": [
+      "Nearby drivers sounds like a geometry question. The geometry is the easy half: the hard half is that two riders can be handed the same driver in the same second. A compact reference solution at the Staff bar (L6/L7): theory, a three-version design, an alternate path, and six challenges. {DURATION} minutes, {SLIDES} numbered slides.",
+      "The thesis: keep where drivers are as fast, overwrite-only, lossy memory, and keep who gets which driver as one exact conditional write, owned by one matcher per city.",
+      "IN THIS VIDEO\n• Estimates: 1.25 million location writes a second, about 1 GB in memory, 2,100 claims a second\n• Theory: H3 cells and k-rings, geohash vs S2 vs H3, soft state, fenced conditional claims, leases, batched assignment\n• Six challenges: two riders one driver, the driver who vanishes, boundaries and hot cells, a lost shard, nearest is not closest, and \"no drivers\" next to idle drivers",
+      "HOW TO USE IT\nRun the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first."
+    ],
+    "description_bottom": [
+      "LINKS\nWritten reference design: https://github.com/nirmata78/design-room/blob/main/solutions/SD-39-ride-matching/SD-39_Ride_Matching_Reference_Design.md\nRun this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room\nAll videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md",
+      "ABOUT THIS VIDEO\nThis is a scripted walkthrough, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script, diagrams and the written design were produced with Claude Code. Numbers are back-of-the-envelope estimates for the exercise, labelled as given, illustrative or initial targets, not any company's real figures, and this is not any company's actual design. The technical content has not been reviewed by a person.",
+      "#SystemDesign #SoftwareEngineering #DistributedSystems"
+    ]
+  },
+  "linkedin": {
+    "post": [
+      "Every ride-matching answer draws a geohash. Then two riders get the same driver, and the geohash can't help.",
+      "I've published a {DURATION}-minute reference solution for nearby drivers and ride matching at the Staff bar: theory, a three-version design and six challenges, on {SLIDES} numbered slides.",
+      "The idea that unlocks it: two problems, two stores. Where drivers are is 1.25 million writes a second of soft state, kept in memory and allowed to be lost. Who gets which driver is one conditional, fenced write per claim, owned by one matcher per city.",
+      "What it goes into:\n→ The claim, as one SQL WHERE clause\n→ A driver who accepts and vanishes\n→ Cell boundaries and a 3,000-driver downtown cell\n→ Why \"no drivers\" can be a successful response",
+      "Best on a second pass: pause after each question and answer it first.",
+      "▶ {YOUTUBE_URL}",
+      "It's a scripted walkthrough with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator.",
+      "Where does your system keep the one write that must never be wrong?",
+      "#SystemDesign #SoftwareEngineering #DistributedSystems"
+    ],
+    "first_comment": "Written reference design, stage by stage: https://github.com/nirmata78/design-room/blob/main/solutions/SD-39-ride-matching/SD-39_Ride_Matching_Reference_Design.md\n\nRun this round yourself, with an AI interviewer that won't help you: https://github.com/nirmata78/design-room",
+    "document": {
+      "pdf": "../../SD-39_Ride_Matching_Reference_Design.pdf",
+      "title": "Nearby drivers and ride matching: a Staff-level reference design"
+    }
+  }
+}

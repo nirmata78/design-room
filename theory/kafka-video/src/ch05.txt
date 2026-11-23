@@ -1,0 +1,78 @@
+#! title: Can Kafka be the database?
+#! short: Kafka as a database
+
+= th | Kafka in system design · Module 5 of 6 | Can Kafka be the database? | What a log can and cannot do, log compaction, read models, and the honest limits of event sourcing on Kafka.
+N: Module five. Kafka stores data durably, replicated, for as long as you like. So someone always asks: why do we need a database at all?
+
+## 5.1 The short answer
+N: We start with what a database does for you, and how much of it Kafka can do.
+
+= table | Kafka or a database? | Compare by the questions each one can answer
+Question | Kafka | Database
+What happened, in order? | **Excellent** | Only if you designed for it
+Read everything from a position | **Excellent** | Possible, and costly
+What is order 9814's status now? | Scan, or build a view | **Index lookup**
+Find orders over $100 in Paris | No | **Query with secondary indexes**
+Reserve this seat if it is free | No | **Conditional write**
+Change two entities atomically, based on what you read | No | **Transaction**
+N: Compare them by the questions each one can answer. What happened, in what order? Kafka is excellent at that. Read everything from a position? Also excellent. But what is the status of this order right now? Kafka has no index by key, so you scan, or build a view elsewhere. Ad hoc queries are not possible. And the two most important rows are the last ones: a conditional write, and a transaction based on what you just read. Those are what make a database a database.
+
+## 5.2 The missing check
+N: Next, the single missing feature that settles this question.
+
+= dia | The missing check | A log accepts every append
+k-no-cas
+N: Two customers try to book seat twelve A at the same moment. On the left, both append a booking event to a log. Both appends succeed, because a log has no way to say: only write this if the seat is still free. Now the log holds two bookings for one seat. On the right, a database has a unique constraint on the seat. The first write wins, and the second is rejected immediately, while the customer is still on the page.
+
+= th | The line to say | Kafka records decisions; it cannot make them. Invariants are enforced before the event is published.
+V: Kafka records decisions. It cannot make them. Anything that must be checked against current state is decided in a database first, and then published as a fact.
+[pause: 0.8]
+
+## 5.3 Log compaction
+N: Next, the Kafka feature that looks most like a table: log compaction.
+
+= dia | Log compaction | Keep the latest value of each key
+k-compaction
+N: A compacted topic keeps at least the latest value of every key. In the older segments, A one, B one and A two have been removed, because newer values exist. Offsets never change, and order is preserved, so a gap simply appears. Notice that B two is still there. The active segment is never compacted, so compaction runs behind, and readers can see several values for a key. A key with a null value is a tombstone, and it deletes that key after a retention period.
+
+= cards c3 | Log compaction | What it is good for, and what it does not promise
+Good for :: Rebuilding current state on startup: configuration, reference data, a processor's saved state.
+Not a promise :: Readers may see **older values** too. Compaction runs behind, so apply updates in order and let the last one win.
+Watch out :: A reader that lags more than `delete.retention.ms`, one day by default, can **miss a tombstone** and keep deleted data.
+N: Compaction is excellent for rebuilding current state when a service starts: configuration, reference data, or a stream processor's saved state. It is not a promise that you will see only the latest value, so consumers must apply updates in order and let the last one win. And one operational warning. A reader that lags by more than a day, by default, can miss a tombstone, and keep data that should have been deleted.
+
+## 5.4 Read models
+N: Next, the pattern that gives each kind of query the store it deserves.
+
+= dia | Read models | One write path, many purpose-built views
+k-cqrs
+N: This is the division of labour that works. Writes go to PostgreSQL, where the constraints live. Change data capture streams every committed change into Kafka. Then each query gets the store it deserves: Elasticsearch for search, Redis for lookups by key, and Iceberg tables for analytics. This separation of the write model from the read models is called CQRS. Because the log can be replayed, a broken read model can be deleted and rebuilt. The price is that read models lag behind the write.
+
+= panel watch | Read models | The lag is a product decision
+After a customer places an order, the search view may not show it for a moment.
+Read **your own writes** from the primary store for the page right after a change, and use the views everywhere else.
+N: That lag is a product decision, and you must design for it. A customer places an order, opens the order list, and the view has not caught up yet, so the order seems to be missing. The usual answer is to read from the primary store for the page right after a change, and to use the views everywhere else.
+
+## 5.5 Event sourcing and where truth lives
+N: Finally, event sourcing, and the honest answer to where the truth should live.
+
+= table | Event sourcing on Kafka | The idea is sound, and Kafka is missing two pieces
+Event sourcing needs | Kafka offers | Consequence
+Load one entity's events | No lookup by key | Scan a partition, or keep a separate state store
+Reject a write if the entity changed | No check on expected version | Concurrent commands can both succeed
+Keep history for years | Long retention, tiered storage | This part works well
+N: Event sourcing stores every change as an event, and derives current state from them. The idea is sound, but Kafka is missing two pieces. It cannot load one entity's events by key, so you scan a partition or keep a separate state store. And it cannot reject a write because the entity has changed since you read it, so two concurrent commands can both succeed. A purpose-built event store, or a database table of events with a version constraint, does both. Kafka then distributes those events.
+
+= table | Where does the truth live? | Three honest options
+Option | Truth lives in | Choose it when
+Database first | The database, with an outbox into Kafka | **The default**: anything with invariants
+Log first | Kafka, with single-writer processors per key | Facts with no conflicts: clicks, telemetry, sensor data
+Event store | A store with version checks, published to Kafka | Audit-heavy domains that need full history
+> Personal data on an immutable log: encrypt per person, and delete the key to erase it.
+N: So there are three honest options. Database first is the default for anything with invariants. Log first works for facts that can never conflict, such as clicks or telemetry, or when one processor owns each key. An event store fits audit-heavy domains. One more point before moving on: an immutable log and the right to erasure pull against each other. A common answer is to encrypt personal data with a separate key per person, and to delete that key when the person asks.
+
+= probe | Your colleague says: we have Kafka, so we can drop PostgreSQL. What do you say?
+- Kafka has **no conditional write**, no secondary indexes, no multi-entity transactions
+- Keep the database for **decisions**, and Kafka for **distributing the facts**
+- A log-first design fits only if events **cannot conflict**
+C: I ask what the database is doing today. If it enforces any rule, such as a unique booking or a balance that cannot go negative, Kafka cannot replace it, because a log accepts every append. It also has no secondary indexes or multi-entity transactions. I keep the database for decisions and use Kafka to distribute the facts. A log-first design only fits events that cannot conflict.

@@ -1,0 +1,45 @@
+Everyone has drawn the URL shortener: a hash, a table, a cache. It is still asked at every level, because the grade is on what comes after the diagram. This is a full reference solution at the Staff bar (L6/L7): theory with the mechanisms at work, a three-version design with C4 context, container and component views, every component one level down with the technology picked and the alternatives rejected (PostgreSQL vs Cassandra and DynamoDB, etcd vs ZooKeeper and Redis, Redis Cluster vs Memcached and Hazelcast, Kafka, Flink, ClickHouse), eight challenges that break it, and the build cost. 106 minutes, 643 numbered slides, with an interviewer, a candidate and a coach.
+
+The thesis: a URL shortener is a read path with a write path attached. Codes must be unique without a lock per create and unguessable without a lookup, the redirect must be one memory read, and nothing else (counting, abuse, analytics) may stand between the click and the answer.
+
+IN THIS VIDEO
+• Estimates as arithmetic: why seven characters (3.5 trillion codes for 12 billion links), 4,000 redirects a second but 40 at the store, 7 of 20 milliseconds
+• Theory: safety and liveness, six mechanisms, an options matrix for code generation with a pick (and an honest equal)
+• Components and technologies: what each box runs on, how it is built one level down, and why each rival is ruled out
+• Eight challenges: two servers and one code, codes that can be walked, one link at 40,000 clicks a second, 301 or 302, a takedown everywhere in five minutes, counting without slowing the redirect, a region lost, and how you would know
+• The build cost and team split (marked AUX, the manager layer)
+
+HOW TO USE IT
+Run the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first. Slides badged AUX are the manager layer: skip them in a Staff round.
+Captions: turn on CC (English, translatable). Every table and diagram is built up step by step, the way you would draw it at a whiteboard.
+
+CHAPTERS
+0:00 0 Cold open
+3:17 1 Requirements and scope
+9:02 2 Estimates
+13:49 3 Theory
+27:31 4 API and entities
+31:29 5 High-level design
+43:19 5.1 Components and technologies
+1:02:01 6 Bridge
+1:03:04 7 Challenges
+1:03:22 7.1 Challenge 1: Two servers, one code
+1:09:20 7.2 Challenge 2: Codes in order
+1:14:09 7.3 Challenge 3: One link at 40,000 clicks a second
+1:18:55 7.4 Challenge 4: 301 or 302?
+1:22:44 7.5 Challenge 5: Dead everywhere in five minutes
+1:27:37 7.6 Challenge 6: Counting without slowing the redirect
+1:31:35 7.7 Challenge 7: A region goes dark
+1:35:48 7.8 Challenge 8: How would you know it is broken?
+1:40:02 8 Build cost
+1:42:34 9 Recap
+
+LINKS
+Written reference design: https://github.com/nirmata78/design-room/blob/main/solutions/SD-96-url-shortener/SD-96_URL_Shortener_Reference_Design.md
+Run this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room
+All videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md
+
+ABOUT THIS VIDEO
+This is a scripted walkthrough, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script, diagrams and the written design were produced with Claude Code. Numbers are back-of-the-envelope estimates for the exercise, labelled as given, derived, illustrative or initial targets, not any company's real figures, and this is not any company's actual design. The technical content has not been reviewed by a person.
+
+#SystemDesign #SoftwareEngineering #DistributedSystems

@@ -1,0 +1,53 @@
+{
+  "mp4": "Kafka-Full.mp4",
+  "teaser_chapter": null,
+  "thumbnail": {
+    "kicker": "System design course",
+    "title": "Where Kafka<br><em>belongs</em>",
+    "sub": "Topics, keys, partitions, brokers, guarantees, and why it is not your database.",
+    "id": "design-room"
+  },
+  "youtube": {
+    "title": "Apache Kafka in System Design: Topics, Keys, Partitions, Brokers and Guarantees (Full Course)",
+    "playlist": "System design theory · design-room (create it once, reuse it)",
+    "tags": [
+      "apache kafka",
+      "kafka",
+      "kafka tutorial",
+      "kafka system design",
+      "system design",
+      "system design interview",
+      "kafka partitions",
+      "kafka topics",
+      "event driven architecture",
+      "outbox pattern",
+      "exactly once",
+      "distributed systems"
+    ],
+    "description_top": [
+      "How many topics do you need? Which key? How many partitions and brokers? Can Kafka be your database? A {DURATION}-minute course that answers each question with reasoning and arithmetic, on one running example.",
+      "The thesis: Kafka does not make the decisions in your system. It makes sure everyone hears about them.",
+      "IN THIS COURSE\n• Why one topic per event type quietly breaks ordering, and the rule that replaces it\n• Choosing a key, and the hot-key arithmetic to run before you commit\n• Sizing partitions and brokers from disk, throughput, network and rebuild time\n• The three settings that make an acknowledged write durable\n• What exactly once really covers, the idempotent receiver, and the outbox pattern\n• Log compaction, read models, and the honest limits of event sourcing on Kafka\n• Current to Kafka 4.4: KRaft, the new consumer protocol, share groups, tiered storage, diskless topics\n• A finished design, a decision sheet and interview drills",
+      "HOW TO USE IT\nEach module ends with an interviewer question. Pause, answer aloud, then compare."
+    ],
+    "description_bottom": [
+      "SOURCES\nApache Kafka documentation: https://kafka.apache.org/documentation/\nKafka 4.4.0 release announcement: https://kafka.apache.org/blog/2026/10/22/apache-kafka-4.4.0-release-announcement/\nQueues for Kafka (KIP-932): https://cwiki.apache.org/confluence/display/KAFKA/KIP-932%3A+Queues+for+Kafka\nDiskless topics (KIP-1150): https://cwiki.apache.org/confluence/display/KAFKA/KIP-1150%3A+Diskless+Topics",
+      "PRACTISE\nRun a system design mock with an AI interviewer: https://github.com/nirmata78/design-room",
+      "ABOUT THIS VIDEO\nThe voices are synthetic (Kokoro-82M, generated locally). Script, slides and diagrams were produced with Claude Code, and version-specific claims were checked against public documentation in November 2026. The marketplace and its numbers are illustrative: measure your own workload before sizing a cluster. The technical content has not been reviewed by a person. Apache Kafka is a trademark of the Apache Software Foundation, and this course is independent of it.",
+      "#ApacheKafka #SystemDesign #DistributedSystems"
+    ]
+  },
+  "linkedin": {
+    "post": [
+      "\"One topic per event type\" is common Kafka advice. It can ship an order before your consumer knows it exists.",
+      "I've published a {DURATION}-minute course on where Kafka belongs in a system design, worked on one sized example from the first question to a finished design.",
+      "The idea that unlocks topic design: Kafka orders events only inside one partition of one topic. Put order-created, order-paid and order-shipped in three topics and they arrive with three different lags. Events that must stay in order relative to each other belong in the same topic, under the same key.",
+      "What it goes into:\n→ Partition and broker counts from arithmetic, including rebuild time\n→ Why the default min.insync.replicas of 1 undermines acks=all\n→ What exactly once covers, and where the duplicate really dies\n→ Why a log cannot reserve a seat, and what that means for Kafka as a database\n→ What changed through Kafka 4.4",
+      "▶ {YOUTUBE_URL}",
+      "The voices are synthetic, and the course was built with Claude Code as part of design-room, my open-source system design interview simulator.",
+      "Where do you draw the line: is Kafka ever your source of truth?",
+      "#ApacheKafka #SystemDesign #DistributedSystems"
+    ],
+    "first_comment": "Run a system design mock with an AI interviewer that won't help you: https://github.com/nirmata78/design-room"
+  }
+}

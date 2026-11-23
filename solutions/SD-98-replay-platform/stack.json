@@ -1,0 +1,200 @@
+{
+  "_doc": "Single source for SD-98's technology choices (compact cut: no drill interlude; the booklet keeps the probes in `drill`). Read by video/src/stack.py for the 5.1 technology slides, the stack table, the fix-slide 'Rejected' lines and the C4 technology labels, and by `stack.py sync` for the booklet and OUTLINE.md regions. Slide `how` is two sentences; the rest goes in `detail` (booklet only).",
+  "c4": {
+    "logs": [
+      "Log store",
+      "MCAP chunks on GCS",
+      "Hashed per chunk."
+    ],
+    "cat": [
+      "Scenario catalog",
+      "PostgreSQL",
+      "Sets, versions."
+    ],
+    "api": [
+      "Run API",
+      "Go on Kubernetes",
+      "Writes manifests."
+    ],
+    "plan": [
+      "DAG planner",
+      "Go service",
+      "Keys; cache lookups."
+    ],
+    "sched": [
+      "Scheduler",
+      "Kubernetes + Kueue",
+      "Quotas, preemption."
+    ],
+    "work": [
+      "Sim workers",
+      "GPU and CPU pods",
+      "Hermetic harness."
+    ],
+    "cache": [
+      "Artifact cache",
+      "GCS + Bigtable",
+      "Content-addressed."
+    ],
+    "res": [
+      "Results store",
+      "ClickHouse",
+      "Metrics per run."
+    ],
+    "gate": [
+      "Gate service",
+      "Go service",
+      "Policy as code."
+    ]
+  },
+  "stack": [
+    {
+      "id": "logs",
+      "heading": "Log store: MCAP chunks on object storage",
+      "kicker": "Technology · log store",
+      "title": "Logs as immutable one-minute chunks, named by their hash",
+      "pick": "MCAP files on GCS, one-minute chunks",
+      "why": "Hashed chunks make a manifest a list of hashes; byte-range reads fetch one topic without a copy.",
+      "how": "Logs are cut into one-minute MCAP chunks with a per-topic index, each named by its SHA-256. Workers read by byte range and verify the hash.",
+      "detail": "About 1 GB a log-minute (compressed camera, lidar and radar subsets, illustrative). 20 PB today, plus 1 PB a month; cold chunks move to an archive class after 90 days unless a scenario set references them. A release gate reads about 250 TB in four hours, about 17 GB/s, spread over thousands of chunks: object storage serves that in parallel; the scheduler places workers in the region that holds the chunks.",
+      "rejected": [
+        [
+          "HDFS or a shared file system",
+          "Another 20 PB system to run, and a copy per job."
+        ],
+        [
+          "Logs in a database",
+          "Frames are blobs: more cost, a second truth, no byte ranges."
+        ]
+      ],
+      "summary": [
+        "Log store",
+        "MCAP chunks on GCS",
+        "HDFS, a database",
+        "immutable, hashed, read by range"
+      ],
+      "course": "building-blocks course, part 7 §7.10–7.12 (blob layout, integrity)",
+      "parts": "7 §7.10–7.12",
+      "drill": [
+        "A chunk is re-uploaded after a fix to the logger. What happens to old results?",
+        "Nothing changes under them: the fixed chunk has a new hash, so it is a new input. Old manifests still name the old hash, so old runs stay reproducible; a new scenario-set version picks up the new chunk.",
+        "a new hash is a new input; old manifests unchanged"
+      ]
+    },
+    {
+      "id": "cache",
+      "heading": "Artifact cache: a content-addressed store with an index",
+      "kicker": "Technology · artifact cache",
+      "title": "Stage outputs stored by the hash of everything that made them",
+      "pick": "CAS blobs on GCS + a Bigtable index",
+      "why": "A key that hashes everything a stage read hits only when recomputing would give the same output.",
+      "how": "Key = SHA-256(image digest, params, seed, mode, input keys). The blob is written first, then the index row, so a row always finds a whole blob.",
+      "detail": "About 100 TB of perception outputs for 20 versions of the gate set, plus exploratory outputs evicted by last access after 30 days. Bigtable rows are tiny (≈ 200 bytes); lookups are batched per scenario. 1 % of hits are re-computed by the auditor and compared byte for byte (challenge 6).",
+      "rejected": [
+        [
+          "Redis",
+          "100 TB does not belong in memory, and silent eviction loses cited results."
+        ],
+        [
+          "A Bazel remote cache",
+          "A near-equal for build actions; small outputs, eviction not tied to gate sets."
+        ]
+      ],
+      "summary": [
+        "Artifact cache",
+        "CAS on GCS + Bigtable",
+        "Redis, Bazel cache",
+        "key = hash of everything read"
+      ],
+      "course": "building-blocks course, part 7 §7.12 (integrity) and part 9 §9.1 (caching patterns)",
+      "parts": "7 §7.12, 9 §9.1",
+      "drill": [
+        "A stage reads an environment variable that is not in its key. What breaks?",
+        "The cache returns an output computed under a different value: a poisoned hit that no key comparison can see. The fix is hermeticity: stages run in a sandbox where only the manifest's inputs exist, so anything a stage can read is in its key.",
+        "hermetic sandbox; nothing readable outside the key"
+      ]
+    },
+    {
+      "id": "sched",
+      "heading": "Scheduler: Kubernetes with Kueue",
+      "kicker": "Technology · scheduler",
+      "title": "Kueue on Kubernetes: quotas per team, priority for the gate",
+      "pick": "Kubernetes + Kueue, a ClusterQueue per team",
+      "why": "Admission by quota with borrowing, priority and preemption, on the cluster we already run.",
+      "how": "Gates run in a reserved, top-priority queue; teams share a cohort and borrow idle quota. Exploratory jobs are preemptible at stage boundaries.",
+      "detail": "GPU pools by type; gang admission for multi-GPU stages. Fair share by team over a rolling day. A gate needs ≈ 1,040 GPUs for four hours if nothing is cached, ≈ 300 with the usual hit rate; the reserved queue holds 400 and borrows the rest.",
+      "rejected": [
+        [
+          "One FIFO queue",
+          "The gate waits behind exploration; one team fills the pool."
+        ],
+        [
+          "Slurm",
+          "Strong at fair share; a separate world from our Kubernetes images."
+        ]
+      ],
+      "summary": [
+        "Scheduler",
+        "Kubernetes + Kueue",
+        "FIFO queue, Slurm",
+        "quota, borrowing, preemption"
+      ],
+      "course": "building-blocks course, part 15 §15.4 (priority, quota and preemption) and §15.8 (task leasing)",
+      "parts": "15 §15.4, 15.8"
+    },
+    {
+      "id": "res",
+      "heading": "Results store and catalog: ClickHouse and PostgreSQL",
+      "kicker": "Technology · results and catalog",
+      "title": "Metrics in columns; manifests and scenario sets in rows",
+      "pick": "ClickHouse for metrics; PostgreSQL for manifests",
+      "why": "Six billion metric rows a month are scanned by column; manifests and verdicts must be transactional.",
+      "how": "`metric(run, scenario, name, value)` in ClickHouse, ordered by (scenario, name, run). Manifests, sets and verdicts in PostgreSQL, immutable once written.",
+      "detail": "A gate decision compares 50,000 scenarios × ~1,000 metrics for two runs: 100 M values, a few seconds in a columnar store. Manifests are rows with content hashes; a scenario set is a versioned list of (chunk range, tags).",
+      "rejected": [
+        [
+          "PostgreSQL for metrics",
+          "Six billion narrow rows a month: every comparison is a slow scan."
+        ],
+        [
+          "Elasticsearch",
+          "Search over text, not paired numbers across 50,000 scenarios."
+        ]
+      ],
+      "summary": [
+        "Results, catalog",
+        "ClickHouse; PostgreSQL",
+        "Postgres for metrics, Elasticsearch",
+        "columns for metrics, rows for manifests"
+      ],
+      "course": "building-blocks course, part 14 §14.9 (columnar storage) and part 8 §8.1 (isolation)",
+      "parts": "14 §14.9, 8 §8.1"
+    }
+  ],
+  "challenges": {
+    "1": [
+      "A fixed random seed",
+      "it removes one source of difference; threads, GPU atomic adds and the wall clock still reorder the computation."
+    ],
+    "2": [
+      "Caching by build number",
+      "a new build invalidates every stage, and a stage whose dependency changed under the same name serves a stale hit."
+    ],
+    "3": [
+      "One FIFO queue",
+      "the release gate waits behind exploration, and one team can fill the cluster."
+    ],
+    "4": [
+      "Frame-by-frame comparison with the log",
+      "after the ego diverges, the log no longer shows what the other road users would have done."
+    ],
+    "5": [
+      "A fixed threshold against yesterday's run",
+      "noise moves it, the baseline drifts, and nobody can say later why a build passed."
+    ],
+    "6": [
+      "Pass-rate dashboards",
+      "a gate that cannot fail looks exactly like a gate that is passing."
+    ]
+  }
+}

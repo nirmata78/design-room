@@ -1,0 +1,140 @@
+/* set per solution: --qid below (the slide-number label) */
+:root { --qid: "SD-94"; }
+/* Reference-solution video slides · Google theme (2026-11-22; was the "scientific" serif style of 2026-11-21).
+   On top of pdf-kit style.css + deck.css. 13.333 × 7.5 in → 1920 × 1080 frames.
+   Plus Jakarta Sans for titles and statements, Inter for prose, labels and tables, Roboto Mono for code; booktabs tables, hairline rules,
+   a white page. Colour means role and is used sparingly: red only for a failure, green only for a fix, blue for "new", yellow for a hedge or a cost. */
+/* colour and type tokens: pdf-kit/google-theme.css (loaded after this file) */
+body { background: #fff; color: var(--ink); }
+.slide { padding: 0.5in 0.75in 0.6in; background: #fff; font-family: var(--body); }
+/* number of the logical slide (every reveal step of one slide carries the same number) */
+.slide::after { content: var(--qid, "SD") " · " attr(data-n); position: absolute; right: 0.4in; bottom: 0.22in; font: 600 11pt/1 var(--sans);
+  letter-spacing: 1pt; color: var(--faint); }
+/* kicker + title */
+.slide .k { font: 650 12.5pt/1.2 var(--sans); letter-spacing: 2.2pt; text-transform: uppercase; color: var(--g-blue-ink); margin-bottom: 7pt; }
+.slide .k.r { color: var(--g-red-ink); }
+.slide h1 { font: 700 31pt/1.12 var(--display); letter-spacing: -0.3pt; margin: 0 0 16pt !important; padding: 0 0 10pt;
+  border-bottom: 0.9pt solid var(--rule); color: var(--ink); }
+.slide.dia { padding-top: 0.4in; }
+.slide.dia h1 { font-size: 26pt; margin-bottom: 8pt !important; padding-bottom: 6pt; }
+.slide h1.q { color: #202124; border-bottom-color: #f4c7c3; }
+.slide h1.q::before { content: "Q"; font: 800 0.62em/1 var(--sans); color: #fff; background: var(--red); padding: 3pt 7pt 4pt;
+  border-radius: 2pt; margin-right: 12pt; vertical-align: 4pt; }
+.vtag { display: inline-block; font: 800 0.6em/1 var(--sans); color: #fff; background: var(--accent); padding: 4pt 8pt; border-radius: 2pt;
+  margin-right: 12pt; vertical-align: 4pt; letter-spacing: .5pt; }
+.chips { font: 600 14pt/1.3 var(--sans); color: var(--g-blue-ink); margin: -8pt 0 10pt; letter-spacing: .2pt; }
+.chips i { font-style: normal; color: var(--rule); margin: 0 10pt; }
+/* figures */
+.slide figure.grow { display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 0; min-height: 0; }
+.slide figure.grow svg { width: 100%; height: 100%; max-height: 100%; flex: 1; min-height: 0; }
+.slide figcaption { font: italic 14pt/1.3 var(--body); color: var(--muted); margin-top: 4pt; align-self: flex-start; }
+/* tables: booktabs — a heavy top and bottom rule, a light rule under the header, nothing vertical */
+table.bt { width: 100%; border-collapse: collapse; font: 20pt/1.36 var(--body); border-top: 1.6pt solid var(--ink);
+  border-bottom: 1.6pt solid var(--ink); margin: 2pt 0 14pt; background: none; }
+table.bt th { font: 650 12pt/1.2 var(--sans); letter-spacing: 1.4pt; text-transform: uppercase; color: var(--muted); background: none;
+  text-align: left; padding: 9pt 12pt 8pt; border-bottom: 0.8pt solid var(--ink); }
+table.bt td { padding: 8pt 12pt; border-bottom: 0.5pt solid var(--hair); vertical-align: top; }
+table.bt tr:last-child td { border-bottom: 0; }
+table.bt.sm { font-size: 17.5pt; } table.bt.sm td { padding: 7pt 11pt; } table.bt.sm th { padding: 8pt 11pt 7pt; }
+table.bt.xs { font-size: 14pt; line-height: 1.3; } table.bt.xs td { padding: 5pt 10pt; } table.bt.xs th { padding: 6pt 10pt 5pt; }
+table.bt td b { font-weight: 700; }
+table.bt code, .slide td code { font: 12.5pt "Roboto Mono", monospace; background: none; padding: 0; color: #1967d2; }
+/* options matrix: the pick marked, rejected rows kept and greyed */
+table.mx tr.pick td { background: var(--green-bg); } table.mx tr.pick td:first-child { box-shadow: inset 5pt 0 0 var(--green); padding-left: 16pt; }
+table.mx tr.rej td { color: var(--faint); } table.mx tr.rej td:first-child { text-decoration: line-through; text-decoration-thickness: 1pt; }
+table.mx.tech tr.rej td:first-child { text-decoration: none; color: var(--muted); font-weight: 600; }
+table.mx.tech tr.rej td { color: #3c4043; }
+table.mx.tech td:first-child { width: 28%; }
+table.sig td:nth-child(2) { color: #202124; } table.sig td:nth-child(3) { color: #202124; }
+/* trace: one event per row, time first */
+table.tl { width: 100%; border-collapse: collapse; font: 20.5pt/1.4 var(--body); border-top: 1.6pt solid var(--ink);
+  border-bottom: 1.6pt solid var(--ink); margin: 0 0 14pt; }
+table.tl th { font: 600 14pt/1.4 var(--sans); color: var(--muted); text-align: left; white-space: nowrap; width: 1%;
+  padding: 9pt 18pt 9pt 4pt; vertical-align: top; letter-spacing: .3pt; }
+table.tl td { padding: 9pt 6pt; border-bottom: 0.5pt solid var(--hair); }
+table.tl tr:last-child td, table.tl tr:last-child th { border-bottom: 0; }
+table.tl .bad { color: var(--g-red-ink); font-weight: 700; } table.tl .ok, table.tl .good { color: var(--g-green-ink); font-weight: 700; }
+table.tl code { font: 15pt "Roboto Mono", monospace; background: none; }
+/* cards: hairline boxes, a thin coloured rule on the left names the role */
+.cards { display: grid; gap: 16pt; margin-top: 4pt; }
+.cards.c2 { grid-template-columns: 1fr 1fr; } .cards.c3 { grid-template-columns: 1fr 1fr 1fr; } .cards.c4 { grid-template-columns: repeat(4, 1fr); }
+.cd { border: 0.8pt solid var(--rule); border-left: 4pt solid var(--accent); border-radius: 1pt; padding: 14pt 18pt; background: #fff; }
+.cd h3 { font: 650 13pt/1.25 var(--sans); letter-spacing: 1.3pt; text-transform: uppercase; color: var(--g-blue-ink); margin: 0 0 8pt; }
+.cd p, .cd li { font: 19pt/1.42 var(--body); color: var(--ink); margin: 0 0 6pt; }
+.cd.red { border-left-color: var(--red); } .cd.red h3 { color: var(--g-red-ink); }
+.cd.amb { border-left-color: var(--amber); } .cd.amb h3 { color: var(--g-yellow-ink); }
+.cd.grn { border-left-color: var(--green); } .cd.grn h3 { color: var(--g-green-ink); }
+.tiles { display: grid; gap: 16pt; grid-template-columns: repeat(var(--n, 4), 1fr); margin: 10pt 0 22pt; }
+.tile { border-top: 1.6pt solid var(--ink); padding: 14pt 4pt 10pt; }
+.tile b { display: block; font: 700 42pt/1.05 var(--display); color: var(--ink); letter-spacing: -0.5pt; }
+.tile.red b { color: var(--g-red-ink); } .tile.blue b { color: var(--g-blue-ink); }
+.tile span { display: block; font: 15pt/1.35 var(--sans); color: var(--muted); margin-top: 8pt; }
+.line { font: 600 21pt/1.36 var(--body); border-left: 4pt solid var(--green); padding: 10pt 20pt; color: #202124; margin-top: auto; background: none; }
+.line.r { border-left-color: var(--red); color: #202124; } .line.a { border-left-color: var(--amber); color: #202124; }
+/* case / fix / why / hedge strips under a diagram */
+.strip { display: grid; grid-template-columns: 1fr 1fr; gap: 16pt; margin-top: 10pt; }
+.strip.one { grid-template-columns: 1fr; } .strip.three { grid-template-columns: 1fr 1fr 1fr; }
+.case, .fixb, .whyb, .hedge, .techhow { font: 16.5pt/1.38 var(--body); padding: 9pt 14pt 10pt; border-left: 4pt solid; background: none; border-radius: 0; }
+.case b.t, .fixb b.t, .whyb b.t, .hedge b.t, .techhow b.t { display: block; font: 650 11pt/1.2 var(--sans); letter-spacing: 1.6pt;
+  text-transform: uppercase; margin-bottom: 4pt; }
+.case { border-color: var(--red); color: #202124; background: var(--red-bg); } .case b.t { color: var(--g-red-ink); }
+.fixb { border-color: var(--green); color: #202124; background: var(--green-bg); } .fixb b.t { color: var(--g-green-ink); }
+.whyb { border-color: var(--accent); color: #202124; background: var(--blue-bg); } .whyb b.t { color: var(--g-blue-ink); }
+.hedge { border-color: var(--amber); color: #202124; background: var(--amber-bg); } .hedge b.t { color: var(--g-yellow-ink); }
+.techhow { border-color: var(--accent); color: var(--ink); margin: 0 0 10pt; font-size: 15.5pt; } .techhow b.t { color: var(--g-blue-ink); }
+.techhow code { font: 14pt "Roboto Mono", monospace; background: none; color: #1967d2; }
+/* one line under a fix: the rejected tool, in bold, and the property that rules it out */
+.rejb { font: 15.5pt/1.35 var(--body); color: #3c4043; border-left: 4pt solid var(--faint); padding: 5pt 14pt 6pt; margin-top: 8pt; }
+.rejb b.t { font: 650 11pt/1 var(--sans); letter-spacing: 1.6pt; text-transform: uppercase; color: var(--muted); margin-right: 12pt; }
+.rejb b:not(.t) { font-weight: 650; color: var(--ink); }
+.rejb code { font: 13.5pt "Roboto Mono", monospace; background: none; color: inherit; }
+.cite { font: italic 13.5pt/1.3 var(--body); color: var(--muted); margin-top: auto; }
+.grade { font: 16.5pt/1.38 var(--body); padding: 9pt 14pt; border-left: 4pt solid var(--violet); background: var(--violet-bg); color: #202124; margin-top: auto; }
+.grade b.t { display: block; font: 650 11pt/1.2 var(--sans); letter-spacing: 1.6pt; text-transform: uppercase; color: var(--violet); margin-bottom: 3pt; }
+/* theory: properties and the THEORY badge */
+.slide.theory .k { color: var(--violet); }
+.slide.theory::before { content: "THEORY"; position: absolute; top: 0.26in; right: 0.75in; font: 650 10.5pt/1 var(--sans);
+  letter-spacing: 2pt; padding: 4pt 8pt; color: var(--violet); border: 0.8pt solid var(--violet); }
+.prop { border-left: 4pt solid var(--violet); padding: 8pt 18pt 9pt; margin-bottom: 12pt; }
+.prop .lbl { font: 650 11.5pt/1 var(--sans); letter-spacing: 2pt; text-transform: uppercase; color: var(--violet); }
+.prop p { font: 19.5pt/1.38 var(--body); margin: 6pt 0 0; }
+.prop.safe { border-left-color: var(--red); } .prop.safe .lbl { color: var(--g-red-ink); }
+.prop.live { border-left-color: var(--green); } .prop.live .lbl { color: var(--g-green-ink); }
+/* interviewer question slides */
+.qs { justify-content: center; background: #fff; padding-left: 1.1in; }
+.qs::before { content: ""; position: absolute; left: 0.6in; top: 1.2in; bottom: 1.2in; border-left: 4pt solid var(--g-yellow); }
+.qs .who { font: 650 13pt/1 var(--sans); letter-spacing: 2.4pt; color: var(--g-yellow-ink); text-transform: uppercase; }
+.qs .qq { font: 600 38pt/1.2 var(--display); letter-spacing: -0.3pt; color: #202124; margin: 16pt 0 22pt; max-width: 11.2in; }
+.qs .ans { margin-top: 14pt; font: 21pt/1.4 var(--body); border-left: 4pt solid var(--green); padding: 10pt 20pt; max-width: 11.2in; color: #202124; }
+.qs .pz { margin-top: 18pt; font: 650 12pt/1 var(--sans); letter-spacing: 2pt; text-transform: uppercase; color: var(--faint); }
+.qs .pz::before { content: "❚❚"; margin-right: 9pt; font-size: 0.85em; }
+/* statement slides: chapter cards, thesis, key lines, "if asked, I'd say" — light paper, a serif statement */
+.th { background: var(--paper); color: var(--ink); justify-content: center; padding: 0.9in 1.1in; }
+.th .lbl { font: 650 13pt/1 var(--sans); letter-spacing: 2.6pt; color: var(--g-blue-ink); text-transform: uppercase; }
+.th .s { font: 600 40pt/1.2 var(--display); letter-spacing: -0.4pt; margin: 18pt 0 20pt; max-width: 11.2in; color: var(--ink); }
+.th .s em { font-style: italic; color: var(--g-blue-ink); }
+.th .sub { font: italic 20pt/1.45 var(--body); color: var(--muted); max-width: 11in; }
+.th.card .s { font-size: 54pt; font-weight: 700; } .th.card .lbl { font-size: 15pt; }
+.th.say { background: #fff; border-left: 0; }
+.th.say::before { content: ""; position: absolute; left: 0.7in; top: 1.3in; bottom: 1.3in; border-left: 3pt solid var(--accent); }
+.th.say .s { font: 600 29pt/1.4 var(--display); letter-spacing: 0; }
+.ribbon { display: flex; gap: 0; margin: 26pt 0 0; border-top: 1.2pt solid var(--rule); }
+.ribbon span { flex: 1; font: 600 11.5pt/1 var(--sans); padding: 10pt 4pt 0; color: var(--faint); text-align: center; white-space: nowrap;
+  letter-spacing: .6pt; border-top: 3pt solid transparent; margin-top: -2pt; }
+.ribbon span.done { color: var(--muted); border-top-color: var(--rule); }
+.ribbon span.on { color: var(--g-blue-ink); border-top-color: var(--accent); font-weight: 800; }
+/* manager layer */
+.slide.aux::before { content: "AUX · EM LAYER · OPTIONAL IN A STAFF / IC ROUND"; position: absolute; top: 0.26in; right: 0.75in;
+  font: 650 10.5pt/1 var(--sans); letter-spacing: 1.2pt; padding: 4pt 8pt; color: var(--g-yellow-ink); border: 0.8pt solid var(--amber); }
+/* code and wire formats */
+pre.code, pre.wire { font: 16.5pt/1.5 "Roboto Mono", monospace; background: #f8f9fa; border: 0; border-top: 1.2pt solid var(--ink);
+  border-bottom: 1.2pt solid var(--ink); border-radius: 0; padding: 12pt 18pt; white-space: pre; position: relative; margin: 0 0 12pt; }
+pre.code::before, pre.wire::before { content: "pseudocode"; position: absolute; top: 7pt; right: 10pt; font: 650 10pt/1 var(--sans);
+  letter-spacing: 1.5pt; text-transform: uppercase; color: var(--faint); }
+pre.wire::before { content: "wire format"; } pre.code[data-lang]::before { content: attr(data-lang); }
+pre .cm { color: #5f6368; font-style: italic; } pre .kw { color: var(--g-red-ink); font-weight: 700; } pre .st { color: var(--g-green-ink); } pre .fn, pre .k { color: var(--g-blue-ink); }
+.cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16pt; }
+.tr { display: flex; flex-wrap: wrap; gap: 7pt; margin: 0 0 10pt; }
+.tr span { font: 650 12pt/1 var(--sans); padding: 5pt 9pt; border: 0.8pt solid; letter-spacing: .4pt; }
+.tr .fr { color: var(--g-blue-ink); } .tr .api { color: var(--violet); } .tr .ent { color: var(--g-green-ink); } .tr .nfr { color: var(--g-yellow-ink); }
+.cd ul { margin: 0; padding-left: 20pt; } .cd li { margin-bottom: 5pt; }

@@ -1,0 +1,21 @@
+"Retry with backoff" is the answer that double-charges a customer. The grade is on what you do instead.
+
+I've published a 82-minute reference solution for a payment system and its double-entry ledger at the Staff bar: theory, a three-version design, and six challenges, on 549 numbered slides.
+
+The idea that unlocks it: exactly-once does not exist across the bank boundary, so build one effect per intent, a state for "not knowing yet", and books you can reconcile.
+
+What it goes into:
+→ The bank timed out: an UNKNOWN state and an inquiry by your own reference
+→ Why partition by merchant, not by account (and a million one-time cards)
+→ Gateway or direct processor, with the break-even
+→ Debezium, and what to use instead below 1,000 events a second
+
+Best on a second pass: pause after each question and answer it first.
+
+▶ [YouTube link: rerun publish_kit.py with --youtube-url]
+
+It's a scripted walkthrough with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator.
+
+Do you integrate a gateway or a processor directly, and at what volume did you switch?
+
+#SystemDesign #SoftwareEngineering #DistributedSystems

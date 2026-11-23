@@ -1,0 +1,185 @@
+{
+  "_doc": "Single source for SD-97's technology choices (compact cut). Read by video/src/stack.py for the 5.1 technology slides, the stack table, the fix-slide 'Rejected' lines and the C4 technology labels, and by `stack.py sync` for the booklet and OUTLINE.md regions.",
+  "c4": {
+    "uplink": [
+      "Vehicle uplink",
+      "C++, on the vehicle",
+      "Buffer, priorities."
+    ],
+    "gw": [
+      "Telemetry gateway",
+      "EMQX (MQTT 5), mTLS",
+      "Per-vehicle identity."
+    ],
+    "log": [
+      "Telemetry log",
+      "Kafka, by vehicle ID",
+      "Per-vehicle order."
+    ],
+    "upd": [
+      "State updater",
+      "Flink, keyed by vehicle",
+      "Newer seq only."
+    ],
+    "live": [
+      "Live store",
+      "Go, in memory, H3",
+      "Latest per vehicle."
+    ],
+    "map": [
+      "Map API",
+      "Go, WebSockets",
+      "Cell subscriptions."
+    ],
+    "lake": [
+      "History lake",
+      "Iceberg on GCS",
+      "Day × vehicle bucket."
+    ],
+    "replay": [
+      "Replay API",
+      "Trino over Iceberg",
+      "One vehicle, one hour."
+    ]
+  },
+  "stack": [
+    {
+      "id": "log",
+      "heading": "Telemetry log: Kafka, keyed by vehicle ID",
+      "kicker": "Technology · telemetry log",
+      "title": "Kafka keyed by vehicle: even load and per-vehicle order",
+      "pick": "Kafka, 512 partitions, keyed by vehicle ID",
+      "why": "Even load, and each vehicle's messages in order on one partition.",
+      "how": "Topic `positions`, partition = hash(vehicle); a separate `safety` topic. Three days on the brokers.",
+      "detail": "300 MB/s at peak, 900 MB/s with replication. Keying by geo cell was rejected: a vehicle crossing a cell boundary would change partitions, losing per-vehicle order, and a stadium's cell would be one hot partition.",
+      "rejected": [
+        [
+          "Keying by geo cell",
+          "Hot partitions; a moving vehicle loses its order."
+        ],
+        [
+          "Google Pub/Sub",
+          "An honest equal with ordering keys."
+        ]
+      ],
+      "summary": [
+        "Telemetry log",
+        "Kafka by vehicle ID",
+        "keyed by cell, Pub/Sub",
+        "per-vehicle order; even load"
+      ],
+      "course": "building-blocks course, part 10 §10.2 and §10.6 (partitioned logs, ordering)",
+      "parts": "10 §10.2, 10.6"
+    },
+    {
+      "id": "live",
+      "heading": "Live store: the SD-39 index, holding vehicles instead of drivers",
+      "kicker": "Technology · live store",
+      "title": "The latest position per vehicle, in memory, by H3 cell",
+      "pick": "Go service, in memory, H3 res 9, per city",
+      "why": "Only the latest matters, and 2 M vehicles fit in 400 MB.",
+      "how": "vehicle → (cell, position, seq) and cell → vehicles, with per-cell change counters. Older seq is dropped.",
+      "detail": "The same design as SD-39's location index, at resolution 9 because the map zooms further in. Hot cells (> 300 vehicles) are split further; each cell also keeps a count at resolutions 6 and 7 for zoomed-out maps.",
+      "rejected": [
+        [
+          "Redis GEO",
+          "No per-cell change feed, no expiry per member."
+        ],
+        [
+          "The history lake",
+          "Minutes behind, built for scans."
+        ]
+      ],
+      "summary": [
+        "Live store",
+        "in-memory H3, per city",
+        "Redis GEO, the lake",
+        "latest only; per-cell change feed"
+      ],
+      "course": "building-blocks course, part 6 §6.5 (hot keys) and SD-39 (location index)",
+      "parts": "6 §6.5"
+    },
+    {
+      "id": "map",
+      "heading": "Map API: viewports subscribe to cells",
+      "kicker": "Technology · map API",
+      "title": "A viewport is a set of cells; the server pushes what changed",
+      "pick": "Go, WebSockets, a 1 s push tick",
+      "why": "Deltas for subscribed cells cost far less than every client polling.",
+      "how": "A viewport maps to cells at its zoom's resolution; each second the server pushes changes, or counts when zoomed out.",
+      "detail": "About 5,000 concurrent viewers. At city zoom a viewport is ~100 resolution-7 cells sent as counts; at street zoom ~50 resolution-9 cells sent as vehicles. A viewer pans: subscribe the new cells, send their snapshot, then deltas.",
+      "rejected": [
+        [
+          "Polling a bounding box",
+          "5,000 scans of the hottest cells a second."
+        ],
+        [
+          "Every vehicle in view",
+          "200,000 points at city zoom."
+        ]
+      ],
+      "summary": [
+        "Map API",
+        "WebSockets, cell subscriptions",
+        "polling, all points",
+        "deltas per cell; counts when zoomed out"
+      ],
+      "course": "building-blocks course, part 11 §11.6 (push) and part 10 §10.10 (fan-out)",
+      "parts": "11 §11.6, 10 §10.10"
+    },
+    {
+      "id": "lake",
+      "heading": "History lake: Iceberg, partitioned by day and vehicle bucket",
+      "kicker": "Technology · history lake",
+      "title": "History laid out for “one vehicle, one hour”",
+      "pick": "Iceberg on GCS, Parquet, day × 256 vehicle buckets",
+      "why": "One vehicle's hour becomes one bucket and a range read.",
+      "how": "Partitioned by (event day, hash(vehicle) mod 256), sorted by vehicle and seq; late positions go to their event day.",
+      "detail": "About 52 TB a month at ~50 bytes a position, 1.25 PB for two years. ML training reads whole days in bulk; audits read one bucket and filter. Snapshots pin what a replay read.",
+      "rejected": [
+        [
+          "Arrival-hour partitions",
+          "One replay scans everyone; late fixes land in the wrong hour."
+        ],
+        [
+          "A time-series database",
+          "Not for 10¹² positions with per-vehicle replay."
+        ]
+      ],
+      "summary": [
+        "History lake",
+        "Iceberg, day × bucket",
+        "ingest-hour partitions, TSDB",
+        "one vehicle's hour is a range read"
+      ],
+      "course": "building-blocks course, part 7 §7.10 (blob layout) and part 14 §14.9 (columnar storage)",
+      "parts": "7 §7.10, 14 §14.9"
+    }
+  ],
+  "challenges": {
+    "1": [
+      "Writing every arriving position to the live store",
+      "a three-minute-old buffered fix overwrites the position from one second ago."
+    ],
+    "2": [
+      "Keying the log by geo cell",
+      "a stadium's cell becomes one hot partition and vehicles lose their order as they move."
+    ],
+    "3": [
+      "Clients polling a bounding box",
+      "5,000 viewers scan the hottest cells every second."
+    ],
+    "4": [
+      "Flushing the buffer oldest first",
+      "the map stays three minutes behind for the whole flush, and safety events queue behind history."
+    ],
+    "5": [
+      "Partitioning history by arrival time",
+      "a vehicle's hour is spread over every file that arrived late, and one replay scans everyone."
+    ],
+    "6": [
+      "Consumer-lag dashboards",
+      "lag can be zero while a vehicle on the map is 40 seconds stale."
+    ]
+  }
+}

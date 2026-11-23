@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<path d="M140.0,73.2 L140.0,69.9" fill="none" stroke="#5f6368" stroke-width="1.5"/>
+<path d="M640.0,73.2 L640.0,69.9" fill="none" stroke="#5f6368" stroke-width="1.5"/>
+<path d="M558.1,166.8 L539.3,177.5" fill="none" stroke="#5f6368" stroke-width="1.5"/>
+<path d="M1140.0,73.2 L1140.0,69.9" fill="none" stroke="#5f6368" stroke-width="1.5"/>
+<path d="M1240.0,120.0 L1252.6,120.0" fill="none" stroke="#5f6368" stroke-width="1.5"/>
+<path d="M1240.0,540.0 L1287.7,540.0" fill="none" stroke="#5f6368" stroke-width="1.5"/>
+<path d="M640.0,586.8 L640.0,590.1" fill="none" stroke="#5f6368" stroke-width="1.5"/>
+<path d="M240.0,120.0 L295.0,120.0" fill="none" stroke="#3c4043" stroke-width="2.2"/>
+<path d="M485.0,120.0 L540.0,120.0" fill="none" stroke="#3c4043" stroke-width="7"/><path d="M485.0,120.0 L540.0,120.0" fill="none" stroke="#ffffff" stroke-width="3"/>
+<path d="M740.0,120.0 L793.6,120.0" fill="none" stroke="#3c4043" stroke-width="2.2"/>
+<path d="M986.4,120.0 L1040.0,120.0" fill="none" stroke="#3c4043" stroke-width="2.2"/>
+<path d="M1140.0,166.8 L1140.0,272.8" fill="none" stroke="#3c4043" stroke-width="2.2"/>
+<path d="M1140.0,387.2 L1140.0,493.2" fill="none" stroke="#3c4043" stroke-width="2.2"/>
+<path d="M140.0,493.2 L140.0,387.2" fill="none" stroke="#3c4043" stroke-width="2.2"/>
+<path d="M140.0,272.8 L140.0,166.8" fill="none" stroke="#3c4043" stroke-width="2.2"/>
+<path d="M1040.0,540.0 L985.0,540.0" fill="none" stroke="#3c4043" stroke-width="2.2"/>
+<path d="M795.0,540.0 L740.0,540.0" fill="none" stroke="#3c4043" stroke-width="2.2"/>
+<path d="M640.0,493.2 L640.0,387.2" fill="none" stroke="#3c4043" stroke-width="2.2"/>
+<path d="M640.0,272.8 L640.0,166.8" fill="none" stroke="#3c4043" stroke-width="2.2"/>
+<path d="M1140.0,586.8 L1140.0,602.8" fill="none" stroke="#3c4043" stroke-width="2.2"/>
+<path d="M1140.0,717.2 L1140.0,733.2" fill="none" stroke="#3c4043" stroke-width="2.2"/>
+<rect x="40.0" y="73.2" width="200.0" height="93.6" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<text x="140.0" y="129.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.3" font-weight="700" fill="#202124">EVENT</text>
+<rect x="540.0" y="73.2" width="200.0" height="93.6" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<text x="640.0" y="129.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.3" font-weight="700" fill="#202124">SEAT</text>
+<rect x="1040.0" y="73.2" width="200.0" height="93.6" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<text x="1140.0" y="129.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.3" font-weight="700" fill="#202124">HOLD</text>
+<rect x="40.0" y="493.2" width="200.0" height="93.6" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<text x="140.0" y="549.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.3" font-weight="700" fill="#202124">FAN</text>
+<rect x="540.0" y="493.2" width="200.0" height="93.6" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<text x="640.0" y="549.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.3" font-weight="700" fill="#202124">TICKET</text>
+<rect x="1040.0" y="493.2" width="200.0" height="93.6" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<text x="1140.0" y="549.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.3" font-weight="700" fill="#202124">ORDER</text>
+<rect x="986.3" y="733.2" width="307.4" height="93.6" fill="#e8f0fe" stroke="#4285f4" stroke-width="2.4"/>
+<rect x="992.3" y="739.2" width="295.4" height="81.6" fill="none" stroke="#4285f4" stroke-width="1.8"/>
+<text x="1140.0" y="789.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="27.3" font-weight="700" fill="#202124">PAYMENT ATTEMPT</text>
+<path d="M390.0,62.8 L485.0,120.0 L390.0,177.2 L295.0,120.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<text x="390.0" y="128.6" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="22.4" font-weight="700" fill="#202124">HAS</text>
+<path d="M890.0,62.8 L986.4,120.0 L890.0,177.2 L793.6,120.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<text x="890.0" y="128.6" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="22.4" font-weight="700" fill="#202124">HELD BY</text>
+<path d="M1140.0,272.8 L1236.4,330.0 L1140.0,387.2 L1043.6,330.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<text x="1140.0" y="338.6" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="22.4" font-weight="700" fill="#202124">BECOMES</text>
+<path d="M140.0,272.8 L235.0,330.0 L140.0,387.2 L45.0,330.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<text x="140.0" y="338.6" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="22.4" font-weight="700" fill="#202124">JOINS</text>
+<path d="M890.0,482.8 L985.0,540.0 L890.0,597.2 L795.0,540.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<text x="890.0" y="548.6" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="22.4" font-weight="700" fill="#202124">ISSUES</text>
+<path d="M640.0,272.8 L735.0,330.0 L640.0,387.2 L545.0,330.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<text x="640.0" y="338.6" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="22.4" font-weight="700" fill="#202124">FOR</text>
+<path d="M1140.0,602.8 L1244.5,660.0 L1140.0,717.2 L1035.5,660.0 Z" fill="#fef7e0" stroke="#b06000" stroke-width="2.4"/>
+<path d="M1140.0,607.7 L1235.5,660.0 L1140.0,712.3 L1044.5,660.0 Z" fill="none" stroke="#b06000" stroke-width="1.8"/>
+<text x="1140.0" y="668.6" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="22.4" font-weight="700" fill="#202124">TRIED AS</text>
+<ellipse cx="140.0" cy="40.0" rx="82.3" ry="29.9" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="140.0" y="47.5" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="20.8" fill="#202124" font-weight="700">event_id</text>
+<line x1="90.1" y1="52.9" x2="189.9" y2="52.9" stroke="#202124" stroke-width="1.6"/>
+<ellipse cx="640.0" cy="40.0" rx="74.8" ry="29.9" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="640.0" y="47.5" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="20.8" fill="#202124" font-weight="700">seat_id</text>
+<line x1="596.3" y1="52.9" x2="683.7" y2="52.9" stroke="#202124" stroke-width="1.6"/>
+<ellipse cx="500.0" cy="200.0" rx="59.7" ry="29.9" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="500.0" y="207.5" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="20.8" fill="#202124">state</text>
+<ellipse cx="1140.0" cy="40.0" rx="74.8" ry="29.9" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="1140.0" y="47.5" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="20.8" fill="#202124" font-weight="700">hold_id</text>
+<line x1="1096.3" y1="52.9" x2="1183.7" y2="52.9" stroke="#202124" stroke-width="1.6"/>
+<ellipse cx="1350.0" cy="120.0" rx="97.4" ry="29.9" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="1350.0" y="127.5" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="20.8" fill="#202124">expires_at</text>
+<ellipse cx="1370.0" cy="540.0" rx="82.3" ry="29.9" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="1370.0" y="547.5" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="20.8" fill="#202124" font-weight="700">order_id</text>
+<line x1="1320.1" y1="552.9" x2="1419.9" y2="552.9" stroke="#202124" stroke-width="1.6"/>
+<ellipse cx="640.0" cy="620.0" rx="74.8" ry="29.9" fill="#ffffff" stroke="#5f6368" stroke-width="1.8"/>
+<text x="640.0" y="627.5" text-anchor="middle" font-family="'Roboto Mono', monospace" font-size="20.8" fill="#202124">barcode</text>
+<text x="267.5" y="149.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="26.0" font-weight="700" fill="#ea4335">1</text>
+<text x="512.5" y="149.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="26.0" font-weight="700" fill="#ea4335">N</text>
+<text x="766.8" y="149.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="26.0" font-weight="700" fill="#ea4335">N</text>
+<text x="1013.2" y="149.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="26.0" font-weight="700" fill="#ea4335">1</text>
+<text x="1120.0" y="229.7" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="26.0" font-weight="700" fill="#ea4335">1</text>
+<text x="1120.0" y="450.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="26.0" font-weight="700" fill="#ea4335">1</text>
+<text x="160.0" y="450.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="26.0" font-weight="700" fill="#ea4335">N</text>
+<text x="160.0" y="229.7" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="26.0" font-weight="700" fill="#ea4335">M</text>
+<text x="1012.5" y="529.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="26.0" font-weight="700" fill="#ea4335">1</text>
+<text x="767.5" y="529.9" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="26.0" font-weight="700" fill="#ea4335">N</text>
+<text x="660.0" y="450.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="26.0" font-weight="700" fill="#ea4335">1</text>
+<text x="660.0" y="229.7" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="26.0" font-weight="700" fill="#ea4335">1</text>
+<text x="1120.0" y="604.7" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="26.0" font-weight="700" fill="#ea4335">1</text>
+<text x="1120.0" y="735.1" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="26.0" font-weight="700" fill="#ea4335">N</text>
+<rect x="1384" y="692" width="36" height="16" fill="#e8f0fe" stroke="#4285f4" stroke-width="1.6"/>
+<text x="1434" y="705.2" font-family="Inter, Roboto, sans-serif" font-size="15" fill="#202124">entity</text>
+<rect x="1384" y="719" width="36" height="16" fill="#e8f0fe" stroke="#4285f4" stroke-width="1.6"/>
+<rect x="1388" y="723" width="28" height="8" fill="none" stroke="#4285f4" stroke-width="1.2"/>
+<text x="1434" y="732.2" font-family="Inter, Roboto, sans-serif" font-size="15" fill="#202124">weak entity</text>
+<path d="M1402,744 L1422,754 L1402,764 L1382,754 Z" fill="#fef7e0" stroke="#b06000" stroke-width="1.6"/>
+<text x="1434" y="759.2" font-family="Inter, Roboto, sans-serif" font-size="15" fill="#202124">relationship</text>
+<path d="M1402,771 L1422,781 L1402,791 L1382,781 Z" fill="#fef7e0" stroke="#b06000" stroke-width="1.6"/>
+<path d="M1402,776 L1412,781 L1402,786 L1392,781 Z" fill="none" stroke="#b06000" stroke-width="1.2"/>
+<text x="1434" y="786.2" font-family="Inter, Roboto, sans-serif" font-size="15" fill="#202124">identifying relationship</text>
+<ellipse cx="1402" cy="808" rx="20" ry="9" fill="#fff" stroke="#5f6368" stroke-width="1.4"/>
+<text x="1434" y="813.2" font-family="Inter, Roboto, sans-serif" font-size="15" fill="#202124">attribute</text>
+<ellipse cx="1402" cy="835" rx="20" ry="9" fill="#fff" stroke="#5f6368" stroke-width="1.4"/>
+<line x1="1393" y1="838" x2="1411" y2="838" stroke="#202124" stroke-width="1.4"/>
+<text x="1434" y="840.2" font-family="Inter, Roboto, sans-serif" font-size="15" fill="#202124">key attribute (underlined)</text>
+<ellipse cx="1402" cy="862" rx="20" ry="9" fill="#fff" stroke="#5f6368" stroke-width="1.4"/>
+<ellipse cx="1402" cy="862" rx="15" ry="5" fill="none" stroke="#5f6368" stroke-width="1"/>
+<text x="1434" y="867.2" font-family="Inter, Roboto, sans-serif" font-size="15" fill="#202124">multivalued attribute</text>
+<ellipse cx="1402" cy="889" rx="20" ry="9" fill="#fff" stroke="#5f6368" stroke-width="1.4" stroke-dasharray="4 3"/>
+<text x="1434" y="894.2" font-family="Inter, Roboto, sans-serif" font-size="15" fill="#202124">derived attribute</text>
+<line x1="1382" y1="916" x2="1422" y2="916" stroke="#3c4043" stroke-width="6"/><line x1="1382" y1="916" x2="1422" y2="916" stroke="#fff" stroke-width="2.4"/>
+<text x="1434" y="921.2" font-family="Inter, Roboto, sans-serif" font-size="15" fill="#202124">total participation (every one takes part)</text>
+<rect x="180" y="800" width="800" height="88.9" rx="6" fill="#fef7e0" stroke="#b06000" stroke-width="1.2"/>
+<text x="194" y="830.9" font-family="Inter, Roboto, sans-serif" font-size="24.7" fill="#202124">A seat has at most one live hold; the seat row is the truth,</text>
+<text x="194" y="864.2" font-family="Inter, Roboto, sans-serif" font-size="24.7" fill="#202124">the hold row is bookkeeping.</text>
+</svg>
