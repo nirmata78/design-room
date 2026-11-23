@@ -1,91 +1,86 @@
 # SD-44 · Payment processing and the double-entry ledger: reference-solution video
 
-Staff bar (L6/L7), manager layer marked AUX. **Length 73:56**, 18 chapters, **160 numbered slides**, **8,977 spoken words**
-(candidate 85.1 %, interviewer 4.0 %, key line 7.6 %, coach 3.4 %). Built 2026-11-20 in the SD-94 reference format; it replaces
-the earlier 26-minute mock round, which has been retired. Scripted walkthrough
-with synthetic voices; numbers are illustrative, not any company's figures; not legal, accounting or compliance advice.
-**The technical content has not been reviewed by a person, and the video has not been watched end to end.**
+Staff bar (L6/L7), **compact cut** (GUIDELINES §3.4). **Length 1:22:26**, 9 chapters plus 6 challenge sub-chapters and 5.1 / 5.2, **138 numbered slides** in **549 reveal frames**,
+**9,737 spoken words** (candidate 86.2 %, interviewer 2.9 %, key line 6.5 %, coach 4.4 %). Rebuilt 2026-11-22 from the earlier
+retrofit; a few minutes over the 80-minute compact target because of the material added on request (partition key, runtime, gateway
+or processor, Debezium alternatives). Scripted walkthrough with synthetic voices; numbers are illustrative, not any company's figures;
+not legal, accounting or compliance advice. **The technical content has not been reviewed by a person, and the video has not been
+watched end to end.**
 
-Output: `payments-ledger-reference.mp4` (local only). Written companion: `../SD-44_Payments_Ledger_Reference_Design.md` (PDF beside it, 31 pages).
-Publish kit: `publish/` (YouTube title, description with chapters, tags, thumbnail, LinkedIn post). Plan: `OUTLINE.md`.
+Output: `payments-ledger-reference.mp4` with `payments-ledger-reference.srt` and `.vtt` beside it (local only; no subtitle stream).
+Written companion: `../SD-44_Payments_Ledger_Reference_Design.md` (PDF beside it, 41 pages). Publish kit: `publish/`. Plan: `OUTLINE.md`.
 
 ## Chapters
 
 | Time | Chapter |
 |---|---|
 | 00:00 | 0 Cold open |
-| 03:00 | 1 Requirements and scope |
-| 07:43 | 2 Estimates |
-| 12:18 | 3 Theory |
-| 21:53 | 4 API and entities |
-| 27:36 | 5 High-level design |
-| 36:46 | 6 Bridge |
-| 37:28 | 7 Challenges |
-| 37:47 | 7.1 Challenge 1: The bank timed out |
-| 42:24 | 7.2 Challenge 2: Three retries at once |
-| 46:38 | 7.3 Challenge 3: A crash between the ledger and the event |
-| 49:57 | 7.4 Challenge 4: The hot merchant |
-| 53:24 | 7.5 Challenge 5: Refunds, and a chargeback months later |
-| 57:10 | 7.6 Challenge 6: 999,998 against 1,000,000 |
-| 60:57 | 7.7 Challenge 7: A bug double-posted forty thousand entries |
-| 64:39 | 7.8 Challenge 8: How would you know before finance does? |
-| 68:35 | 8 Build cost (AUX) |
-| 71:08 | 9 Recap |
+| 02:39 | 1 Requirements and scope |
+| 08:29 | 2 Estimates |
+| 13:03 | 3 Theory |
+| 22:46 | 4 API and entities |
+| 28:04 | 5 High-level design |
+| 36:20 | 5.1 Components and technologies |
+| 46:44 | 5.2 When you don't need all this |
+| 48:26 | 6 Bridge |
+| 49:23 | 7 Challenges |
+| 49:42 | 7.1 Challenge 1: The bank timed out |
+| 54:30 | 7.2 Challenge 2: Three retries at once |
+| 59:18 | 7.3 Challenge 3: A crash between the ledger and the event |
+| 63:43 | 7.4 Challenge 4: The hot merchant, and a million one-time accounts |
+| 69:26 | 7.5 Challenge 5: 999,998 against 1,000,000 |
+| 74:06 | 7.6 Challenge 6: How would you know before finance does? |
+| 78:47 | 8 Recap |
 
-## The eight challenges
+## The six challenges
 
-| # | Challenge | The fix |
-|---|---|---|
-| 1 | The bank timed out | Attempt committed before the call; UNKNOWN; inquiry and reversal by our reference; settlement file as arbiter |
-| 2 | Three retries at once | Idempotency key inserted first, unique, with a request hash; 409 / stored response / 422 |
-| 3 | A crash between the ledger and the event | Transactional outbox, at-least-once relay, de-duplication by event ID |
-| 4 | The hot merchant | Append entries, derived balance; sub-accounts or one writer for the rare checked operation |
-| 5 | Refunds and a late chargeback | New transactions dated now; the refund limit as one conditional update |
-| 6 | 999,998 against 1,000,000 | Expectations from the ledger, line-by-line match, owned and aged breaks |
-| 7 | 40,000 double-posted entries | Kill switch, payout hold, reversing entries tagged with the incident, receivables; a (payment, type) constraint |
-| 8 | How would you know? | Approval rate per segment, UNKNOWN age, zero-sum ledger page, synthetic payments, symptom pairs |
+| # | Challenge | The fix, one level down | Rejected |
+|---|---|---|---|
+| 1 | The bank timed out | attempt row before the call; UNKNOWN by conditional update; inquiry by our reference; breaker, never fail over an unknown | treating a timeout as a decline |
+| 2 | Three retries at once | unique insert of the key with a request hash in the payment's transaction; 409 / stored / 422 | check, then insert |
+| 3 | A crash between the ledger and the event | outbox row in the transaction; Debezium reads the log through a slot, commit order, at least once | publish after the commit |
+| 4 | The hot merchant, and a million one-time accounts (V4) | insert-only entries, projector, payout writer; an account is a row, not a partition | one balance row per payment |
+| 5 | 999,998 against 1,000,000 | expectations by reference, line-by-line match, owned breaks; a spike is an incident (reversing entries) | matching on amount and time |
+| 6 | How would you know before finance does? | approval rate by segment, UNKNOWN age, slot lag, unmatched by age, zero-sum, a probe | alerting on the error rate |
+
+## Answers to the author's review of 2026-11-22
+
+| Question | Where |
+|---|---|
+| Why partition by account? A million one-time accounts? | it is **not** partitioned by account: slide "The partition key" (chapter 5), estimates, challenge 4 second push; booklet "The partition key" and 6.4 |
+| State machine appears piece by piece | chapter 4, 12 steps (`diagrams.py`, `states`) |
+| ERD appears piece by piece | chapter 4, both models build up entity by entity (`order=`) |
+| Why Go; against Python, Java, WebFlux, Quarkus, Rust | 5.1 "Why Go" table and narration; booklet "Runtime" and the `runtime` entry of `stack.json` |
+| Fastest ledger for a small business | booklet "Building a payment ledger for your own business: the ladder"; TigerBeetle in challenge 4 and `payments-db` |
+| Gateway or processor; why gateways | 5.1 table with the break-even; 5.2; booklet "Gateway or processor" |
+| Why Debezium; alternatives | `outbox-log` technology slide (polling relay, own decoding consumer, managed capture); challenge 3 second push; booklet detail |
+
+## Canon check
+
+See `OUTLINE.md`. Covered: keys, double entry, UNKNOWN and inquiry, outbox, reconciliation, hot accounts and the partition key, refunds
+and chargebacks as new transactions, PCI scope, gateway against processor. Dismissed aloud: FX, fraud scoring, payouts, KYC.
 
 ## Rebuild
 
 ```bash
-solutions/SD-44-payments-ledger/video/build-video.sh            # diagrams -> slides + script -> frames -> payments-ledger-reference.mp4
+solutions/SD-44-payments-ledger/video/build-video.sh            # diagrams -> slides + script -> layout gate -> frames -> payments-ledger-reference.mp4
 solutions/SD-44-payments-ledger/video/build-video.sh --frames   # stop after the frames
 solutions/SD-44-payments-ledger/build-sd-booklet.sh SD-44_Payments_Ledger_Reference_Design   # the written reference design (PDF)
 ```
 
-Slides and script are generated together from `video/src/*.py` (copied DSL from SD-94): edit the sources, not `video-slides.html` or
-the script. The booklet is assembled from `booklet-src/*.md` (`cat booklet-src/*.md > SD-44_Payments_Ledger_Reference_Design.md`).
+Slides and script are generated together from `video/src/*.py`: edit the sources, not `video-slides.html` or the script. Technologies
+are edited in `../stack.json` only (`stack.py sync` regenerates the booklet's and outline's marked regions). The booklet's Markdown
+is now the source (the old `booklet-src/` was removed).
 
 ## QA done
 
-- `ffprobe`: H.264 1920x1080, AAC, a chapter data stream (18 chapters); no subtitle stream. Duration 1:13:56.
-- Audio intelligibility (`check_audio.py`, 8 excerpts of 60 s across the length): Whisper confidence -0.17 to -0.30; 5 suspect
-  substitutions, four of them function words (an/and, in/and, "your call" heard as "you're cool"); one real: "auth" in "auth pending"
-  heard as "off". Not re-voiced.
-- Sync probe at 66:40 and 58:20: the burned caption matches the slide's narration.
-- Frames: all 160 slides read on contact sheets before the build (fixed: baseline compressed vertically so it reads larger, budget-bar
-  label clipped, idempotency box text overflow, row-four boxes clipped in short views, ERD edges and legend). Eight frames sampled from the MP4.
-- Booklet: built clean (no missing glyphs after replacing the approximately sign), 31 pages tiled and read; pages 9 and 22 read zoomed.
-- **Not watched end to end.**
-
-## Canon check
-
-| Canonical point | Source | Covered at, or dismissed because |
-|---|---|---|
-| Pay-in flow through a payment service and an external processor | standard treatments; cue sheet | Ch. 5 V1–V3; FR1 flow |
-| Hosted payment page / tokenisation to keep card data out of scope | standard treatments | Ch. 1 OUT; ch. 8 V1 |
-| Double-entry ledger | all | M3; ch. 4 worked example; C5 |
-| Idempotency keys; exactly-once as at-least-once + idempotent effect | all | M1; precision statement in theory 1; C2 |
-| Retry with backoff; dead-letter for failures | standard treatments | C1 (retries carry the reference); C3 (webhooks with backoff); dead-letter = break or aged UNKNOWN |
-| Reconciliation with settlement files | all | M6; C6 |
-| Handling a PSP timeout / unknown outcome | cue sheet (crux) | C1 |
-| Sagas and compensations | cue sheet | Options matrix row C; C1 reversal; dismissed as the core model because compensation can itself be unknown |
-| Outbox | cue sheet | M4; C3 |
-| Hot account | cue sheet | C4 |
-| Wallet / stored balance product | some treatments | Dismissed aloud: a different product (stored value) with its own regulation; the same journal underneath |
-| Payouts to merchants | some treatments | OUT (SD-81); payout checks in C4 and C7 |
-| Fraud | all | OUT (SD-43), one call in the latency budget |
-| Multi-currency | cue sheet | Ch. 4 (currency on every amount); C5 second fix |
-| What changed since older treatments | — | Network tokens and processor idempotency keys are now common, which makes M5 easier; the UNKNOWN state is still needed |
-
-
+- Layout gate: **0 failures**, 7 warnings (`dense`: slides 4, 53, 64–69 carry 100–126 words against the cap of 95; every one is a table or
+  a technology slide whose content is the point). No `redraw` warnings.
+- ffprobe: H.264 + AAC, 1920 × 1080, 9 chapters plus 6 challenge sub-chapters and 5.1 / 5.2 plus 6 sub-chapters, no subtitle stream, 82:16.
+- Captions: 1,117 cues; first cue at 0:01 (the card's lead pause), last ends about 3 s before the end (the closing pause); no line over 42
+  characters or more than 2 lines; every VTT cue carries a `<v Name>` voice span.
+- Contact sheets: the last step of all 138 slides read as images before rendering; eight frames sampled across the finished video.
+- Audio intelligibility (faster-whisper, 22 excerpts of 30 s, 6 of them in 5.1 and the challenges): 10 suspect words, all Whisper
+  noise (an, and, timeout and, owned, hot/hard, writer/rider); no technology name (Debezium, Kafka, PostgreSQL, Go, WebFlux) flagged.
+- Sync probe at 75:14 (challenge 6 trace): each row appears with its own sentence. The first render had a defect found by this probe
+  (a helper that auto-prepended a marker moved 15 slides one sentence early); it was removed and every one of those slides re-marked by hand.

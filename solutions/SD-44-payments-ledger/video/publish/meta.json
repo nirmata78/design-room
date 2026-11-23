@@ -4,18 +4,34 @@
   "thumbnail": {
     "kicker": "Staff reference solution",
     "title": "The bank timed out.<br><em>Now what?</em>",
-    "sub": "Idempotency keys, an UNKNOWN state, a double-entry journal, and reconciliation.",
+    "sub": "Idempotency keys, an UNKNOWN state, a double-entry journal, reconciliation. Why Go, why a gateway, why Debezium.",
     "id": "design-room · SD-44"
   },
   "youtube": {
-    "title": "Payment System & Double-Entry Ledger Design: Staff-Level Reference Solution",
+    "title": "Payment System & Double-Entry Ledger Design: Staff-Level Reference (Idempotency, Outbox, Gateway)",
     "playlist": "System design reference solutions · design-room (create it once, reuse it)",
-    "tags": ["system design", "system design interview", "payment system design", "double entry ledger", "idempotency", "exactly once", "transactional outbox", "reconciliation", "fintech system design", "staff engineer", "distributed systems", "software architecture"],
+    "tags": [
+      "system design",
+      "system design interview",
+      "payment system design",
+      "double entry ledger",
+      "idempotency",
+      "transactional outbox",
+      "debezium",
+      "change data capture",
+      "reconciliation",
+      "stripe vs processor",
+      "payment gateway",
+      "partition key",
+      "fintech system design",
+      "staff engineer",
+      "distributed systems"
+    ],
     "description_top": [
-      "The happy path of a payment is three boxes and a database. This question is about the other paths: a bank call that times out and leaves you not knowing whether the customer paid, three retries of the same payment at once, a refund ninety days later, and a statement that disagrees with your books. A full reference solution at the Staff bar (L6/L7): theory, a three-version design, eight challenges that break it, and the build cost. {DURATION} minutes, {SLIDES} numbered slides, with an interviewer, a candidate and a coach.",
-      "The thesis: exactly-once does not exist across a network boundary. So the design is at-least-once delivery, one effect per intent, a state for \"we don't know yet\", and a reconciliation that finds what the rest missed, all on an append-only double-entry journal where a balance is a sum, never a field.",
-      "IN THIS VIDEO\n• Estimates as arithmetic: 40,000 journal entries a second, a hot merchant at 5,000 a second against one row lock, a 2-second budget the processor owns\n• Theory: safety and liveness, seven mechanisms, an options matrix (including why a distributed transaction with the bank is impossible)\n• Eight challenges: the bank timed out, three retries at once, a crash between ledger and event, the hot merchant, refunds and a late chargeback, 999,998 against 1,000,000, a bug that double-posted 40,000 entries, and how you would know\n• The build cost and the one-way doors (marked AUX, the manager layer)",
-      "HOW TO USE IT\nRun the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first. Slides badged AUX are the manager layer: skip them in a Staff round."
+      "The happy path of a payment is three boxes and a database. This question is about the other paths: a bank call that times out and leaves you not knowing whether the customer paid, three retries at once, and a statement that disagrees with your books. A compact reference solution at the Staff bar (L6/L7): theory, a three-version design, technology choices against their rivals, an alternate path for a small business, and six challenges that break it. {DURATION} minutes, {SLIDES} numbered slides, with an interviewer, a candidate and a coach.",
+      "The thesis: exactly-once does not exist across a network boundary. So the design is at-least-once delivery, one effect per intent, a state for not knowing yet, and a reconciliation that finds what the rest missed, on an append-only double-entry journal.",
+      "IN THIS VIDEO\n• Estimates from one scale line: 9 billion payments a month, 40,000 journal entries a second, 580 TB in seven years\n• Why the partition key is the merchant and not the account, and what changes with a million one-time accounts\n• Why Go, against Java virtual threads, Spring WebFlux, Python and Rust\n• Gateway or direct processor: what a gateway buys, what it costs, the break-even\n• Debezium against a polling relay and the other ways to read the log\n• Six challenges: the timeout, three retries, a crash before the event, the hot merchant, 999,998 against 1,000,000, and how you would know first",
+      "HOW TO USE IT\nRun the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first."
     ],
     "description_bottom": [
       "LINKS\nWritten reference design: https://github.com/nirmata78/design-room/blob/main/solutions/SD-44-payments-ledger/SD-44_Payments_Ledger_Reference_Design.md\nRun this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room\nAll videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md",
@@ -25,15 +41,15 @@
   },
   "linkedin": {
     "post": [
-      "Your payment call times out. Did the customer pay? \"Mark it failed\" is how double charges happen.",
-      "I've published a {DURATION}-minute reference solution for the payment system and double-entry ledger question, at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on {SLIDES} numbered slides.",
-      "The idea that unlocks it: exactly-once does not exist across a network boundary. So you design for one effect per intent, a state for \"we don't know yet\", and a reconciliation that finds what everything else missed.",
-      "What it goes into:\n→ A timeout is a state: UNKNOWN, then an inquiry by your own reference\n→ Idempotency keys are inserted, not checked\n→ A balance is a sum of immutable entries, never a column\n→ Reconciliation is a component, not a safety net",
+      "\"Retry with backoff\" is the answer that double-charges a customer. The grade is on what you do instead.",
+      "I've published a {DURATION}-minute reference solution for a payment system and its double-entry ledger at the Staff bar: theory, a three-version design, and six challenges, on {SLIDES} numbered slides.",
+      "The idea that unlocks it: exactly-once does not exist across the bank boundary, so build one effect per intent, a state for \"not knowing yet\", and books you can reconcile.",
+      "What it goes into:\n→ The bank timed out: an UNKNOWN state and an inquiry by your own reference\n→ Why partition by merchant, not by account (and a million one-time cards)\n→ Gateway or direct processor, with the break-even\n→ Debezium, and what to use instead below 1,000 events a second",
       "Best on a second pass: pause after each question and answer it first.",
       "▶ {YOUTUBE_URL}",
       "It's a scripted walkthrough with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator.",
-      "When your books and the processor's disagree by two, where do you start?",
-      "#SystemDesign #SoftwareEngineering #Fintech"
+      "Do you integrate a gateway or a processor directly, and at what volume did you switch?",
+      "#SystemDesign #SoftwareEngineering #DistributedSystems"
     ],
     "first_comment": "Written reference design, stage by stage: https://github.com/nirmata78/design-room/blob/main/solutions/SD-44-payments-ledger/SD-44_Payments_Ledger_Reference_Design.md\n\nRun this round yourself, with an AI interviewer that won't help you: https://github.com/nirmata78/design-room",
     "document": {

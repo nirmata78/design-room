@@ -1,129 +1,275 @@
 from dsl import *
+from stack import TECH, SUMMARY, SUMMARY_SAY, STACK, say_text
+import re
+P = "[+]"
 
 # ───────────────────────── 4 · API and entities ─────────────────────────
 chapter(4, "API and entities", 3, "The contract first. It forces the semantics into the open.", [
- "C: The A-P-I before the boxes. It is the contract with every merchant, and it shows whether I have thought about failure. Every call carries a tag: the requirement it serves and the entity it reads or writes."])
+ "C: The A-P-I before the boxes. It is the contract with every merchant, and it shows whether I have thought about failure. Every call carries a tag: the requirement it serves and the entity it touches."])
 
-def wire(l, r): return f'<div class="cols2"><pre class="wire">{l}</pre><pre class="wire">{r}</pre></div>'
-
-S(plain("API · pay", "POST /v1/payments", tr(("fr", "serves FR1"), ("api", "POST /payments"), ("ent", "writes Idempotency · Payment · Attempt · JournalTxn"), ("nfr", "idempotent")) +
-  wire('<span class="cm">// request</span>\nPOST /v1/payments\nIdempotency-Key: k-91\n{ merchantId: "m-42",\n  amount: { value: 1050,\n            currency: "EUR" },\n  methodToken: "tok_7c1…",\n  capture: "auto" }',
-       '<span class="cm">// response</span>\n201 { paymentId: "p-7731",\n      status: "captured" }\n\n<span class="cm">// or, honestly</span>\n202 { paymentId: "p-7731",\n      status: "pending" }\n\n<span class="cm">// same key, other body → 422\n// same key, in flight  → 409</span>')), [
- "C: Pay. The client sends an idempotency key in a header, and a body with the merchant, the amount and a token for the card. The amount is an integer in minor units with its currency: one thousand and fifty cents, never ten point five as a float. The card number never reaches us: a token does.",
- "C: The response is the payment I-D and a status, and the status can honestly be pending. The same key with a different body is rejected with a four twenty-two. The same key while the first is still in flight gets a four-oh-nine: retry later."])
+S(plain("API · pay (FR1)", "POST /v1/payments: a key, minor units, an honest pending",
+  tr(("fr", "serves FR1"), ("api", "POST /payments"), ("ent", "writes Payment · Attempt · JournalTxn"), ("nfr", "idempotent")) +
+  code('POST /v1/payments\nIdempotency-Key: k-91\n{"merchantId": "m-42",\n "amount": {"value": 1050,\n            "currency": "EUR"},\n "methodToken": "tok_7c1…",\n "capture": "auto"}\n201 {"paymentId": "p-7731", "status": "captured"}\n202 {"paymentId": "p-7731", "status": "pending"}', "http", hl=(2, 4, 8, 9))), [
+ "C: Pay. The client sends an idempotency key in a header, and a body with the merchant, the amount and a token for the card.",
+ "C: The amount is an integer in minor units with its currency: one thousand and fifty cents, never ten point five as a float. The card number never reaches us: a token does.",
+ "C: The answer is the payment I-D and a status, and the status can honestly be pending. The same key with a different body is a four twenty-two. The same key while the first is in flight is a four-oh-nine."])
 
 S(dia("API · the payment's states", "A state machine with an exit from “unknown”", "states", chip=chips("UNKNOWN is a state", "illegal transitions rejected")), [
- "C: Behind that status is an explicit state machine. Created, then auth pending when we send it. From there, authorised or declined, or the red one: unknown, on a timeout or an ambiguous answer. Unknown has exactly two exits: the inquiry says approved, or the processor says not found after its safe window.",
- "C: Then captured, settled when the file matches, partially refunded, refunded, and chargeback. Any transition not drawn here is rejected by the code. A capture on a declined payment is not a bug to handle later: it cannot happen."], cls="dia")
+ P, "C: Behind that status is a state machine, drawn one state at a time. A payment is created.", P,
+ "C: It becomes auth pending when we send it.", P,
+ "C: From there, authorised when the processor approves.", P,
+ "C: Declined, when it declines.", P,
+ "C: Or the red one: unknown, on a timeout or an ambiguous answer.", P,
+ "C: Unknown has two exits. The inquiry says approved, and the payment becomes authorised.", P,
+ "C: Or the processor says not found after its safe window, and it becomes declined.", P,
+ "C: Authorised becomes captured.", P,
+ "C: Captured becomes settled when the file matches.", P,
+ "C: Captured can be partly refunded.", P,
+ "C: And then refunded in full.", P,
+ "C: And a settled payment can be disputed: a chargeback. Any transition not drawn here is rejected by the code. A capture on a declined payment is not a bug to handle later: it cannot happen."], cls="dia")
 
-S(plain("API · capture, void, refund", "Adjustments are new operations, never edits", tr(("fr", "serves FR1 · FR2"), ("api", "capture · void · refunds"), ("ent", "writes Payment · JournalTxn"), ("nfr", "idempotent")) +
-  wire('<span class="cm">// each with its own Idempotency-Key</span>\nPOST /v1/payments/p-7731/capture\n     { amount: 1050 }\nPOST /v1/payments/p-7731/void\nPOST /v1/payments/p-7731/refunds\n     { amount: 2500 }',
-       '<span class="cm">// the refund limit, one statement</span>\nUPDATE payment\n SET refunded = refunded + :amt\n WHERE id = :p\n   AND refunded + :amt &lt;= captured\n<span class="cm">// 0 rows → 422 exceeds captured</span>')), [
- "C: Capture, void and refund are separate calls, each with its own idempotency key. Each one creates a new journal transaction that references the payment. Nothing is edited.",
- "C: The refund limit is enforced by one conditional update on the payment row: add the amount only if the total stays within what was captured. Zero rows updated means the refund is refused. That one statement will matter in challenge five."])
-
-S(plain("API · notify", "Webhooks, and the poll that backs them up", tr(("fr", "serves FR3"), ("api", "webhook · GET /payments/{id}"), ("ent", "reads Outbox · Payment")) +
-  wire('<span class="cm">// to the merchant, signed</span>\nPOST https://merchant/hooks\nSignature: t=…, v1=…\n{ eventId: "e-551",\n  type: "payment.captured",\n  paymentId: "p-7731",\n  status: "captured" }',
-       '<span class="cm">// retried with backoff for days\n// merchants de-duplicate by eventId</span>\n\n<span class="cm">// the backstop: always correct</span>\nGET /v1/payments/p-7731\n -> { status: "captured", … }')), [
- "C: Notify. Every state change becomes a signed webhook with an event I-D. It is retried with backoff, for days if necessary, so a merchant may see the same event twice and de-duplicates by event I-D.",
- "C: And the backstop: a get on the payment always returns the state from our database. A merchant who missed every webhook can still find out."])
-
-S(plain("API · internal calls", "Inquiry, settlement import, balance", tr(("fr", "serves FR1 · FR4 · FR5"), ("api", "Inquire · ImportSettlement · balance"), ("ent", "Attempt · SettlementLine · Break · BalanceProjection")) +
-  wire('<span class="cm">// our reference per attempt</span>\nInquire(processor, "p-7731/1")\n -> approved | declined | not_found\n\n<span class="cm">// the raw file is stored unchanged</span>\nImportSettlement(file)\nGET /breaks?status=open&amp;age&gt;1d',
-       '<span class="cm">// balance, from the projection</span>\nGET /v1/accounts/acc-9/balance\n -> { balance: 18204400,\n      currency: "EUR",\n      asOfEntry: 991200731 }\n\n<span class="cm">// for audit: the sum over entries\n// for the period, joined to txns</span>')), [
- "C: Three internal calls. Inquire asks a processor about our own reference for one attempt: payment I-D, slash, attempt number. Import settlement stores the processor's file unchanged before anything reads it. And breaks are listed by status and age.",
- "C: A balance comes from the projection, and says which entry it is current to. For an audit, the answer is the sum over entries for the period, joined to their transactions and payments."])
+S(plain("API · the rest of the surface", "Every endpoint, tagged", table(["Endpoint", "Serves", "Touches", "The point"], [
+  ["<code>POST …/capture · …/void</code>", "FR1 · FR2", "Payment, JournalTxn", "its own key; a new transaction, nothing edited"],
+  ["<code>POST …/refunds</code>", "FR2", "Payment, JournalTxn", "limit: one conditional update on the payment row"],
+  ["<code>webhook</code> to the merchant", "FR3", "Outbox", "signed, retried for days, at least once"],
+  ["<code>GET /v1/payments/{id}</code>", "FR3", "Payment", "the backstop: always the database's state"],
+  ["<code>Inquire(processor, ref)</code>", "FR1 · FR4", "Attempt", "our reference: payment ID, slash, attempt number"],
+  ["<code>GET /v1/accounts/{id}/balance</code>", "FR5", "Balance projection", "says the entry it is current to"]], "bt xs mx")), [
+ "C: The rest of the surface, each tagged.", P,
+ "C: Capture and void, each with its own key, each a new transaction that references the payment. Nothing is edited.", P,
+ "C: Refunds. The limit is one conditional update on the payment row: add the amount only if the total stays within what was captured.", P,
+ "C: Webhooks, signed, retried with backoff for days. A merchant may see an event twice and de-duplicates by event I-D.", P,
+ "C: A get on the payment: the backstop. A merchant who missed every webhook can still find the state.", P,
+ "C: Inquire asks a processor about our own reference for one attempt.", P,
+ "C: And a balance, from the projection, which says which entry it is current to."])
 
 S(dia("Data · conceptual model", "Entities and relationships, in Chen notation", "erd-chen"), [
- "C: The conceptual model. A payment has attempts: one per call to a processor, each with our reference. A payment posts journal transactions. A transaction contains entries, at least two, and each entry is on one account. A balance is a derived attribute of an account: the sum of its entries.",
- "C: A break, from reconciliation, may explain one transaction. The double borders are weak entities: an attempt only exists inside its payment, and an entry only inside its transaction."], cls="dia")
+ "C: The conceptual model, one entity at a time.", P,
+ "C: A payment, with its state and its merchant.", P,
+ "C: It has attempts: one per call to a processor, each with our reference. An attempt only exists inside its payment.", P,
+ "C: A payment posts journal transactions.", P,
+ "C: A transaction contains entries, at least two, and an entry exists only inside its transaction.", P,
+ "C: Each entry is on one account, which also belongs to a merchant. A balance is a derived attribute of an account: the sum of its entries.", "[+2]",
+ "C: And a break, from reconciliation, may explain one transaction."], cls="dia")
 
 S(dia("Data · physical model", "Tables, keys, and what is allowed to change", "erd-physical"), [
- "C: The physical model. Journal entries are partitioned by account and only ever inserted. Journal transactions carry the payment and the type, and a check at commit that debits equal credits per currency. The payment row is the only mutable row, and it is changed only by conditional updates.",
- "C: Idempotency keys with their request hash and stored response, kept seven days. The outbox, written in the same transaction as the state. And a balance projection that can be rebuilt from the entries at any time."], cls="dia")
+ "C: The physical tables, one at a time.", P,
+ "C: Journal entries, keyed by merchant, account and entry, hashed into sixty-four partitions by merchant, and only ever inserted.", P,
+ "C: Journal transactions carry the payment and the type, with a check at commit that debits equal credits.", P,
+ "C: The payment row is the only mutable row, changed only by conditional updates.", P,
+ "C: Idempotency keys, with their request hash and stored response, kept seven days.", P,
+ "C: The outbox, written in the same transaction as the state.", "[+2]",
+ "C: And a balance projection that can be rebuilt from the entries at any time."], cls="dia")
 
 S(dia("Data · a worked example", "One capture, as balanced entries", "entries", chip=chips("integer minor units", "debits = credits")), [
- "C: A worked example. A capture of one thousand and fifty, with a fee of thirty. The processor receivable is debited one thousand and fifty: the processor owes us that. The merchant payable is credited one thousand and twenty: we owe the merchant that. And fee revenue is credited thirty. Debits, one thousand and fifty. Credits, one thousand and fifty. Balanced.",
- "C: A refund is a new transaction that mirrors these lines. Nothing in this one ever changes."], cls="dia")
-
-S(plain("Data · money", "Three rules about amounts", '<div class="cards c3">'
-  '<div class="cd red"><h3>Never a float</h3><p>0.1 + 0.2 is not 0.3 in binary floating point. Integer minor units only.</p></div>'
-  '<div class="cd"><h3>A currency on every amount</h3><p>An amount without its currency is a bug waiting for the second currency.</p></div>'
-  '<div class="cd amb"><h3>Conversion is a transaction</h3><p>With the rate it used, versioned. Never a silent multiply.</p></div></div>'), [
- "C: Three rules about amounts, because they are cheap to state and expensive to forget. Never a float: in binary floating point, point one plus point two is not point three, and the error ends up in someone's balance. A currency on every amount. And conversion, if it ever happens, is its own transaction, with the rate it used, versioned."])
+ "C: A worked example. A capture of one thousand and fifty, with a fee of thirty.", P,
+ "C: The processor receivable is debited one thousand and fifty: the processor owes us that.", P,
+ "C: The merchant payable is credited one thousand and twenty: we owe the merchant that.", P,
+ "C: Fee revenue is credited thirty.", P,
+ "C: Debits one thousand and fifty, credits one thousand and fifty: balanced.", P,
+ "C: A refund is a new transaction that mirrors these lines. Three rules about amounts, cheap to state and expensive to forget: never a float, a currency on every amount, and a conversion is its own transaction with the rate it used."], cls="dia")
 
 # ───────────────────────── 5 · high-level design ─────────────────────────
-chapter(5, "High-level design", 4, "Three versions, each answering the objection to the one before", [
- "C: Now the design, in three versions. Each version is introduced by the objection to the one before. The boxes never move: every later picture is a view of the same baseline."])
+chapter(5, "High-level design", 4, "Three versions on one picture, then every path", [
+ "C: The design in three versions. Each answers the objection to the one before, and it is one picture from here to the end: later slides only show what changes on it."])
 
-S(dia("High-level design · version 1 of 3", "The simplest thing that works", "base-v1", vtag="V1",
-      chip=chips("one service", "one database", "a synchronous call")), [
- "C: Version one. The merchant calls the payments A-P-I. The payment service charges the card at the processor, synchronously. When the answer comes back, it updates the payment's status and the merchant's balance column in one transaction, and answers. It is the simplest thing that works, and many first versions look exactly like this."], cls="dia")
+S(dia("Design · version 1", "The simplest thing that works", "base-v1", vtag="V1", chip=chips("one service", "one database", "a synchronous call")), [
+ "C: Version one, drawn in the order a payment travels.", P,
+ "C: The merchant.", P, "C: Calls the payments A-P-I.", P, "C: Which hands it to the payment service.", P,
+ "C: The service records the payment in one database: a status, and a balance column.", P,
+ "C: And charges the card at the processor, synchronously. It is the simplest thing that works. The objection comes next."], cls="dia")
 
-S(plain("V1 · the objection", "A timeout, a retry, and two charges",
-  '<pre class="trace"><span class="t">10:00:00.000  </span>p-7731 sent to the processor, 1,050\n<span class="t">10:00:01.900  </span>no answer: marked <span class="bad">failed</span>\n<span class="t">10:00:02.400  </span>the processor approves it\n<span class="t">10:00:05.000  </span>the checkout retries as a new payment p-7744: approved\n<span class="t">10:00:05.000  </span><span class="bad">the customer has two holds of 1,050</span>\n<span class="t">next month    </span>auditor: “why is this balance 18,204,400?” <span class="bad">no history</span></pre>', red=True), [
- "C: The objection, as a trace. At ten o'clock the payment goes to the processor. At one point nine seconds, no answer, so version one marks it failed. At two point four seconds the processor approves it anyway. At five seconds the checkout retries as a new payment, which is approved. The customer now has two holds.",
- "C: And next month an auditor asks why a balance is what it is, and the answer is a number that was updated in place. There is no history to show."])
+S(trace("V1 · the objection", "A timeout, a retry, and two charges", [
+  ("10:00:00.000", "p-7731 is sent to the processor for 1,050"),
+  ("10:00:01.900", "no answer: marked <span class='bad'>failed</span>"),
+  ("10:00:02.400", "the processor approves it"),
+  ("10:00:05.000", "the checkout retries as a new payment p-7744: approved; <span class='bad'>two holds of 1,050</span>"),
+  ("next month", "an auditor asks why this balance is 18,204,400: <span class='bad'>there is no history</span>")]), [
+ "C: The objection, as a trace.", P, "C: The payment goes to the processor.", P,
+ "C: At one point nine seconds, no answer, so version one marks it failed.", P, "C: Half a second later the processor approves it anyway.", P,
+ "C: The checkout retries as a new payment, which is approved. The customer has two holds.", P,
+ "C: And next month an auditor asks why a balance is what it is, and the answer is a number that was updated in place."])
 
-S(dia("High-level design · version 2 of 3", "One effect per intent, and books that prove themselves", "base-v2", vtag="V2",
+S(dia("Design · version 2", "One effect per intent, and books that prove themselves", "base-v2", vtag="V2",
       chip=chips("key inserted first", "attempt committed before the call", "UNKNOWN", "journal")), [
- "C: Version two. The A-P-I inserts the idempotency key first. The payment service commits the payment as auth pending, with an attempt and our reference, before it calls out. A new adapter calls the processor with that reference. And the database now holds a journal: balanced, immutable entries, with balances as a projection.",
- "C: A timeout now moves the payment to unknown instead of failed, and a retry with the same key gets the same answer instead of a new payment."], cls="dia")
+ P, "C: Version two. Everything from version one stays where it was.", P,
+ "C: New: a processor adapter. The A-P-I now inserts the idempotency key first. The payment service commits the payment as auth pending, with an attempt and our own reference, before it calls out, and the adapter calls the processor with that reference. The database holds a journal: balanced, immutable entries, with balances as a projection. A timeout now moves the payment to unknown instead of failed, and a retry with the same key gets the same answer."], cls="dia")
 
-S(plain("V2 · the one transaction", "State, entries, outbox row and key, together",
-  '<pre class="code">BEGIN;\n  UPDATE payment SET state = <span class="kw">\'CAPTURED\'</span>, captured = 1050\n   WHERE id = <span class="kw">\'p-7731\'</span> AND state = <span class="kw">\'AUTH_PENDING\'</span>;  <span class="cm">-- legal edge only</span>\n  INSERT INTO journal_txn   (txn_id, payment_id, type) VALUES (…, <span class="kw">\'capture\'</span>);\n  INSERT INTO journal_entry (account, dir, amount_minor, currency)  <span class="cm">-- 3 rows</span>\n       VALUES (recv, <span class="kw">\'D\'</span>, 1050, …), (mpay, <span class="kw">\'C\'</span>, 1020, …), (fees, <span class="kw">\'C\'</span>, 30, …);\n  INSERT INTO outbox (payload) VALUES (<span class="kw">\'payment.captured p-7731\'</span>);\n  UPDATE idempotency SET status = <span class="kw">\'done\'</span>, response = … WHERE key = <span class="kw">\'k-91\'</span>;\nCOMMIT;  <span class="cm">-- a deferred check rejects it unless debits = credits</span></pre>' +
-  line("All or nothing. There is no moment where the state says captured and the books do not.", "a")), [
- "C: The heart of version two is this one transaction. Move the state from auth pending to captured, and only along a legal edge. Insert the journal transaction and its three entries. Insert the outbox row. Mark the idempotency key done, with the response. Commit, and a deferred check rejects the whole thing unless debits equal credits.",
- "C: All or nothing. There is never a moment where the state says captured and the books do not."])
+S(plain("V2 · the objection", "Correct inside, and still three holes", cards(
+  ("red", "Telling others", "Merchants hear about a change by a second write after the commit. A crash in between, and they never hear."),
+  ("red", "Unknowns pile up", "Nothing ends an unknown. Ten a second at peak, forever pending."),
+  ("red", "The outside disagrees", "Our books can still differ from the processor's, and nobody would know."), cols=3)), [
+ "C: The objection to version two. Inside the database it is correct. But:", P,
+ "C: Merchants hear about a change through a second write after the commit, so a crash in between means they never hear.", P,
+ "C: Nothing ends an unknown: ten a second at peak, pending forever.", P,
+ "C: And our books can still disagree with the processor's, and nothing would notice."])
 
-S(plain("V2 · the objection", "Correct inside, and still three holes", '<div class="cards c3">'
-  '<div class="cd red"><h3>Telling others</h3><p>Merchants and other systems hear about a change by a second write after the commit. A crash in between, and they never hear.</p></div>'
-  '<div class="cd red"><h3>Unknowns pile up</h3><p>Nothing ends an unknown. Ten a second at peak, forever pending.</p></div>'
-  '<div class="cd red"><h3>The outside disagrees</h3><p>Our books can still differ from the processor\'s, and nobody would know.</p></div></div>'), [
- "C: The objection to version two. Inside the database it is correct. But merchants hear about a change through a second write after the commit, so a crash in between means they never hear. Nothing ends an unknown: ten a second at peak, pending forever. And our books can still disagree with the processor's, and nothing would notice."])
+S(dia("Design · version 3", "Close every loop", "base-v3", vtag="V3", chip=chips("outbox → log → webhooks", "inquiry job", "reconciliation", "finance ops")), [
+ P, "C: Version three closes those loops. Version two, carried as it was.", P,
+ "C: New: an outbox relay feeds an event log, and a webhook sender posts signed events to the merchant.", P,
+ "C: An inquiry job reads unknown payments, asks the adapter by reference, and resolves them in the database.", P,
+ "C: And reconciliation takes the processor's settlement file, compares it with expectations from the ledger,", P,
+ "C: and hands the breaks to finance operations. This is the baseline. It stays, and every picture from here on is a view of it."], cls="dia")
 
-S(dia("High-level design · version 3 of 3", "Close every loop", "base-v3", vtag="V3",
-      chip=chips("outbox → log → webhooks", "inquiry job", "reconciliation", "finance ops")), [
- "C: Version three closes those loops. From the database, an outbox relay feeds an event log, and a webhook sender posts signed events to the merchant. An inquiry job reads unknown payments, asks the adapter by reference, and resolves them in the database. And reconciliation takes the processor's settlement file, compares it with expectations from the ledger, and hands breaks to finance operations.",
- "C: This is the baseline. It stays on screen, and every picture from here on is a view of it."], cls="dia")
+S(plain("Design · the containers", "Each container, what it owns, and its number", table(["Container", "Owns", "Its number"], [
+  ["Payments API", "The key, the request hash, the 2-second deadline; never the state", "10,000/s peak, stateless"],
+  ["Payment service", "The state machine and the postings: legal edges only", "one commit per payment"],
+  ["Processor adapter", "The reference on every call and the processor's error codes", "~1.5 s p99 at the processor"],
+  ["Ledger database", "Payments, journal, outbox, keys; one partition per merchant slice", "64 partitions, ~10 primaries"],
+  ["Outbox relay + log, webhooks", "Committed rows in commit order; signed, retried webhooks", "40,000 rows/s at peak"],
+  ["Inquiry job", "Ends every UNKNOWN by our reference, with backoff", "10 a second at peak"],
+  ["Reconciliation", "Expectations, the file match, owned breaks", "2.9 × 10⁸ lines, 5 min"]], "bt xs mx")), [
+ "C: The containers, one at a time, with what each owns and its number.", P,
+ "C: The payments A-P-I owns the key, the request hash and the two-second deadline. It never owns the state, so it stays stateless at ten thousand a second.", P,
+ "C: The payment service owns the state machine and the postings. Only legal edges, one commit per payment.", P,
+ "C: The processor adapter puts our reference on every call and maps the processor's codes into three classes. About one and a half seconds at the processor, at the ninety-ninth percentile.", P,
+ "C: The ledger database holds payments, journal, outbox and keys: sixty-four partitions on about ten primaries, one merchant slice per partition.", P,
+ "C: The outbox relay and log publish committed rows in commit order, and the webhook sender signs and retries them. At the peak that is forty thousand rows a second.", P,
+ "C: The inquiry job ends every unknown by our reference, with backoff: about ten a second at the peak.", P,
+ "C: And reconciliation: expectations, the file match and owned breaks. Two hundred and ninety million lines, about five minutes."])
 
-S(plain("V3 · the pay path", "Commit, call, commit again",
-  '<pre class="code"><span class="kw">def</span> pay(req, key):\n    row = idem.insert_or_get(req.client, key, hash(req))   <span class="cm"># unique; same txn as below</span>\n    <span class="kw">if</span> row.existing: <span class="kw">return</span> row.response <span class="kw">or</span> conflict(<span class="kw">"in progress"</span>)\n    p = db.commit(new_payment(req, state=<span class="kw">"AUTH_PENDING"</span>, attempt=1))  <span class="cm"># evidence first</span>\n    <span class="kw">try</span>:\n        r = adapter.authorise(p, ref=f<span class="kw">"{p.id}/1"</span>, deadline=1.9)\n    <span class="kw">except</span> Timeout:\n        db.commit(p.to(<span class="kw">"UNKNOWN"</span>))                      <span class="cm"># the inquiry job takes over</span>\n        <span class="kw">return</span> pending(p)\n    <span class="kw">return</span> db.commit(p.apply(r), entries(r), outbox(r), idem_done(key))</pre>' +
-  line("No branch guesses. A crash anywhere leaves a row that says how far we got.", "a")), [
- "C: The pay path in code. Insert or read the idempotency key; if it already exists, return the stored response or say in progress. Commit the payment as auth pending with attempt one: evidence first. Call the adapter with our reference and a deadline of one point nine seconds. On a timeout, commit unknown and answer pending: the inquiry job takes over. Otherwise one transaction: state, entries, outbox, key done.",
- "C: No branch guesses. A crash at any line leaves a row that says how far we got."])
+S(plain("Design · the ledger database", "The partition key: the owner, not the account", table(["Key", "Co-locates", "A capture (3 accounts)", "A balance read", "A hot merchant"], [
+  ["Account", "one account's entries", "cross-partition, every time", "one partition", "one hot row"],
+  ["Payment", "one payment's entries", "one partition", "scatter over all", "spread; balance is a sum of all"],
+  ("pick", ["<b>Merchant</b>", "everything one owner has", "<b>one partition</b>", "<b>one partition</b>", "one partition: sub-accounts, challenge 4"]),
+  ["Time", "the same period", "one partition, all writers", "scatter", "all writers on the newest"]], "bt xs mx") +
+  line("Shared accounts, such as fee revenue, exist once per partition and are summed for the company view.", "a")), [
+ "C: One decision on the database deserves its own slide, because it is the one an interviewer asks about: why this partition key?", P,
+ "C: By account: all of one account's entries are together, so a balance read is one partition. But a capture touches three accounts, the receivable, the payable and the fee, so it spans partitions every time, and I would need a distributed transaction for every payment.", P,
+ "C: By payment: a capture is local, but a balance is a scatter across every partition.", P,
+ "C: By merchant: a capture is one partition, a balance read is one partition, and the cost is that a hot merchant is a hot partition. That is the cost I can handle, in challenge four.", P,
+ "C: By time: all writers hit the newest partition. No.", P,
+ "C: And shared accounts, fee revenue or the processor receivable, would be hot and cross-partition, so each partition has its own, and the company view sums them."])
 
-S(plain("V3 · what it leaves open", "The details are where it breaks", '<div class="cards c2">'
-  '<div class="cd grn"><h3>What V3 has</h3><p>Keys inserted first, an unknown state with an exit, one transaction for state and books, an outbox, inquiry, reconciliation.</p></div>'
-  '<div class="cd red"><h3>What it has not been tested against</h3><p>A real timeout. Three retries at once. A crash mid-way. A hot merchant. Late refunds. A statement that disagrees. A bad release. A silent decline.</p></div></div>' +
-  line("Eight questions. Each fix creates the next. These are the challenges.", "r")), [
- "C: What version three leaves open. It has every mechanism from the theory chapter. It has not yet been tested against a real timeout, three retries at once, a crash in the middle, a hot merchant, late refunds, a statement that disagrees, a bad release, or a silent drop in approvals. Those are the eight challenges, after the flows."])
+S(dia("Flow · FR1 pay · POST /payments · writes Payment, Attempt, JournalTxn, Outbox", "A payment, end to end", "flow-pay"), [
+ P, "C: The pay path, numbered.", P,
+ "C: One: the merchant posts the payment with its key.", P,
+ "C: Two: the A-P-I inserts the key and hands over to the service.", P,
+ "C: Three: one transaction commits the payment as auth pending, with its attempt.", P,
+ "C: Four: the adapter is asked to authorise.", P,
+ "C: Five: it calls the processor with our reference. The answer comes back along the same path, and a second transaction commits the state, the entries, the outbox row and the key marked done."], cls="dia")
 
-def flow(n, fr, title, svg, tags, say):
-    S(dia(f"High-level design · requirement {n} · {fr}", title, svg, trs=tr(*tags)), say, cls="dia")
+S(dia("Sequence · FR1 pay", "One payment, as a sequence", "seq-pay"), [
+ "C: The same payment as a sequence.", P, "C: The merchant posts with key k-ninety-one.", P,
+ "C: One transaction: the key as processing, the payment as auth pending, the attempt with its reference.", P,
+ "C: Authorise, through the adapter.", P, "C: With reference p-seventy-seven thirty-one, slash one.", P,
+ "C: Approved in three hundred and forty milliseconds.", P,
+ "C: The second transaction, highlighted: captured, entries, outbox, key done.", P, "C: Then two-oh-one, captured."], cls="dia")
 
-flow(1, "pay", "FR1: one payment, end to end", "flow-fr1",
-     [("fr", "serves FR1"), ("api", "POST /payments"), ("ent", "writes Payment · Attempt · JournalTxn · Outbox"), ("nfr", "< 2 s or pending")], [
- "C: Requirement one, pay, by the numbers. One: the merchant posts the payment with its key. Two: the A-P-I hands it to the payment service. Three: one transaction inserts the key and commits the payment as auth pending, with its attempt. Four: the service asks the adapter to authorise. Five: the adapter calls the processor with our reference.",
- "C: Six: approved comes back. The service then commits the second transaction: the state, the entries, the outbox row and the key marked done. Seven: the status goes back to the A-P-I. Eight: the merchant gets its answer."])
-flow(2, "adjust", "FR2: a refund", "flow-fr2",
-     [("fr", "serves FR2"), ("api", "POST /refunds"), ("ent", "writes Payment · JournalTxn"), ("nfr", "≤ captured")], [
- "C: Requirement two, a refund. One and two: the merchant's refund call, with its own key, reaches the service. Three: the conditional update on the payment row, which refuses anything that would exceed the captured amount. Four and five: the refund goes to the processor with a reference made from the payment and the refund key. Six: the result comes back, and a new journal transaction is posted, dated now, referencing the payment."])
-flow(3, "notify", "FR3: every change reaches the merchant", "flow-fr3",
-     [("fr", "serves FR3"), ("api", "webhook"), ("ent", "reads Outbox"), ("nfr", "at least once")], [
- "C: Requirement three, notify. One: the outbox row is committed in the same transaction as the state. Two: the relay reads committed rows and publishes them to the event log. Three: the webhook sender reads the log. Four: it signs and posts to the merchant, retrying with backoff. The merchant de-duplicates by event I-D, and can always fall back to asking for the payment."])
-flow(4, "reconcile", "FR4: our books against theirs, every day", "flow-fr4",
-     [("fr", "serves FR4"), ("api", "ImportSettlement"), ("ent", "writes Break"), ("nfr", "owned within a day")], [
- "C: Requirement four, reconcile. One: the processor's settlement file arrives and is stored unchanged. Two: the reconciliation job asks the ledger for the day's expectations, by reference and net of fees, and matches line by line. Matches move payments to settled, with settlement entries. Three: every line that does not match becomes a break, with an owner, in front of finance operations."])
-flow(5, "explain", "FR5: any balance, from the journal", "flow-fr5",
-     [("fr", "serves FR5"), ("api", "GET /balance"), ("ent", "reads BalanceProjection · JournalEntry")], [
- "C: Requirement five, explain. One and two: a balance request reaches the service. Three: it reads the projection, which says the entry it is current to. Four and five: the answer goes back. For an audit, the same path sums the entries for the period and joins them to their transactions and payments: every number explained by the records that produced it."])
+S(dia("Sequence · FR2 adjust", "A refund, with the limit in one statement", "seq-refund"), [
+ "C: Requirement two, a refund, as a sequence.", P, "C: A refund of twenty-five hundred on a payment that has already been refunded part-way.", P,
+ "C: A second one, two milliseconds later, with another key.", P,
+ "C: The conditional update: add the amount only if the total stays within what was captured. One row.", P,
+ "C: The same statement for the second: zero rows.", P, "C: So the second gets four twenty-two.", P,
+ "C: The winner goes to the processor with its own reference.", "[+2]",
+ "C: And a new journal transaction is posted, dated now. Three months later a chargeback is posted the same way, dated now, and the closed month is untouched."], cls="dia")
 
-S(dia("Design · C4 level 1", "The system in its context", "c4-context"), [
- "C: The C4 context. A customer pays at a merchant. The merchant's system creates payments and receives webhooks. Our payments and ledger system authorises, captures and inquires at the processor, and receives its settlement files every day. And finance operations owns breaks and corrections. Notice that two of the four neighbours keep their own books of the same money."], cls="dia")
+S(dia("Sequence · FR5 explain", "Any balance, from the journal", "seq-explain"), [
+ "C: Requirement five, explain.", P, "C: An auditor asks for a merchant's payable balance as of the end of October.", P,
+ "C: The service sums the entries on that account, up to that date. One partition, because the key is the merchant.", P,
+ "C: The answer says which entry it is current to.", "[+2]",
+ "C: And for every unit of it, the entries joined to their transactions and payments: every number explained by the records that produced it."], cls="dia")
 
-S(dia("Design · C4 level 2", "The containers", "c4-containers"), [
- "C: The containers. The payments A-P-I owns keys and the deadline. The payment service owns the state machine and the postings. The database holds payments, the journal and the outbox, partitioned by account. The adapter owns references and the processor's error codes. Below: the outbox relay and log, the webhook sender, the inquiry job, and the reconciliation pipeline, which writes expectations and adjustments back into the ledger."], cls="dia")
+# ───────────────────────── 5.1 · components and technologies ─────────────────────────
+subchapter("5.1", "Components and technologies", ["C: Now one level down. The same picture with what each box runs on, three containers opened up, and for each choice, what I rejected and why."])
 
-S(dia("Design · sequence", "One payment, as a sequence", "seq-pay"), [
- "C: The same payment as a sequence. One: the merchant posts with key k-ninety-one. Two: the A-P-I inserts the key as processing, commits the payment as auth pending, and the attempt with reference p-seventy-seven thirty-one slash one. Three and four: authorise, through the adapter, with that reference. Approved in three hundred and forty milliseconds. Five, highlighted: the one transaction. Then two-oh-one, captured."], cls="dia")
+S(dia("Architecture · C4 containers · technologies", "The same containers, now with what they run on", "c4-containers-tech"), [
+ "C: The same container view; only the type lines changed. The six boxes in scope, one at a time.", P,
+ P, "C: The payments A-P-I: Go, gRPC inside, REST outside.", P,
+ "C: The payment service: Go, with the state machine.", P,
+ "C: The processor adapter: Go, one per processor.", P,
+ "C: The ledger database: PostgreSQL, partitioned by merchant.", P,
+ "C: The outbox relay: Debezium on Kafka Connect, publishing to Kafka.", P,
+ "C: And reconciliation: a Spark batch, with expectations in PostgreSQL."], cls="dia")
+
+S(dia("Architecture · C4 components · payment service", "Inside the payment service, in the order a payment meets it", "c4-comp-service"), [
+ "C: Inside the payment service, in the order a payment meets it.", P,
+ "C: The A-P-I hands over.", P, "C: The idempotency guard: a unique insert, with a request hash.", P,
+ "C: The state machine: conditional updates, legal edges only.", P,
+ "C: The attempt writer: our reference, committed before the call.", P,
+ "C: The processor port: a deadline of one point nine seconds, and three error classes.", P,
+ "C: Below, the ledger database: the key row, the state, entries and outbox, and the attempt row first.", P,
+ "C: The adapter.", P, "C: The processor.", P,
+ "C: And the inquiry job, which asks the adapter by reference and resolves through the state machine. Challenges one and two happen in this picture."], cls="dia")
+
+S(dia("Architecture · C4 components · ledger database", "Inside one partition of the ledger database", "c4-comp-db"), [
+ "C: Inside one partition of the ledger database.", P,
+ "C: The payment service issues one transaction.", P, "C: One transaction: the state, the entries and the outbox row, together.", P,
+ "C: It writes the payment row, the only mutable one.", P,
+ "C: The journal entries, insert only, with sixteen sub-accounts for a hot merchant.", P,
+ "C: And the outbox table, in the same transaction.", P,
+ "C: A balance projection is derived from the journal, seconds behind.", P, "C: And a payout writer, one per merchant, checks the sum.", P,
+ "C: The outbox row reaches the write-ahead log, in commit order.", P, "C: A replication slot holds the log for the reader.", P,
+ "C: Debezium reads the slot.", P, "C: And publishes to Kafka, by merchant. Challenges three and four happen here."], cls="dia")
+
+S(dia("Architecture · C4 components · reconciliation", "Inside reconciliation, from the file to an owned break", "c4-comp-rec"), [
+ "C: Inside reconciliation.", P,
+ "C: The processor's file.", P, "C: Stored unchanged, before anything reads it.", P,
+ "C: The expectation builder asks the ledger what it expects to settle, by reference and net of fees.", P,
+ "C: The matcher joins file to expectations by reference, and checks amount, fee and state.", P,
+ "C: Matches become settled, with settlement entries in the ledger.", P,
+ "C: Everything else goes to the break writer: a type, an owner and an age.", P,
+ "C: Into a queue that finance operations works.", P,
+ "C: Finance approves a correction.", P, "C: The corrector posts reversing entries, tagged with the incident. Challenge five happens in this picture."], cls="dia")
+
+def tsay(_id):
+    """Compact cut: the slide carries the reasons; the narration reads how, why, and the first clause of each rejection."""
+    s = STACK[_id]; first = lambda t: re.split(r"(?<=[.:;])\s", say_text(t))[0].rstrip(".:;") + "."
+    out = [P, "C: " + say_text(s["how"]), P, "C: Why: " + first(s["why"])]
+    for i, (n, w) in enumerate(s["rejected"]):
+        out += [P, f"C: {'Rejected: ' if i == 0 else ''}{say_text(n)}. " + first(w)]
+    return out
+for _id in ("payments-db", "outbox-log"):
+    S(tech(**TECH(_id)), tsay(_id))
+
+S(plain("Technology · language and runtime", "Why Go: the services wait for a bank, not for the CPU", table(["Runtime", "Overhead per request", "Memory per instance", "In this design"], [
+  ("pick", ["<b>Go</b>", "0.1 – 0.5 ms", "30 – 80 MB", "Flat tail, small replicas, deadlines in every call"]),
+  ["Java 21+, virtual threads (Spring Boot, Quarkus)", "0.2 – 1 ms warm", "200 – 500 MB; native 50 – 100", "An equal choice for a Java team"],
+  ["Spring WebFlux (reactive)", "like virtual threads", "like virtual threads", "Harder code for what virtual threads now give"],
+  ["Python, async", "1 – 3 ms", "60 – 150 MB", "One core per process; a fatter tail"],
+  ["Rust", "0.05 – 0.3 ms", "10 – 40 MB", "Fastest and leanest; not where our time goes"]], "bt xs mx") +
+  grade("Illustrative orders of magnitude from public benchmarks that disagree with each other. Measure on your own load.")), [
+ "C: Why Go everywhere? Because the language is not where the two seconds go.", P,
+ "C: Go. Our own code costs a fraction of a millisecond a request, a replica is thirty to eighty megabytes, and a context deadline cancels a whole call chain. That is a flat tail and cheap replicas. The processor takes a second; the commit, a few milliseconds.", P,
+ "C: Java twenty-one and later, with virtual threads, in Spring Boot or Quarkus, is within a small factor of Go and an equal choice for a Java team. It costs more memory per instance, unless compiled native.", P,
+ "C: Spring WebFlux, the reactive stack. It was the answer to blocking threads. Virtual threads now give the same concurrency with plain blocking code, and a JDBC driver blocks anyway. I would not choose it for a payments service.", P,
+ "C: Python with async: a core per process under the interpreter lock, several times less throughput per core, and a fatter tail.", P,
+ "C: Rust is the fastest and leanest. It pays where microseconds matter, a matching engine, not in a service whose time is a bank call and a commit. The cost is hiring and build speed.", P,
+ "N: The numbers are illustrative and the public benchmarks disagree. The signal is saying where the time goes, and what would change the answer."])
+
+S(plain("Technology · gateway or processor", "Why most companies use a gateway, and when we would not", table(["", "A gateway (Stripe, Adyen)", "Direct to a processor or acquirer"], [
+  ["<b>Time to first payment</b>", "days: one API", "months: underwriting, certification"],
+  ["<b>Card-data scope</b>", "tokens and hosted fields keep it out of ours", "the highest compliance level, audited yearly"],
+  ["<b>Price, illustrative</b>", "about 2.9 % + 30 ¢ blended at list", "interchange plus a margin, about 1.8 – 2.4 %"],
+  ["<b>You also get</b>", "methods, fraud tools, disputes, payouts", "only what you build"],
+  ["<b>Control</b>", "their routing, their outage is yours", "your routing, several processors"],
+  ["<b>Still ours either way</b>", "the ledger, keys, UNKNOWN, reconciliation", "the same"]], "bt xs mx") +
+  line("Break-even, illustrative: a 0.7 % premium against a team and audits of $80,000 a month is about $10 million of card volume a month.", "a")), [
+ "C: The question every interviewer eventually asks: why not just use a gateway? Often you should.", P,
+ "C: A gateway gives one A-P-I in days. Direct means underwriting and certification: months.", P,
+ "C: Card data. Tokens and hosted fields keep it out of our scope. Direct puts us in the highest compliance level.", P,
+ "C: Price, illustrative: a gateway is about two point nine percent plus thirty cents at list. A direct processor is interchange plus a margin, about one point eight to two point four percent.", P,
+ "C: A gateway also brings payment methods, fraud tools, disputes and payouts. Direct gives only what we build.", P,
+ "C: Control: with a gateway their routing and their outage are ours. Direct, we route across several processors.", P,
+ "C: And what is ours either way: the ledger, the keys, the unknown state, and reconciliation. A gateway's balance is not our books, and a timeout to a gateway is still an unknown.", P,
+ "C: Break-even: a premium of seven tenths of a percent against a team and audits of about eighty thousand dollars a month is about ten million dollars of card volume a month. We are far past it, so direct, behind one interface, and a gateway is one more adapter."])
+
+S(tech(**TECH("adapter")), tsay("adapter"))
+
+_ss = SUMMARY_SAY()
+S(plain("Technology · the stack on one slide", "The stack, against its rivals",
+        table(["Container", "Choice", "Rejected", "The deciding reason"], SUMMARY(), "bt xs mx") +
+        grade("Naming a product is not the signal. Naming the property that rules out its rival is.")), _ss[:-1] + [P, _ss[-1]])
+
+# ───────────────────────── 5.2 · when you don't need all this ─────────────────────────
+subchapter("5.2", "When you don't need all this", ["C: Before I break it: a much smaller design is correct at a smaller scale, and I should say where the line is. This is the one I would build for a small business."], sub="ALTERNATE")
+
+S(dia("Alternate path · ALTERNATE", "A gateway, one PostgreSQL primary, a polled outbox", "alt",
+      cap="One adapter (the gateway), one primary, a polled outbox; no Kafka, no Debezium, no partitions"), [
+ P, "C: The alternate path. The spine stays: the key, the state machine, the journal, reconciliation.", P,
+ "C: What changes is marked. The adapter is the gateway.", P, "C: The database is one primary with a synchronous standby.", P, "C: And the outbox relay is a poll every two hundred milliseconds, not change capture. No Kafka, no Debezium, no partitions.",
+ "C: What it gives up, precisely: one writer, about twelve hundred commits a second. No replayable log. The gateway's fee premium and its outages, which are ours. And a failover can lose what the standby had not yet received, if it is asynchronous."], cls="dia")
+
+key("ALTERNATE · the line", "Below about <em>300 payments a second</em> and <em>$10 million a month</em>, I'd ship the one-primary, gateway version, and say when I'd switch.", [
+ "C: Where is the line? One primary commits about twelve hundred of our transactions a second. Our peak, from the scale line, is ten thousand: eight times past it. And at ten million dollars a month the gateway's premium pays for a payments team. We are nine billion payments a month past that.",
+ "V: Below about three hundred payments a second, with room to spare, and ten million dollars a month, I'd ship the one-primary gateway version, and I'd say out loud when I'd switch.", "[pause: 0.8]"])

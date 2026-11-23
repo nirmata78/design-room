@@ -1,14 +1,14 @@
-Your payment call times out. Did the customer pay? "Mark it failed" is how double charges happen.
+"Retry with backoff" is the answer that double-charges a customer. The grade is on what you do instead.
 
-I've published a 74-minute reference solution for the payment system and double-entry ledger question, at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on 160 numbered slides.
+I've published a 82-minute reference solution for a payment system and its double-entry ledger at the Staff bar: theory, a three-version design, and six challenges, on 549 numbered slides.
 
-The idea that unlocks it: exactly-once does not exist across a network boundary. So you design for one effect per intent, a state for "we don't know yet", and a reconciliation that finds what everything else missed.
+The idea that unlocks it: exactly-once does not exist across the bank boundary, so build one effect per intent, a state for "not knowing yet", and books you can reconcile.
 
 What it goes into:
-→ A timeout is a state: UNKNOWN, then an inquiry by your own reference
-→ Idempotency keys are inserted, not checked
-→ A balance is a sum of immutable entries, never a column
-→ Reconciliation is a component, not a safety net
+→ The bank timed out: an UNKNOWN state and an inquiry by your own reference
+→ Why partition by merchant, not by account (and a million one-time cards)
+→ Gateway or direct processor, with the break-even
+→ Debezium, and what to use instead below 1,000 events a second
 
 Best on a second pass: pause after each question and answer it first.
 
@@ -16,6 +16,6 @@ Best on a second pass: pause after each question and answer it first.
 
 It's a scripted walkthrough with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator.
 
-When your books and the processor's disagree by two, where do you start?
+Do you integrate a gateway or a processor directly, and at what volume did you switch?
 
-#SystemDesign #SoftwareEngineering #Fintech
+#SystemDesign #SoftwareEngineering #DistributedSystems

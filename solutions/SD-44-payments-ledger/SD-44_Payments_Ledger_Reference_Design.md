@@ -7,8 +7,8 @@ documentclass: article
 fontsize: 10pt
 geometry: a4paper,top=0.7in,bottom=0.75in,left=0.75in,right=0.75in
 colorlinks: true
-linkcolor: blue
-urlcolor: blue
+linkcolor: gblueink
+urlcolor: gblueink
 toc: true
 toc-depth: 2
 numbersections: false
@@ -258,6 +258,12 @@ challenges need their balance check); loans and instalments (SD-95).
 
 # Stage 2: Back-of-the-envelope
 
+::: {.key title="The scale line: three numbers every estimate starts from"}
+**9 billion payments a month** (290 million a day, 3,300 a second on average) · **peak 10,000 a second** on a sale-day
+evening, one merchant at 5,000 a second · **seven years** of balanced entries, about 2.9 × 10¹². Every estimate below says which
+of these it starts from. All three are illustrative.
+:::
+
 ## How to do estimates in this round
 
 Three numbers matter. Compute them aloud, and end each one with the decision it drives.
@@ -266,9 +272,9 @@ Three numbers matter. Compute them aloud, and end each one with the decision it 
 **Arithmetic:** 10,000 payments a second × about 4 entries each (receivable, merchant payable, fee, and
 sometimes a hold) = **40,000 entries a second** at peak.
 **What it means:** one database primary will not take that at peak with multi-row transactions.
-**How it changes the design:** partition the journal by account; a payment's entries go to the partitions of
-the accounts they touch.
-**Say:** "Forty thousand entries a second, so the journal is partitioned by account from the start."
+**How it changes the design:** partition the journal, and key it by the **owner (the merchant), not the account**: a
+capture touches three accounts, so keyed by account every payment would span partitions (see *The partition key*, Stage 5).
+**Say:** "Forty thousand entries a second, so the journal is partitioned from the start, and by merchant, so a posting never leaves its partition."
 :::
 
 ::: {.key title="Top-3 number 2: the hot account"}
@@ -295,7 +301,7 @@ point nine seconds I answer pending."
 
 | Quantity | Arithmetic | Label | Decision |
 |---|---|---|---|
-| Journal writes | 10,000 × 4 = **40,000 entries/s** | derived | partition by account |
+| Journal writes | 10,000 × 4 = **40,000 entries/s** | derived | partition by merchant (owner), not by account |
 | Average rate | peak ÷ 3 about **3,300/s** | illustrative | sizes daily volumes |
 | Payments a day | 3,300 × 86,400 about **2.9 × 10^8^** | derived | settlement files are hundreds of millions of lines |
 | Seven-year journal | 3,300 × 3.15 × 10^7^ × 7 × 4 × 200 B about **580 TB** | illustrative | hot partitions plus cold archive |
@@ -367,7 +373,7 @@ database and is the backstop when webhooks are lost.
 
 ![Conceptual model in Chen notation. A payment has attempts and posts journal transactions; a transaction contains at least two entries, each on one account; a balance is derived; a break may explain one transaction.](diagrams/video-erd-chen.pdf){width=96%}
 
-![Physical model. Journal entries are partitioned by account and only inserted. The payment row is the only mutable row, changed by conditional updates. Idempotency keys keep a request hash and the stored response. The outbox commits with the state.](diagrams/video-erd-physical.pdf){width=96%}
+![Physical model. Journal entries are hashed by merchant into 64 partitions and only inserted. The payment row is the only mutable row, changed by conditional updates. Idempotency keys keep a request hash and the stored response. The outbox commits with the state.](diagrams/video-erd-physical.pdf){width=96%}
 
 | Table | Key | Mutability | Lose it? |
 |---|---|---|---|
@@ -454,21 +460,21 @@ name; the sweeper catches it. After the final commit: done, and the response is 
 
 ## The numbered flows, one per functional requirement
 
-![FR1, pay. 1 pay · 2 create · 3 one transaction: key and AUTH_PENDING with attempt · 4 authorise · 5 by reference · 6 approved · 7 status · 8 the answer.](diagrams/video-flow-fr1.pdf){width=90%}
+![FR1, pay. 1 pay · 2 create · 3 one transaction: key and AUTH_PENDING with attempt · 4 authorise · 5 by reference · 6 approved · 7 status · 8 the answer.](diagrams/video-flow-pay.pdf){width=90%}
 
-![FR2, a refund. The conditional update, the processor refund with a reference made of the payment and the refund key, and a new journal transaction dated now.](diagrams/video-flow-fr2.pdf){width=90%}
+![FR2, a refund. The conditional update, the processor refund with a reference made of the payment and the refund key, and a new journal transaction dated now.](diagrams/video-seq-refund.pdf){width=90%}
 
-![FR3, notify. The outbox row commits with the state; the relay publishes; the webhook sender signs and retries; the merchant de-duplicates by event ID.](diagrams/video-flow-fr3.pdf){width=90%}
+![FR3, notify. The outbox row commits with the state; the relay publishes; the webhook sender signs and retries; the merchant de-duplicates by event ID.](diagrams/video-seq-outbox.pdf){width=90%}
 
-![FR4, reconcile. The raw file is stored; expectations come from the ledger; matches settle payments; every unmatched line becomes a break owned by finance operations.](diagrams/video-flow-fr4.pdf){width=90%}
+![FR4, reconcile. The raw file is stored; expectations come from the ledger; matches settle payments; every unmatched line becomes a break owned by finance operations.](diagrams/video-flow-recon.pdf){width=90%}
 
-![FR5, explain. A balance comes from the projection with the entry it is current to; audit sums the entries for the period.](diagrams/video-flow-fr5.pdf){width=90%}
+![FR5, explain. A balance comes from the projection with the entry it is current to; audit sums the entries for the period.](diagrams/video-seq-explain.pdf){width=90%}
 
 ## The C4 views and the sequences
 
 ![C4 level 1. A customer pays at a merchant; the merchant's system calls us; we call the processor and receive its settlement files; finance operations owns breaks. Two neighbours keep their own books of the same money.](diagrams/video-c4-context.pdf){width=92%}
 
-![C4 level 2. The API owns keys and the deadline; the payment service the state machine and postings; one relational database per partition holds payments, journal and outbox; the adapter owns references and error codes; relay, webhook sender, inquiry job and reconciliation complete the loops.](diagrams/video-c4-containers.pdf){width=96%}
+![C4 level 2. The API owns keys and the deadline; the payment service the state machine and postings; one relational database per partition holds payments, journal and outbox; the adapter owns references and error codes; relay, webhook sender, inquiry job and reconciliation complete the loops.](diagrams/video-base-v3.pdf){width=96%}
 
 ![One payment as a sequence.](diagrams/video-seq-pay.pdf){width=92%}
 
@@ -485,7 +491,7 @@ so far). A relational store with transactions and constraints does both. A log i
 
 **Why here:** multi-row atomic postings, constraints (unique keys, deferred balance check), conditional updates for
 state edges and refund limits. **Internals to explain:** row locks and why a hot row serialises; a deferred
-constraint checked at commit; partitioning by account and what a transaction that touches two partitions costs
+constraint checked at commit; partitioning by merchant, why not by account, and what a transaction that touches two partitions costs
 (say: keep a posting's accounts co-located where possible, for example by merchant, and use the database's
 distributed transactions only for the rare cross-partition posting). **Alternatives:** a distributed SQL store
 (the same model with built-in partitioning: a fine choice at this scale); a key-value store (no multi-row
@@ -511,12 +517,230 @@ wrong is how real systems double-charge.
 **Why here:** the outside truth arrives as files. A batch join of hundreds of millions of lines is minutes of work;
 the hard part is the break workflow, not the matching.
 
+## Technologies, one level down
+
+Every container with the technology it runs on, how it is built, the alternatives rejected and why, and the question an interviewer asks about it. Generated from `stack.json`.
+
+<!-- stack:sections -->
+
+## Ledger database: PostgreSQL, partitioned by merchant
+
+*How it is built.* The key is the owner, the merchant, not the account: a capture touches three accounts and would span partitions. Shared accounts, like fee revenue, exist once per partition and are summed for the company view. A deferred constraint checks that debits equal credits at commit. Unique keys on the idempotency key and on the processor reference. 64 logical partitions are mapped to physical primaries, so a rebalance moves a partition, not rows. Accounts are rows: a million one-time accounts are about 100 MB and change nothing in the layout. TigerBeetle is a purpose-built ledger database (Zig, 128-byte accounts and transfers, thousands of transfers per batch on a single leader, strict serialisability): the fastest at plain debits and credits and a natural upgrade for the ledger core past one primary, but it holds only accounts and transfers, so the state machine, keys and outbox still need a database.
+
+*Why PostgreSQL 16, 64 partitions by merchant, a synchronous standby each:* State, journal and outbox commit together or not at all; a posting never leaves its partition.
+
+*Rejected:*
+
+- **Partitioning by account**: Every capture becomes a cross-partition transaction.
+- **TigerBeetle, a ledger database**: Fastest at debits and credits, but state, keys and outbox need a database anyway. The upgrade past one primary.
+- **A key-value store, or a log as the truth**: No multi-row transaction, no synchronous refund limit.
+
+*Course:* theory/03 (partitioning).
+
+**Partition key, compared**
+
+| Key | Co-locates | A capture (3 accounts) | A balance read | A hot merchant |
+|---|---|---|---|---|
+| Account | one account's entries | cross-partition, every time | one partition | one hot row |
+| Payment | one payment's entries | one partition | scatter over all | spread, but its balance is a sum of all |
+| **Merchant** | everything of one owner | **one partition** | **one partition** | one partition: sub-accounts (challenge 4) |
+| Time | the same period | one partition, all writers | scatter | every writer on the newest partition |
+
+## Runtime: Go for the services, and the honest rivals
+
+*How it is built.* The processor takes a second, the commit a few milliseconds, our own code microseconds. So raw speed is not the lever. What matters is a low and flat tail under bursts, memory per replica, a deadline that cancels the whole call chain, and engineers who can run it at three in the morning. Illustrative orders of magnitude from public benchmarks that disagree with each other, so measure on your own load. Service overhead per request: Go 0.1 to 0.5 ms; Java 21+ with virtual threads (Spring Boot or Quarkus) 0.2 to 1 ms warm; Spring WebFlux about the same throughput as virtual threads with much harder code and stack traces, and a JDBC driver blocks anyway; Python async 1 to 3 ms and about a fifth of the per-core throughput under the interpreter lock; Rust 0.05 to 0.3 ms. Memory per instance: Go 30 to 80 MB, JVM 200 to 500 MB, Quarkus native 50 to 100 MB, Python 60 to 150 MB, Rust 10 to 40 MB. Reported comparisons of Go against Java virtual threads range from parity to Go ahead by tens of percent on throughput and several times less memory. Rust pays where microseconds matter, such as a matching engine that never waits on a database, not in a payments service whose time is a bank call and a commit; the cost is hiring and build speed. For a Java team, Java 21+ with virtual threads is an equal choice, and Java 25 removed the main pinning limit.
+
+*Why Go services, one static binary each, context deadlines through every call:* Our share of the two seconds is under a hundred milliseconds and the commit dominates it. Any serious runtime meets that; Go is chosen for small memory, a flat tail and one way to carry a deadline.
+
+*Rejected:*
+
+- **Java 21+ with virtual threads (Spring Boot, Quarkus)**: An equal choice. Within a small factor of Go on throughput, more memory per instance. The right pick for a Java team.
+- **Spring WebFlux**: Reactive code to get what virtual threads now give with plain blocking code.
+- **Python**: One core per process under the GIL, several times less throughput per core, a fatter tail.
+- **Rust**: Fastest and leanest, and not where our time goes. The cost is hiring and build speed.
+
+*Course:* theory/02 (concurrency).
+
+## Outbox relay and log: Debezium into Kafka
+
+*How it is built.* The outbox row commits with the payment. Debezium, in Kafka Connect, reads the write-ahead log through a replication slot and publishes rows to Kafka in commit order, at least once. The risk: a stalled reader makes the database keep log. Alternatives, in the order I would reach for them. A polling relay, SELECT with SKIP LOCKED then mark published: simplest, no Kafka Connect, adds 100 to 500 ms and a query a second; right below about 1,000 events a second. Debezium Server or the embedded engine: the same capture without Kafka Connect, sinking to a cloud queue. Our own consumer of logical decoding with pgoutput: no framework, but we own slot handling, restarts and schema changes. Managed capture such as AWS DMS or Datastream: fine for analytics, weaker ordering guarantees. A database-native queue such as pgmq or River: no Kafka at all, one system fewer. LISTEN and NOTIFY: lossy, never the only path. Publishing after or before the commit: not atomic.
+
+*Why Outbox table, Debezium (change data capture), Kafka:* Reading the write-ahead log costs the database nothing extra and keeps commit order.
+
+*Rejected:*
+
+- **A polling relay**: Right below about 1,000 events a second; here a hot query and 100 ms or more added. It is the alternate path.
+- **Own consumer of logical decoding**: We would own slots, restarts and schema changes.
+- **Managed capture (DMS, Datastream)**: Built for analytics copies; weaker ordering and replay.
+
+*Course:* theory/06 (messaging).
+
+## Processor adapter: direct processors, with a gateway as another adapter
+
+*How it is built.* The port has authorise, capture, void, refund, inquire and read settlement. Each adapter maps the processor's codes into three classes; only the ambiguous one becomes UNKNOWN. Gateway or direct. A gateway gives one API, tokenisation that keeps card data out of our scope, many payment methods, fraud tools and dispute handling, in days. It costs a blended price, about 2.9 percent plus 30 cents at list for cards, and one more hop. Direct processor or acquirer integration prices interchange plus a margin, about 1.8 to 2.4 percent, but needs card-data compliance at the highest level, underwriting, network certification and months of work. Rough break-even, illustrative: a premium of 0.7 percent against a team and audits of about $80,000 a month is about $10 million of card volume a month. Either way the ledger stays ours: a gateway's balance is not our books, and a timeout to a gateway is still an unknown, found again by the idempotency key it supports.
+
+*Why A Go adapter per processor behind one port: a reference on every call:* The processor is where unknowns are born. Our own reference per attempt lets us ask about it, and reverse it.
+
+*Rejected:*
+
+- **A shared generic client**: The ambiguous class gets lost in the lowest common denominator.
+- **A gateway only, at this volume**: About 0.7 % of volume above interchange: tens of millions a year. Right below $10 million a month.
+- **Retrying every timeout**: If the first call landed, the retry charges twice.
+
+*Course:* theory/07 (failure).
+
+## Reconciliation: expectations, matched by reference
+
+*How it is built.* The ledger produces, per processor and day, what it expects to be settled, by reference and net of fees. The raw file is stored unchanged, then joined by reference. Matches become settled; everything else becomes a break with a type, an owner and an age. About 290 million lines a day at a million lines a second is five minutes of batch. Break types: missing at the processor, missing here, amount differs, duplicate.
+
+*Why A Spark batch over the processor files, expectations in PostgreSQL, a break workflow with owners:* A report of totals cannot say which line is wrong. A match by reference can.
+
+*Rejected:*
+
+- **Matching on amount and time alone**: Two same-amount payments in a minute are indistinguishable; match by reference.
+- **Comparing daily totals**: A matching total can hide two offsetting errors; a differing one does not say which line.
+
+*Course:* theory/08 (batch).
+
+<!-- /stack:sections -->
+
+## The stack on one page
+
+<!-- stack:summary -->
+
+| Container | Choice | Rejected | The deciding reason |
+|---|---|---|---|
+| Ledger database | PostgreSQL, by merchant | Partition by account; TigerBeetle | A posting stays in one partition |
+| Services | Go | Java virtual threads; Rust | Memory, tail and deadlines, not speed |
+| Outbox and log | Debezium into Kafka | Polling relay; publish after commit | Commit order, no extra load |
+| Processor adapter | Go per processor; gateway too | One generic client; gateway only | Own reference; price at our volume |
+| Reconciliation | Spark batch, breaks queue | Match by amount and time; totals | Reference match, owned breaks |
+
+Each fix in Stage 6 rejects one tool by name:
+
+| Deep dive | Rejected | Because |
+|---|---|---|
+| 6.1 | Treating a timeout as a decline | the bank may have charged; a retry double-charges. |
+| 6.2 | Check, then insert, for the idempotency key | two concurrent requests both pass the check; a unique constraint decides. |
+| 6.3 | Publishing to the broker after the commit | a crash between the two loses the event for good. |
+| 6.4 | One balance row updated on every payment | it serialises the hot merchant on one lock; post journal lines and derive balances. |
+| 6.5 | Matching on amount and time alone | two same-amount payments in a minute are indistinguishable; match by reference. |
+| 6.6 | Alerting on the error rate | finance finds the break before the dashboard does; measure unmatched count and age. |
+
+<!-- /stack:summary -->
+
+## The partition key: the owner, not the account
+
+The question an interviewer asks about the database is *why this partition key?* A capture posts to three accounts (the
+processor receivable, the merchant payable, the fee), and one transaction has to commit all of them.
+
+| Key | Co-locates | A capture (3 accounts) | A balance read | A hot merchant |
+|---|---|---|---|---|
+| Account | one account's entries | cross-partition, every time | one partition | one hot row |
+| Payment | one payment's entries | one partition | scatter over all partitions | spread, but the balance is a sum of all |
+| **Merchant** | everything one owner has | **one partition** | **one partition** | one partition: sub-accounts (6.4) |
+| Time | the same period | one partition, all writers | scatter | every writer on the newest partition |
+
+By merchant keeps every posting and every balance read inside one partition, at the cost that a hot merchant is a hot
+partition, which 6.4 handles. **Shared accounts** (fee revenue, the processor receivable) would be hot and cross-partition, so
+each partition has its own, and the company-wide figure is the sum of the mirrors. 64 logical partitions map to about ten
+primaries, so a rebalance moves a partition, not rows.
+
+![The same container view, with the type lines naming the technologies.](diagrams/video-c4-containers-tech.pdf){width=100%}
+
+![Inside the payment service: where challenges 1 and 2 happen.](diagrams/video-c4-comp-service.pdf){width=100%}
+
+![Inside one partition of the ledger database: where challenges 3 and 4 happen.](diagrams/video-c4-comp-db.pdf){width=100%}
+
+![Inside reconciliation: where challenge 5 happens.](diagrams/video-c4-comp-rec.pdf){width=100%}
+
+## Gateway or processor: why most companies use a gateway
+
+A **gateway** (Stripe, Adyen, Braintree) is a payment service provider with one API in front of acquirers and networks. A
+**processor or acquirer** (Worldpay, Fiserv, a bank) is the party that actually moves card money; integrating with it directly
+means a network of contracts and certifications.
+
+| | A gateway | Direct to a processor or acquirer |
+|---|---|---|
+| Time to first payment | days: one API | months: underwriting, network certification |
+| Card-data scope | tokens and hosted fields keep it out of yours (the lightest self-assessment) | the highest compliance level, audited yearly |
+| Price (illustrative, list) | about 2.9 % + 30 ¢ blended for cards | interchange plus a margin, about 1.8 to 2.4 % at scale, negotiated |
+| You also get | payment methods, 3-D Secure, fraud tools, disputes, payouts, reporting | only what you build |
+| Control | their routing; their outage is yours | your routing across several processors |
+| Still yours either way | the ledger, idempotency keys, the UNKNOWN state, reconciliation | the same |
+
+**Simpler** (days against months), **cheaper at small volume** (no team, no audits), and **dearer at large volume**, where the
+blended premium over interchange is the whole margin. Break-even, illustrative: a 0.7 % premium against a payments team and
+audits of about $80,000 a month is about **$10 million of card volume a month**. Large companies run both: a gateway for the
+long tail of payment methods, direct processors for the bulk of cards.
+
+**What stays yours with a gateway.** A gateway's balance is not your books: you still keep your own journal, so that you
+can explain every figure, reconcile against the gateway's balance transactions and payout reports, and move to a second
+provider. A network timeout to a gateway is still an *unknown*: you resolve it by retrieving the payment by the idempotency
+key you sent (Stripe accepts one), which is the same inquiry mechanism with a different endpoint. Webhooks from a gateway are
+at-least-once and may arrive out of order: de-duplicate by event ID and re-read the object before acting. That is why the
+design puts a **processor port** between the payment service and any provider: a gateway is one more adapter.
+
+## Runtime: why Go, and how it compares
+
+Our own code costs microseconds inside a call to a processor that takes a second, and the commit takes a few milliseconds, so
+the language is **not** the bottleneck. What matters: a flat tail under bursts, memory per replica (replicas cost money), a
+deadline that cancels the whole call chain, and engineers who can run it at 3 a.m.
+
+| Runtime | Overhead per request | Memory per instance | Verdict here |
+|---|---|---|---|
+| **Go** | 0.1 to 0.5 ms | 30 to 80 MB | the pick: small, flat tail, deadlines in every call |
+| Java 21+ with virtual threads (Spring Boot, Quarkus) | 0.2 to 1 ms warm | 200 to 500 MB; Quarkus native 50 to 100 MB | an equal choice for a Java team; plain blocking code scales |
+| Spring WebFlux (reactive) | like virtual threads | like virtual threads | not chosen: reactive code for what virtual threads now give, and a JDBC driver blocks anyway |
+| Python, async | 1 to 3 ms | 60 to 150 MB | one core per process under the interpreter lock; several times less throughput per core |
+| Rust | 0.05 to 0.3 ms | 10 to 40 MB | fastest and leanest; pays in a matching engine, not here; costs hiring and build speed |
+
+*Illustrative orders of magnitude.* Public benchmarks disagree: comparisons of Go against Java virtual threads range from
+parity to Go ahead by tens of percent on I/O-bound throughput and several times less memory; virtual threads against WebFlux
+trade wins depending on the workload; Java 25 removed the main virtual-thread pinning limit. **Measure on your own load.**
+For a latency-critical in-memory component (a crypto exchange's matching engine, which never waits on a database) Rust or C++
+is the right tool; a payments service waits on a bank and a commit, so Go, or Java with virtual threads, is enough.
+
+## Building a payment ledger for your own business: the ladder
+
+For a small business, the fastest correct path is a ladder, and you climb only when the number says so:
+
+1. **A gateway (Stripe) and one PostgreSQL primary with your own journal.** Keys first, UNKNOWN, a polled outbox,
+   reconciliation against the gateway's balance transactions. Correct from day one, days of work. This is the 5.2 alternate.
+2. **A tuned PostgreSQL:** partition by merchant, a synchronous standby, batch inserts. Takes you to thousands of payments a second.
+3. **Change capture instead of polling** (Debezium) when events need a replayable log or consumers multiply.
+4. **A purpose-built ledger core** (TigerBeetle) for debits and credits when one primary's commit rate or a hot account is the
+   limit, with PostgreSQL still holding payment state and the outbox.
+5. **Direct processors** when the gateway premium exceeds the cost of a team (about $10 million a month, illustrative).
+
+"The fastest in the world" is a property of one component at one scale, not of the whole system. The slowest part of a
+payment is the processor, so the design that wins is the one that is **correct under retry**, then simple to operate.
+
+## 5.2 When you don't need all this (alternate path)
+
+![ALTERNATE: a gateway, one primary, a polled outbox.](diagrams/video-alt.pdf){width=100%}
+
+One adapter (the gateway); one PostgreSQL primary with a synchronous standby; the outbox polled every 200 ms; no Kafka, no
+Debezium, no partitions. **It gives up** one writer (about 1,200 commits a second), a replayable log, the gateway's fee premium
+and its outages, and, with an asynchronous standby, the lag on failover. **Crossover**, from the scale line: below about
+300 payments a second and $10 million a month, ship this and say when you would switch. We are at 10,000 a second and
+9 billion a month, so the full design.
+
 # Stage 6: Deep dives
 
-The video's eight challenges, each in the same shape: the risk, the naive answer and why it fails, the mechanism,
-the failure case that tests it, what to say, and the weak answers to avoid. They are ordered so that each fix
-creates the next question. Correctness: 2 and 5. Failure recovery: 1, 3 and 7. Overload: 4. The outside truth: 6.
-Observability: 8. The crux, not knowing and the outside world's books, gets two: 1 and 6.
+The video runs **six** challenges (the compact cut); this stage keeps **all eight deep dives**, each in the same shape: the risk,
+the naive answer and why it fails, the mechanism, the failure case that tests it, what to say, and the weak answers to avoid.
+They are ordered so that each fix creates the next question.
+
+| Video challenge | Booklet section | Note |
+|---|---|---|
+| 1 The bank timed out | 6.1 | the crux, part one |
+| 2 Three retries at once | 6.2 | |
+| 3 A crash between the ledger and the event | 6.3 | the video adds the replication slot as the new risk |
+| 4 The hot merchant, and a million one-time accounts | 6.4 | the video adds the million-accounts push (below) |
+| (folded into the refund sequence and challenge 5) | 6.5 Refunds and a chargeback | booklet only |
+| 5 999,998 against 1,000,000 | 6.6, with 6.7 as its second push | 6.7 the bad release |
+| 6 How would you know before finance does? | 6.8 | |
 
 ![The challenge map: the carried baseline with every attack point outlined.](diagrams/video-map.pdf){width=92%}
 
@@ -647,7 +871,7 @@ relay reads committed rows in order and publishes them, at least once; consumers
 ![Nothing is lost at the crash.](diagrams/video-seq-outbox.pdf){width=92%}
 
 **The second-level push:** *"The relay is twenty minutes behind. Or a merchant's endpoint is down for a day."* Outbox age
-is a metric with an alert. The relay is partitioned by account so one slow partition does not hold the others. Webhooks
+is a metric with an alert. The relay publishes keyed by merchant, so one slow partition does not hold the others. Webhooks
 retry with backoff for days, then the merchant is told to reconcile with `GET`; the merchant dashboard reads our database,
 not the stream.
 
@@ -680,6 +904,28 @@ through **one writer per merchant**.
 available, now."* Per payment: a conditional update on the payment row; one payment is never hot. Per merchant: the single
 payout writer sums the sub-accounts and posts the payout. Payouts are rare next to payments, so serialising them costs
 nothing. The honest limit: the projection lag must be measured and stated to the payouts team.
+
+**The second-level push in the video: "a million one-time virtual cards a day, none ever hot. Do you partition by account now?"**
+No. An account is a **row**, not a partition: a million accounts at about 100 bytes is 100 MB, created by an upsert on first
+posting. They hash with their merchant, so they spread evenly, and a posting between a card and its funding account stays in
+one partition. Partitioning by account would solve a problem we do not have (cold accounts) and bring back the one we avoided
+(every posting spanning partitions). Three further points:
+
+1. **Does the card need a ledger account at all?** A card is an *instrument*. Its spending limit is a hold in authorisation
+   (SD-77). The ledger needs accounts for *who owes whom*: the program's or the customer's, with the card ID as a tag on the
+   entries. One-time accounts that never carry a balance are rows nobody reads.
+2. **The cross-partition case is real, and rare:** a funding account shared by many merchants. Post it in two steps, a
+   pending debit on one side and a confirmation on the other, or give each merchant a mirror account and settle the mirrors in
+   a batch.
+3. **Housekeeping:** close and archive accounts with zero balance and no activity; keep the account table small enough to cache.
+
+**Past one primary: a purpose-built ledger database.** TigerBeetle (written in Zig) is built for exactly debits and credits:
+128-byte accounts and transfers, thousands of transfers in one batched request on a single leader, strict serialisability,
+and a flag that makes an account refuse to go below zero. A hot account is not a lock there, because the engine applies a
+batch in order on one core. It is the natural upgrade for the *ledger core* of a very large or very hot system, and it is
+only the core: payment state, idempotency keys, the outbox and the break workflow still need a general database. Published
+throughput figures are vendor-reported and workload-dependent, so measure your own; and weigh a younger system's operational
+maturity against the speed.
 
 > "Five thousand updates a second to one balance row would serialise on its lock. So payments only append entries and the
 > balance is derived. Where a check needs the balance now, like a payout, I split the account into sub-accounts or serialise
