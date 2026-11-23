@@ -1,6 +1,6 @@
 A distributed lock can be correct at every step and still let two writers through. Here is why, and the fix.
 
-I've published a 78-minute reference solution for the distributed lock question, at the Staff bar: theory, a three-version design, seven challenges, and the build cost, on 166 numbered slides.
+I've published a 99-minute reference solution for the distributed lock question, at the Staff bar: theory, a three-version design, seven challenges, and the build cost, on 575 numbered slides.
 
 The idea that unlocks it: a lock service says who should be working. Only the resource says who is allowed to write. A holder pauses for fifteen seconds, its lease expires, a second holder is granted, and the first one wakes up and writes. The fix is a token that only increases, checked at the resource.
 

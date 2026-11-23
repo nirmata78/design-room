@@ -1,0 +1,72 @@
+stack sync: up to date
+automarked 114 legacy slides (hand-place markers to refine): ['ch0_2.py:16', 'ch0_2.py:30', 'ch0_2.py:43', 'ch0_2.py:43', 'ch0_2.py:43', 'ch0_2.py:43'] …
+slides 176 frames 575 words {'C': 10913, 'I': 539, 'V': 639, 'N': 401} total 12492
+by chapter {'0': 342, '1': 808, '2': 819, '3': 1570, '4': 978, '5': 2760, '6': 80, '7': 4282, '8': 544, '9': 309}
+  voice 20/977
+  voice 40/977
+  voice 60/977
+  voice 80/977
+  voice 100/977
+  voice 120/977
+  voice 140/977
+  voice 160/977
+  voice 180/977
+  voice 200/977
+  voice 220/977
+  voice 240/977
+  voice 260/977
+  voice 280/977
+  voice 300/977
+  voice 320/977
+  voice 340/977
+  voice 360/977
+  voice 380/977
+  voice 400/977
+  voice 420/977
+  voice 440/977
+  voice 460/977
+  voice 480/977
+  voice 500/977
+  voice 520/977
+  voice 540/977
+  voice 560/977
+  voice 580/977
+  voice 600/977
+  voice 620/977
+  voice 640/977
+  voice 660/977
+  voice 680/977
+  voice 700/977
+  voice 720/977
+  voice 740/977
+  voice 760/977
+  voice 780/977
+  voice 800/977
+  voice 820/977
+  voice 840/977
+  voice 860/977
+  voice 880/977
+  voice 900/977
+  voice 920/977
+  voice 940/977
+  voice 960/977
+/Users/neo.bsuir/Projects/design-room/solutions/SD-24-distributed-lock/video/distributed-lock-reference.mp4  1080p  99:20  18 chapters  575 frames
+  00:00  0 Cold open
+  02:39  1 Requirements and scope
+  09:08  2 Estimates
+  15:32  3 Theory
+  27:49  4 API and entities
+  35:05  5 High-level design
+  47:12  5.1 Components and technologies
+  57:00  6 Bridge
+  57:38  7 Challenges
+  57:56  7.1 Challenge 1: The paused holder
+  63:53  7.2 Challenge 2: The resource cannot check
+  68:32  7.3 Challenge 3: Clocks and leases
+  72:50  7.4 Challenge 4: Leader loss, partition, group loss
+  78:40  7.5 Challenge 5: The top of the hour
+  82:52  7.6 Challenge 6: A hot name, several locks
+  87:15  7.7 Challenge 7: How would you know?
+  91:49  8 Build cost
+  96:32  9 Recap
+EXIT 0 elapsed 8857s

@@ -494,3 +494,19 @@ Planned: 86.5 minutes, 11,505 words, 182 slides. **Actual (script, after the bui
 | 8 Build cost | 544 | 7 |
 | 9 Recap | 309 | 6 |
 | **Total** | **11,073** | **166** |
+
+## 5.1 Components and technologies (retrofit, 2026-11-22)
+
+<!-- stack:outline -->
+
+| Container | Choice | How it is built | Rejected | Theory part |
+|---|---|---|---|---|
+| Consensus groups | etcd-class store, 4 groups × 5 replicas, one name in one group | Writes go to the leader, are appended to a log, replicated and committed on a majority | One cache node, set if absent with expiry; A quorum of independent cache nodes; A relational row with select for update | 04, 07 |
+| Lock SDK | JVM and Go libraries; a heartbeat every third of the lease | The library opens a session and sends a heartbeat about every third of the lease, which is 3.3 seconds for a ten-second lease | A thin client that only calls acquire; A sidecar process per host | 07 |
+| Gateway | Go service on Kubernetes, gRPC, three zones | The gateway authenticates the caller, applies a per-tenant quota, maps the name to its group with the slot map and forwards to the cached leader of that group | Clients talking to the groups directly; A shared layer-7 proxy | 08 |
+| Epoch store | A three-replica strongly consistent store, outside the groups | The epoch sits in the top sixteen bits of every token, and the log index in the low forty-eight | Keep the epoch inside the groups; A clock-derived epoch | 07 |
+| The check at the resource | A conditional write at the resource; a validating proxy where it cannot | Where the resource supports it, the token is the generation, version or entity tag, and the write is conditional on it: a SQL update where the stored token is at most mine, or a write-if-generation-matches | A check in the application before the write; An idempotency key alone | 07 |
+
+Fix-slide rejections: 1: A lease with no token; 2: Checking the token in the application; 3: A quorum of cache nodes for the lock; 4: Restoring the groups from a backup; 5: Every waiter polling the same name; 6: One global lock for a whole resource family; 7: Alerting on whether the service is up.
+
+<!-- /stack:outline -->

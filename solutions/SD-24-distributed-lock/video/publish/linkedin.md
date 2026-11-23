@@ -7,7 +7,7 @@ Post from a computer, after the YouTube video is public. The link is still pendi
 ```text
 A distributed lock can be correct at every step and still let two writers through. Here is why, and the fix.
 
-I've published a 78-minute reference solution for the distributed lock question, at the Staff bar: theory, a three-version design, seven challenges, and the build cost, on 166 numbered slides.
+I've published a 99-minute reference solution for the distributed lock question, at the Staff bar: theory, a three-version design, seven challenges, and the build cost, on 575 numbered slides.
 
 The idea that unlocks it: a lock service says who should be working. Only the resource says who is allowed to write. A holder pauses for fifteen seconds, its lease expires, a second holder is granted, and the first one wakes up and writes. The fix is a token that only increases, checked at the resource.
 
@@ -36,5 +36,5 @@ Written reference design, stage by stage: https://github.com/nirmata78/design-ro
 Run this round yourself, with an AI interviewer that won't help you: https://github.com/nirmata78/design-room
 ```
 
-**Media: attach the reference design.** In the post composer, More (+) → Add a document → `../../SD-24_Distributed_Lock_Reference_Design.pdf` (38 pages, 2.4 MB; limit 300 pages, 100 MB).
+**Media: attach the reference design.** In the post composer, More (+) → Add a document → `../../SD-24_Distributed_Lock_Reference_Design.pdf` (44 pages, 2.1 MB; limit 300 pages, 100 MB).
 Document title, shown on the viewer: **A distributed lock service: a Staff-level reference design**. A post carries one attachment, so the video stays a link in the text, and the document is what shows in the feed.

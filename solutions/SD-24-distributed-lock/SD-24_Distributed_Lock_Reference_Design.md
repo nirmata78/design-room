@@ -7,8 +7,8 @@ documentclass: article
 fontsize: 10pt
 geometry: a4paper,top=0.7in,bottom=0.75in,left=0.75in,right=0.75in
 colorlinks: true
-linkcolor: blue
-urlcolor: blue
+linkcolor: gblueink
+urlcolor: gblueink
 toc: true
 toc-depth: 2
 numbersections: false
@@ -706,6 +706,114 @@ take everyone.
 
 **Alternatives.** An idempotency key (cheapest, when the operation allows it). Accepting an efficiency lock
 and saying so in the contract (honest). Neither is a proxy, and both are cheaper.
+
+## Technologies, one level down
+
+Every container with the technology it runs on, how it is built, the alternatives rejected and why, and the question an interviewer asks about it. Generated from `stack.json`.
+
+<!-- stack:sections -->
+
+## Consensus groups: an etcd-class store
+
+*How it is built.* Writes go to the leader, are appended to a log, replicated and committed on a majority. A lease is an object with a time to live that keys attach to; when it expires the keys vanish. Acquire is one transaction: if the name does not exist, create it and attach the lease, else say who holds it. Every name lives in exactly one group, chosen by hash, so there are no cross-group transactions. Reads that must be fresh confirm leadership first. The revision is stamped on every change and rises across the group; the token is that revision with the epoch in its top bits. Watches wake waiters in order.
+
+*Why etcd-class store, 4 groups × 5 replicas, one name in one group:* A lock needs a replicated record that survives losing a minority, an order for every change, leases that expire and an atomic set-if-absent. Its per-key revision is a ready-made fencing token.
+
+*Rejected:*
+
+- **One cache node, set if absent with expiry**: Replication is asynchronous: the primary grants the lock and dies before the copy arrives, and the new primary grants it again.
+- **A quorum of independent cache nodes**: Safety rests on timing: a pause between acquire and use lets a second client assemble a majority. And it produces no token.
+- **A relational row with select for update**: A row lock lives as long as the connection: no lease, no token. Right when the resource is in the same database.
+
+*Course:* theory/04 (replication and consistency) and theory/07 (correctness under failure).
+
+*Drill.* "The leader of a group dies mid-acquire. Can two clients both be told they hold the name?" No. A grant commits only on a majority, and the new leader has every committed entry. A client that never saw the answer retries and learns the truth. The trap is a read from a follower that has not caught up.
+
+## Lock SDK: a library with a local deadline
+
+*How it is built.* The library opens a session and sends a heartbeat about every third of the lease, which is 3.3 seconds for a ten-second lease. It keeps a local deadline shorter than the lease. If the heartbeat cannot get through and the local deadline passes, it raises LockLost to the application, which must stop. The library never reuses a token after expiry. A renewed lease is a new grant with a new token. The local deadline allows for the heartbeat period and the clock-rate error, not for a pause.
+
+*Why JVM and Go libraries; a heartbeat every third of the lease:* The holder must stop on its own when it cannot prove it still holds the lock. That logic has to live in the process that does the work.
+
+*Rejected:*
+
+- **A thin client that only calls acquire**: The application would have to build the heartbeat and the deadline itself, and every team would get it slightly wrong.
+- **A sidecar process per host**: One more process that can pause independently of the application, which is the failure we are guarding against.
+
+*Course:* theory/07 (correctness under failure).
+
+*Drill.* "The application's thread pauses for forty seconds with a ten-second lease. What stops the stale write?" Nothing in the library can, since the whole process is paused. That is why the token exists: the resource rejects the stale write because a newer token has been seen.
+
+## Gateway: stateless, with the slot map
+
+*How it is built.* The gateway authenticates the caller, applies a per-tenant quota, maps the name to its group with the slot map and forwards to the cached leader of that group. On a not-leader answer it refreshes the leader and retries once. It holds no lock state, so losing a gateway loses nothing but in-flight calls. The operator console reaches the same gateway for force revoke, with its own role.
+
+*Why Go service on Kubernetes, gRPC, three zones:* Clients should not know which group owns a name or who leads it. A stateless layer keeps that knowledge and can be restarted at will.
+
+*Rejected:*
+
+- **Clients talking to the groups directly**: Every client library would carry the slot map and leader changes, and a rebalance would need a client release.
+- **A shared layer-7 proxy**: Leader routing is application knowledge; a generic proxy would round-robin onto followers.
+
+*Course:* theory/08 (reliability and operations).
+
+## Epoch store: a small durable counter
+
+*How it is built.* The epoch sits in the top sixteen bits of every token, and the log index in the low forty-eight. It is read at group start and bumped only on a rebuild or a slot move, a handful of times a year. The store is itself replicated, three replicas across zones, and is written with a conditional update. Token floors per slot are kept here too, so a rebuilt group seeds above every token ever issued.
+
+*Why A three-replica strongly consistent store, outside the groups:* If every group were lost, tokens would restart from zero and go backwards. The epoch is the one number that must survive, so it lives somewhere else.
+
+*Rejected:*
+
+- **Keep the epoch inside the groups**: The failure it protects against is losing the groups. It must not share their fate.
+- **A clock-derived epoch**: A wall-clock epoch depends on clocks agreeing across a rebuild; a bad clock gives a smaller number.
+
+*Course:* theory/07 (correctness under failure).
+
+*Drill.* "Every group is lost in a disaster. How do you restart without issuing a token an old holder could beat?" Bump the epoch in the epoch store, start the groups empty, seed the token floor above the old maximum, and wait one maximum lease before granting. Every new token exceeds every old one.
+
+## The check at the resource
+
+*How it is built.* Where the resource supports it, the token is the generation, version or entity tag, and the write is conditional on it: a SQL update where the stored token is at most mine, or a write-if-generation-matches. Where the resource is a partner API with no such primitive, a validating proxy keeps the highest token per resource in a consistent store and forwards only fresh calls. It fails closed. The proxy's own step is a conditional update, so two concurrent holders cannot both pass.
+
+*Why A conditional write at the resource; a validating proxy where it cannot:* The lock service cannot stop a stale write; only the resource can, and only if the check and the write are one atomic step.
+
+*Rejected:*
+
+- **A check in the application before the write**: Two steps, and the pause lands between them. That is exactly the failure.
+- **An idempotency key alone**: Cheapest, and the right answer when the operation allows it. It does not help when the second write is a different, valid operation.
+
+*Course:* theory/07 (correctness under failure).
+
+*Drill.* "The resource is a partner HTTP API with no conditional write. Where does the check go?" In a validating proxy that keeps the highest token seen per resource in a consistent store and rejects lower ones, failing closed. The proxy's step is itself a conditional update.
+
+<!-- /stack:sections -->
+
+## The stack on one page
+
+<!-- stack:summary -->
+
+| Container | Choice | Rejected | The deciding reason |
+|---|---|---|---|
+| Consensus groups | etcd-class, 4 × 5 replicas | Cache node; Redlock; SQL row | Safety without timing; a revision as token |
+| Lock SDK | Library, local deadline | Thin client; sidecar | Stop on our own |
+| Gateway | Go, gRPC, stateless | Direct clients; generic proxy | Routing knowledge in one place |
+| Epoch store | 3-replica durable counter | In the groups; clock epoch | Survives losing every group |
+| Resource check | Conditional write; proxy | App-side check | Atomic with the write |
+
+Each fix in Stage 6 rejects one tool by name:
+
+| Deep dive | Rejected | Because |
+|---|---|---|
+| 6.1 | A lease with no token | a paused holder wakes after expiry with no idea, and writes; only a token the resource checks can reject it. |
+| 6.2 | Checking the token in the application | two steps, and the pause lands between them; the check must be atomic with the write. |
+| 6.3 | A quorum of cache nodes for the lock | its safety rests on timing assumptions, and it issues no token. |
+| 6.4 | Restoring the groups from a backup | the backup predates later grants, so tokens would go backwards; start empty with a higher epoch. |
+| 6.5 | Every waiter polling the same name | a thundering herd at expiry; a watch wakes one waiter in order. |
+| 6.6 | One global lock for a whole resource family | it makes one group the bottleneck for everything; split the name and keep one name in one group. |
+| 6.7 | Alerting on whether the service is up | it can be up while grants miss their budget; measure acquire latency and token monotonicity. |
+
+<!-- /stack:summary -->
 
 # Stage 6: Deep dives
 

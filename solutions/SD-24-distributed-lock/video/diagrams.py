@@ -138,6 +138,29 @@ d.edge("app", "res", "write + token", "", src="t", dst="l", via=[(175, 155)], at
 d.legend(40, 850, ("person", "container", "db", "ext"))
 d.save(OUT / "c4-containers.svg")
 
+# the same container view with the technologies (labels from ../stack.json)
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / 'src')); import stack
+c4.Diagram.OVERRIDE = {k: (v[1], v[2]) for k, v in stack.C4.items()}
+d = c4.Diagram(1600, 900)
+d.boundary(380, 60, 1000, 760, "Lock service", "Software System")
+d.node("app", 40, 330, 270, 160, "person", "Application", "Container: JVM service", "Uses the lock SDK, owns the work.")
+d.node("sdk", 400, 330, 250, 160, "container", "Lock SDK", "Library", "Session, heartbeat, local deadline, LockLost.", size=21)
+d.node("gw", 740, 330, 230, 160, "container", "Gateway", "Stateless service", "Auth, quota, slot map, leader cache.", size=21)
+d.node("grp", 1080, 330, 280, 160, "db", "Consensus groups", "4 × 5 replicas", "Replicated state machine, log, snapshots.", size=21, stack=True)
+d.node("epoch", 1080, 640, 280, 110, "db", "Epoch store", "Durable counter", "", size=21)
+d.node("res", 1120, 90, 260, 130, "ext", "Protected resource", "External", "Checks the token.")
+d.node("ops", 740, 640, 230, 110, "container", "Operator console", "CLI + API", "", size=21)
+d.edge("app", "sdk", "acquire(name)", "in process", src="r", dst="l", at=(350, 310))
+d.edge("sdk", "gw", "Acquire, heartbeat", "gRPC", src="r", dst="l", at=(695, 310))
+d.edge("gw", "grp", "propose to leader", "gRPC", src="r", dst="l", at=(1025, 310))
+d.edge("grp", "epoch", "read and bump epoch", "", src="b", dst="t", at=(1220, 570))
+d.edge("ops", "gw", "ForceRevoke", "", src="t", dst="b", at=(855, 580))
+d.edge("app", "res", "write + token", "", src="t", dst="l", via=[(175, 155)], at=(640, 140))
+d.legend(40, 850, ("person", "container", "db", "ext"))
+d.save(OUT / "c4-containers-tech.svg")
+c4.Diagram.OVERRIDE = {}
+
+
 # ───────────────────────────── 3 · sequences ─────────────────────────────────────────────────────────
 def seq(name, parts, steps, **kw):
     s = sq.Seq(1500, size=22, row=50, **kw)
