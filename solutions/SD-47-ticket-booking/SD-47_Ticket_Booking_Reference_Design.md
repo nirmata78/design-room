@@ -1,86 +1,40 @@
 ---
 title: "SD-47 · Ticket Booking Under Contention"
-subtitle: "A reference solution for a 60-minute FAANG-style system design round, explained down to every term"
+subtitle: "A reference solution at the Staff bar: a rejection system, an atomic claim, a hold that expires, and a payment that may never answer"
 author: "design-room reference solution · practise with the simulator first"
-date: "20 October 2026 · second edition, expanded"
+date: "21 November 2026 · reference-solution edition"
 documentclass: article
 fontsize: 10pt
 geometry: a4paper,top=0.7in,bottom=0.75in,left=0.75in,right=0.75in
 colorlinks: true
-linkcolor: blue
-urlcolor: blue
+linkcolor: gblueink
+urlcolor: gblueink
 toc: true
 toc-depth: 2
 numbersections: false
 ---
-
 \newpage
-
 # How to read this document
 
-This is the **answer key for `SD-47`** in `~/Projects/design-room`. It shows how a strong L6
-EM candidate runs the round: what to say, what to draw, and **when**. The first edition was a
-9-page script. This edition keeps the script and adds the **why** behind every line, so you can
-defend each choice when the interviewer asks *"why?"* or *"what is that?"*.
+This is the reference solution for **SD-47, ticket and seat booking under contention**, written for the
+**Staff bar (L6/L7)**. It follows the order of the video that accompanies it, and the video follows the order an
+interviewer expects: **scope, numbers, a simple design, then break it, fix it, and recap.** Everything the video says
+is here, with the reasoning, the code and the traps written out.
 
-**The document has three layers, and you'll read them differently:**
+**Four layers, read in this order:**
 
-1. **Part I, the system in pictures.** Read it first. It explains what the fan experiences, what
-   happens second by second when a million people arrive, and where the load lands. There's no
-   interview script in it, only understanding.
-2. **Part II, the round stage by stage.** This is what you do in the 60 minutes. Each stage has a
-   time budget, the words to say, what to draw, and boxes that explain every term.
-3. **Part III, the internals.** How PostgreSQL row locks, Redis, Kafka, CDNs and card payments
-   actually work, at the depth the hour-long "requirement drip" rounds warn about: *"if you're going to use a specific
-   tool, be prepared to talk in depth about that tool, how it works, and why it's best."*
+1. **Part I, the system in pictures.** What a fan sees, what happens second by second when a million people arrive,
+   where the load lands. Start here if the vocabulary is new.
+2. **Part II, the reference solution** (this is the video, in print): thesis, requirements, estimates, a theory
+   chapter, API and data, the design in three versions, then **eight challenges** that break it, a build cost and a recap.
+3. **Part III, the internals** for when an interviewer digs: PostgreSQL, Redis, Kafka, a CDN, card payments, signed tokens.
+4. **The one-page cheat card** at the end.
 
-**The coloured boxes:**
+**How to use it.** Run the round cold first (`mock me SD-47`). Then read Part II with your own notes beside it. Mark
+every place where you named a number, a mechanism or a trade-off less precisely than this document does.
 
-::: {.key title="Top-3 number"}
-One of the three back-of-the-envelope numbers worth computing out loud in the round. In a real
-interview you have time for one or two calculations, not ten.
-:::
-
-::: why
-Explains a term or a decision in plain words. This is for you, not for the interviewer.
-:::
-
-> Words you can say in the room, nearly verbatim.
-
-::: warn
-A trap: something weak candidates do, or a claim that breaks under a follow-up question.
-:::
-
-::: load
-What this part of the system sees during the on-sale peak, with numbers.
-:::
-
-**Practise in three passes.** (1) Read Part I and Part II once, end to end. (2) Close the document
-and run the simulator cold:
-`Read CLAUDE.md. Mock me: SD-47, L6 EM, full round, 60 minutes, add requirements mid-round.`
-(3) Debrief against the Stage 12 self-check, then reread only the sections where you fell short.
-**Don't memorise numbers.** Memorise *the order of the argument* and how to rebuild each number in
-twenty seconds.
-
-**The prompt as the interviewer reads it:**
-*"Design ticket booking for a stadium: fifty thousand seats, and a million people trying to buy them
-the moment sales open."*
-
-::: {.key title="The one-sentence insight to land by minute 12"}
-A million people cannot be allowed to fight over fifty thousand rows in a database. The design's
-job is to **turn a stampede into a metered stream**, and to be **honest, fast and fair with the 98%
-who will not get a ticket**. Getting the 2% who do buy right is the easy part once the stampede is
-gone.
-:::
-
-::: why
-**Why is this the insight?** Most candidates start with the database: "how do I stop two people
-buying seat 14?" That problem is real but small, and Stage 6 solves it with one SQL statement. The
-hard problem is that **a million clients arrive in the same minute**, and any component they can all
-reach at once falls over. So the design is mostly about **where people wait** (the waiting room),
-**what they read while waiting** (one cached number) and **how fast they are let through** (the
-admission rate). The remaining 2% is a normal transactional system.
-:::
+> Numbers in this document are **illustrative or initial targets**, never measurements. Each one is labelled the first
+> time it appears. A number you cannot tie to a decision is decoration; every one here is tied to one.
 
 \newpage
 
@@ -110,7 +64,7 @@ ask "what is that?", the answer is here.
 |--------|----------------------------------------------------|
 | **Waiting room** | A virtual queue in front of the shop. Fans wait there and are let into the shop in a controlled stream |
 | **Lobby** | The waiting room *before* T0. Everyone who arrives early is in the lobby with no position yet |
-| **Lottery (the T0 draw)** | At T0 everyone in the lobby gets a **random** place in the line. People who arrive after T0 join at the back in arrival order. Explained in Stage 6.2 |
+| **Lottery (the T0 draw)** | At T0 everyone in the lobby gets a **random** place in the line. People who arrive after T0 join at the back in arrival order. Explained in challenges 4 and 5 |
 | **Queue token** | A signed ticket the waiting room gives a fan on joining. It says: "this user, this event, this place in line". The signature means it can't be forged |
 | **seq** | A fan's number in the line: 1, 2, 3 … 1,000,000 |
 | **admittedUpTo** | One number per event: "everyone with seq at or below this may now enter the shop". It only grows |
@@ -185,7 +139,7 @@ ask "what is that?", the answer is here.
 | **SLO** (service level objective) | A target we commit to, like "hold API p99 < 300 ms" |
 | **Invariant** | Something that must always be true, like "no seat has two tickets". We monitor it directly |
 | **Backpressure** | Slowing the input when the system is overloaded, instead of accepting work and failing it |
-| **Little's law** | *Items in a system = arrival rate × time each spends in it.* Used in Stage 2 to size R |
+| **Little's law** | *Items in a system = arrival rate × time each spends in it.* Used in Chapter 2 to size R |
 | **Game day** | A planned rehearsal where you deliberately break things in staging to test the runbook |
 
 \newpage
@@ -230,21 +184,6 @@ For the ~29,000 fans with low numbers, the story continues:
    email. Declined: seats go back to the pool, and the fan can try another card while the admission
    token lasts.
 
-## The same journey as states of one fan
-
-A state diagram is the compact form of the two journeys. It's also the clearest way to answer *"what
-can go wrong for a fan, and what happens then?"*
-
-![The life of one fan during an on-sale. Most fans go LOBBY -> QUEUED -> TOLD_SOLD_OUT and never touch inventory.](diagrams/sd47-fan-states.pdf){width=58%}
-
-::: why
-**Why can HOLDING go back to ADMITTED?** A hold can fail (409) or expire after 5 minutes. The fan
-is still in the shop with a valid admission token and can try again. **Why does ADMITTED end in
-TIMED_OUT?** The 10-minute admission token stops one fan from occupying a shopping slot forever.
-When it runs out, the slot is freed for the next fan in line. That's how the waiting room keeps
-moving even when people walk away.
-:::
-
 ## The funnel: who gets what
 
 ![Where a million fans end up. The design is mostly about the red box.](diagrams/sd47-funnel.pdf){width=72%}
@@ -257,24 +196,6 @@ sold out. **Why are 9,000 admitted fans without an order not a problem?** Their 
 released, those seats go back into the pool, and fans admitted later buy them. Admission continues
 until the seats are actually gone.
 :::
-
-## The on-sale minute by minute
-
-This is how the system behaves under load: what happens, and which part feels it.
-
-| Time | What happens | Load where it matters |
-|------|----------------------------------|--------------------|
-| **T-30 min** | Lobby opens. Fans arrive over 30 minutes, most in the last five | Joins ~600/s on average, peaks of a few thousand/s. Page and countdown served by the CDN |
-| **T-1 s** | 1M browsers show a countdown from the **server's** clock (they synced their offset on join), so nobody gains by refreshing | Nothing reaches the origin |
-| **T0** | Lobby closes. The draw is final: the order of the random scores is the order of the line | One Redis write per event |
-| **T0 to T0+20 s** | Each lobby browser asks *"what's my number?"* once, after a random delay of 0–20 s (**jitter**) so they don't all ask in the same millisecond | ~50,000 req/s to the waiting-room service, each one O(log n) Redis lookup |
-| **T0 onward** | Every waiting browser polls the shared queue state every ~10 s | ~100,000 req/s **at the CDN**, about 200 req/s at the origin |
-| **T0 to T0+2 min** | Admission controller **slow-starts**: R = 500/min, then ramps up while the shop stays healthy | Inventory sees its first holds |
-| **T0+2 to T0+15 min** | Steady state: ~10,000 fans shopping, R ~ 2,000/min | ~5,000 seat-map reads/s (Redis), 50–500 holds/s (PostgreSQL), ~25 payments/s (PSP) |
-| **~T0+15 min** | Remaining seats ÷ 2.5 < fans still shopping, so `soldOut = true` | 970,000 fans see *sold out* within one polling interval |
-| **T0+15 to T0+30 min** | Stragglers' holds expire, their seats are re-offered to fans already admitted, then to the waitlist | Low |
-
-![The stampede at T0, as a sequence. Notice that the million-fan arrows end at the CDN and the waiting room, never at inventory.](diagrams/sd47-seq-t0.pdf){width=92%}
 
 ## Where the load lands
 
@@ -292,26 +213,44 @@ database only sees the people actually clicking "hold".
 :::
 
 \newpage
-# Part II — The round, stage by stage
+\newpage
+# Part II — The reference solution
 
-**The 60-minute clock** (the hour-long requirement-drip format; CLAUDE.md pace `hour`):
+## The thesis, and what this question grades
 
-| Minutes | Stage | On the whiteboard |
-|---------|---------------------------------|------------------|
-| 0:00–0:03 | Introductions | — |
-| 0:03–0:08 | **Stage 1** Clarify requirements | Requirements list + "out of scope" box |
-| 0:08–0:12 | **Stage 2** Back-of-the-envelope (two numbers, maybe three) | Three lines of arithmetic |
-| 0:12–0:18 | **Stage 3** API and data model | 6–8 endpoints, 4–5 tables |
-| 0:18–0:28 | **Stage 4** High-level design + walk-through | The container diagram |
-| 0:28–0:48 | **Stage 6** Deep dives, **Stage 7** new requirements as they arrive | Changes marked on the diagram |
-| 0:48–0:54 | **Stages 8–9** Failure modes, SLOs | Short list |
-| 0:54–0:55 | **Stage 10** The EM layer | Team split, phasing |
-| 0:55–0:57 | **Stage 11** The close | — |
-| 0:57–0:60 | Your question | — |
+::: {.key title="The thesis"}
+**This is not a booking system. It is a rejection system.** Fifty thousand seats cannot be shared with a million
+people, so the design **converts a stampede into a stream**. Every seat has exactly one place where its state
+lives and exactly one atomic way to change it.
+:::
 
-Stage 5 (tool choices) has no slot. The interviewer can ask it at any time, and you answer inline.
+**The definition to say aloud.** A ticket booking system sells a *fixed set of individually identified seats* to
+*many more buyers than seats*, with a *time-limited hold* between "free" and "sold", so that **no seat is ever sold
+twice and no seat is ever stuck in limbo.** Each clause carries weight: *fixed set* (inventory never grows by
+accident), *individually identified* (contention is per seat), *many more buyers* (twenty to one turns most requests
+into refusals), *time-limited hold* (a third state, data and not a lock), *never twice, never stuck* (safety and
+liveness).
 
-# Stage 1: Clarify requirements · 0:03–0:08
+**The hook.** A seat looks like a row with a boolean. The hard parts are everything around the boolean: a million
+people reaching it in the same second, a human who needs three minutes to pay, and a payment provider that
+sometimes does not answer.
+
+| Axis | Weak signal | Strong signal |
+|---|---|---|
+| **Requirements** | Starts drawing. Never asks what "fair" means | Asks about oversell, specific seats, checkout time, fairness, payment behaviour, map freshness. Cuts search, pricing and resale aloud |
+| **Correctness** | "Check availability, then insert a booking" | One atomic conditional claim. A third state. Expiry that does not depend on a job. An *unknown* payment state |
+| **Trade-offs** | Names a product, or "a distributed lock" | Options, each with the failure that rules it out; says what the pick gives up |
+| **Depth** | "A queue in front", and stops | Admission rate from Little's law; a controller driven by shop health; why the poll is cacheable; why the lottery is drawn at join time |
+| **Operations** | Watches CPU | Age of the oldest expired hold; seats frozen by unknown payments; admission against hold latency; a pre-event load test; a plan for the day it fails |
+
+::: warn
+**Two ways to be wrong run through this question:** a seat sold twice, and a seat nobody can ever buy. Most weak
+designs defend the first and forget the second. Keep both in view in every answer.
+:::
+
+\newpage
+
+# Chapter 1 · Requirements and scope
 
 Ask **five or six questions, not fifteen**. Each one changes the design, so say why you're asking.
 The interviewer's answers below come from the simulator's cue sheet.
@@ -347,7 +286,7 @@ latency and whoever runs bots. A lottery among early arrivals is fairer. Either 
 engineering (the promoter, product) owns the decision. An EM candidate says so.
 
 **Payment.** The PSP is slow and sometimes doesn't answer. "Didn't answer" is not "declined": the
-customer may have been charged. The whole PAYMENT_PENDING state in Stage 6 comes from this one
+customer may have been charged. The whole PAYMENT_PENDING state in challenge 3 comes from this one
 question.
 
 **Map freshness.** If the map had to be exact, every fan would need a live connection to the
@@ -372,84 +311,9 @@ cloud?" sound thorough and change nothing. Each question should visibly change a
 whiteboard.
 :::
 
+
 \newpage
-
-# Stage 2: Back-of-the-envelope · 0:08–0:12
-
-## How to do estimates in an interview
-
-You have about four minutes. **That is time for two calculations, three at most.** So don't fill a
-table. Pick the numbers that **decide the design**, say each one as *number → consequence*, and
-round hard: 1M/60 s is "about 17,000 a second", not 16,667.
-
-Below, the **top three** come first, in the order to compute them. If you only have time for two, do
-1 and 2 and mention 3 in a sentence. The full table follows for your understanding. You won't
-compute it all in the room, but you should be able to rebuild any row when asked.
-
-::: {.key title="Top-3 number 1 — Who wins: about 2% of fans get tickets"}
-**Arithmetic.** 50,000 seats ÷ ~2.5 tickets per order = **~20,000 orders**. 20,000 buyers out of
-1,000,000 fans = **2%**. 98% of the people who show up will leave without a ticket, whatever we build.
-
-**What it means.** "Winners vs losers" is not about the lottery. It's simple supply and demand: how
-many fans *can* succeed at all. The lottery (Stage 6.2) decides *which* fans get the early places in
-line. This number decides *how many* places in line are worth anything.
-
-**How it changes the design.** This is **mostly a rejection system**, so the cheap, fast, honest
-"no" is a first-class feature:
-
-- Losers must **not** reach the database to find out they lost. They wait in a queue that costs
-  almost nothing per person.
-- We tell them **early**: the `soldOut` flag reaches 970,000 people within seconds of the last seats
-  being spoken for.
-- A position and an ETA are shown, so fan #600,000 knows their chances.
-
-**Say:** *"Fifty thousand seats at about two and a half per order is twenty thousand orders, so about
-two percent of the people who show up get tickets. This is mostly a system for saying no quickly and
-fairly. I'll design the 'no' path as carefully as the 'yes' path."*
-:::
-
-::: {.key title="Top-3 number 2 — Without a queue: ~33,000 contended transactions a second on 50,000 rows"}
-**Arithmetic.** Suppose everyone could reach the inventory database directly. 1M fans each click
-"hold" about twice in the first minute: 2,000,000 attempts ÷ 60 s = **~33,000 transactions/s**, all
-aimed at the same 50,000 rows, and really at the best few thousand seats.
-
-**What "without a queue" means.** It's the thought experiment that justifies the waiting room: what
-would the write path see if we let everyone in at once?
-
-**Why that's fatal, not just big.** A PostgreSQL primary can do several thousand simple writes a
-second on *different* rows. When everyone fights over the *same* rows, each transaction waits for the
-row lock held by the one in front. While it waits it holds a database connection, and there are only
-a few hundred. The pool empties in milliseconds, new requests time out, clients retry, and the
-retries make it worse (a **retry storm**). The database doesn't slow down gracefully. It stops.
-
-**How it changes the design.** A waiting room that admits fans at a **rate we choose**. With
-R ~ 2,000 fans/minute, the database sees **~50 holds/s**, about 700 times less.
-
-**Say:** *"If a million people could reach the database, that's about thirty thousand contended
-writes a second on fifty thousand rows. Lock queues, connection pool exhausted, retry storm. So the
-first component is a waiting room, and after it the write path is a few hundred transactions a
-second, which one PostgreSQL primary handles comfortably."*
-:::
-
-::: {.key title="Top-3 number 3 — Queue polling: ~100,000 requests a second while people wait"}
-**Arithmetic.** 1,000,000 waiting fans, each asking "where am I?" every 10 seconds =
-**~100,000 requests/s** for as long as the queue exists, about 15 minutes.
-
-**What "queue polling" means.** A waiting fan's browser has to learn when it's their turn. The
-simplest way is to ask periodically: that's polling. (The alternative, a pushed message over a
-WebSocket, is discussed below.)
-
-**How it changes the design.** 100,000 req/s is too much for our origin, so the answer must be
-**identical for every fan** and therefore **cacheable at the CDN**. That's the trick: instead of
-"what's *my* position?" (a different answer per fan), every fan asks "how far has the line moved?"
-(one number per event) and computes its own position locally from the `seq` in its token. With a
-1-second TTL each CDN edge fetches it from us once a second: ~200 req/s at the origin instead of
-100,000.
-
-**Say:** *"A million people polling every ten seconds is a hundred thousand requests a second. I'll
-make the poll response the same for everyone, just 'admitted up to number N', so the CDN can cache it
-for a second. The origin sees one request per edge location per second."*
-:::
+# Chapter 2 · Estimates
 
 ## The full table, row by row
 
@@ -527,7 +391,104 @@ lost.
 
 \newpage
 
-# Stage 3: API and data model · 0:12–0:18
+# Chapter 3 · Theory
+
+*What makes this problem hard, in terms that outlive any product name.* It comes after the estimates and before any
+design, so the design can lean on it. Six parts.
+
+## 3.1 What it is, and what it is not
+
+**A ticket booking system** is a *fixed set of individually identified seats*, sold to *many more buyers than seats*,
+with a *time-limited hold* between free and sold. It is confused with four neighbours:
+
+| Not this | Why not |
+|---|---|
+| **A lock** | A lock belongs to a process and vanishes when it crashes or is held too long. A hold is *data with an expiry*: it survives a crashed server and needs no open transaction |
+| **A shopping cart** | A cart promises nothing. A hold promises that nobody else can take this seat until a time you can read |
+| **An auction** | Price does not move with demand. The contest is over *who gets there first*, not who pays most |
+| **A queue (the data structure)** | The line here is a *product experience*: a position, an estimated wait, an honest "likely sold out". It is also a load-shedding device |
+
+## 3.2 Properties, stated separately
+
+| | Property | Said precisely |
+|---|---|---|
+| **Safety** (must never happen) | **S1** | One seat belongs to two orders |
+| | **S2** | Money is taken for seats we do not deliver, or seats are delivered with no money |
+| **Liveness** (must eventually happen) | **L1** | Every seat is eventually sold or free again: nothing is stuck in limbo |
+| | **L2** | Every fan eventually learns where they stand: a position, "sold out", an order result |
+| | **L3** | The sale-opening minute does not take the system down; admitted work finishes |
+
+Every mechanism below says which of these it serves, and every challenge says which one it is protecting.
+
+## 3.3 The central tension
+
+**Demand is unbounded; supply and checkout capacity are not.** The fairest line (strict first-come) rewards bots and
+low latency and invites refresh storms. The cheapest line (random admission among early arrivals) needs a product
+decision. The picture is a funnel: **1,000,000 fans at the door, about 10,000 inside the shop, about 50 holds a second,
+20,000 orders.** Everything left of the shop is cheap and edge-served; everything right of it is expensive and
+protected.
+
+::: why
+**Why "fairness against load" and not "consistency against availability"?** The inventory is a single-writer
+relational row set: there is no replica disagreement to resolve. The trade the problem forces is *who gets the scarce
+resource, and how cheaply do we tell everyone else no*. A designer who frames it as CAP has chosen the wrong axis.
+:::
+
+## 3.4 The seven mechanisms
+
+Each in a fixed form: **property it protects, how it works, the failure it rules out, what it costs.** Mechanism first,
+product name second.
+
+| # | Mechanism | Protects | How | Rules out | Costs |
+|---|---|---|---|---|---|
+| 1 | **Conditional claim** | S1 | One statement whose `WHERE` clause is the availability check, rows locked in a stable order | A read-then-write race | Contended rows; the loser gets a 409 |
+| 2 | **Hold as data with an expiry** | L1, no lock across a human | A seat row `HELD` with a `hold_id` and an expiry time; no transaction stays open | A transaction open for minutes; a lost lock | A clock to trust; a sweeper |
+| 3 | **Two expiry paths** | L1 | Lazy: the claim treats an expired hold as free. Sweeper: releases and announces, so the map catches up | Seats stuck forever; correctness that depends on a job | Staleness while the sweeper is down |
+| 4 | **Admission control at the edge** | L3 | A line, a pointer, and a rate chosen from shop health (increase slowly, cut fast) | A stampede on 50,000 rows | Most fans wait; a rate to tune |
+| 5 | **Freeze, authorize then capture, "unknown" as a state, idempotency keys** | S2 | Move `HELD` to `PAYMENT_PENDING` before the provider call; reserve money first, take it last; ask again with the same key | Double charge; a seat sold twice after a late approval | Seats frozen up to ten minutes; a reconciler |
+| 6 | **Split reads** | L2, L3 | Immutable layout on the CDN; a versioned availability bitmap; one cached queue-state answer for everyone | A live map from the database | A click on a stale seat fails (gracefully) |
+| 7 | **Random admission and signed tokens** | fairness | Draw a random score at join time for everyone present at T0; signed, short-lived tokens bound to the account | Bots winning at T0; forged positions | A product rule to explain |
+
+::: why
+**Why is the hold "data" and not "a lock"?** A lock is something a process *holds*. If the process dies, the lock
+goes with it, or lingers, depending on the lock service. A hold is a row: it is there after a crash, it expires on its
+own, and anyone can read when. It also means the hold can be reasoned about in a *transaction log*, not in the
+memory of a service.
+:::
+
+## 3.5 The options matrix, for the central decision
+
+*How do we stop two fans taking one seat, across a three-minute checkout?* Six serious approaches:
+
+| | Approach | Atomic? | Survives a crashed server? | Holds a connection through checkout? | Fails when |
+|---|---|---|---|---|---|
+| a | Read the seat, then write it | no | yes | no | Two readers both see free |
+| b | A database row lock held through checkout | yes | **no** | **yes (minutes)** | The pool empties; the database falls over |
+| c | A distributed lock per seat (a cache key with a lease) | mostly | partly | no | The lease expires mid-transaction; a second system to run and to fail |
+| d | `SERIALIZABLE` transactions | yes | yes | no | Under contention most transactions abort and retry |
+| e | An optimistic version column on each seat | per seat | yes | no | A multi-seat all-or-nothing claim still ends in one conditional update |
+| **f** | **One conditional update; the hold is data with an expiry (pick)** | **yes** | **yes** | **no** | A slow fan loses the hold; hot seats are contended rows on one primary |
+
+**The pick is (f).** What it **gives up:** the hold can expire on a slow fan; the hottest seats are contended rows on
+a single primary (which is why the waiting room exists); and there must be a sweeper. Options (b) and (c) are the ones
+a candidate reaches for first, and the ones to rule out aloud.
+
+## 3.6 The failure catalogue
+
+The things that will go wrong. It becomes the challenge list, in an order where each fix creates the next question:
+
+1. Two fans on one seat → **the claim** (S1)
+2. Holds that outlive their owner → **two expiry paths** (L1)
+3. The hold expires while the payment is in flight → **freeze, authorize, unknown** (S2)
+4. A stampede at the door → **the waiting room** (L3)
+5. Bots, and an unfair line → **a lottery and signed tokens** (fairness)
+6. A stale map for ten thousand shoppers → **split reads** (L2)
+7. Requirements that arrive mid-sale → **the seams** (extension)
+8. A failure nobody can see → **measure the promise** (all)
+
+\newpage
+
+# Chapter 4 · API and entities
 
 ## The API
 
@@ -712,7 +673,7 @@ CREATE TABLE ticket (
   seat 812, the second ticket insert fails. The database enforces the invariant independently of our
   code. That's "belt and braces".
 - **`outbox`** exists so that "seats changed" and "tell the rest of the system" happen in **one
-  transaction**. Stage 6.5 explains why.
+  transaction**. challenge 6 explains why.
 :::
 
 **Waiting-room state lives in Redis**, not PostgreSQL:
@@ -730,11 +691,92 @@ CREATE TABLE ticket (
 **Why `{e}` in braces?** In Redis Cluster, a key's **hash slot** decides which node stores it.
 If part of a key is in `{…}`, only that part is hashed. So every key of event `e` lands on the **same
 node**, and one Lua script can touch all of them atomically. Different events land on different
-nodes, which is how many simultaneous on-sales spread out (Stage 6.6).
+nodes, which is how many simultaneous on-sales spread out (challenge 7).
 :::
 
 \newpage
-# Stage 4: High-level design · 0:18–0:28
+# Chapter 5 · High-level design
+
+Three versions on **one carried baseline**. Each is introduced by the objection it answers. The boxes never move: every
+later picture is a view of the same drawing. *Colour means role:* client blue, edge darker blue, service purple, data
+store green, queue orange, cache yellow, external grey. Red is only failure; a green outline is only a fix.
+
+## V1 · The simplest thing that works
+
+One API and one database. A seat table with a status column. The API reads the seat; if it is available it writes the
+fan's name. For a small venue with a quiet sale this is enough, and saying so is part of the answer.
+
+![V1: one API, one table, read then write.](diagrams/video-base-v1.pdf){width=80%}
+
+**The objection.** Two fans can both read "available" and both write. There is no state for "someone is paying", so
+a lock would have to be held for the whole checkout. And a million requests land straight on the table.
+
+## V2 · A third state, a conditional claim, and a separate order path
+
+![V2: the claim, the hold, and checkout behind it. New boxes outlined blue.](diagrams/video-base-v2.pdf){width=90%}
+
+The seat gets a third state and an expiry; the claim becomes **one conditional update**. Checkout moves to its own
+**order service**, which freezes the seats, calls the **payment provider** and only then sells. The two paths are
+separated because the provider is slow and sometimes silent, and the inventory database must never wait for it.
+
+**The objection.** The claim is correct, but a million fans still reach fifty thousand rows, and the seat map is still
+read from the same database that the claims lock.
+
+## V3 · An edge, a waiting room, a seat-map pipeline
+
+![V3: the shape that survives the sale. New boxes outlined blue.](diagrams/video-base-v3.pdf){width=100%}
+
+Three additions, each with a job:
+
+- **CDN and gateway** absorb the million. Nothing behind them is sized for it. The gateway checks an **admission
+  token** on every shop call: no token, no shop.
+- **Waiting room**: a lobby, a signed place in line, a pointer, and a cached, user-independent answer to "how far has
+  the line moved?". An **admission controller** moves the pointer at a rate it reads from shop health.
+- **Seat-map pipeline**: the database writes a change and an **outbox** row in one transaction; a log carries it to a
+  **snapshot builder**, which publishes at most one versioned bitmap a second to a cache.
+
+**What V3 leaves open.** The details: the payment race, bots, what the map shows after a mid-sale release, and what we
+cannot see. Those are the eight challenges.
+
+## One numbered flow per functional requirement
+
+Each is a view of the same baseline. The numbers are the order of the arrows.
+
+**FR1 · Join and admission.** (1) A fan requests the sale page from the CDN. (2) The gateway sends "join" to the
+waiting room, which draws a random score and returns a signed queue token. (3) The fan polls one cached answer and
+computes their own position; when the pointer reaches them, `admit` exchanges the queue token for a ten-minute admission
+token.
+
+![FR1](diagrams/video-flow-fr1.pdf){width=85%}
+
+**FR2 · Browse.** (1) Request. (2) The layout comes from the CDN, immutable; the availability comes from the seat-map
+cache by version, with a 304 when nothing changed. (3) Response.
+
+![FR2](diagrams/video-flow-fr2.pdf){width=85%}
+
+**FR3 · Hold.** (1) Request with the admission token and an idempotency key. (2) The gateway checks the token. (3) The
+API sends one conditional claim, all or nothing. (4) The database answers won or lost. (5) The API answers `201` with an
+expiry, or `409` with a fresh bitmap. (6) The response.
+
+![FR3](diagrams/video-flow-fr3.pdf){width=85%}
+
+**FR4 · Pay and ticket.** (1) `POST /orders` reaches the order service. (2) It **freezes** the seats before calling the
+provider. (3) It authorizes. (4) The provider answers approved, declined, or nothing. (5) A silent answer becomes
+*unknown*, and the reconciler asks again. The seats are sold only on an approved authorization.
+
+![FR4](diagrams/video-flow-fr4.pdf){width=90%}
+
+**FR5 · Expiry and release.** (1) The sweeper releases expired holds in small batches. (2) The same transaction writes
+an outbox row. (3) The released seat is announced and can go to a fan on the waitlist.
+
+![FR5](diagrams/video-flow-fr5.pdf){width=90%}
+
+## The C4 views, and the sequences, follow in the pages below
+
+The context, container and component views, and the walk-through of one fan from the lobby to a ticket, are the
+unchanged detail that sits under the baseline. The baseline is the map; these are the territory.
+
+## The container view, and the walk-through of one fan
 
 Draw the context first (30 seconds), then the containers, then **walk one request end to end.**
 
@@ -767,76 +809,7 @@ interview you draw L1 in seconds, spend your time on L2, and zoom to L3 only in 
 | Hold expirer | Releases expired holds and announces them | Background cleanup, never on the critical path |
 | Notification service | Tickets, waitlist offers | Third-party email and push are slow; keep them async |
 
-## The walk-through: one fan, end to end
-
-The walk-through is where you prove the boxes work together. Below it's split into four phases,
-each with its own sequence diagram. **In the room you say all four in about three minutes while
-pointing at the container diagram.** The sequence diagrams are for your understanding; draw one only
-if the interviewer asks.
-
-### Phase 1 — Lobby and the draw
-
-![Phase 1: joining before T0 (the lobby, with a secret random score) and after T0 (plain FIFO). At T0 the lobby's random order becomes the line.](diagrams/sd47-seq-lobby-lottery.pdf){width=82%}
-
-1. Before the sale opens, fans sit in a **lobby** behind a bot challenge. Joining stores the fan in a
-   Redis sorted set with a **secret random score**. The client gets a signed queue token marked
-   `LOBBY` and the server's clock for the countdown.
-2. At T0 the phase flips to `QUEUE`. The sorted set's order **is** the lottery result: lowest random
-   score is first in line. Each lobby fan asks `GET /queue/me` once, after a random 0–20 s delay, and
-   learns its `seq`.
-3. A fan arriving after T0 gets `INCR next:{e}`: the next number after the last lobby fan.
-
-### Phase 2 — Waiting and admission
-
-![Phase 2: polling the shared state through the CDN, the admission controller moving the pointer, and the exchange of a queue token for an admission token.](diagrams/sd47-seq-poll-admit.pdf){width=92%}
-
-4. Every ~10 s each client fetches `queue/state`: **one tiny JSON per event, cached at the CDN for one
-   second**. It computes its own position as `seq - admittedUpTo`. A million pollers reach the origin
-   about once per CDN edge per second.
-5. The **admission controller** moves `admittedUpTo` forward by R every second, slowing down when the
-   shop shows strain.
-6. When `seq <= admittedUpTo`, the client calls `/admit` and gets a 10-minute **admission JWT**. The
-   gateway verifies it on every later call without a network round trip. Only admitted fans can reach
-   inventory.
-
-### Phase 3 — The seat map and the hold
-
-7. The client loads the immutable **layout** from the CDN and the **availability bitmap** by version.
-8. `POST /holds` reaches the **inventory service**, which runs one all-or-nothing claim in PostgreSQL
-   and writes an outbox row in the same transaction. The answer is **201** with a 5-minute hold, or
-   **409** with a fresh bitmap.
-
-(The race between two fans for one seat is Stage 6.1's sequence diagram; the map's refresh path is
-Stage 6.5's.)
-
-### Phase 4 — Checkout and payment
-
-![Phase 4, the whole booking at a glance: admission, hold, freeze, authorize, sell, capture, with the three possible PSP outcomes. Stage 6.4 zooms into the "unknown" branch.](diagrams/sd47-seq-booking.pdf){width=96%}
-
-9. `POST /orders` goes to the **order service**. It records the order, moves the hold to
-   `PAYMENT_PENDING` (deadline extended) and **authorizes** the card at the PSP. The fan gets 202 and
-   polls.
-10. Approved: seats become `SOLD`, the authorization is **captured**, tickets are issued. Declined:
-    seats are released. No answer: seats stay frozen until the answer is definite.
-11. Outbox → Kafka → the **seat-map service** rebuilds the bitmap at most once a second; the
-    **notification service** sends tickets; the **hold expirer** cleans up holds nobody came back for.
-
-> "Three paths with three different scaling shapes. The queue path is huge and stateless, so it goes
-> to the edge. The read path is large and can be stale, so it's cached. The write path is small and
-> must be correct, so it's a relational database with row-level atomicity. Mixing any two of these
-> is how ticket sites fall over."
-
-::: why
-**Why does mixing paths make sites fall over?** The most common real failure is a seat-map read that
-queries the inventory database. At 5,000 reads/s those queries compete with the holds for
-connections and CPU, the holds slow down, users retry, and the database melts under traffic that was
-never supposed to touch it. Keeping the read path on a snapshot cache means the worst a read storm
-can do is make the map a little staler.
-:::
-
-\newpage
-
-# Stage 5: Why these technology choices · asked at any time
+# Chapter 5 (continued) · Why these technology choices
 
 Requirement-drip interview guides say it outright: *if you name a tool, be ready to defend it in depth.* For each
 tool: why it fits here, the internals you must be able to explain, and the alternative you rejected.
@@ -924,22 +897,191 @@ of stateful servers holding a million open connections to push a number that cha
 Polling a cached file is simpler, cheaper and degrades better: if the push fleet dies, fans see
 nothing; if the CDN briefly can't refresh, fans see a number one second older.
 
-## Why not a single "magic" store?
+## Technologies, one level down
 
-> "Each store matches one path's needs: Redis is fast and can lose a second, which suits the queue.
-> PostgreSQL is strict and transactional, which suits the seats. Kafka is a durable, replayable log,
-> which suits fan-out. The CDN is a cache at the edge, which suits a million identical reads. One
-> store for everything would be too weak for the seats or too expensive for the queue."
+Every container with the technology it runs on, how it is built, the alternatives rejected and why, and the question an interviewer asks about it. Generated from `stack.json`.
+
+<!-- stack:sections -->
+
+## Inventory DB: PostgreSQL, one conditional statement
+
+*How it is built.* Each seat of each event is a row with a state. A claim is one update statement that names the state it expects: set held where the seat is free. A second fan's identical statement matches no row and learns the seat is taken. The hold row and the outbox row commit in the same transaction. Read committed is enough because the check and the change are the same statement. The database is partitioned by event, so a hot on-sale loads one partition.
+
+*Why PostgreSQL 16, primary and synchronous standby, read committed:* Selling a seat once is a conditional update on a row, in a transaction with the hold and the outbox. Row locks and constraints are the tools that make it true.
+
+*Rejected:*
+
+- **Read the seat, then update it**: Two fans both read free and both write. The conditional update closes the gap in one statement.
+- **Redis for the hold**: A key can expire or vanish while the database still says held. The hold belongs in the same transaction as the seat.
+- **A distributed lock per seat**: One more system, and a lock without a token has the stale-holder failure.
+
+*Course:* theory/03 (partitioning and storage) and theory/07 (correctness under failure).
+
+*Drill.* "Ten thousand fans click the same seat in the same second. What does the database do?" Ten thousand identical conditional updates queue on one row; the first matches, the other 9,999 match nothing and return taken. The trap is a read-then-write in the application.
+
+## Waiting room: Redis with Lua
+
+*How it is built.* A fan joins the lobby and receives a position. An admission pointer advances at the rate the controller sets. A Lua script moves a batch from the lobby into the admitted set and mints their tokens in one atomic step, so no fan is admitted twice. Polling for position is served from a cached snapshot, not from Redis. Persistence to disk is on, and the line can be rebuilt from the join log if the node is lost.
+
+*Why Redis, a sorted set for the lobby, a pointer, Lua scripts for the atomic steps:* A million fans arriving at once cannot all reach the shop. The line is a data structure that must be fast and atomic.
+
+*Rejected:*
+
+- **The relational database as the queue**: A million inserts in a minute onto the inventory primary: the line would take the booking path down with it.
+- **Kafka as the queue**: Good for ordering, awkward for a position the fan can poll and a pointer that advances.
+- **A third-party waiting room product**: A real option; we show the design, and buy if the team cannot run it.
+
+*Course:* theory/05 (caching) and theory/09 (real-time and connections).
+
+*Drill.* "The Redis node holding the line fails. What happens to the million fans waiting?" A replica is promoted and the line is rebuilt from the replicated state and the join log; positions may shift slightly but nobody is admitted twice, because admission is a single script. The trap is losing the line.
+
+## Admission: a dial and a signed token
+
+*How it is built.* The admission controller watches the shop's load and turns the rate dial down or up. A fan reaching the pointer gets a short-lived signed token, a JWT valid for ten minutes. Every shop call carries it. The gateway verifies the signature and expiry locally, so the check costs no database call. A bot farm can hold many tokens; per-fan limits sit behind the gateway.
+
+*Why A Go control loop, a signed token, a gateway that verifies without a database call:* The shop can serve only so many shoppers. The dial sets how many enter per second, and a signed pass proves they were let in.
+
+*Rejected:*
+
+- **Rate limiting at the gateway only**: It rejects fans instead of queueing them: a fair line becomes a race of retries.
+- **A session lookup per request**: The session store becomes the bottleneck of the shop.
+
+*Course:* theory/08 (reliability and operations).
+
+## Seat events: Kafka with the outbox
+
+*How it is built.* Each claim, release and sale writes an outbox row in the same transaction as the seat change. A relay publishes the rows to Kafka in commit order, partitioned by event, at least once. The seat-map builder, notifications and a future waitlist are separate consumer groups, each deduplicating. A waitlist, for example, is just a new consumer of this log.
+
+*Why Outbox in the inventory transaction, Kafka partitioned by event:* The seat map, notifications and any later consumer need to know what changed. The event must exist if and only if the claim committed.
+
+*Rejected:*
+
+- **Publishing after the commit**: A crash between the two loses a seat change for ever.
+- **Consumers reading the database**: Every consumer adds load to the inventory primary during the sale.
+
+*Course:* theory/06 (messaging and streams).
+
+*Drill.* "Product wants a waitlist added mid-sale. What changes in the booking path?" Nothing. The waitlist is a new consumer group reading the seat events, and it acts on a released seat. The trap is rewriting booking.
+
+## CDN: the queue state and the layout
+
+*How it is built.* The CDN caches the immutable venue layout for a long time and the queue state for a second. When many requests for an expired object reach one point of presence, request collapsing sends one request to the origin. The WAF rejects obvious bot traffic and scripted floods before they reach the waiting room. Per-fan data, like a position, is not cached at the edge; it goes through a short cached snapshot at the origin.
+
+*Why A CDN with a WAF, one-second lifetimes, request collapsing:* Ten thousand shoppers asking for the same seat map should cost one origin request, not ten thousand.
+
+*Rejected:*
+
+- **Serving everything from the origin**: The origin would carry the whole stampede.
+- **A long edge lifetime for seat state**: Fans would see seats as free that are gone, and click into failures.
+
+*Course:* theory/05 (caching).
+
+## Seat map: layout and a versioned bitmap
+
+*How it is built.* The venue layout is immutable and cached for ever. A builder consumes the seat events and writes a compact bitmap of seat states, about six kilobytes per event, to the snapshot cache under a version number. The seat-map service serves the layout plus the latest bitmap, and the client shows a fresh-as-of time. A stale map can show a taken seat as free; the claim is what decides, so staleness costs a retry, not an oversell.
+
+*Why A Go service, an immutable layout object, a bitmap snapshot per event version in Redis:* Ten thousand shoppers want to see which seats are free. That must not touch the inventory primary.
+
+*Rejected:*
+
+- **Querying the seat table per shopper**: Ten thousand readers on the primary during the sale.
+- **Pushing every seat change to every browser**: A fan-out of every claim to ten thousand screens.
+
+*Course:* theory/05 (caching).
+
+*Drill.* "The map says a seat is free and the fan clicks it, but it is gone. Is that an oversell?" No. The claim, one conditional update, decides, and answers taken; the map is a hint. The client refetches. The trap is treating the map as the truth.
+
+## Order service and the hold expirer
+
+*How it is built.* The order service runs a saga: freeze the hold so it cannot expire mid-payment, call the payment provider with an idempotency key, then confirm the sale or release. The hold expirer sweeps holds past their time and releases them; the claim itself also expires an old hold when it finds one. A reconciler asks the provider about payments that went silent. Two paths each cover the other's gap: the sweeper catches what no claim touches, and the claim catches what the sweeper has not reached.
+
+*Why Go order service, an idempotent payment call, a hold expirer, a reconciler:* A hold must end, whether the fan pays, abandons or the payment goes quiet. Both outcomes must be safe.
+
+*Rejected:*
+
+- **A TTL on a Redis key as the hold**: The key and the database can disagree. The hold belongs with the seat.
+- **Releasing the hold the moment it expires**: If the payment succeeded in that instant, we have taken money for a seat we resold.
+
+*Course:* theory/07 (correctness under failure).
+
+*Drill.* "The hold expires, then the payment succeeds. Who gets the seat?" The fan who paid, because the hold was frozen before the call. A reconciler resolves a silent payment by asking the provider, and only then releases. The trap is releasing at expiry.
+
+<!-- /stack:sections -->
+
+## The stack on one page
+
+<!-- stack:summary -->
+
+| Container | Choice | Rejected | The deciding reason |
+|---|---|---|---|
+| Inventory DB | PostgreSQL, conditional update | Read then write; Redis hold | Check and change are one statement |
+| Waiting room | Redis, sorted set, Lua | Database; Kafka | Fast and atomic admission |
+| Admission | Rate dial; signed token | Gateway limit only; sessions | Check without a database |
+| Seat events | Outbox into Kafka | Publish after; poll the DB | A waitlist is a new consumer |
+| CDN and WAF | One-second lifetime, collapsing | Origin only; long lifetime | Shared answers cost one request |
+| Seat map | Layout plus bitmap by version | Query per shopper; push all | Reads never touch the primary |
+| Orders and holds | Saga; sweeper; reconciler | Redis TTL; release at expiry | Freeze before the call |
+
+Each fix in Stage 6 rejects one tool by name:
+
+| Deep dive | Rejected | Because |
+|---|---|---|
+| 6.1 | Read the seat, then update it | two fans both see free; one statement is the check and the change. |
+| 6.2 | Holding seats in Redis with a TTL | the key and the database can disagree; two paths cover each other's gap. |
+| 6.3 | Releasing the hold at the moment it expires | the payment may have succeeded in that instant; freeze before the call and reconcile silence. |
+| 6.4 | Autoscaling the shop to a million at the door | scale lags the spike; a line in front and a dial behind it. |
+| 6.5 | First-come at the gate | bots with faster connections win; a lottery for everyone present, then first-come. |
+| 6.6 | Querying the seat table per shopper | ten thousand readers on the primary; an immutable layout and a versioned bitmap. |
+| 6.7 | Rewriting booking to add a waitlist | a waitlist is a new consumer of the seat events, not a redesign. |
+| 6.8 | Alerting on server health | the servers can be fine while seats sell twice; measure the promise, not the machine. |
+
+<!-- /stack:summary -->
+
+# Chapter 6 · Bridge
+
+> **It works. Where does it break first?**
+
+Version 3 has one order, an atomic claim, a hold with an expiry, a line in front of the shop, a pipeline for the map and
+a payment path that expects silence. It has *not* been tested against: two fans on one seat; a fan who leaves; a
+payment that arrives late; a million at the door; bots; ten thousand shoppers reading the map; a promoter who changes
+the plan; or a failure nobody can see. These are the eight attack points on the baseline, taken in an order where
+**each fix creates the next question.**
+
+![The challenge map: eight attack points on the same baseline.](diagrams/video-map.pdf){width=100%}
 
 \newpage
-# Stage 6: Deep dives · 0:28–0:48
 
-The interviewer picks. Expect at least 6.1 and 6.2; 6.4 is the hardest probe. With a full hour you
-can cover four or five. **For each: state the risk, the mechanism and the failure case**, in that
-order. Everything below is deeper than you'll say out loud. The boxes marked "Say" are the spoken
-version.
+# Chapter 7 · Challenges
 
-## 6.1 Two fans click the same seat in the same millisecond
+Each challenge runs the same way: **the question, the naive answer, a case with numbers, where it breaks, the fix, why it
+works** (naming the property it protects), **the second-level push** ("what if the fix fails?"), a **second fix or an
+honest limit**, and **what to say in the room**. The deep dive that follows each frame is the full mechanism, with the
+SQL and the code.
+
+## Challenge 1 · Two fans, one seat
+
+**Two fans click the same seat in the same millisecond.** *The correctness crux, part one.* Protects **S1**.
+
+| | |
+|---|---|
+| **The question** | "Two users click the same seat in the same millisecond. Walk me through it, mechanically." |
+| **The naive answer** | Read the seat. If it is available, write the hold. |
+| **The case** | Seat 102. Fan A and Fan B both read `AVAILABLE` at 10:00:01.120. Both write. Both pay. Two tickets for seat 102. |
+| **Where it breaks** | The claim path in inventory: the check and the change are two steps with a gap between them. |
+| **The fix** | One conditional `UPDATE` whose `WHERE` clause is the check. Rows locked in ascending order, `NOWAIT`, all or nothing. The loser gets a `409` with a fresh bitmap. |
+| **Why it works** | **S1** by atomicity: whoever commits first wins; the other's condition is false and it changes zero rows. |
+| **If the fix fails** | A bug elsewhere issues a second ticket, or the primary fails over mid-claim. |
+| **Second fix** | `UNIQUE (event_id, seat_id)` on the ticket rejects the second insert, independently of our code. On failover, a synchronous replica: an unacknowledged claim never became a hold. |
+
+![Attack and fix on the baseline.](diagrams/video-ch1-fix.pdf){width=85%}
+
+::: {.key title="If asked, I would say"}
+One conditional update is the check and the change, all or nothing, with rows locked in a stable order. The loser
+fails in milliseconds and gets a fresh map. And the ticket table has a unique constraint on event and seat as an
+independent guard.
+:::
+
+### Deep dive · the claim, in SQL and code
 
 **The risk.** Two requests read "seat 102 is free", both write "seat 102 is mine", both pay: an
 oversell. This is a classic **read-then-write race**: the check and the change are separate steps,
@@ -967,7 +1109,7 @@ UPDATE event_seat
        version = version + 1
  WHERE event_id = :e AND seat_id = ANY(:seats)
    AND (state = 'AVAILABLE'
-        OR (state = 'HELD' AND hold_expires_at < now()))   -- lazy expiry, see 6.3
+        OR (state = 'HELD' AND hold_expires_at < now()))   -- lazy expiry, see challenge 2
 RETURNING seat_id;
 -- If fewer rows came back than were requested: ROLLBACK, answer 409 (all-or-nothing).
 
@@ -1042,7 +1184,7 @@ guards are much less likely to fail together.
 ::: why
 **What happens to the old hold when lazy expiry steals its seat?** Fan A's hold expired at 10:07:00
 and Fan C claimed seat 101 at 10:07:02. A's `hold` row still says `ACTIVE`, but the seat row now
-carries C's `hold_id`. When A comes back and submits an order, the freeze step (6.4) checks
+carries C's `hold_id`. When A comes back and submits an order, the freeze step (challenge 3) checks
 `WHERE hold_id = A's hold AND state = 'HELD'` and finds zero rows, so A is told *"your hold
 expired"*. **The seat row is the truth; the hold row is bookkeeping.**
 :::
@@ -1065,296 +1207,33 @@ a conditional update, so just write the conditional update.
 
 \newpage
 
-## 6.2 The waiting room: the lottery, polling, admission and bots
 
-This is the deep dive that decides the round, because it's where the million fans are.
-
-### The fairness question, and why a lottery
-
-**The risk.** If the line is strictly first-come-first-served at T0, the order is decided in the first
-few hundred milliseconds after 10:00:00. Who wins that race? Whoever has the lowest network latency
-to our servers, the fastest device, and above all **bots** that fire at exactly T0 from data centres.
-It also encourages a million people to hammer *refresh* at 09:59:59, which is a self-inflicted
-load spike.
-
-**The mechanism: a lottery among early arrivals.** Everyone who is in the lobby **before T0** is
-treated the same: at T0 they're put in a **random order**. Arriving at 09:30 or 09:59 makes no
-difference. Anyone arriving **after** T0 joins the back of the line in arrival order (FIFO), behind
-every lobby fan.
-
-::: why
-**Why is that fair, and is it fair to people who came early?** The lottery removes the only
-advantage that FIFO-at-T0 gives: speed in the first second, which mostly rewards bots and good
-networks. Coming 30 minutes early earns nothing over coming one minute early, by design. That's
-deliberate: otherwise fans would camp for hours and the lobby would open ever earlier. Coming
-*before* T0 still beats coming after, so there's a clear reason to be on time. This is a **product
-policy**; the lobby page must state the rule ("everyone here at 10:00 gets a random place"). Ticketmaster
-and other large ticketing sites use this pattern. In the room, name it as a product decision you would
-take to the promoter, not as an engineering fact.
-
-**Why a random score at join time rather than a shuffle at T0?** They're equivalent: giving every
-entrant an independent uniform random number and sorting by it produces a uniformly random order of
-everyone present at T0. Doing it at join time means T0 itself costs nothing: no batch job has to
-shuffle a million entries in the critical second. The score is generated **server-side** with a
-cryptographic random generator and never sent to the client, so nobody can see or influence their
-draw before T0.
-
-**What stops someone re-joining until they get a good number?** `ZADD NX`: re-joining with the same
-account keeps the first score. And one queue entry per verified account (see bots below).
-:::
-
-### The code: join, the T0 flip, and "what's my number?"
-
-The join is one Lua script, so the phase check and the write are atomic. A join racing the T0 flip
-lands cleanly on one side of it.
-
-```lua
--- join.lua  KEYS: phase:{e}, lobby:{e}, next:{e}, seqOf:{e}
---           ARGV: userId, randomScore (from SecureRandom in the service, never shown to clients)
-local phase = redis.call('GET', KEYS[1])
-if phase == 'LOBBY' then
-  redis.call('ZADD', KEYS[2], 'NX', ARGV[2], ARGV[1])   -- NX: re-joining keeps the first draw
-  return {'LOBBY', 0}
-end
-if redis.call('ZSCORE', KEYS[2], ARGV[1]) then           -- a lobby fan re-opening the page
-  return {'LOBBY', 0}                                    -- (they ask /queue/me for their seq)
-end
-local existing = redis.call('HGET', KEYS[4], ARGV[1])
-if existing then return {'QUEUE', tonumber(existing)} end  -- idempotent re-join after T0
-local seq = redis.call('INCR', KEYS[3])                   -- late arrivals: plain FIFO
-redis.call('HSET', KEYS[4], ARGV[1], seq)
-return {'QUEUE', seq}
-```
-
-```lua
--- open_queue.lua, run once at T0 by the scheduler. Safe to run twice.
--- KEYS: phase:{e}, lobby:{e}, next:{e}
-if redis.call('GET', KEYS[1]) == 'QUEUE' then return redis.call('GET', KEYS[3]) end
-redis.call('SET', KEYS[1], 'QUEUE')
-local n = redis.call('ZCARD', KEYS[2])   -- lobby size: lobby fans hold numbers 1..n
-redis.call('SET', KEYS[3], n)            -- the first late arrival gets n + 1
-return n
-```
-
-```java
-// GET /events/{e}/queue/me  - lobby fans call this once after T0 (with 0-20 s client jitter)
-public SignedSeq myNumber(QueueToken token) {
-    verifier.verify(token);                               // our signature, this event
-    if (token.kind() == Kind.QUEUE) return SignedSeq.of(token.seq());
-    Long rank = redis.zrank("lobby:{" + token.eventId() + "}", token.userId());   // O(log n)
-    if (rank == null) throw new NotInLobby();
-    return signer.sign(token.eventId(), token.userId(), rank + 1);   // seq is 1-based
-}
-```
-
-::: load
-**At T0, ~1M `queue/me` calls arrive within 20 seconds**, ~50,000/s, each one `ZRANK` on one sorted
-set. `ZRANK` is O(log n), about 20 steps for a million entries, and Redis runs ~100,000 such commands
-a second per node. It fits on the event's node, just. **If it didn't**, precompute: a background job
-walks the sorted set once (`ZRANGE` in chunks of 10,000) and writes each fan's `seq` into the
-`seqOf:{e}` hash, so `queue/me` becomes an `HGET`. The client-side 0–20 s jitter is what turns a
-one-millisecond spike into a 20-second plateau. **The sorted set itself** is about 100 bytes per
-entry, so ~100 MB for a million fans: fine on one node.
-:::
-
-### Polling the shared state through the CDN
-
-The waiting client needs one piece of information: *has my number come up?* The poll answers it
-with a response that is **identical for every fan**:
-
-```http
-GET /events/evt-7731/queue/state HTTP/1.1
-
-HTTP/1.1 200 OK
-Content-Type: application/json
-Cache-Control: public, max-age=1, stale-while-revalidate=2, stale-if-error=30
-
-{"admittedUpTo": 31800, "ratePerMin": 2000, "soldOut": false, "serverTime": 1792131002}
-```
-
-::: why
-**Why the response has no user in it.** A CDN can only cache a response that is the same for
-everyone who asks. *"You are 380,577th"* is different for every fan, so it can't be cached: a
-million fans would mean a million origin requests. *"The line has reached number 31,800"* is the same
-for everyone. The client already knows its own `seq` (it's in the signed token) and does the
-subtraction itself. **Moving one subtraction to the client turns an uncacheable request into a
-cacheable one.** That's the core trick of the whole waiting room.
-
-**What the headers mean.** `public, max-age=1`: any cache, including the CDN, may serve this copy
-for one second. `stale-while-revalidate=2`: for two more seconds the CDN may keep serving the old
-copy *while* it fetches a new one in the background, so no fan waits on the refresh.
-`stale-if-error=30`: if our origin is failing, keep serving the last good copy for 30 seconds. A
-fan sees the line pause instead of an error page.
-:::
-
-::: {.why title="Why does the CDN cache it for exactly one second?"}
-The TTL trades **origin load** against **freshness**:
-
-- **Origin load** is roughly *number of CDN edges ÷ TTL*. With ~200 edges and a 1-second TTL, the
-  origin sees ~200 requests a second (or ~1 a second with an origin shield). With no caching it
-  would see all 100,000.
-- **Freshness** is set mostly by the **client's polling interval** (~10 s), not by the TTL. A 1-second
-  TTL adds at most one second to a ten-second wait, which nobody notices. The pointer moves about 33
-  places a second, so a 1-second-old value is at most ~33 places behind.
-
-**Why not longer, say 10 seconds?** The origin load is already negligible at 1 s, so there's nothing
-left to save. A 10-second TTL would double the worst-case delay before a fan notices their turn,
-make the line visibly jump in steps of ~330, and slow the **sold-out** message, which should reach
-970,000 people as fast as possible.
-
-**Why not shorter, or zero?** Zero means no caching and 100,000 req/s at the origin. Sub-second
-TTLs aren't reliably supported by all CDNs and buy no freshness the 10-second polling interval
-would let anyone see.
-
-**So 1 second is the point where origin load is already tiny and freshness is already as good as
-the polling interval allows.** In the room: *"one second, because the origin cost is already
-negligible and fans poll every ten seconds anyway."*
-:::
-
-The client loop, with **adaptive polling**: fans far back in the line poll less often.
-
-```javascript
-async function waitForTurn(eventId, queueToken, mySeq) {
-  for (;;) {
-    const s = await (await fetch(`/events/${eventId}/queue/state`)).json();  // CDN-served
-    if (s.soldOut) return showSoldOut(eventId);
-    const ahead = mySeq - s.admittedUpTo;
-    if (ahead <= 0) return admit(eventId, queueToken);       // POST /admit
-    showPosition(ahead, Math.ceil(ahead / s.ratePerMin));     // "about N minutes"
-    await sleep(pollDelayMs(ahead));
-  }
-}
-
-// Far from the front: poll rarely. Near the front: poll often. Always add jitter (+-20%)
-// so a million clients that started together don't stay synchronised.
-function pollDelayMs(ahead) {
-  const base = ahead > 50_000 ? 30_000 : ahead > 5_000 ? 10_000 : 3_000;
-  return base * (0.8 + Math.random() * 0.4);
-}
-```
-
-::: load
-**Adaptive polling cuts the 100,000 req/s further.** About 950,000 of the million fans are more than
-50,000 places back, so they poll every 30 s instead of 10. Total: ~32,000 + ~5,000 + small change
-~ **37,000 req/s** at the CDN. It's a cheap win and a good sentence in the room, but the design
-doesn't depend on it: the CDN handles 100,000 req/s anyway.
-:::
-
-### The admission controller: turning the dial
-
-![The admission control loop, once a second per event. It's the same idea as TCP congestion control: increase gently while healthy, cut sharply on trouble (AIMD).](diagrams/sd47-admission-loop.pdf){width=55%}
-
-```java
-@Scheduled(fixedRate = 1000)                  // one active instance per event (leader-elected)
-void tick() {
-    for (long e : onSales.active()) {
-        Signals s = metrics.read(e);          // shoppers, hold p99, DB CPU, PSP errors, 409 ratio
-        double r = rates.get(e);              // fans per minute
-        if (s.holdP99Millis() > 300 || s.dbCpu() > 0.70 || s.pspErrorRate() > 0.05) {
-            r = Math.max(MIN_RATE, r * 0.7);  // multiplicative decrease: back off fast
-        } else if (s.activeShoppers() < TARGET_SHOPPERS) {   // 10,000
-            r = Math.min(MAX_RATE, r + RAMP_STEP);           // additive increase: ramp slowly
-        }
-        rates.put(e, r);
-        long n = carry.take(e, r / 60.0);     // whole fans this second; fractions carried over
-        redis.eval(ADVANCE_LUA, keysFor(e), n, (long) r, soldOutDecision(e, s));
-    }
-}
-```
-
-```lua
--- advance.lua  KEYS: admittedUpTo:{e}, next:{e}, rate:{e}, soldOut:{e}
--- Never admit past the last issued number: there's nobody there yet.
-local cur  = tonumber(redis.call('GET', KEYS[1]) or '0')
-local last = tonumber(redis.call('GET', KEYS[2]) or '0')
-local new  = math.min(cur + tonumber(ARGV[1]), last)
-redis.call('SET', KEYS[1], new)
-redis.call('SET', KEYS[3], ARGV[2])
-redis.call('SET', KEYS[4], ARGV[3])
-return new
-```
-
-::: why
-**Why a feedback loop instead of a fixed R?** Our capacity estimate (10,000 shoppers) is a guess
-until the sale is running. Real capacity depends on how fast fans pick seats, how slow the PSP is
-today, and how hot one section is. The controller measures and adjusts. **Why "slow start"?** At T0
-every cache is cold and every connection pool is empty. Starting at a quarter of the target rate and
-ramping is cheaper than discovering the limit by falling over. **Why cut by 30% but grow by a small
-step?** Overload makes things worse quickly (retries, queues); under-admission only wastes a little
-time. So react fast to bad signals and slowly to good ones. **Why one active instance per event?**
-Two controllers both advancing the pointer would admit double. A simple lease (a Redis key with a
-TTL, renewed every second) makes one instance the leader; if it dies, another takes over within a
-few seconds and the pointer just pauses meanwhile.
-:::
-
-### Admission: exchanging the queue token
-
-```java
-// POST /events/{e}/admit
-public AdmissionToken admit(QueueToken qt) {
-    verifier.verify(qt);
-    long seq = resolveSeq(qt);                           // token seq, or lobby rank + 1
-    long pointer = redis.getLong("admittedUpTo:{" + qt.eventId() + "}");
-    if (seq > pointer) throw new NotYourTurnYet(seq - pointer);  // client clock or cache skew
-    // First admission wins; asking again returns the same token, never a fresh 10 minutes.
-    String key = "admitted:{" + qt.eventId() + "}:" + qt.userId();
-    AdmissionToken fresh = signer.admission(qt.eventId(), qt.userId(), Duration.ofMinutes(10));
-    String stored = redis.setIfAbsentOrGet(key, fresh.serialized(), Duration.ofHours(6));
-    AdmissionToken token = AdmissionToken.parse(stored);
-    if (token.expired()) throw new ShoppingWindowEnded();   // TIMED_OUT in the fan state machine
-    return token;
-}
-```
-
-::: why
-**What is admission, in one line?** Moving one fan from "waiting" to "allowed to shop", proven by a
-token. **Why can't a fan skip the queue by calling `/holds` directly?** The gateway rejects any shop
-call without a valid admission token for that event, and only `/admit` issues one, only when
-`seq <= admittedUpTo`, and `seq` is inside a token we signed. **Why does a second `/admit` return the
-same token?** Otherwise a fan could refresh their 10-minute window indefinitely and occupy a shopping
-slot forever. When the window ends, it ends. The fan can rejoin the back of the line if the sale is
-still on.
-:::
-
-### The sold-out signal
-
-Two stages, because "sold out" is a prediction until it isn't:
-
-1. **`admissionPaused` ("likely sold out").** When *available seats ÷ 2.5* drops below the number of
-   admitted fans still shopping, we stop admitting. Everyone already inside can probably absorb
-   what's left. Waiting fans see *"Tickets are likely sold out. Stay if you like: seats may come back."*
-2. **`soldOut` (final).** When no seat is `AVAILABLE` or `HELD`, only `PAYMENT_PENDING` or `SOLD`,
-   for a few minutes. If holds expire and seats come back, the controller resumes admission from
-   where the pointer stopped.
-
-::: why
-**Why two stages?** Declaring sold out too early leaves seats unsold if admitted fans don't buy.
-Declaring it too late wastes the time of 970,000 people. The first stage stops the waste; the second
-is the truth. Both flags travel in the same cached JSON, so they reach everyone within one poll.
-:::
-
-### Bots
-
-- **Challenge at lobby entry** (CAPTCHA or an invisible browser challenge from the WAF).
-- **One queue entry per verified account**, with a phone number or a payment card on file, bound to a
-  device fingerprint. Account farms are the real attack, so verification makes accounts expensive.
-- **Purchase limits per account and per payment card**: the card limit catches one buyer with many
-  accounts.
-- **Tokens are signed and short-lived**, and the admission token is bound to the user id, so a token
-  can't be sold or shared at scale.
-- **Verified-fan pre-registration** for flagship events: fans register days ahead and are screened
-  offline. Only registered fans may join.
-- **After the sale**: cancel orders flagged by fraud scoring and release the seats to the waitlist.
-
-> "Fairness is a product decision, so I'd take it to the promoter: a lottery for everyone in the
-> lobby at T0, then first-come-first-served. Each fan's position is computed client-side from a
-> signed sequence number and one cached pointer, so a waiting fan costs us almost nothing. An
-> admission controller moves the pointer at a rate it adjusts from shop health, and a sold-out flag
-> in the same cached response tells the 98% within seconds."
 
 \newpage
+## Challenge 2 · The hold that outlives its owner
 
-## 6.3 Holds: the expiry mechanism
+**The hold that outlives its owner.** Protects **L1**.
+
+| | |
+|---|---|
+| **The question** | "A fan holds two seats and closes the laptop. Your sweeper is down for ten minutes. What do users see?" |
+| **The naive answer** | A cleanup job every minute releases expired holds. |
+| **The case** | 10:00:00 hold on 101 and 102, five minutes. 10:05:00 it expires. The job runs at 10:05:50: the map shows the seats taken for fifty seconds. If the job is down, the seats stay taken for everyone. |
+| **Where it breaks** | Inventory, expiry: correctness depends on a job. |
+| **The fix** | **Lazy expiry** inside the claim predicate (an expired hold is claimable at once) plus a **sweeper** every five seconds with `SKIP LOCKED`, batches of 500, announcing releases through the outbox. |
+| **Why it works** | **L1**: correctness never depends on the job. The job only makes the map catch up. |
+| **If the fix fails** | The sweeper releases a seat a buyer is paying for. |
+| **Second fix** | The predicate says `state = 'HELD'`: a seat in `PAYMENT_PENDING` is never touched. A sweeper that is down costs *staleness, not oversell*; alert on the age of the oldest expired hold above 30 seconds. |
+
+![The sweeper and the lazy path.](diagrams/video-ch2-fix.pdf){width=85%}
+
+::: {.key title="If asked, I would say"}
+Two expiry paths, each covering the other's gap. The claim treats an expired hold as free, so correctness does not
+depend on a job. A sweeper releases in small batches and announces the release so the map catches up. If it dies we
+get staleness, not oversell, and an alert on the oldest expired hold.
+:::
+
+### Deep dive · the expiry mechanism
 
 **The risk.** A fan holds two seats and closes the laptop. If nothing releases the hold, those seats
 are lost for the rest of the sale. If something releases them **too early**, we sell them while the
@@ -1365,7 +1244,7 @@ first fan is paying.
 ![Lazy expiry and the sweeper. Fan C claims an expired seat directly; the sweeper releases seats nobody tried and announces them so the map shows them free.](diagrams/sd47-seq-expiry.pdf){width=88%}
 
 1. **Lazy expiry** is the `OR (state = 'HELD' AND hold_expires_at < now())` in the claim predicate
-   (6.1). An expired hold is claimable the instant it expires, whether or not any job has run.
+   (challenge 1). An expired hold is claimable the instant it expires, whether or not any job has run.
    **Correctness never depends on the sweeper.**
 2. **The sweeper** runs every 5 seconds, releases expired holds and **publishes `SeatsReleased`**, so
    the seat map shows those seats as free. Without it, expired seats would be claimable but invisible
@@ -1400,7 +1279,7 @@ block each other or a buyer.
 At 5-second intervals, 500 per batch releases 100 seats a second, far more than expire.
 
 **Why does `PAYMENT_PENDING` never expire this way?** The predicate says `state = 'HELD'`. A seat
-whose payment is in flight is frozen by design (6.4). Only the order service, once the payment
+whose payment is in flight is frozen by design (challenge 3). Only the order service, once the payment
 outcome is definite, can release it.
 :::
 
@@ -1418,7 +1297,34 @@ the map shows them as taken, so fans don't click them and the sell-through slows
 > alert on the oldest expired hold."
 
 \newpage
-## 6.4 The hardest probe: the hold expires, then the payment succeeds
+
+
+\newpage
+## Challenge 3 · The hold expires, then the payment succeeds
+
+**The hold expires, then the payment succeeds.** *The correctness crux, part two, and the best probe in the round.* Protects **S2**.
+
+| | |
+|---|---|
+| **The question** | "The hold expires while the payment provider is still thinking, then the payment succeeds. What do you do?" |
+| **The naive answer** | The hold expired, so release the seat. If the payment arrives later, refund. |
+| **The case** | 4:50 the fan submits. 5:00 the hold expires. 5:01 Fan C claims seat 101. 5:05 the provider answers *approved* for Fan A. Two people paid for one seat. |
+| **Where it breaks** | Order service to inventory: nothing stops the seat being released while a payment is in flight. |
+| **The fix (four parts)** | **Freeze** the seats (`HELD` to `PAYMENT_PENDING`, ten more minutes) *before* calling the provider. **Authorize, then capture.** A timeout is **unknown, not failed**: query by idempotency key, accept the webhook, first definite answer wins. **The residual case** refunds and apologises. |
+| **Why it works** | **S2**: money is reserved before seats are sold, and every step is cheap to undo until the last. |
+| **If the fix fails** | The provider stays silent for an hour. |
+| **Second fix** | A reconciler with backoff and a freeze deadline; cancel with the provider, then release. The trade-off is explicit and goes to the product owner: *slower sell-through at the very end of the sale.* |
+
+![Freeze, authorize, and a reconciler.](diagrams/video-ch3-fix.pdf){width=95%}
+
+::: {.key title="If asked, I would say"}
+I would rather hold a seat ten extra minutes than sell it twice or charge someone for nothing. Seats are frozen before I
+call the provider, sold only on an approved authorization, and an unknown outcome stays frozen until a status check
+or the webhook gives a definite answer. The cost is slower sell-through at the end, and I would show that trade-off to
+the product owner.
+:::
+
+### Deep dive · the freeze, the authorization and the reconciler
 
 **The risk.** A fan's hold lasts 5 minutes. They submit payment at 4:50. The PSP takes 15 seconds.
 Meanwhile the hold expires, someone else claims the seat, and then the first payment comes back
@@ -1589,11 +1495,377 @@ exact race this deep dive is about).
 
 \newpage
 
-## 6.5 The seat map for 10,000 shoppers
+
+
+\newpage
+## Challenge 4 · A million at the door
+
+**A million at the door, and the line in front of it.** *Challenges 4 and 5 share one section below: the stampede (this one) and the fair line (next).* Protects **L3**.
+
+| | |
+|---|---|
+| **The question** | "A million users hit your inventory database at once. What breaks?" |
+| **The naive answer** | Autoscale the database and the API fleet. |
+| **The case** | 33,333 writes a second on 50,000 rows. Each waits on a row lock while holding a connection; a pool of a few hundred empties in milliseconds; timeouts; retries; a retry storm. |
+| **Where it breaks** | The whole front: gateway to inventory. |
+| **The fix** | A waiting room: a lobby, a position, admission at a rate $R$ chosen from shop capacity (Little's law: 10,000 shoppers over 5 minutes is 2,000 a minute). The poll answer is the *same for everyone*, so the CDN holds it. An **admission controller** adjusts $R$ by shop health (increase slowly, cut fast), with a slow start. A pointer advanced by one Lua script. An admission token checked at the gateway. |
+| **Why it works** | **L3**: the core only sees what it chose to admit. Demand is absorbed at the edge. |
+| **If the fix fails** | The controller dies, or the CDN cannot reach the origin. |
+| **Second fix** | One leader per event by lease; the pointer simply pauses. `stale-if-error` at the CDN. Jitter on every synchronised action. Double the fans changes the lobby size, not the database load. |
+
+![The line in front of the shop.](diagrams/video-ch4-fix.pdf){width=85%}
+
+::: {.key title="If asked, I would say"}
+I convert a stampede into a stream. A million people wait at the edge for almost nothing each; a controller admits them at
+a rate the shop can serve, and cuts that rate when hold latency or the payment error rate rises. The database only ever
+sees what I chose to admit.
+:::
+
+
+\newpage
+## Challenge 5 · A fair line, and the bots
+
+**A fair line, and the bots.** *Part two of the waiting-room section.* Protects **fairness**.
+
+| | |
+|---|---|
+| **The question** | "What does fair mean, and how do you stop a bot holding all 50,000 seats?" |
+| **The naive answer** | Strict first-come-first-served from T0. |
+| **The case** | The order is decided in the first few hundred milliseconds. Data-centre bots at five milliseconds take the first thousands of places, and everybody refreshes at 09:59:59. |
+| **Where it breaks** | The waiting-room join. |
+| **The fix** | A **lottery** among everyone present before T0 (a random score drawn server-side at join time, `ZADD NX`), late arrivals first-come behind. Signed queue tokens bound to the account. One entry per verified account. Purchase limits per account and per card. A challenge at the lobby. Pre-registered fans for flagship events. **It is a product decision, taken to the promoter.** |
+| **Why it works** | Fairness is the removal of an advantage that speed gives. A random draw at join time costs nothing at T0. |
+| **If the fix fails** | An account farm passes verification. |
+| **Second fix** | Limits per payment card and per device; cancel flagged orders after the sale and release them to the waitlist. The honest limit: no scheme is bot-proof, the aim is to make bots expensive. |
+
+![A fair line.](diagrams/video-ch5-fix.pdf){width=85%}
+
+::: {.key title="If asked, I would say"}
+Fairness is a product decision, so I would take it to the promoter: a lottery for everyone in the lobby at T0, then
+first-come. Each place is a signed number, so it cannot be forged or traded. And I would make bots expensive with one
+entry per verified account and limits per card.
+:::
+
+### Deep dive · the waiting room (challenges 4 and 5): the lottery, polling, admission, bots
+
+This is the deep dive that decides the round, because it's where the million fans are.
+
+#### The fairness question, and why a lottery
+
+**The risk.** If the line is strictly first-come-first-served at T0, the order is decided in the first
+few hundred milliseconds after 10:00:00. Who wins that race? Whoever has the lowest network latency
+to our servers, the fastest device, and above all **bots** that fire at exactly T0 from data centres.
+It also encourages a million people to hammer *refresh* at 09:59:59, which is a self-inflicted
+load spike.
+
+**The mechanism: a lottery among early arrivals.** Everyone who is in the lobby **before T0** is
+treated the same: at T0 they're put in a **random order**. Arriving at 09:30 or 09:59 makes no
+difference. Anyone arriving **after** T0 joins the back of the line in arrival order (FIFO), behind
+every lobby fan.
+
+::: why
+**Why is that fair, and is it fair to people who came early?** The lottery removes the only
+advantage that FIFO-at-T0 gives: speed in the first second, which mostly rewards bots and good
+networks. Coming 30 minutes early earns nothing over coming one minute early, by design. That's
+deliberate: otherwise fans would camp for hours and the lobby would open ever earlier. Coming
+*before* T0 still beats coming after, so there's a clear reason to be on time. This is a **product
+policy**; the lobby page must state the rule ("everyone here at 10:00 gets a random place"). Ticketmaster
+and other large ticketing sites use this pattern. In the room, name it as a product decision you would
+take to the promoter, not as an engineering fact.
+
+**Why a random score at join time rather than a shuffle at T0?** They're equivalent: giving every
+entrant an independent uniform random number and sorting by it produces a uniformly random order of
+everyone present at T0. Doing it at join time means T0 itself costs nothing: no batch job has to
+shuffle a million entries in the critical second. The score is generated **server-side** with a
+cryptographic random generator and never sent to the client, so nobody can see or influence their
+draw before T0.
+
+**What stops someone re-joining until they get a good number?** `ZADD NX`: re-joining with the same
+account keeps the first score. And one queue entry per verified account (see bots below).
+:::
+
+#### The code: join, the T0 flip, and "what's my number?"
+
+The join is one Lua script, so the phase check and the write are atomic. A join racing the T0 flip
+lands cleanly on one side of it.
+
+```lua
+-- join.lua  KEYS: phase:{e}, lobby:{e}, next:{e}, seqOf:{e}
+--           ARGV: userId, randomScore (from SecureRandom in the service, never shown to clients)
+local phase = redis.call('GET', KEYS[1])
+if phase == 'LOBBY' then
+  redis.call('ZADD', KEYS[2], 'NX', ARGV[2], ARGV[1])   -- NX: re-joining keeps the first draw
+  return {'LOBBY', 0}
+end
+if redis.call('ZSCORE', KEYS[2], ARGV[1]) then           -- a lobby fan re-opening the page
+  return {'LOBBY', 0}                                    -- (they ask /queue/me for their seq)
+end
+local existing = redis.call('HGET', KEYS[4], ARGV[1])
+if existing then return {'QUEUE', tonumber(existing)} end  -- idempotent re-join after T0
+local seq = redis.call('INCR', KEYS[3])                   -- late arrivals: plain FIFO
+redis.call('HSET', KEYS[4], ARGV[1], seq)
+return {'QUEUE', seq}
+```
+
+```lua
+-- open_queue.lua, run once at T0 by the scheduler. Safe to run twice.
+-- KEYS: phase:{e}, lobby:{e}, next:{e}
+if redis.call('GET', KEYS[1]) == 'QUEUE' then return redis.call('GET', KEYS[3]) end
+redis.call('SET', KEYS[1], 'QUEUE')
+local n = redis.call('ZCARD', KEYS[2])   -- lobby size: lobby fans hold numbers 1..n
+redis.call('SET', KEYS[3], n)            -- the first late arrival gets n + 1
+return n
+```
+
+```java
+// GET /events/{e}/queue/me  - lobby fans call this once after T0 (with 0-20 s client jitter)
+public SignedSeq myNumber(QueueToken token) {
+    verifier.verify(token);                               // our signature, this event
+    if (token.kind() == Kind.QUEUE) return SignedSeq.of(token.seq());
+    Long rank = redis.zrank("lobby:{" + token.eventId() + "}", token.userId());   // O(log n)
+    if (rank == null) throw new NotInLobby();
+    return signer.sign(token.eventId(), token.userId(), rank + 1);   // seq is 1-based
+}
+```
+
+::: load
+**At T0, ~1M `queue/me` calls arrive within 20 seconds**, ~50,000/s, each one `ZRANK` on one sorted
+set. `ZRANK` is O(log n), about 20 steps for a million entries, and Redis runs ~100,000 such commands
+a second per node. It fits on the event's node, just. **If it didn't**, precompute: a background job
+walks the sorted set once (`ZRANGE` in chunks of 10,000) and writes each fan's `seq` into the
+`seqOf:{e}` hash, so `queue/me` becomes an `HGET`. The client-side 0–20 s jitter is what turns a
+one-millisecond spike into a 20-second plateau. **The sorted set itself** is about 100 bytes per
+entry, so ~100 MB for a million fans: fine on one node.
+:::
+
+#### Polling the shared state through the CDN
+
+The waiting client needs one piece of information: *has my number come up?* The poll answers it
+with a response that is **identical for every fan**:
+
+```http
+GET /events/evt-7731/queue/state HTTP/1.1
+
+HTTP/1.1 200 OK
+Content-Type: application/json
+Cache-Control: public, max-age=1, stale-while-revalidate=2, stale-if-error=30
+
+{"admittedUpTo": 31800, "ratePerMin": 2000, "soldOut": false, "serverTime": 1792131002}
+```
+
+::: why
+**Why the response has no user in it.** A CDN can only cache a response that is the same for
+everyone who asks. *"You are 380,577th"* is different for every fan, so it can't be cached: a
+million fans would mean a million origin requests. *"The line has reached number 31,800"* is the same
+for everyone. The client already knows its own `seq` (it's in the signed token) and does the
+subtraction itself. **Moving one subtraction to the client turns an uncacheable request into a
+cacheable one.** That's the core trick of the whole waiting room.
+
+**What the headers mean.** `public, max-age=1`: any cache, including the CDN, may serve this copy
+for one second. `stale-while-revalidate=2`: for two more seconds the CDN may keep serving the old
+copy *while* it fetches a new one in the background, so no fan waits on the refresh.
+`stale-if-error=30`: if our origin is failing, keep serving the last good copy for 30 seconds. A
+fan sees the line pause instead of an error page.
+:::
+
+::: {.why title="Why does the CDN cache it for exactly one second?"}
+The TTL trades **origin load** against **freshness**:
+
+- **Origin load** is roughly *number of CDN edges ÷ TTL*. With ~200 edges and a 1-second TTL, the
+  origin sees ~200 requests a second (or ~1 a second with an origin shield). With no caching it
+  would see all 100,000.
+- **Freshness** is set mostly by the **client's polling interval** (~10 s), not by the TTL. A 1-second
+  TTL adds at most one second to a ten-second wait, which nobody notices. The pointer moves about 33
+  places a second, so a 1-second-old value is at most ~33 places behind.
+
+**Why not longer, say 10 seconds?** The origin load is already negligible at 1 s, so there's nothing
+left to save. A 10-second TTL would double the worst-case delay before a fan notices their turn,
+make the line visibly jump in steps of ~330, and slow the **sold-out** message, which should reach
+970,000 people as fast as possible.
+
+**Why not shorter, or zero?** Zero means no caching and 100,000 req/s at the origin. Sub-second
+TTLs aren't reliably supported by all CDNs and buy no freshness the 10-second polling interval
+would let anyone see.
+
+**So 1 second is the point where origin load is already tiny and freshness is already as good as
+the polling interval allows.** In the room: *"one second, because the origin cost is already
+negligible and fans poll every ten seconds anyway."*
+:::
+
+The client loop, with **adaptive polling**: fans far back in the line poll less often.
+
+```javascript
+async function waitForTurn(eventId, queueToken, mySeq) {
+  for (;;) {
+    const s = await (await fetch(`/events/${eventId}/queue/state`)).json();  // CDN-served
+    if (s.soldOut) return showSoldOut(eventId);
+    const ahead = mySeq - s.admittedUpTo;
+    if (ahead <= 0) return admit(eventId, queueToken);       // POST /admit
+    showPosition(ahead, Math.ceil(ahead / s.ratePerMin));     // "about N minutes"
+    await sleep(pollDelayMs(ahead));
+  }
+}
+
+// Far from the front: poll rarely. Near the front: poll often. Always add jitter (+-20%)
+// so a million clients that started together don't stay synchronised.
+function pollDelayMs(ahead) {
+  const base = ahead > 50_000 ? 30_000 : ahead > 5_000 ? 10_000 : 3_000;
+  return base * (0.8 + Math.random() * 0.4);
+}
+```
+
+::: load
+**Adaptive polling cuts the 100,000 req/s further.** About 950,000 of the million fans are more than
+50,000 places back, so they poll every 30 s instead of 10. Total: ~32,000 + ~5,000 + small change
+~ **37,000 req/s** at the CDN. It's a cheap win and a good sentence in the room, but the design
+doesn't depend on it: the CDN handles 100,000 req/s anyway.
+:::
+
+#### The admission controller: turning the dial
+
+![The admission control loop, once a second per event. It's the same idea as TCP congestion control: increase gently while healthy, cut sharply on trouble (AIMD).](diagrams/sd47-admission-loop.pdf){width=55%}
+
+```java
+@Scheduled(fixedRate = 1000)                  // one active instance per event (leader-elected)
+void tick() {
+    for (long e : onSales.active()) {
+        Signals s = metrics.read(e);          // shoppers, hold p99, DB CPU, PSP errors, 409 ratio
+        double r = rates.get(e);              // fans per minute
+        if (s.holdP99Millis() > 300 || s.dbCpu() > 0.70 || s.pspErrorRate() > 0.05) {
+            r = Math.max(MIN_RATE, r * 0.7);  // multiplicative decrease: back off fast
+        } else if (s.activeShoppers() < TARGET_SHOPPERS) {   // 10,000
+            r = Math.min(MAX_RATE, r + RAMP_STEP);           // additive increase: ramp slowly
+        }
+        rates.put(e, r);
+        long n = carry.take(e, r / 60.0);     // whole fans this second; fractions carried over
+        redis.eval(ADVANCE_LUA, keysFor(e), n, (long) r, soldOutDecision(e, s));
+    }
+}
+```
+
+```lua
+-- advance.lua  KEYS: admittedUpTo:{e}, next:{e}, rate:{e}, soldOut:{e}
+-- Never admit past the last issued number: there's nobody there yet.
+local cur  = tonumber(redis.call('GET', KEYS[1]) or '0')
+local last = tonumber(redis.call('GET', KEYS[2]) or '0')
+local new  = math.min(cur + tonumber(ARGV[1]), last)
+redis.call('SET', KEYS[1], new)
+redis.call('SET', KEYS[3], ARGV[2])
+redis.call('SET', KEYS[4], ARGV[3])
+return new
+```
+
+::: why
+**Why a feedback loop instead of a fixed R?** Our capacity estimate (10,000 shoppers) is a guess
+until the sale is running. Real capacity depends on how fast fans pick seats, how slow the PSP is
+today, and how hot one section is. The controller measures and adjusts. **Why "slow start"?** At T0
+every cache is cold and every connection pool is empty. Starting at a quarter of the target rate and
+ramping is cheaper than discovering the limit by falling over. **Why cut by 30% but grow by a small
+step?** Overload makes things worse quickly (retries, queues); under-admission only wastes a little
+time. So react fast to bad signals and slowly to good ones. **Why one active instance per event?**
+Two controllers both advancing the pointer would admit double. A simple lease (a Redis key with a
+TTL, renewed every second) makes one instance the leader; if it dies, another takes over within a
+few seconds and the pointer just pauses meanwhile.
+:::
+
+#### Admission: exchanging the queue token
+
+```java
+// POST /events/{e}/admit
+public AdmissionToken admit(QueueToken qt) {
+    verifier.verify(qt);
+    long seq = resolveSeq(qt);                           // token seq, or lobby rank + 1
+    long pointer = redis.getLong("admittedUpTo:{" + qt.eventId() + "}");
+    if (seq > pointer) throw new NotYourTurnYet(seq - pointer);  // client clock or cache skew
+    // First admission wins; asking again returns the same token, never a fresh 10 minutes.
+    String key = "admitted:{" + qt.eventId() + "}:" + qt.userId();
+    AdmissionToken fresh = signer.admission(qt.eventId(), qt.userId(), Duration.ofMinutes(10));
+    String stored = redis.setIfAbsentOrGet(key, fresh.serialized(), Duration.ofHours(6));
+    AdmissionToken token = AdmissionToken.parse(stored);
+    if (token.expired()) throw new ShoppingWindowEnded();   // TIMED_OUT in the fan state machine
+    return token;
+}
+```
+
+::: why
+**What is admission, in one line?** Moving one fan from "waiting" to "allowed to shop", proven by a
+token. **Why can't a fan skip the queue by calling `/holds` directly?** The gateway rejects any shop
+call without a valid admission token for that event, and only `/admit` issues one, only when
+`seq <= admittedUpTo`, and `seq` is inside a token we signed. **Why does a second `/admit` return the
+same token?** Otherwise a fan could refresh their 10-minute window indefinitely and occupy a shopping
+slot forever. When the window ends, it ends. The fan can rejoin the back of the line if the sale is
+still on.
+:::
+
+#### The sold-out signal
+
+Two stages, because "sold out" is a prediction until it isn't:
+
+1. **`admissionPaused` ("likely sold out").** When *available seats ÷ 2.5* drops below the number of
+   admitted fans still shopping, we stop admitting. Everyone already inside can probably absorb
+   what's left. Waiting fans see *"Tickets are likely sold out. Stay if you like: seats may come back."*
+2. **`soldOut` (final).** When no seat is `AVAILABLE` or `HELD`, only `PAYMENT_PENDING` or `SOLD`,
+   for a few minutes. If holds expire and seats come back, the controller resumes admission from
+   where the pointer stopped.
+
+::: why
+**Why two stages?** Declaring sold out too early leaves seats unsold if admitted fans don't buy.
+Declaring it too late wastes the time of 970,000 people. The first stage stops the waste; the second
+is the truth. Both flags travel in the same cached JSON, so they reach everyone within one poll.
+:::
+
+#### Bots
+
+- **Challenge at lobby entry** (CAPTCHA or an invisible browser challenge from the WAF).
+- **One queue entry per verified account**, with a phone number or a payment card on file, bound to a
+  device fingerprint. Account farms are the real attack, so verification makes accounts expensive.
+- **Purchase limits per account and per payment card**: the card limit catches one buyer with many
+  accounts.
+- **Tokens are signed and short-lived**, and the admission token is bound to the user id, so a token
+  can't be sold or shared at scale.
+- **Verified-fan pre-registration** for flagship events: fans register days ahead and are screened
+  offline. Only registered fans may join.
+- **After the sale**: cancel orders flagged by fraud scoring and release the seats to the waitlist.
+
+> "Fairness is a product decision, so I'd take it to the promoter: a lottery for everyone in the
+> lobby at T0, then first-come-first-served. Each fan's position is computed client-side from a
+> signed sequence number and one cached pointer, so a waiting fan costs us almost nothing. An
+> admission controller moves the pointer at a rate it adjusts from shop health, and a sold-out flag
+> in the same cached response tells the 98% within seconds."
+
+\newpage
+
+
+
+\newpage
+## Challenge 6 · The seat map for ten thousand shoppers
+
+**The seat map for ten thousand shoppers.** Protects **L2** and **L3**.
+
+| | |
+|---|---|
+| **The question** | "Is a user allowed to see a seat as available and then fail to get it?" |
+| **The naive answer** | Each shopper reads the seat table every two seconds. |
+| **The case** | 10,000 shoppers every 2 seconds is 5,000 reads a second against the same rows the claims lock; the claim p99 climbs. |
+| **Where it breaks** | Inventory serving both reads and writes. |
+| **The fix** | The **layout** is immutable and lives on the CDN. The **availability** is a bitmap (50,000 bits, 6.25 KB) built from the event log and published at most once a second to a cache; clients send the version they have and get **304** when nothing changed; admitted fans only. |
+| **Why it works** | **L2/L3**: the claim is authoritative and the map is a hint. A stale click fails in milliseconds with a fresh map. |
+| **If the fix fails** | The stream stalls. |
+| **Second fix** | Staleness grows, never incorrectness. A click gets a `409` with the current bitmap. The map is rebuilt from a scan. The log offset as the version never goes backwards. |
+
+![The seat-map pipeline.](diagrams/video-ch6-fix.pdf){width=85%}
+
+::: {.key title="If asked, I would say"}
+The map can be a second or two stale because the write path decides. The layout is immutable on the CDN and the
+availability is a 6-kilobyte bitmap, rebuilt once a second from the event stream and served by version. A stale click
+fails fast with a fresh map.
+:::
+
+### Deep dive · the seat map pipeline
 
 **The risk.** 10,000 shoppers refreshing a 50,000-seat map every 2 seconds is 5,000 reads a second.
 Served from the inventory database, that would compete with the holds for the same rows and
-connections, which is exactly the "mixed paths" failure from Stage 4.
+connections, which is exactly the "mixed paths" failure from Chapter 5.
 
 **The mechanism: split the map into an immutable part and a live part.**
 
@@ -1689,7 +1961,33 @@ phase 2, but polling a 6 KB bitmap is good enough and has fewer moving parts.
 
 \newpage
 
-## 6.6 Several events on sale at the same time
+
+
+\newpage
+## Challenge 7 · Requirements that arrive mid-sale
+
+**Requirements that arrive mid-sale.** *The extension seams.*
+
+| | |
+|---|---|
+| **The question** | "The promoter wants to release 5,000 more seats mid-sale." Then: "Add a waitlist." Then: "A 20-date tour with ten times the traffic." |
+| **The naive answer** | Redesign, or restart the sale. |
+| **The case** | 45,000 are sold. 5,000 rows must appear under live contention; the layout and the map are cached; a sold-out flag has already reached 970,000 people. |
+| **Where it breaks** | The layout cache, the sold-out flag, per-event limits. |
+| **The fix** | Insert the rows as `AVAILABLE` in one transaction, publish a new layout version (a new CDN key), clear the flag, let the controller resume. The waitlist is a **new consumer** of seat-released events, giving a *targeted hold*. "Best available" is an allocator that hands different fans different seats. The tour: everything is keyed by event; mega events get their own cell; the payment budget is split; **one active queue per account per tour**. |
+| **Why it works** | The seams were there. The claim path does not change; new demand lands as consumers and read models. |
+| **If the fix fails** | Two mega events share a Redis node or a payment budget. |
+| **Second fix** | Pin hot slots and move to a dedicated cell the day before (on-sales are scheduled); stagger on-sales; split the budget. |
+
+![The waitlist is a new consumer.](diagrams/video-ch7-fix.pdf){width=85%}
+
+::: {.key title="If asked, I would say"}
+Say what changes, what does not, and what it costs. Releasing seats is an insert and a new layout version; the claim
+does not move. The waitlist is a new consumer on the stream. A tour is an isolation problem, not a coordination one,
+because everything is keyed by event.
+:::
+
+### Deep dive · several events on sale at once
 
 **The question you'll get:** *"A 20-date stadium tour goes on sale on Friday at 10:00 for all
 dates at once, and three other big shows open the same morning. What changes?"*
@@ -1768,7 +2066,85 @@ The waiting room switches **on** automatically when an event's arrival rate cros
 
 \newpage
 
-## 6.7 The whole system under load: how it degrades
+
+### The requirements as they arrive, worked
+
+The requirement-drip format adds requirements as you go. The scoring is about **re-stating the delta**: what
+changes, what doesn't, what it costs. Don't silently redraw.
+
+| New requirement | Change | What stays untouched |
+|-----------|---------------------------------|---------------|
+| *"Promoter releases 5,000 more seats mid-sale"* (the cue-sheet curveball) | Insert rows as `AVAILABLE` in one transaction; bump the layout version (new CDN key); clear `soldOut`; let the controller resume | The claim path: new rows are claimable like any other |
+| *"Add a waitlist when sold out"* | New consumer of `SeatsReleased`: offer the seats to the next waitlisted fan with a **targeted hold** and a notification | Inventory gets one nullable column; the queue is unchanged |
+| *"Best available, not pick-a-seat"* | A server-side **allocator** chooses contiguous seats by section score; contention drops sharply because the server avoids collisions | Same claim SQL, a different source of seat ids |
+| *"A celebrity tour: 20 shows, 10× traffic, bots"* | challenge 7: one queue per show, a cross-show lobby, dedicated cells, a PSP budget | The per-event architecture already shards cleanly |
+| *"Multi-region"* | Edge, queue state and reads are global; **each event's inventory is homed in one region** (single writer) with a synchronous replica in a second zone | No multi-master writes on seats, ever |
+| *"Dynamic pricing"* | Price lives on the seat or section, read at hold time and **locked into the hold** | The claim; the price the fan saw is the price they pay |
+
+### Worked delta 1: the waitlist
+
+![The waitlist as a new consumer: a released seat becomes a targeted hold for the next waitlisted fan, who gets a deep link with a one-off admission token.](diagrams/sd47-seq-waitlist.pdf){width=86%}
+
+```sql
+ALTER TABLE event_seat ADD COLUMN hold_for_user bigint;   -- null for ordinary holds
+-- A targeted hold is an ordinary HELD row created by the waitlist service, with a 10-minute
+-- expiry; the freeze step additionally checks hold_for_user = the ordering user.
+```
+
+> "The waitlist is a new consumer of SeatsReleased. It creates a targeted hold for the next fan who
+> wants that many seats, and the notification carries a deep link with an admission token for that
+> fan only. Inventory gets one nullable column; the queue and the claim path don't change."
+
+::: why
+**Why is this a good answer to score?** It shows the extension point from Chapter 5 was real: the
+event stream was there "so the waitlist could subscribe later", and now it does. **The interviewer
+is checking whether new requirements land as new consumers and read models, or as a redesign.**
+:::
+
+### Worked delta 3: the promoter releases 5,000 more seats
+
+```sql
+BEGIN;
+INSERT INTO event_seat (event_id, seat_id, section, state)
+SELECT :e, gs, :section, 'AVAILABLE' FROM generate_series(50000, 54999) AS gs;
+INSERT INTO outbox (event_id, event_type, payload)
+VALUES (:e, 'InventoryAdded', jsonb_build_object('from', 50000, 'to', 54999, 'layoutVersion', 4));
+COMMIT;
+```
+
+Then: the snapshot builder grows the bitmap; clients see `layoutVersion` 4 in the next map response
+and fetch `/layout?v=4` from the CDN (a new URL, so no purge); the controller clears `soldOut` and
+`admissionPaused` and resumes moving the pointer.
+
+\newpage
+
+
+\newpage
+## Challenge 8 · How would you know it is broken?
+
+**How would you know it is broken?** *The observability challenge, and the one that is always last.*
+
+| | |
+|---|---|
+| **The question** | "What is the SLO for the sale opening, and what is your plan for the day it fails?" |
+| **The naive answer** | CPU, error rate and a dashboard. |
+| **The case** | The dashboard is green while unknown payments pile up and two thousand seats sit frozen; the line has stopped moving. |
+| **Where it breaks** | The whole baseline, silently. |
+| **The fix** | SLIs tied to promises: hold p99 and the 409 ratio; admission rate against shop health; the **age of the oldest expired hold**; **seats frozen by unknown payments and their age**; queue-state staleness; map version lag; **tickets issued against seats sold (they must be equal)**. A **synthetic fan** every ten seconds through lobby, hold and release. A pre-event load test at 2× and a game day. A kill switch that stops admission, and a status page. |
+| **Symptom pair** | Hold p99 *flat* and admitted fans *falling* points at the payment path, not inventory. |
+| **Why it works** | Measure the promise, not the machine. |
+| **If the fix fails** | The metrics say all is fine and fans are angry. |
+| **Second fix** | The synthetic fan, and a support-contact signal as a metric of last resort. |
+
+![Measure the promise.](diagrams/video-ch8-fix.pdf){width=85%}
+
+::: {.key title="If asked, I would say"}
+The SLI is a fan completing a purchase, probed continuously. I watch seats frozen by unknown payments and the age of the
+oldest expired hold, because those are where this system fails silently. And there is a plan for degradation: shrink the
+rate, pause admission, and say so.
+:::
+
+### Deep dive · the whole system under load: how it degrades
 
 A good design doesn't only work at the planned load. It **fails gently** above it. The interviewer
 may ask *"what if twice as many people show up?"* or *"what breaks first?"*
@@ -1787,7 +2163,7 @@ may ask *"what if twice as many people show up?"* or *"what breaks first?"*
 ::: load
 **Double the fans (2M instead of 1M).** The database doesn't notice: R is set by shop health, not by
 demand. What doubles is the lobby (~200 MB of Redis), the T0 `queue/me` burst (~100,000/s: precompute
-the ranks, Stage 6.2) and CDN polling (CDN capacity, not ours). Sell-out time doesn't change; the
+the ranks, challenges 4 and 5) and CDN polling (CDN capacity, not ours). Sell-out time doesn't change; the
 sold-out message goes to 1.97M people instead of 970,000. **This is the strongest argument for the
 design: demand is absorbed at the edge, and the core only ever sees what it chose to admit.**
 :::
@@ -1825,82 +2201,8 @@ everyone retries at once) or a shared cache expiry. Each wave is far above the a
 :::
 
 \newpage
-# Stage 7: Requirements that arrive mid-round · as given
 
-The requirement-drip format adds requirements as you go. The scoring is about **re-stating the delta**: what
-changes, what doesn't, what it costs. Don't silently redraw.
-
-| New requirement | Change | What stays untouched |
-|-----------|---------------------------------|---------------|
-| *"Promoter releases 5,000 more seats mid-sale"* (the cue-sheet curveball) | Insert rows as `AVAILABLE` in one transaction; bump the layout version (new CDN key); clear `soldOut`; let the controller resume | The claim path: new rows are claimable like any other |
-| *"Add a waitlist when sold out"* | New consumer of `SeatsReleased`: offer the seats to the next waitlisted fan with a **targeted hold** and a notification | Inventory gets one nullable column; the queue is unchanged |
-| *"Best available, not pick-a-seat"* | A server-side **allocator** chooses contiguous seats by section score; contention drops sharply because the server avoids collisions | Same claim SQL, a different source of seat ids |
-| *"A celebrity tour: 20 shows, 10× traffic, bots"* | Stage 6.6: one queue per show, a cross-show lobby, dedicated cells, a PSP budget | The per-event architecture already shards cleanly |
-| *"Multi-region"* | Edge, queue state and reads are global; **each event's inventory is homed in one region** (single writer) with a synchronous replica in a second zone | No multi-master writes on seats, ever |
-| *"Dynamic pricing"* | Price lives on the seat or section, read at hold time and **locked into the hold** | The claim; the price the fan saw is the price they pay |
-
-## Worked delta 1: the waitlist
-
-![The waitlist as a new consumer: a released seat becomes a targeted hold for the next waitlisted fan, who gets a deep link with a one-off admission token.](diagrams/sd47-seq-waitlist.pdf){width=86%}
-
-```sql
-ALTER TABLE event_seat ADD COLUMN hold_for_user bigint;   -- null for ordinary holds
--- A targeted hold is an ordinary HELD row created by the waitlist service, with a 10-minute
--- expiry; the freeze step additionally checks hold_for_user = the ordering user.
-```
-
-> "The waitlist is a new consumer of SeatsReleased. It creates a targeted hold for the next fan who
-> wants that many seats, and the notification carries a deep link with an admission token for that
-> fan only. Inventory gets one nullable column; the queue and the claim path don't change."
-
-::: why
-**Why is this a good answer to score?** It shows the extension point from Stage 4 was real: the
-event stream was there "so the waitlist could subscribe later", and now it does. **The interviewer
-is checking whether new requirements land as new consumers and read models, or as a redesign.**
-:::
-
-## Worked delta 2: best available
-
-::: why
-**Why does "best available" reduce contention?** With pick-a-seat, 2,000 fans looking at the same
-front-row map all click the same 50 seats, and most get 409s. With best available, the fan asks for
-"2 seats in section A" and the **allocator** picks which ones. It can hand different requests
-different seats, e.g. by scanning from a random offset within the best block, or by keeping a small
-in-memory free list per section and popping from it. The database claim is the same conditional
-update; it just rarely conflicts. Fans also stop needing a live map, so the read path shrinks too.
-:::
-
-```sql
--- allocator query (simplified; assumes row_no and seat_score columns on event_seat):
--- the best free adjacent pair in a section, skipping rows another buyer is claiming
-SELECT a.seat_id, b.seat_id
-  FROM event_seat a
-  JOIN event_seat b ON b.event_id = a.event_id AND b.seat_id = a.seat_id + 1
- WHERE a.event_id = :e AND a.section = :s AND a.row_no = b.row_no
-   AND a.state = 'AVAILABLE' AND b.state = 'AVAILABLE'
- ORDER BY a.seat_score DESC
- LIMIT 1
- FOR UPDATE OF a, b SKIP LOCKED;
-```
-
-## Worked delta 3: the promoter releases 5,000 more seats
-
-```sql
-BEGIN;
-INSERT INTO event_seat (event_id, seat_id, section, state)
-SELECT :e, gs, :section, 'AVAILABLE' FROM generate_series(50000, 54999) AS gs;
-INSERT INTO outbox (event_id, event_type, payload)
-VALUES (:e, 'InventoryAdded', jsonb_build_object('from', 50000, 'to', 54999, 'layoutVersion', 4));
-COMMIT;
-```
-
-Then: the snapshot builder grows the bitmap; clients see `layoutVersion` 4 in the next map response
-and fetch `/layout?v=4` from the CDN (a new URL, so no purge); the controller clears `soldOut` and
-`admissionPaused` and resumes moving the pointer.
-
-\newpage
-
-# Stage 8: Failure modes and reliability · 0:48–0:52
+### Failure modes and reliability
 
 | Failure | Blast radius | Mitigation |
 |--------|-----------|-----------------------------------------|
@@ -1925,7 +2227,7 @@ clocks and one is 20 seconds fast, its holds expire 20 seconds early, and a seat
 its owner thinks they still have time. One clock, the database's, avoids the whole class of bugs.
 :::
 
-# Stage 9: SLOs, observability, operations · 0:52–0:54
+### SLOs, observability, operations
 
 - **The invariant monitor (page immediately):** per event, no seat with two tickets, and the number of
   tickets equals the number of `SOLD` seats. **Oversell has an SLO of zero.**
@@ -1955,7 +2257,27 @@ oversell rather than 99.99%?** Because it's an invariant, not a latency. Any vio
 with a refund, an angry fan at a gate, and possibly a news story.
 :::
 
-# Stage 10: The EM layer · 0:54–0:55 (or when asked)
+
+\newpage
+# Chapter 8 · Build cost (AUX: the engineering-manager layer)
+
+*This layer is optional in a Staff round and expected in a manager round. All figures are illustrative; replace them with
+the team's own.*
+
+| Version | Scope | People and time |
+|---|---|---|
+| **V1** | A sale with no waiting room: one primary per event, the conditional claim and holds, orders, one provider | **3 engineers, 2 months** |
+| **V2** | The sweeper, the freeze and the reconciler, the outbox and the snapshot builder | **+2 engineers, 2 months** |
+| **V3** | The waiting room, the admission controller, bot controls, the load test and game days | **+2 engineers, 3 months** |
+
+**Buy against build.** The payment provider and the bot challenge are bought. The waiting room can be bought for the
+first season and built when per-event cost or control justifies it. Inventory and orders are ours: they hold the
+invariant.
+
+**Top risks.** A payment-provider outage during a flagship sale (answer: a second provider). The first big on-sale
+with no load test. A fairness rule decided late by the business.
+
+## Phasing, team split and the asks
 
 - **Phasing.** *MVP (6–8 weeks):* holds, checkout, the claim path, a simple FIFO queue, a polled seat
   map. *Then:* the lobby and lottery, bot defence, adaptive polling, SSE deltas, the waitlist, the
@@ -1979,7 +2301,26 @@ event schema, a token format) let them ship independently. An EM answer names th
 the invariant.
 :::
 
-# Stage 11: The close · 0:55–0:57
+# Chapter 9 · Recap
+
+![The final baseline.](diagrams/video-base-final.pdf){width=100%}
+
+| Path | In one sentence |
+|---|---|
+| **Join** | A lobby and a signed place in line; a cached answer identical for everyone |
+| **Browse** | An immutable layout on the CDN and a versioned bitmap, one version a second |
+| **Hold** | One conditional update, all or nothing; a `409` with a fresh map |
+| **Pay** | Freeze, authorize, sell on approval; silence is *unknown*, not failure |
+| **Expire** | The claim treats an expired hold as free; a sweeper makes the map catch up |
+| **Release** | New rows and a new layout version; the waitlist is a consumer |
+
+**Common mistakes in this round:** a database lock held through checkout · a sweeper as the only expiry · a timeout
+treated as a decline · a live map read from the database · strict first-come at T0 · numbers with no decision attached ·
+no number for what "fair" costs · no plan for the day it fails.
+
+> *Fifty thousand seats, a million fans: the design is the distance between what arrives and what is admitted.*
+
+## The four-sentence close
 
 > "**What I built:** a waiting room that meters a million people into a few hundred transactions a
 > second, a cached seat map, and a relational claim path with time-limited holds. **Key trade-off:** I
@@ -1994,7 +2335,33 @@ decisions. It shows you know what you built, what you gave up for it, what could
 where you'd invest. Interviewers often write the debrief from your close.
 :::
 
-# Stage 12: Self-check after a simulator run
+# Canon check
+
+The points the standard treatments of this question make, each either covered or dismissed aloud.
+
+| Canonical point | Where covered, or why dismissed |
+|---|---|
+| Three-state seat, atomic conditional claim | Chapter 3 mechanism 1; V2; challenge 1 |
+| A hold with a TTL, not a lock through checkout | Mechanism 2; challenges 1 and 2 |
+| A virtual waiting room admitting at a serviceable rate; the queue as a product | Chapter 2; challenge 4 |
+| Sweeper plus lazy expiry | Challenge 2 |
+| Hold expired, payment succeeded: take a position | Challenge 3 |
+| Seat-map read path split; a stale click is acceptable and graceful | Challenge 6 |
+| Fairness and bots; a lottery over strict first-come | Challenge 5 |
+| Idempotent purchase | Chapter 4; challenge 3 |
+| Adjacent seats ("best available") | Challenge 7 (an allocator) |
+| A pre-event load test; an SLO for the opening | Challenge 8; Chapter 8 |
+| A distributed lock per seat | **Dismissed** in the options matrix: a second system, and a lease can expire mid-transaction |
+| Optimistic locking with a version column | In the options matrix; ends in a conditional update anyway |
+| "Exactly-once" payment | Corrected in challenge 3: at-least-once with idempotent effects |
+| Multi-region | Challenge 7: each event homed in one region, a single writer; no multi-master seats |
+
+*What changed since older write-ups:* strict first-come at T0 is now widely seen as bot-friendly; verified-fan
+registration and per-event lotteries are standard for flagship events.
+
+\newpage
+
+# Self-check after a simulator run
 
 Score yourself honestly; the simulator's debrief uses similar dimensions.
 
@@ -2018,7 +2385,7 @@ a per-user poll response that can't be cached; forgetting to tell the losers.
 \newpage
 # Part III — The internals, for when the interviewer digs
 
-Requirement-drip rounds promise an in-depth tool probe. These appendices go one level below Stage 5,
+Requirement-drip rounds promise an in-depth tool probe. These appendices go one level below the technology choices,
 in plain words. Read them once; reread the one for whichever tool you named in your last mock.
 
 ## Appendix A — PostgreSQL: row locks, Read Committed, replication
@@ -2137,53 +2504,6 @@ its position in the log, so a restart resumes exactly where it stopped. A simple
 **polling publisher** (`SELECT … FROM outbox WHERE published = false … FOR UPDATE SKIP LOCKED`, publish,
 mark published): fine at our 500 rows/s, with a little more database load.
 
-## Appendix D — How a CDN serves a million identical requests
-
-1. A fan's browser resolves `tickets.example.com` and reaches the **nearest edge** (anycast or
-   geo-DNS).
-2. The edge builds a **cache key** from the URL (here: path + event id) and looks it up.
-3. **Hit, still fresh** (younger than `max-age`): answered from the edge's memory. Our servers see
-   nothing.
-4. **Miss or expired:** the edge asks the next tier. With **request collapsing**, 500 simultaneous
-   misses for the same key at one edge become **one** upstream request; the other 499 wait a few
-   milliseconds for its answer.
-5. **Origin shield** (optional): all edges ask one regional shield, and only the shield asks us.
-   Origin load becomes ~1 request per TTL per key, however many edges there are.
-6. **`stale-while-revalidate`**: the edge answers immediately from the slightly stale copy and
-   refreshes in the background. **`stale-if-error`**: if we fail, it keeps serving the last good copy.
-
-**Versioned URLs vs purges.** To change a cached file you can **purge** it (tell every edge to drop
-it, which takes seconds to propagate) or **change its URL** (`/layout?v=4`). The second is instant and
-can't half-fail, so immutable assets get versioned URLs with long TTLs.
-
-## Appendix E — Card payments in plain words
-
-**The parties.** The **cardholder** (the fan) pays the **merchant** (us). We talk to a **PSP**
-(Stripe, Adyen…), which works with an **acquirer** (the merchant's bank). The acquirer sends the
-request through the **card scheme** (Visa, Mastercard) to the **issuer** (the fan's bank), which
-approves or declines.
-
-**The operations.**
-
-| Operation | What happens | When we use it |
-|--------|-----------------------------------|-----------------|
-| **Authorize** | The issuer reserves the amount on the card; no money moves yet. Valid for several days | After freezing the seats |
-| **Capture** | The reserved amount is actually taken | After the seats are `SOLD` |
-| **Void** (cancel) | The reservation is released before capture; no charge ever appears | Anything fails between authorize and capture |
-| **Refund** | Money returned after capture; visible, slower, costs a fee | Only the residual case |
-
-**3-D Secure.** In the EU (and Poland), **strong customer authentication** often makes the
-authorization ask the fan to confirm in their banking app. That can take a minute or two, which is
-another reason the `PAYMENT_PENDING` deadline is 10 minutes and checkout is asynchronous.
-
-**Idempotency at the PSP.** Major PSPs accept an idempotency key on every request. Sending the same
-`authorize` twice with the same key returns the first result instead of reserving the money twice.
-That's what makes retrying after a timeout safe.
-
-**Why timeouts happen.** The request travels PSP → acquirer → scheme → issuer and back. Any hop can
-be slow. The PSP may have a result we never received because our connection dropped. That's the
-"unknown outcome", and it's normal at volume, not exotic.
-
 ## Appendix F — Signed tokens (JWT) in plain words
 
 A JWT is three base64 parts: `header.payload.signature`. The header names the algorithm, the
@@ -2230,3 +2550,4 @@ one queue per tour.
 three paths, MVP = hold + claim + auth/capture + FIFO queue.
 
 **Close:** what I built · key trade-off · biggest risk · next.
+

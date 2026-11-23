@@ -4,6 +4,7 @@ Generators: ~/.claude/skills/slide-video-kit/scripts/{c4svg,seqsvg}.py.  Run: py
 import pathlib, sys
 sys.path.insert(0, str(pathlib.Path.home() / ".claude/skills/slide-video-kit/scripts"))
 import c4svg as c4, seqsvg as sq
+import basesvg as bs
 from erdsvg import ERD
 
 OUT = pathlib.Path(__file__).resolve().parent / "svg"
@@ -58,6 +59,35 @@ d.note(270, 650, 760, "Losing a second of queue state is survivable; losing a se
        "and the seats never do.", size=18)
 d.save(OUT / "c4-containers-wait.svg")
 
+# the same container view with the technologies (labels from ../stack.json)
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / 'src')); import stack
+c4.Diagram.OVERRIDE = {k: (v[1], v[2]) for k, v in stack.C4.items()}
+d = c4.Diagram(1600, 820)
+d.boundary(230, 20, 1090, 780, "Ticket booking system")
+d.node("fan", 20, 110, 170, 140, "person", "Fans", "Person")
+d.node("cdn", 20, 450, 170, 140, "ext", "CDN / WAF", "External")
+d.node("wr", 270, 100, 200, 130, "container", "Waiting room", "Container", "join, queue/me, admit")
+d.node("redis", 550, 100, 200, 130, "db", "Queue store", "Redis", "lobby set, pointer")
+d.node("ac", 830, 100, 200, 130, "focus", "Admission controller", "Container", "turns the R dial")
+d.node("gw", 270, 440, 200, 130, "container", "API gateway", "Container", "checks admission JWT")
+d.node("map", 550, 440, 200, 130, "container", "Seat-map service", "Container", "bitmap by version")
+d.node("snap", 830, 440, 200, 130, "db", "Snapshot cache", "Redis", "6.25 KB per event")
+d.node("kafka", 1110, 440, 190, 130, "queue", "Seat events", "Kafka")
+d.edge("fan", "wr", "join", "", src="r:0.5", dst="l:0.5", at=(230, 150))
+d.edge("cdn", "wr", "queue/state, 1 s TTL", "", src="t:0.6", dst="b:0.3", via=[(122, 330), (330, 330)], at=(225, 315), width=200)
+d.edge("wr", "redis", "ZADD, ZRANK", "", src="r", dst="l", at=(510, 150), width=80)
+d.edge("ac", "redis", "advance pointer", "Lua", src="l", dst="r", at=(790, 150), width=80)
+d.edge("cdn", "gw", "shop calls", "", src="r:0.5", dst="l:0.5", at=(230, 495))
+d.edge("gw", "map", "map", "", src="r", dst="l", at=(510, 490))
+d.edge("map", "snap", "read", "", src="r", dst="l", at=(790, 490))
+d.edge("kafka", "snap", "rebuild ≤ 1/s", "", src="l", dst="r", at=(1070, 470), width=90)
+d.edge("ac", "snap", "shop health", "", src="b:0.5", dst="t:0.5", at=(930, 320))
+d.note(270, 650, 760, "Losing a second of queue state is survivable; losing a seat isn't. So the queue lives in Redis "
+       "and the seats never do.", size=18)
+d.save(OUT / "c4-containers-wait-tech.svg")
+c4.Diagram.OVERRIDE = {}
+
+
 # ── C4 level 2: the write path ───────────────────────────────────────────────────────────────────
 d = c4.Diagram(1600, 820)
 d.boundary(230, 20, 1100, 780, "Ticket booking system")
@@ -82,6 +112,35 @@ d.edge("exp", "idb", "release expired, SKIP LOCKED", "", src="t:0.5", dst="b:0.5
 d.edge("ord", "psp", "authorize, query, capture", "", src="b:0.4", dst="r:0.5", via=[(358, 670)], at=(290, 700), width=150)
 d.note(570, 620, 520, "ticket UNIQUE (event, seat): the last line of defence against oversell.", size=18)
 d.save(OUT / "c4-containers-write.svg")
+
+# the same container view with the technologies (labels from ../stack.json)
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / 'src')); import stack
+c4.Diagram.OVERRIDE = {k: (v[1], v[2]) for k, v in stack.C4.items()}
+d = c4.Diagram(1600, 820)
+d.boundary(230, 20, 1100, 780, "Ticket booking system")
+d.node("gw", 20, 110, 170, 140, "container", "API gateway", "Container")
+d.node("psp", 20, 600, 170, 140, "ext", "Payment provider", "External")
+d.node("inv", 270, 100, 220, 130, "focus", "Inventory & holds", "Container", "the atomic claim")
+d.node("idb", 570, 100, 220, 130, "db", "Inventory DB", "PostgreSQL", "event_seat, hold, outbox")
+d.node("kafka", 870, 100, 180, 130, "queue", "Seat events", "Kafka", "outbox relay")
+d.node("noti", 1120, 100, 180, 130, "container", "Notifications", "Container", "tickets by email")
+d.node("ord", 270, 440, 220, 130, "container", "Order service", "Container", "checkout saga")
+d.node("odb", 570, 440, 220, 130, "db", "Order DB", "PostgreSQL", "orders, tickets")
+d.node("exp", 870, 440, 220, 130, "container", "Hold expirer", "Container", "sweeper")
+d.edge("gw", "inv", "hold", "JWT", src="r:0.5", dst="l:0.5", at=(230, 150))
+d.edge("inv", "idb", "claim + outbox", "1 txn", src="r", dst="l", at=(530, 145), width=80)
+d.edge("idb", "kafka", "relay", "", src="r", dst="l", at=(830, 150))
+d.edge("kafka", "noti", "events", "", src="r", dst="l", at=(1085, 150))
+d.edge("gw", "ord", "order", "", src="b:0.5", dst="l:0.5", via=[(105, 505)], at=(150, 470))
+d.edge("ord", "inv", "freeze, sell", "", src="t:0.5", dst="b:0.5", at=(380, 330))
+d.edge("ord", "odb", "order, tickets", "", src="r", dst="l", at=(530, 485), width=80)
+d.edge("exp", "idb", "release expired, SKIP LOCKED", "", src="t:0.5", dst="b:0.5", via=[(980, 330), (680, 330)],
+       at=(830, 315), width=300)
+d.edge("ord", "psp", "authorize, query, capture", "", src="b:0.4", dst="r:0.5", via=[(358, 670)], at=(290, 700), width=150)
+d.note(570, 620, 520, "ticket UNIQUE (event, seat): the last line of defence against oversell.", size=18)
+d.save(OUT / "c4-containers-write-tech.svg")
+c4.Diagram.OVERRIDE = {}
+
 
 # ── C4 level 3: inside the inventory service ─────────────────────────────────────────────────────
 d = c4.Diagram(1600, 780)
@@ -220,71 +279,6 @@ s.msg("ord", "inv", "confirm: conditional transition, only once")
 s.end()
 s.msg("rec", "psp", "past the deadline: cancel, release seats")
 s.save(OUT / "seq-unknown.svg")
-
-# ── Follow-up 1: fairness ────────────────────────────────────────────────────────────────────────
-d = c4.Diagram(1600, 540)
-d.text(40, 40, "THREE OPTIONS, WITH THEIR CONSEQUENCES — THE PROMOTER DECIDES", 17, "#8c959f", True)
-d.node("fifo", 40, 70, 480, 220, "ext", "Strict FIFO at T0", "Option A",
-       "Rewards the lowest latency and the best bots. Looks fair, isn't.", size=27)
-d.node("lot", 560, 70, 480, 220, "focus", "Lottery among the lobby", "Option B · recommended",
-       "Everyone present at T0 has the same chance. Then FIFO for late arrivals.", size=27)
-d.node("reg", 1080, 70, 480, 220, "container", "Verified pre-registration", "Option C · flagship events",
-       "Fans screened days ahead. Slower, the strongest against bots.", size=27)
-d.note(40, 330, 1520, "What I bring: the data from the last on-sale (bot share, latency spread), the rules written "
-       "in plain words, and how each fan learns their position early. What I don't do: decide fairness alone.", size=19)
-d.note(40, 440, 1520, "Then: publish the rules before the sale, measure complaints and bot cancellations after, "
-       "and revisit with the promoter.", size=19, colour="#2d8a4e", bg="#e7f4ec")
-d.save(OUT / "fu-fairness.svg")
-
-# ── Follow-up 2: the primary fails mid-sale ──────────────────────────────────────────────────────
-d = c4.Diagram(1600, 640)
-steps = [("t0", "0–5 s", "Detect", "hold p99 and errors spike; on-call paged"),
-         ("t1", "5–30 s", "Queue absorbs it", "controller cuts R to the floor; the line pauses"),
-         ("t2", "~30 s", "Failover", "synchronous replica promoted; nothing acknowledged is lost"),
-         ("t3", "1–5 min", "Slow restart", "R ramps again from slow start; shoppers retry with jitter"),
-         ("t4", "same day", "Verify", "invariant monitor clean; PAYMENT_PENDING ages normal")]
-for i, (nid, t, h, desc) in enumerate(steps):
-    d.node(nid, 30 + i * 314, 80, 280, 220, "focus" if i == 1 else "container", h, t, desc, size=25)
-for a, b in zip([s_[0] for s_ in steps], [s_[0] for s_ in steps][1:]):
-    d.edge(a, b, "", src="r", dst="l", dashed=False)
-d.note(30, 360, 1540, "Comms: a status line on the waiting page ('the line has paused'), the promoter told within "
-       "minutes, support given the script. Nobody is told 'sold out' because of our outage.", size=19)
-d.note(30, 470, 1540, "Week after: blameless review; game day before the next big sale — kill the primary, stop the "
-       "sweeper, slow the PSP, kill the controller's leader.", size=19, colour="#2d8a4e", bg="#e7f4ec")
-d.save(OUT / "fu-failover.svg")
-
-# ── Follow-up 3: three teams, twelve weeks ───────────────────────────────────────────────────────
-d = c4.Diagram(1600, 660)
-cols = ["Weeks 1–4", "Weeks 5–8", "Weeks 9–12"]
-for i, c in enumerate(cols):
-    d.text(420 + i * 390, 40, c.upper(), 17, "#8c959f", True, "middle")
-rows = [("Edge & waiting room", ["FIFO queue, admission JWT", "lobby + lottery, CDN state", "bot defence, load test 1M"]),
-        ("Inventory & orders", ["claim, holds, lazy expiry", "freeze, authorize → capture", "invariant monitor, game day"]),
-        ("Payments", ["PSP adapter, idempotency", "unknown outcome, reconciler", "second PSP for failover"])]
-for r, (team, cells) in enumerate(rows):
-    y = 70 + r * 160
-    d.text(30, y + 70, team, 20, "#24292f", True)
-    for i, c in enumerate(cells):
-        kind = "focus" if (r == 1 and i == 2) else ("component" if i == 0 else "container")
-        d.node(f"c{r}{i}", 240 + i * 390, y, 360, 120, kind, c, "", size=20)
-d.note(240, 560, 1140, "Contracts between teams: the event stream and the admission token. Never cut: the invariant "
-       "monitor.", size=19)
-d.save(OUT / "fu-roadmap.svg")
-
-# ── Follow-up 4: the CDN bill ────────────────────────────────────────────────────────────────────
-d = c4.Diagram(1600, 620)
-d.text(40, 40, "\"THE CDN BILL FOR ONE ON-SALE WAS 3× THE FORECAST\": SLICE BEFORE YOU GUESS", 17, "#8c959f", True)
-sl = [("p", "By path", "queue/state, layout, availability"), ("v", "By client version", "a release polling every 1 s?"),
-      ("b", "By bot score", "headless clients polling flat out"), ("c", "Cause", "polling rate × size × audience")]
-for i, (nid, h, desc) in enumerate(sl):
-    d.node(nid, 40 + i * 390, 70, 340, 160, "focus" if i == 3 else "container", h, "", desc, size=26)
-for a, b in zip("pvb", "vbc"):
-    d.edge(a, b, "", src="r", dst="l", dashed=False)
-d.note(40, 290, 740, "Contain: block flagged bots at the WAF, raise the poll interval server-side "
-       "(it travels in the state JSON), roll back the client.", size=19, colour="#c8341f", bg="#fdecea")
-d.note(820, 290, 740, "Fix: adaptive polling — fans far back poll every 60 s; a cost forecast per on-sale "
-       "reviewed with finance; an alert on edge requests per waiting fan.", size=19, colour="#2d8a4e", bg="#e7f4ec")
-d.save(OUT / "fu-cdn-cost.svg")
 
 # ════════ v2 (2026-10-29): Staff L6/L7 depth — calculations, wire formats, ERDs, alternatives ════════
 GREEN, GREEN_BG, RED, RED_BG, BLUE, BLUE_BG = "#2d8a4e", "#e7f4ec", "#c8341f", "#fdecea", "#2f6fb5", "#e8f0fa"
@@ -459,3 +453,186 @@ d.note(40, 380, 1520, "Many events are an isolation problem, not a coordination 
        "are the PSP pool and edge capacity, so those get explicit budgets.", size=21, colour=BLUE, bg=BLUE_BG)
 d.save(OUT / "fu-multi-event.svg")
 print("diagrams →", OUT)
+
+
+# ───────────────────────────── The carried baseline (2026-11-21 reference-solution format) ─────────────────────
+b = bs.Baseline(1600, 900)
+b.node("fans", 20, 300, 170, 130, "client", "Fans", "browsers · apps")
+b.node("edge", 355, 300, 170, 130, "edge", "CDN · gateway", "token check · cache", since=3)
+b.node("api", 690, 300, 170, 130, "service", "Booking API", "claim · hold")
+b.node("db", 1025, 300, 170, 130, "data", "Seat DB", "one row per seat", shape="db")
+b.node("log", 1360, 300, 170, 130, "queue", "Event log", "seats changed", shape="queue", since=3)
+b.node("wr", 355, 70, 170, 120, "service", "Waiting room", "lobby · pointer", since=3)
+b.node("bm", 690, 70, 170, 120, "cache", "Seat map", "versioned bitmap", since=3)
+b.node("sb", 1025, 70, 170, 120, "service", "Snapshot builder", "1 version / s", since=3)
+b.node("ord", 690, 560, 170, 120, "service", "Order service", "orders", since=2)
+b.node("psp", 1360, 560, 170, 120, "ext", "Payment provider", "2 to 10 s", since=2)
+b.node("ctrl", 20, 70, 170, 120, "service", "Admission controller", "sets the rate", tag="ch4")
+b.node("sweep", 1025, 745, 170, 90, "service", "Sweeper", "every 5 s", tag="ch2")
+b.node("recon", 355, 560, 170, 120, "service", "Reconciler", "unknown orders", tag="ch3")
+b.node("wl", 1360, 70, 170, 120, "service", "Waitlist", "new consumer", tag="ch7")
+b.node("mon", 20, 560, 170, 120, "ext", "Probes", "a synthetic fan", tag="ch8")
+
+REQ = dict(src="r:0.25", dst="l:0.25")
+b.edge("f-a", "fans", "api", "buy a seat", until=2, **REQ)
+b.edge("a-f", "api", "fans", "result", until=2, kind="resp", src="l:0.75", dst="r:0.75")
+b.edge("a-d1", "api", "db", "check, write", until=1, **REQ)
+b.edge("a-d", "api", "db", "claim", since=2, **REQ)
+b.edge("d-a", "db", "api", "won or lost", since=2, kind="resp", src="l:0.75", dst="r:0.75")
+b.edge("a-o", "api", "ord", "pay", since=2, src="b:0.5", dst="t:0.5")
+b.edge("o-d", "ord", "db", "freeze · sell", since=2, src="r:0.2", dst="b:0.2", via=[(1059, 582)])
+b.edge("o-p", "ord", "psp", "authorize", since=2, src="r:0.65", dst="l:0.65", at=(1010, 608))
+b.edge("p-o", "psp", "ord", "answer or silence", since=2, kind="resp", src="l:0.9", dst="r:0.9", at=(1010, 696))
+b.edge("f-e", "fans", "edge", "request", since=3, **REQ)
+b.edge("e-f", "edge", "fans", "response", since=3, kind="resp", src="l:0.75", dst="r:0.75")
+b.edge("e-a", "edge", "api", "admitted only", since=3, **REQ)
+b.edge("a-e", "api", "edge", "result", since=3, kind="resp", src="l:0.75", dst="r:0.75")
+b.edge("e-w", "edge", "wr", "join · poll", since=3, src="t:0.5", dst="b:0.5")
+b.edge("e-b", "edge", "bm", "map", since=3, src="t:0.92", dst="l:0.5", via=[(516, 250), (620, 250), (620, 130)])
+b.edge("d-l", "db", "log", "outbox", since=3, kind="async", src="r:0.5", dst="l:0.5")
+b.edge("l-s", "log", "sb", "events", since=3, kind="async", src="t:0.2", dst="b:0.5", via=[(1394, 245), (1110, 245)])
+b.edge("s-b", "sb", "bm", "publish", since=3, src="l:0.5", dst="r:0.5")
+b.edge("c-w", "ctrl", "wr", "rate", tag="ch4", src="r:0.5", dst="l:0.5")
+b.edge("sw-d", "sweep", "db", "release expired", tag="ch2", src="t:0.8", dst="b:0.8", at=(1262, 520))
+b.edge("r-o", "recon", "ord", "unknown?", tag="ch3", src="r:0.5", dst="l:0.5")
+b.edge("r-p", "recon", "psp", "status", tag="ch3", src="b:0.5", dst="b:0.5", via=[(440, 860), (1445, 860)])
+b.edge("l-wl", "log", "wl", "released", tag="ch7", kind="async", src="t:0.75", dst="b:0.75")
+
+b.edge("m-f", "mon", "fans", "probe", tag="ch8", src="t:0.5", dst="b:0.5")
+
+def sv(name, h, **view):
+    b.h = h
+    b.save(OUT / name, **view)
+ALL = ["ch2", "ch3", "ch4", "ch7", "ch8"]
+sv("base-v1.svg", 470, upto=1, legend=True)
+sv("base-v2.svg", 760, upto=2, new=2, legend=True)
+sv("base-v3.svg", 760, upto=3, new=3, legend=True)
+sv("base-final.svg", 900, upto=3, show=ALL, legend=True)
+sv("map.svg", 900, upto=3, show=ALL, legend=True, attack=["db", "sweep", "ord", "wr", "bm", "edge", "wl"], keep=None)
+
+sv("flow-fr1.svg", 545, upto=3, flow=["f-e", "e-w", "e-a"],
+   notes=[(560, 440, 760, "Join the lobby, get a signed place in line, exchange it for an admission token when the pointer reaches you.", "blue")])
+sv("flow-fr2.svg", 545, upto=3, flow=["f-e", "e-b", "e-f"],
+   notes=[(560, 440, 760, "Layout from the CDN, availability as a versioned bitmap. A 304 when nothing changed.", "blue")])
+sv("flow-fr3.svg", 545, upto=3, flow=["f-e", "e-a", "a-d", "d-a", "a-e", "e-f"],
+   notes=[(560, 440, 760, "Admission token checked at the gateway; one conditional claim; 201 with an expiry, or 409 with a fresh map.", "blue")])
+sv("flow-fr4.svg", 700, upto=3, show=["ch3"], flow=["a-o", "o-d", "o-p", "p-o", "r-o"],
+   notes=[(900, 440, 640, "Freeze, authorize, sell on approval. A silent provider leaves the order unknown, not failed.", "blue")])
+sv("flow-fr5.svg", 900, upto=3, show=["ch2", "ch7"], flow=["sw-d", "d-l", "l-wl"],
+   notes=[(40, 440, 700, "Expired holds return to available and are announced. A released seat can go to the next fan waiting.", "blue")])
+sv("ch1-attack.svg", 545, upto=3, attack=["db"], keep=["edge", "api", "db"], hot=["a-d", "e-a"],
+   notes=[(560, 470, 760, "Two fans read free, both write: seat 102 is sold twice.", "red")])
+sv("ch1-fix.svg", 545, upto=3, fix=["api"], keep=["edge", "api", "db"], ok=["a-d", "d-a"],
+   notes=[(560, 470, 760, "One conditional update is the check and the change. The loser changes zero rows and gets a 409.", "green")])
+sv("ch2-attack.svg", 545, upto=3, attack=["db"], keep=["api", "db"], hot=["a-d"],
+   notes=[(560, 470, 760, "A hold with no owner left: the seat is neither free nor sold, and nothing ever frees it.", "red")])
+sv("ch2-fix.svg", 900, upto=3, show=["ch2"], fix=["sweep", "db"], keep=["api", "db", "sweep", "log"], ok=["sw-d", "d-l", "a-d"],
+   notes=[(40, 480, 640, "Lazy expiry inside the claim; a sweeper every 5 s makes the map catch up.", "green")])
+sv("ch3-attack.svg", 700, upto=3, attack=["ord"], keep=["api", "db", "ord", "psp"], hot=["o-d", "p-o"],
+   notes=[(40, 470, 640, "The hold expired at 5:00; at 5:05 the provider says approved. Two paid, one seat.", "red")])
+sv("ch3-fix.svg", 900, upto=3, show=["ch3"], fix=["ord", "recon"], keep=["api", "db", "ord", "psp", "recon"], ok=["o-d", "o-p", "r-o", "r-p"],
+   notes=[(900, 440, 640, "Freeze before calling the provider. Authorize, then capture. Silence is unknown, not failed.", "green")])
+sv("ch4-attack.svg", 545, upto=3, attack=["db"], keep=["fans", "edge", "api", "db"], hot=["f-e", "e-a", "a-d"],
+   notes=[(560, 470, 760, "33,000 contended writes a second on 50,000 rows. The pool empties; retries make it worse.", "red")])
+sv("ch4-fix.svg", 545, upto=3, show=["ch4"], fix=["wr", "ctrl"], keep=["fans", "edge", "wr", "ctrl", "api", "db"], ok=["e-w", "c-w", "e-a"],
+   notes=[(560, 470, 760, "A line in front, admitted at a rate chosen from shop health. The core sees only what it admits.", "green")])
+sv("ch5-attack.svg", 545, upto=3, attack=["wr"], keep=["fans", "edge", "wr"], hot=["f-e", "e-w"],
+   notes=[(560, 470, 760, "Strict first-come at T0: data-centre bots with 5 ms latency take the first places.", "red")])
+sv("ch5-fix.svg", 545, upto=3, fix=["wr", "edge"], keep=["fans", "edge", "wr"], ok=["f-e", "e-w"],
+   notes=[(560, 470, 760, "A lottery for everyone present at T0; one entry per verified account; signed, short-lived tokens.", "green")])
+sv("ch6-attack.svg", 545, upto=3, attack=["db"], keep=["fans", "edge", "api", "db"], hot=["a-d", "e-a"],
+   notes=[(560, 470, 760, "5,000 map reads a second hit the same rows the claims are locking.", "red")])
+sv("ch6-fix.svg", 545, upto=3, fix=["bm", "sb"], keep=["edge", "bm", "sb", "log", "db"], ok=["e-b", "s-b", "l-s", "d-l"],
+   notes=[(560, 470, 760, "Layout on the CDN; availability as a bitmap built from the event log, served by version.", "green")])
+sv("ch7-attack.svg", 545, upto=3, show=["ch7"], attack=["bm", "wr", "edge"], keep=["db", "edge", "bm", "wr"], hot=["e-b", "e-w"],
+   notes=[(560, 470, 760, "5,000 seats appear while the map is cached and 970,000 fans have been told it is sold out.", "red")])
+sv("ch7-fix.svg", 545, upto=3, show=["ch7"], fix=["wl", "db"], keep=["api", "db", "log", "wl"], ok=["l-wl", "d-l"],
+   notes=[(40, 470, 700, "New rows in one transaction, a new layout version, the flag cleared. A new consumer.", "green")])
+sv("ch8-attack.svg", 545, upto=3, attack=["api"], keep=["edge", "api", "db"], hot=[],
+   notes=[(560, 470, 760, "The dashboard is green. Two thousand seats sit frozen on unknown payments and the line has stopped.", "red")])
+sv("ch8-fix.svg", 700, upto=3, show=["ch8"], fix=["mon"], keep=["fans", "mon", "edge", "api", "db"], ok=["m-f"],
+   notes=[(560, 470, 760, "Measure the promise: a synthetic fan, seats frozen and their age, hold latency against admission.", "green")])
+bs.budget_bar(OUT / "budget.svg", [("gateway", 20, "edge"), ("token + limits", 10, "service"), ("lock + claim", 40, "data"), ("outbox", 10, "queue"), ("return", 20, "edge")],
+              total=300, unit="ms", title="One hold request, p99 planning budget (initial target 300 ms)")
+
+# ───────────────────────────── conceptual model (Chen) and the central-tension funnel ─────────────────────────
+import erdsvg as er
+c = er.Chen(1600, 900, size=26)
+c.entity("ev", 140, 120, "EVENT"); c.entity("se", 640, 120, "SEAT"); c.entity("ho", 1140, 120, "HOLD")
+c.entity("fa", 140, 540, "FAN"); c.entity("ti", 640, 540, "TICKET"); c.entity("or", 1140, 540, "ORDER")
+c.entity("pa", 1140, 780, "PAYMENT ATTEMPT", weak=True)
+c.rel("has", 390, 120, "HAS"); c.rel("hb", 890, 120, "HELD BY"); c.rel("bc", 1140, 330, "BECOMES")
+c.rel("jn", 140, 330, "JOINS"); c.rel("is", 890, 540, "ISSUES"); c.rel("fo", 640, 330, "FOR")
+c.rel("tr", 1140, 660, "TRIED AS", identifying=True)
+c.attr("eid", 140, 40, "event_id", of="ev", key=True)
+c.attr("sid", 640, 40, "seat_id", of="se", key=True); c.attr("st", 500, 200, "state", of="se")
+c.attr("hid", 1140, 40, "hold_id", of="ho", key=True); c.attr("ex", 1350, 120, "expires_at", of="ho")
+c.attr("oid", 1370, 540, "order_id", of="or", key=True)
+c.attr("bar", 640, 620, "barcode", of="ti")
+c.link("ev", "has", "1"); c.link("has", "se", "N", total=True)
+c.link("se", "hb", "N"); c.link("hb", "ho", "1")
+c.link("ho", "bc", "1", src="b", dst="t"); c.link("bc", "or", "1", src="b", dst="t")
+c.link("fa", "jn", "N", src="t", dst="b"); c.link("jn", "ev", "M", src="t", dst="b")
+c.link("or", "is", "1"); c.link("is", "ti", "N")
+c.link("ti", "fo", "1", src="t", dst="b"); c.link("fo", "se", "1", src="t", dst="b")
+c.link("or", "tr", "1", src="b", dst="t"); c.link("tr", "pa", "N", src="b", dst="t")
+c.legend(1380, 700)
+c.note(180, 800, 800, "A seat has at most one live hold; the seat row is the truth, the hold row is bookkeeping.")
+c.save(OUT / "erd-chen.svg")
+
+import html
+FONT = "Inter, Helvetica, Arial, sans-serif"
+def esc(t): return html.escape(str(t))
+def tension():
+    W, H = 1600, 640
+    def tx(x, y, t, sz=30, w=700, fill="#0b2540", anchor="middle"):
+        return f'<text x="{x}" y="{y}" font-family="{FONT}" font-size="{sz}" font-weight="{w}" fill="{fill}" text-anchor="{anchor}">{esc(t)}</text>'
+    stages = [("At the door", "1,000,000 fans", "edge · cached · cheap", 420, "#cfe3fb", "#215a9a"),
+              ("In the shop", "10,000 shoppers", "map · hold · pay", 250, "#e6dcfb", "#6b4fc4"),
+              ("Hold writes", "~50 / s", "one primary", 140, "#d3f3e6", "#1f8a63"),
+              ("Orders", "20,000", "2 % of the door", 70, "#fde3cf", "#c26a1b")]
+    x0, gap, w = 40, 14, 360
+    out = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}">', f'<rect width="{W}" height="{H}" fill="#fff"/>']
+    cy = 270
+    for i, (t, n, s, hh, fill, stroke) in enumerate(stages):
+        x = x0 + i * (w + gap); nxt = stages[i + 1][3] if i + 1 < len(stages) else hh * 0.6
+        pts = f"{x},{cy-hh/2} {x+w},{cy-nxt/2} {x+w},{cy+nxt/2} {x},{cy+hh/2}"
+        out.append(f'<polygon points="{pts}" fill="{fill}" stroke="{stroke}" stroke-width="3"/>')
+        if i == 3: out.append(tx(x + w / 2, cy - hh / 2 - 22, n, 34)); out.append(tx(x + w / 2, cy + hh / 2 + 34, s, 24, 500, "#3a424a"))
+        else: out.append(tx(x + w / 2, cy - 6, n, 34)); out.append(tx(x + w / 2, cy + 34, s, 24, 500, "#3a424a"))
+        out.append(tx(x + w / 2, 520 if False else 60, t, 30, 700, stroke))
+    out.append(f'<line x1="60" y1="590" x2="{W-60}" y2="590" stroke="#c8341f" stroke-width="3" marker-start="url(#a)" marker-end="url(#a)"/>')
+    out.append('<defs><marker id="a" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c8341f"/></marker></defs>')
+    out.append(tx(70, 570, "fairer, costlier to run", 24, 600, "#24292f", "start")); out.append(tx(W - 70, 570, "cheaper, needs a product rule", 24, 600, "#24292f", "end"))
+    out.append(tx(W / 2, 626, "strict first-come  ←  how the line is ordered  →  random among early arrivals", 26, 700, "#c8341f"))
+    out.append(tx(W / 2, 450, "Admitted at a rate the shop chooses. The rest wait, or are told early.", 26, 500, "#24292f"))
+    out.append("</svg>")
+    (OUT / "tension.svg").write_text("\n".join(out))
+tension()
+
+
+# crop a saved view to a band (the boxes do not move; only the window does)
+def crop(name, y0, h=None, w=None):
+    p = OUT / name; t = p.read_text()
+    m = re.search(r'viewBox="0 0 (\d+) (\d+)" width="\d+" height="\d+"', t)
+    w0, hh = int(m.group(1)), int(m.group(2)); h = h or hh - y0; w = w or w0
+    t = t.replace(m.group(0), f'viewBox="0 {y0} {w} {h}" width="{w}" height="{h}"', 1)
+    p.write_text(t)
+import re
+crop("base-v1.svg", 255, 215, w=1240)
+crop("base-v2.svg", 255, 505)
+crop("ch2-fix.svg", 250, 650)
+crop("ch3-fix.svg", 240, 660)
+
+# the view box is a window, not a clip: draw nothing outside it (a dimmed node below the crop must not show)
+def clipview(p):
+    t = p.read_text()
+    m = re.search(r'viewBox="(\d+) (\d+) (\d+) (\d+)"', t)
+    if not m or "vbclip-" in t: return
+    x, y, w, h = m.groups()
+    cid = "vbclip-" + p.stem
+    t = t.replace("</defs>", f'<clipPath id="{cid}"><rect x="{x}" y="{y}" width="{w}" height="{h}"/></clipPath></defs><g clip-path="url(#{cid})">', 1)
+    t = t[:t.rindex("</svg>")] + "</g></svg>"
+    p.write_text(t)
+for p in sorted(OUT.glob("base-*.svg")) + sorted(OUT.glob("flow-fr*.svg")) + sorted(OUT.glob("ch[1-8]-*.svg")) + [OUT / "map.svg"]:
+    clipview(p)

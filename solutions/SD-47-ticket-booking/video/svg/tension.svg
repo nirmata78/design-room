@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 640" width="1600" height="640">
+<rect width="1600" height="640" fill="#fff"/>
+<polygon points="40,60.0 400,145.0 400,395.0 40,480.0" fill="#cfe3fb" stroke="#215a9a" stroke-width="3"/>
+<text x="220.0" y="264" font-family="Inter, Helvetica, Arial, sans-serif" font-size="34" font-weight="700" fill="#0b2540" text-anchor="middle">1,000,000 fans</text>
+<text x="220.0" y="304" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24" font-weight="500" fill="#3a424a" text-anchor="middle">edge · cached · cheap</text>
+<text x="220.0" y="60" font-family="Inter, Helvetica, Arial, sans-serif" font-size="30" font-weight="700" fill="#215a9a" text-anchor="middle">At the door</text>
+<polygon points="414,145.0 774,200.0 774,340.0 414,395.0" fill="#e6dcfb" stroke="#6b4fc4" stroke-width="3"/>
+<text x="594.0" y="264" font-family="Inter, Helvetica, Arial, sans-serif" font-size="34" font-weight="700" fill="#0b2540" text-anchor="middle">10,000 shoppers</text>
+<text x="594.0" y="304" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24" font-weight="500" fill="#3a424a" text-anchor="middle">map · hold · pay</text>
+<text x="594.0" y="60" font-family="Inter, Helvetica, Arial, sans-serif" font-size="30" font-weight="700" fill="#6b4fc4" text-anchor="middle">In the shop</text>
+<polygon points="788,200.0 1148,235.0 1148,305.0 788,340.0" fill="#d3f3e6" stroke="#1f8a63" stroke-width="3"/>
+<text x="968.0" y="264" font-family="Inter, Helvetica, Arial, sans-serif" font-size="34" font-weight="700" fill="#0b2540" text-anchor="middle">~50 / s</text>
+<text x="968.0" y="304" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24" font-weight="500" fill="#3a424a" text-anchor="middle">one primary</text>
+<text x="968.0" y="60" font-family="Inter, Helvetica, Arial, sans-serif" font-size="30" font-weight="700" fill="#1f8a63" text-anchor="middle">Hold writes</text>
+<polygon points="1162,235.0 1522,249.0 1522,291.0 1162,305.0" fill="#fde3cf" stroke="#c26a1b" stroke-width="3"/>
+<text x="1342.0" y="213.0" font-family="Inter, Helvetica, Arial, sans-serif" font-size="34" font-weight="700" fill="#0b2540" text-anchor="middle">20,000</text>
+<text x="1342.0" y="339.0" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24" font-weight="500" fill="#3a424a" text-anchor="middle">2 % of the door</text>
+<text x="1342.0" y="60" font-family="Inter, Helvetica, Arial, sans-serif" font-size="30" font-weight="700" fill="#c26a1b" text-anchor="middle">Orders</text>
+<line x1="60" y1="590" x2="1540" y2="590" stroke="#c8341f" stroke-width="3" marker-start="url(#a)" marker-end="url(#a)"/>
+<defs><marker id="a" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c8341f"/></marker></defs>
+<text x="70" y="570" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24" font-weight="600" fill="#24292f" text-anchor="start">fairer, costlier to run</text>
+<text x="1530" y="570" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24" font-weight="600" fill="#24292f" text-anchor="end">cheaper, needs a product rule</text>
+<text x="800.0" y="626" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26" font-weight="700" fill="#c8341f" text-anchor="middle">strict first-come  ←  how the line is ordered  →  random among early arrivals</text>
+<text x="800.0" y="450" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26" font-weight="500" fill="#24292f" text-anchor="middle">Admitted at a rate the shop chooses. The rest wait, or are told early.</text>
+</svg>

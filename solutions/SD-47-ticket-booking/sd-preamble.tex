@@ -11,15 +11,24 @@
 \usepackage{xcolor}
 \usepackage{framed}
 \setkeys{Gin}{height=0.82\textheight,keepaspectratio}
-\definecolor{keybg}{HTML}{FFF3D1}\definecolor{keyrule}{HTML}{C98A00}
-\definecolor{whybg}{HTML}{E9F1FB}\definecolor{whyrule}{HTML}{2F6DB5}
-\definecolor{saybg}{HTML}{E6F4EA}\definecolor{sayrule}{HTML}{2E8B57}
-\definecolor{warnbg}{HTML}{FBE8E6}\definecolor{warnrule}{HTML}{B03A2E}
-\definecolor{loadbg}{HTML}{F1ECF8}\definecolor{loadrule}{HTML}{6A4C9C}
+% Google theme (2026-11-22): brand hex on rules, tints on panels, the 700/800 shade for the small label text on the tint.
+\definecolor{gink}{HTML}{202124}\definecolor{gmuted}{HTML}{5F6368}\definecolor{gsoft}{HTML}{F8F9FA}
+\definecolor{gblue}{HTML}{4285F4}\definecolor{gblueink}{HTML}{1967D2}
+\definecolor{keybg}{HTML}{FEF7E0}\definecolor{keyrule}{HTML}{FBBC05}\definecolor{keyruleT}{HTML}{B06000}
+\definecolor{whybg}{HTML}{E8F0FE}\definecolor{whyrule}{HTML}{4285F4}\definecolor{whyruleT}{HTML}{1967D2}
+\definecolor{saybg}{HTML}{E6F4EA}\definecolor{sayrule}{HTML}{34A853}\definecolor{sayruleT}{HTML}{188038}
+\definecolor{warnbg}{HTML}{FCE8E6}\definecolor{warnrule}{HTML}{EA4335}\definecolor{warnruleT}{HTML}{C5221F}
+\definecolor{loadbg}{HTML}{F8F9FA}\definecolor{loadrule}{HTML}{5F6368}\definecolor{loadruleT}{HTML}{5F6368}
+\AtBeginDocument{\color{gink}}
+% headings in the display face (the sans family is Plus Jakarta Sans, set by build-sd-booklet.sh)
+\usepackage{titlesec}
+\titleformat*{\section}{\LARGE\sffamily\bfseries\color{gink}}
+\titleformat*{\subsection}{\Large\sffamily\bfseries\color{gink}}
+\titleformat*{\subsubsection}{\large\sffamily\bfseries\color{gblueink}}
 % sdbox{background}{rule}{label}: a shaded panel with a coloured left bar; breaks across pages.
 \newenvironment{sdbox}[3]{%
   \def\FrameCommand{{\color{#2}\vrule width 3pt}\fboxsep=6pt\colorbox{#1}}%
   \MakeFramed{\advance\hsize-\width\FrameRestore}%
-  \noindent{\color{#2}\sffamily\bfseries\small #3}\par\nopagebreak\small}%
+  \noindent{\color{#2T}\sffamily\bfseries\small #3}\par\nopagebreak\small}%
   {\endMakeFramed}
 \renewenvironment{quote}{\begin{sdbox}{saybg}{sayrule}{Say it in the room}\itshape}{\end{sdbox}}

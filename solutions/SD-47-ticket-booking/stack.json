@@ -1,0 +1,335 @@
+{
+  "_doc": "Single source for SD-47's technology choices; see SD-08/stack.json for the format. `how` is spoken, so it carries no code; keep summary cells under 36 characters.",
+  "c4": {
+    "wr": [
+      "Waiting room",
+      "Go, stateless",
+      "join, queue/me, admit."
+    ],
+    "redis": [
+      "Queue store",
+      "Redis, Lua scripts",
+      "Lobby set, pointer."
+    ],
+    "ac": [
+      "Admission controller",
+      "Go control loop",
+      "Turns the R dial."
+    ],
+    "gw": [
+      "API gateway",
+      "Envoy, JWT check",
+      "Local signature check."
+    ],
+    "map": [
+      "Seat-map service",
+      "Go, version keyed",
+      "Bitmap by version."
+    ],
+    "snap": [
+      "Snapshot cache",
+      "Redis",
+      "6.25 KB per event."
+    ],
+    "kafka": [
+      "Seat events",
+      "Kafka",
+      "Outbox relay."
+    ],
+    "inv": [
+      "Inventory & holds",
+      "Go, one statement",
+      "The atomic claim."
+    ],
+    "idb": [
+      "Inventory DB",
+      "PostgreSQL 16",
+      "event_seat, hold, outbox."
+    ],
+    "noti": [
+      "Notifications",
+      "Kafka consumer",
+      "Tickets by email."
+    ],
+    "ord": [
+      "Order service",
+      "Go, checkout saga",
+      "Freeze, charge, confirm."
+    ],
+    "odb": [
+      "Order DB",
+      "PostgreSQL",
+      "Orders, tickets."
+    ],
+    "exp": [
+      "Hold expirer",
+      "Go sweeper",
+      "Expiry and reconcile."
+    ]
+  },
+  "stack": [
+    {
+      "id": "inventory-db",
+      "heading": "Inventory DB: PostgreSQL, one conditional statement",
+      "kicker": "Technology · inventory database",
+      "title": "One statement is the check and the change",
+      "pick": "PostgreSQL 16, primary and synchronous standby, read committed",
+      "why": "Selling a seat once is a conditional update on a row, in a transaction with the hold and the outbox. Row locks and constraints are the tools that make it true.",
+      "how": "Each seat of each event is a row with a state. A claim is one update statement that names the state it expects: set held where the seat is free. A second fan's identical statement matches no row and learns the seat is taken. The hold row and the outbox row commit in the same transaction. Read committed is enough because the check and the change are the same statement.",
+      "detail": "The database is partitioned by event, so a hot on-sale loads one partition.",
+      "rejected": [
+        [
+          "Read the seat, then update it",
+          "Two fans both read free and both write. The conditional update closes the gap in one statement."
+        ],
+        [
+          "Redis for the hold",
+          "A key can expire or vanish while the database still says held. The hold belongs in the same transaction as the seat."
+        ],
+        [
+          "A distributed lock per seat",
+          "One more system, and a lock without a token has the stale-holder failure."
+        ]
+      ],
+      "summary": [
+        "Inventory DB",
+        "PostgreSQL, conditional update",
+        "Read then write; Redis hold",
+        "Check and change are one statement"
+      ],
+      "course": "theory/03 (partitioning and storage) and theory/07 (correctness under failure)",
+      "parts": "03, 07",
+      "drill": [
+        "Ten thousand fans click the same seat in the same second. What does the database do?",
+        "Ten thousand identical conditional updates queue on one row; the first matches, the other 9,999 match nothing and return taken. The trap is a read-then-write in the application.",
+        "one conditional update; the losers match nothing"
+      ]
+    },
+    {
+      "id": "waiting-room",
+      "heading": "Waiting room: Redis with Lua",
+      "kicker": "Technology · waiting room",
+      "title": "A line held in memory, advanced by a pointer",
+      "pick": "Redis, a sorted set for the lobby, a pointer, Lua scripts for the atomic steps",
+      "why": "A million fans arriving at once cannot all reach the shop. The line is a data structure that must be fast and atomic.",
+      "how": "A fan joins the lobby and receives a position. An admission pointer advances at the rate the controller sets. A Lua script moves a batch from the lobby into the admitted set and mints their tokens in one atomic step, so no fan is admitted twice. Polling for position is served from a cached snapshot, not from Redis.",
+      "detail": "Persistence to disk is on, and the line can be rebuilt from the join log if the node is lost.",
+      "rejected": [
+        [
+          "The relational database as the queue",
+          "A million inserts in a minute onto the inventory primary: the line would take the booking path down with it."
+        ],
+        [
+          "Kafka as the queue",
+          "Good for ordering, awkward for a position the fan can poll and a pointer that advances."
+        ],
+        [
+          "A third-party waiting room product",
+          "A real option; we show the design, and buy if the team cannot run it."
+        ]
+      ],
+      "summary": [
+        "Waiting room",
+        "Redis, sorted set, Lua",
+        "Database; Kafka",
+        "Fast and atomic admission"
+      ],
+      "course": "theory/05 (caching) and theory/09 (real-time and connections)",
+      "parts": "05, 09",
+      "drill": [
+        "The Redis node holding the line fails. What happens to the million fans waiting?",
+        "A replica is promoted and the line is rebuilt from the replicated state and the join log; positions may shift slightly but nobody is admitted twice, because admission is a single script. The trap is losing the line.",
+        "a replica; rebuild from the log; admission is atomic"
+      ]
+    },
+    {
+      "id": "admission",
+      "heading": "Admission: a dial and a signed token",
+      "kicker": "Technology · admission",
+      "title": "A controller that turns one dial, and a token the gateway checks locally",
+      "pick": "A Go control loop, a signed token, a gateway that verifies without a database call",
+      "why": "The shop can serve only so many shoppers. The dial sets how many enter per second, and a signed pass proves they were let in.",
+      "how": "The admission controller watches the shop's load and turns the rate dial down or up. A fan reaching the pointer gets a short-lived signed token, a JWT valid for ten minutes. Every shop call carries it. The gateway verifies the signature and expiry locally, so the check costs no database call.",
+      "detail": "A bot farm can hold many tokens; per-fan limits sit behind the gateway.",
+      "rejected": [
+        [
+          "Rate limiting at the gateway only",
+          "It rejects fans instead of queueing them: a fair line becomes a race of retries."
+        ],
+        [
+          "A session lookup per request",
+          "The session store becomes the bottleneck of the shop."
+        ]
+      ],
+      "summary": [
+        "Admission",
+        "Rate dial; signed token",
+        "Gateway limit only; sessions",
+        "Check without a database"
+      ],
+      "course": "theory/08 (reliability and operations)",
+      "parts": "08"
+    },
+    {
+      "id": "seat-events",
+      "heading": "Seat events: Kafka with the outbox",
+      "kicker": "Technology · seat events",
+      "title": "Every change to a seat is an event that others can consume",
+      "pick": "Outbox in the inventory transaction, Kafka partitioned by event",
+      "why": "The seat map, notifications and any later consumer need to know what changed. The event must exist if and only if the claim committed.",
+      "how": "Each claim, release and sale writes an outbox row in the same transaction as the seat change. A relay publishes the rows to Kafka in commit order, partitioned by event, at least once. The seat-map builder, notifications and a future waitlist are separate consumer groups, each deduplicating.",
+      "detail": "A waitlist, for example, is just a new consumer of this log.",
+      "rejected": [
+        [
+          "Publishing after the commit",
+          "A crash between the two loses a seat change for ever."
+        ],
+        [
+          "Consumers reading the database",
+          "Every consumer adds load to the inventory primary during the sale."
+        ]
+      ],
+      "summary": [
+        "Seat events",
+        "Outbox into Kafka",
+        "Publish after; poll the DB",
+        "A waitlist is a new consumer"
+      ],
+      "course": "theory/06 (messaging and streams)",
+      "parts": "06",
+      "drill": [
+        "Product wants a waitlist added mid-sale. What changes in the booking path?",
+        "Nothing. The waitlist is a new consumer group reading the seat events, and it acts on a released seat. The trap is rewriting booking.",
+        "a new consumer of the log; booking is untouched"
+      ]
+    },
+    {
+      "id": "cdn",
+      "heading": "CDN: the queue state and the layout",
+      "kicker": "Technology · CDN and WAF",
+      "title": "The edge absorbs what is the same for everyone",
+      "pick": "A CDN with a WAF, one-second lifetimes, request collapsing",
+      "why": "Ten thousand shoppers asking for the same seat map should cost one origin request, not ten thousand.",
+      "how": "The CDN caches the immutable venue layout for a long time and the queue state for a second. When many requests for an expired object reach one point of presence, request collapsing sends one request to the origin. The WAF rejects obvious bot traffic and scripted floods before they reach the waiting room.",
+      "detail": "Per-fan data, like a position, is not cached at the edge; it goes through a short cached snapshot at the origin.",
+      "rejected": [
+        [
+          "Serving everything from the origin",
+          "The origin would carry the whole stampede."
+        ],
+        [
+          "A long edge lifetime for seat state",
+          "Fans would see seats as free that are gone, and click into failures."
+        ]
+      ],
+      "summary": [
+        "CDN and WAF",
+        "One-second lifetime, collapsing",
+        "Origin only; long lifetime",
+        "Shared answers cost one request"
+      ],
+      "course": "theory/05 (caching)",
+      "parts": "05"
+    },
+    {
+      "id": "seat-map",
+      "heading": "Seat map: layout and a versioned bitmap",
+      "kicker": "Technology · seat map",
+      "title": "An immutable layout and a bitmap built from the event log",
+      "pick": "A Go service, an immutable layout object, a bitmap snapshot per event version in Redis",
+      "why": "Ten thousand shoppers want to see which seats are free. That must not touch the inventory primary.",
+      "how": "The venue layout is immutable and cached for ever. A builder consumes the seat events and writes a compact bitmap of seat states, about six kilobytes per event, to the snapshot cache under a version number. The seat-map service serves the layout plus the latest bitmap, and the client shows a fresh-as-of time.",
+      "detail": "A stale map can show a taken seat as free; the claim is what decides, so staleness costs a retry, not an oversell.",
+      "rejected": [
+        [
+          "Querying the seat table per shopper",
+          "Ten thousand readers on the primary during the sale."
+        ],
+        [
+          "Pushing every seat change to every browser",
+          "A fan-out of every claim to ten thousand screens."
+        ]
+      ],
+      "summary": [
+        "Seat map",
+        "Layout plus bitmap by version",
+        "Query per shopper; push all",
+        "Reads never touch the primary"
+      ],
+      "course": "theory/05 (caching)",
+      "parts": "05",
+      "drill": [
+        "The map says a seat is free and the fan clicks it, but it is gone. Is that an oversell?",
+        "No. The claim, one conditional update, decides, and answers taken; the map is a hint. The client refetches. The trap is treating the map as the truth.",
+        "the claim decides; the map is only a hint"
+      ]
+    },
+    {
+      "id": "orders",
+      "heading": "Order service and the hold expirer",
+      "kicker": "Technology · orders and holds",
+      "title": "A checkout saga, and a sweeper that frees what nobody paid for",
+      "pick": "Go order service, an idempotent payment call, a hold expirer, a reconciler",
+      "why": "A hold must end, whether the fan pays, abandons or the payment goes quiet. Both outcomes must be safe.",
+      "how": "The order service runs a saga: freeze the hold so it cannot expire mid-payment, call the payment provider with an idempotency key, then confirm the sale or release. The hold expirer sweeps holds past their time and releases them; the claim itself also expires an old hold when it finds one. A reconciler asks the provider about payments that went silent.",
+      "detail": "Two paths each cover the other's gap: the sweeper catches what no claim touches, and the claim catches what the sweeper has not reached.",
+      "rejected": [
+        [
+          "A TTL on a Redis key as the hold",
+          "The key and the database can disagree. The hold belongs with the seat."
+        ],
+        [
+          "Releasing the hold the moment it expires",
+          "If the payment succeeded in that instant, we have taken money for a seat we resold."
+        ]
+      ],
+      "summary": [
+        "Orders and holds",
+        "Saga; sweeper; reconciler",
+        "Redis TTL; release at expiry",
+        "Freeze before the call"
+      ],
+      "course": "theory/07 (correctness under failure)",
+      "parts": "07",
+      "drill": [
+        "The hold expires, then the payment succeeds. Who gets the seat?",
+        "The fan who paid, because the hold was frozen before the call. A reconciler resolves a silent payment by asking the provider, and only then releases. The trap is releasing at expiry.",
+        "freeze before the call; reconcile silence"
+      ]
+    }
+  ],
+  "challenges": {
+    "1": [
+      "Read the seat, then update it",
+      "two fans both see free; one statement is the check and the change."
+    ],
+    "2": [
+      "Holding seats in Redis with a TTL",
+      "the key and the database can disagree; two paths cover each other's gap."
+    ],
+    "3": [
+      "Releasing the hold at the moment it expires",
+      "the payment may have succeeded in that instant; freeze before the call and reconcile silence."
+    ],
+    "4": [
+      "Autoscaling the shop to a million at the door",
+      "scale lags the spike; a line in front and a dial behind it."
+    ],
+    "5": [
+      "First-come at the gate",
+      "bots with faster connections win; a lottery for everyone present, then first-come."
+    ],
+    "6": [
+      "Querying the seat table per shopper",
+      "ten thousand readers on the primary; an immutable layout and a versioned bitmap."
+    ],
+    "7": [
+      "Rewriting booking to add a waitlist",
+      "a waitlist is a new consumer of the seat events, not a redesign."
+    ],
+    "8": [
+      "Alerting on server health",
+      "the servers can be fine while seats sell twice; measure the promise, not the machine."
+    ]
+  }
+}

@@ -1,0 +1,71 @@
+stack sync: up to date
+automarked 109 legacy slides (hand-place markers to refine): ['ch0_2.py:10', 'ch0_2.py:14', 'ch0_2.py:28', 'ch0_2.py:41', 'ch0_2.py:41', 'ch0_2.py:41'] …
+slides 182 frames 652 words {'C': 11145, 'I': 406, 'V': 705, 'N': 678} total 12934
+by chapter {'0': 416, '1': 660, '2': 846, '3': 1150, '4': 906, '5': 2758, '6': 101, '7': 5331, '8': 320, '9': 446}
+  voice 20/934
+  voice 40/934
+  voice 60/934
+  voice 80/934
+  voice 100/934
+  voice 120/934
+  voice 140/934
+  voice 160/934
+  voice 180/934
+  voice 200/934
+  voice 220/934
+  voice 240/934
+  voice 260/934
+  voice 280/934
+  voice 300/934
+  voice 320/934
+  voice 340/934
+  voice 360/934
+  voice 380/934
+  voice 400/934
+  voice 420/934
+  voice 440/934
+  voice 460/934
+  voice 480/934
+  voice 500/934
+  voice 520/934
+  voice 540/934
+  voice 560/934
+  voice 580/934
+  voice 600/934
+  voice 620/934
+  voice 640/934
+  voice 660/934
+  voice 680/934
+  voice 700/934
+  voice 720/934
+  voice 740/934
+  voice 760/934
+  voice 780/934
+  voice 800/934
+  voice 820/934
+  voice 840/934
+  voice 860/934
+  voice 880/934
+  voice 900/934
+  voice 920/934
+/Users/neo.bsuir/Projects/design-room/solutions/SD-47-ticket-booking/video/ticket-reference.mp4  1080p  103:57  19 chapters  652 frames
+  00:00  0 Cold open
+  03:11  1 Requirements and scope
+  08:09  2 Estimates
+  14:44  3 Theory
+  23:53  4 API and entities
+  30:42  5 High-level design
+  40:44  5.1 Components and technologies
+  53:42  6 Bridge
+  54:27  7 Challenges
+  54:47  7.1 Challenge 1: Two fans, one seat
+  59:17  7.2 Challenge 2: The hold that outlives its owner
+  64:07  7.3 Challenge 3: The hold expires, then the payment succeeds
+  70:36  7.4 Challenge 4: A million at the door
+  76:40  7.5 Challenge 5: A fair line, and the bots
+  81:23  7.6 Challenge 6: The seat map for ten thousand shoppers
+  86:07  7.7 Challenge 7: Requirements that arrive mid-sale
+  92:07  7.8 Challenge 8: How would you know it is broken?
+  97:40  8 Build cost
+  100:12  9 Recap
+EXIT 0 elapsed 6490s

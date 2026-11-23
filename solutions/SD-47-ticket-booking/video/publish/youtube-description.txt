@@ -1,0 +1,43 @@
+A seat looks like a row with a boolean. The hard part is everything around it: a million people reaching it in the same second, a human who needs three minutes to pay, and a payment provider that sometimes does not answer. This is a full reference solution at the Staff bar (L6/L7): theory, a three-version design, eight challenges that break it, and the build cost. 104 minutes, 652 numbered slides, with an interviewer, a candidate and a coach.
+
+The thesis: this is not a booking system, it is a rejection system. Fifty thousand seats cannot be shared with a million people, so the design converts a stampede into a stream, and gives every seat one place where its state lives and one atomic way to change it.
+
+IN THIS VIDEO
+• Estimates as arithmetic: 2 % of fans get a ticket, 33,000 contended writes a second without a line, 2,000 admissions a minute from Little's law, a 6.25 KB seat map
+• Theory: safety and liveness (a seat sold twice, and a seat stuck in limbo), seven mechanisms, an options matrix with a pick
+• Eight challenges: two fans on one seat, a hold that outlives its owner, a hold that expires while the payment succeeds, a million at the door, a fair line and bots, the seat map, requirements that arrive mid-sale, and how you would know it is broken
+• The build cost, in people and months (marked AUX, the manager layer)
+
+HOW TO USE IT
+Run the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first. Slides badged AUX are the manager layer: skip them in a Staff round.
+
+CHAPTERS
+0:00 0 Cold open
+3:11 1 Requirements and scope
+8:09 2 Estimates
+14:44 3 Theory
+23:53 4 API and entities
+30:42 5 High-level design
+40:44 5.1 Components and technologies
+53:42 6 Bridge
+54:27 7 Challenges
+54:47 7.1 Challenge 1: Two fans, one seat
+59:17 7.2 Challenge 2: The hold that outlives its owner
+1:04:07 7.3 Challenge 3: The hold expires, then the payment succeeds
+1:10:36 7.4 Challenge 4: A million at the door
+1:16:40 7.5 Challenge 5: A fair line, and the bots
+1:21:23 7.6 Challenge 6: The seat map for ten thousand shoppers
+1:26:07 7.7 Challenge 7: Requirements that arrive mid-sale
+1:32:07 7.8 Challenge 8: How would you know it is broken?
+1:37:40 8 Build cost
+1:40:12 9 Recap
+
+LINKS
+Written reference design: https://github.com/nirmata78/design-room/blob/main/solutions/SD-47-ticket-booking/SD-47_Ticket_Booking_Reference_Design.md
+Run this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room
+All videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md
+
+ABOUT THIS VIDEO
+This is a scripted walkthrough, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script, diagrams and the written design were produced with Claude Code. Numbers are back-of-the-envelope estimates for the exercise, labelled as given, illustrative or initial targets, not any company's real figures, and this is not any company's actual design. The technical content has not been reviewed by a person.
+
+#SystemDesign #SoftwareEngineering #DistributedSystems

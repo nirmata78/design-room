@@ -1,0 +1,1 @@
+[["n:fans", "n:api", "n:db", "n:ord", "n:psp", "e:a-d", "e:d-a", "e:a-o", "e:o-d", "e:o-p", "e:p-o"], ["n:wr", "m:wr"], ["n:edge", "m:edge", "e:f-e", "e:e-f", "e:e-a", "e:a-e", "e:e-w"], ["n:bm", "m:bm", "e:e-b"], ["n:sb", "m:sb", "e:s-b"], ["n:log", "m:log", "e:d-l", "e:l-s"]]
