@@ -1,0 +1,162 @@
+[
+ {
+  "ep": 1,
+  "title": "What SRE is, and the world it runs in",
+  "slides": 19,
+  "words": 1269,
+  "est_min": 9.1,
+  "thesis_inserts": 4,
+  "probes": 3,
+  "diagrams": 2
+ },
+ {
+  "ep": 2,
+  "title": "Risk, SLIs, SLOs and error budgets",
+  "slides": 25,
+  "words": 1709,
+  "est_min": 12.3,
+  "thesis_inserts": 5,
+  "probes": 3,
+  "diagrams": 1
+ },
+ {
+  "ep": 3,
+  "title": "Toil and automation",
+  "slides": 18,
+  "words": 1255,
+  "est_min": 9.0,
+  "thesis_inserts": 4,
+  "probes": 3,
+  "diagrams": 2
+ },
+ {
+  "ep": 4,
+  "title": "Monitoring and alerting",
+  "slides": 25,
+  "words": 1637,
+  "est_min": 11.8,
+  "thesis_inserts": 5,
+  "probes": 3,
+  "diagrams": 2
+ },
+ {
+  "ep": 5,
+  "title": "Release engineering and simplicity",
+  "slides": 24,
+  "words": 1455,
+  "est_min": 10.5,
+  "thesis_inserts": 7,
+  "probes": 3,
+  "diagrams": 1
+ },
+ {
+  "ep": 6,
+  "title": "On-call and effective troubleshooting",
+  "slides": 20,
+  "words": 1322,
+  "est_min": 9.5,
+  "thesis_inserts": 4,
+  "probes": 3,
+  "diagrams": 1
+ },
+ {
+  "ep": 7,
+  "title": "Emergencies, incidents and postmortems",
+  "slides": 23,
+  "words": 1498,
+  "est_min": 10.8,
+  "thesis_inserts": 6,
+  "probes": 3,
+  "diagrams": 2
+ },
+ {
+  "ep": 8,
+  "title": "Testing for reliability, and software engineering in SRE",
+  "slides": 19,
+  "words": 1283,
+  "est_min": 9.2,
+  "thesis_inserts": 3,
+  "probes": 3,
+  "diagrams": 2
+ },
+ {
+  "ep": 9,
+  "title": "Load balancing, at the edge and inside the datacenter",
+  "slides": 22,
+  "words": 1565,
+  "est_min": 11.3,
+  "thesis_inserts": 6,
+  "probes": 3,
+  "diagrams": 3
+ },
+ {
+  "ep": 10,
+  "title": "Overload and cascading failure",
+  "slides": 27,
+  "words": 2008,
+  "est_min": 14.4,
+  "thesis_inserts": 6,
+  "probes": 4,
+  "diagrams": 5
+ },
+ {
+  "ep": 11,
+  "title": "Distributed consensus for critical state",
+  "slides": 35,
+  "words": 2820,
+  "est_min": 20.3,
+  "thesis_inserts": 6,
+  "probes": 6,
+  "diagrams": 6
+ },
+ {
+  "ep": 12,
+  "title": "Distributed cron and data pipelines",
+  "slides": 23,
+  "words": 1590,
+  "est_min": 11.4,
+  "thesis_inserts": 6,
+  "probes": 3,
+  "diagrams": 3
+ },
+ {
+  "ep": 13,
+  "title": "Data integrity, what you read is what you wrote",
+  "slides": 21,
+  "words": 1472,
+  "est_min": 10.6,
+  "thesis_inserts": 5,
+  "probes": 3,
+  "diagrams": 2
+ },
+ {
+  "ep": 14,
+  "title": "Reliable product launches at scale",
+  "slides": 18,
+  "words": 1277,
+  "est_min": 9.2,
+  "thesis_inserts": 4,
+  "probes": 3,
+  "diagrams": 1
+ },
+ {
+  "ep": 15,
+  "title": "People: training, interrupts, overload and engagement",
+  "slides": 21,
+  "words": 1441,
+  "est_min": 10.4,
+  "thesis_inserts": 5,
+  "probes": 3,
+  "diagrams": 1
+ },
+ {
+  "ep": 16,
+  "title": "Lessons from other industries, and the close",
+  "slides": 16,
+  "words": 1315,
+  "est_min": 9.5,
+  "thesis_inserts": 4,
+  "probes": 3,
+  "diagrams": 2
+ }
+]

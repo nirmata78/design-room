@@ -1,0 +1,112 @@
+#! title: Kafka in a real design
+#! short: Real designs
+
+= th | Kafka in system design · Module 6 of 6 | Kafka in a real design | Schemas, queues on Kafka, what changed by 2026, the anti-patterns, and the finished design with its decision sheet.
+N: The last module puts everything together: the contract between teams, what is new in Kafka today, the mistakes to avoid, and the finished design for our marketplace.
+
+## 6.1 Schemas are the contract
+N: We start with the coupling that events never removed: the shape of the data.
+
+= table | Schema evolution | Which side upgrades first?
+Rule | Safe changes | Upgrade first
+**Backward** | Delete a field, or add one with a default | **Consumers**
+**Forward** | Add a field, or delete one that had a default | **Producers**
+**Full** | Add or delete fields that have defaults | Either side
+> Enforce the rule in the build, with a schema registry. An incompatible change becomes a **new versioned topic**.
+N: An event is a public contract. Use a schema format such as Avro or Protobuf, and a schema registry that checks each change. Backward compatibility means new readers can read old data, so consumers upgrade first. Forward compatibility means old readers can read new data, so producers upgrade first. Full means either order works, which is the safest choice when teams deploy independently. A truly incompatible change becomes a new versioned topic. Check the rule in the build, long before production.
+
+## 6.2 Queues on Kafka
+N: Next, a feature that changes one old answer about Kafka: share groups.
+
+= dia | Share groups | Kafka can now behave like a work queue
+k-share
+N: In a consumer group, a partition has one reader. So a slow task blocks the tasks behind it, and you cannot add readers beyond the partition count. A share group changes that. Many consumers read the same partition, each record is locked while it is processed, and each is acknowledged individually: accept, release to try again, or reject. The price is order, which is no longer guaranteed. Share groups became production ready in Kafka four point two, and dead-letter queues for them arrived in four point four.
+
+= table | Which channel? | Choose by the job, not by habit
+Need | Good fit
+Ordered facts, many readers, replay | **Kafka topic with consumer groups**
+Tasks on a Kafka platform you already run | **Kafka share groups**
+Tasks with delays, priorities, rich routing | **RabbitMQ, SQS or similar**
+A log without running clusters | **Managed services: Kinesis, Pub/Sub, hosted Kafka**
+A low-volume stream beside your database | **A table, or Redis Streams**
+N: So choose by the job. Ordered facts with many readers and replay belong on a Kafka topic. Tasks on a Kafka platform you already run can now use share groups. If you need delayed delivery, priorities or rich routing, a dedicated queue such as RabbitMQ or SQS is still the better tool. If you do not want to run clusters, use a managed service. And a low-volume stream can live happily in a table beside your database.
+
+## 6.3 What changed by 2026
+N: Next, what has changed, so that your answers are current.
+
+= panel now | Kafka in late 2026 | What an up-to-date answer includes
+**4.0**: no ZooKeeper; the incremental consumer protocol is generally available.
+**4.1**: eligible leader replicas are on by default for new clusters.
+**4.2**: share groups are production ready. **4.4** adds dead-letter queues for them.
+**Diskless topics**: accepted as a direction in March 2026, not in a release as of 4.4.
+N: Here is what an up-to-date answer includes. ZooKeeper is gone, and metadata lives in KRaft controllers. Rebalances are incremental with the new consumer protocol. Leader elections are safer, because new clusters track which replicas are eligible to lead without data loss. Queues are production ready. And diskless topics, which write directly to object storage to avoid paying for traffic between zones, were accepted as a direction in March twenty twenty-six, but they had not shipped as of Kafka four point four.
+
+## 6.4 The anti-patterns
+N: Next, the mistakes that show up again and again in real designs.
+
+= table | Anti-patterns | Six mistakes, and what to do instead
+Mistake | Why it hurts | Instead
+One topic per customer or user | Metadata explodes | Key by customer in one topic
+Large payloads in events | The default limit is about 1 MB | Store the blob, send a reference
+Kafka as request and reply | Slow, and hard to correlate | Use a call
+Auto-created topics | One partition, one replica by default | Create topics through reviewed config
+Consumers without lag alerts | Failures stay invisible for days | Alert on lag, in time behind
+Thousands of partitions "to be safe" | Slower recovery, more overhead | Compute the count from the peak
+N: Six mistakes. One topic per customer makes metadata explode, so key by customer in a shared topic. Large payloads belong in object storage, with a reference in the event. Using Kafka for request and reply is slow and awkward, so make a call. Automatically created topics usually get poor defaults, so create them through reviewed configuration. A consumer without a lag alert can fail silently for days. And partitions added just to be safe make recovery slower.
+
+## 6.5 Kafka in classic design rounds
+N: Next, where Kafka belongs in the system design questions you are most likely to meet.
+
+= table sm | Classic rounds | Where the box goes, and where it does not
+Design | Kafka's job | What stays elsewhere
+News feed | Fan-out work after a post | Feed storage and ranking
+Search | Change stream into the indexer | The source database
+Metrics and logging | Durable buffer before storage | Time-series queries
+Payments | Publish committed ledger entries | **The ledger decides**
+Ticket booking | Tell other systems after a sale | **Seat reservation in the database**
+Chat | Persist and route between services | Live delivery to each device
+Rate limiter | None | A fast counter, checked in line
+N: Here is where the box goes in classic rounds. In a news feed, it carries the fan-out work after a post. For search, it streams changes to the indexer. For metrics, it is a durable buffer. In payments and ticket booking, notice the pattern: the database decides, and Kafka tells everyone else afterwards. In chat, it connects services, and it does not deliver to each device. And a rate limiter needs an answer within the request, so Kafka has no place in it.
+
+## 6.6 The finished design
+N: Now the finished design for our marketplace, with every number we derived.
+
+= dia | The finished design | Every decision from the course, in one picture
+k-reference
+N: Here is the whole design. The order service writes the order and an outbox row in one transaction, and a relay publishes to Kafka. The order events topic has forty-eight partitions, keyed by order ID. The cluster has six brokers across three zones, with three controllers, three replicas and a minimum of two in sync. Seven days are retained, with one on local disk. Failures flow to retry and dead-letter topics. Each consumer removes duplicates in its own way, and schemas are checked in the build.
+
+= table sm | The decision sheet | Six questions, six short answers
+Question | Answer | Decide it from
+Kafka at all? | If several readers need ordered facts or replay | Readers, replay
+How many topics? | One per ordering domain, split only for a reason | Order, retention, access
+Which key? | The smallest unit that needs order | Largest key vs one consumer
+How many partitions? | Peak over the slowest stage, times growth | Consumer throughput
+How many brokers? | Largest of disk, writes, network, plus a spare | Arithmetic, then zones
+Kafka as the database? | No for decisions, yes for facts | Can events conflict?
+N: And here is the sheet to keep. Kafka at all, if several readers need ordered facts or replay. One topic per ordering domain. The key is the smallest unit that needs order. Partitions are the peak over the slowest stage, times growth. Brokers are the largest of disk, throughput and network, plus a spare. And Kafka is not the place to make decisions, but it is an excellent place to distribute them.
+
+## 6.7 Three drills
+N: To finish, three questions an interviewer could ask you. Pause after each one, and answer aloud.
+
+= probe | The consumer's lag is growing, and adding consumers changed nothing. Why?
+- Consumers may already **equal the partition count**
+- Or one **hot key** overloads one partition
+- Look at lag **per partition** before scaling anything
+C: Adding consumers only helps while there are fewer consumers than partitions, so I check that first. If lag is concentrated in one partition, the cause is a hot key, or one poison record that keeps being retried. So I look at lag per partition before scaling anything. If lag is even across partitions, the consumer itself is too slow, and I look at its downstream database.
+
+= probe | A broker fails during a rolling restart, and writes stop on some partitions. What happened?
+- Two replicas were down, so those partitions fell **below the minimum in sync**
+- This is the design **protecting durability**
+- Restart one broker at a time, and only when **no partition is under-replicated**
+C: The restarting broker and the failed broker held replicas of the same partitions, so those partitions dropped to one in-sync replica, below our minimum of two. Kafka rejected writes on purpose, to protect durability. The fix is operational. We restart one broker at a time, wait until no partition is under-replicated, and keep a spare, so that a failure during maintenance does not stop writes.
+
+= probe | Summarise your Kafka design in four sentences.
+- The database **decides**, and an outbox publishes the fact
+- Topics follow **ordering domains**, keyed by order ID, with 48 partitions
+- Six brokers over three zones: **three replicas, two in sync**
+- Consumers are **idempotent**, with retry and dead-letter paths
+C: The database makes every decision, and an outbox publishes each committed fact to Kafka. Topics follow ordering domains and are keyed by order, with forty-eight partitions sized from the peak. Six brokers across three zones keep three replicas with a minimum of two in sync. Consumers remove duplicates using stable event identifiers, and failures have retry and dead-letter paths.
+
+= th | The last line | Kafka does not make the decisions in your system. It makes sure everyone hears about them.
+V: Kafka does not make the decisions in your system. It makes sure that everyone hears about them.
+[pause: 1.5]

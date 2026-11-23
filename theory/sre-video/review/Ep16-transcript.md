@@ -1,0 +1,144 @@
+# Episode 16 · Lessons from other industries, and the close
+
+Reader transcript generated from `src/ch16.txt`. Voices: **COACH** narrates; **SAY THIS** is the slower key-line voice; **INTERVIEWER** and **CANDIDATE** play the probe drills; **ASIDE** is a fifth voice for traps, stories and the then-and-now panels. `[pause]` is silence in seconds; `[reveal]` is where the rest of the slide fades in. Each section also gets an automatic title card and a one-second pause. On-screen text is shown as quoted lines.
+
+### Slide 1 · SRE course · Episode 16 of 16 · Priority 3 — Lessons from other industries, and the close   `[th]`
+> What lifeguards, surgeons and telephone engineers teach about reliability, a map of the whole course, and what the original ideas never had to say about AI.
+**COACH:** The last episode. It does four things. It looks at what software borrowed from other industries. It reads a list of best practices, which is a compact summary of the whole field. It draws one map of everything in this course, with the sentence you should be able to say for each part. And it ends with an addition nobody could have made in two thousand sixteen: what these ideas mean for systems that serve machine-learning models.
+**SAY THIS:** Reliability is not a feature you add. It is the discipline of making failure ordinary.
+*[pause: 0.8]*
+
+
+## 16.0 Why look outside software
+
+### Slide 2 · Other industries — Veterans and their fields   `[cards · c3]`
+> grn Telecommunications :: Emergency calling systems. Users expect the phone to work, and the consequence of failure can be fatal.
+> grn Medical devices and surgery :: Laser eye surgery: strict regulation, careful improvement, gradual acceptance.
+> grn Lifeguarding and defence :: Training, drills, and attention to detail, because lives or vehicles are at stake.
+> > The point: high-stakes fields converged on the same practices. Software is catching up.
+**COACH:** Engineers who came to software from other fields tell the same story. Telecommunications, including emergency calling, where users expect the phone to work and failure can be fatal. Medical devices and eye surgery, with strict regulation and careful improvement. Lifeguarding and defence, where training, drills and attention to detail matter because lives or vehicles are at stake. The point is that high-stakes fields converged on the same practices, and software is catching up.
+
+### Slide 3 · The lessons — Seven practices that recur   `[table · sm]`
+> Practice | What it looks like | Where this course covered it
+> Preparedness and drills | Simulations and live drills, training and certification | Episodes 6, 8, 15
+> Swing capacity | Spare capacity for known events and disasters: a switch on wheels | Episodes 9, 14
+> Defence in depth | Several independent layers, in more than one place | Episode 13
+> Requirements and design | Know what the system must do before you build it | Episode 2
+> Postmortem culture | Learn from failures, openly, without blame | Episode 7
+> Automation | Remove operational overhead | Episode 3
+> Rational decisions | Decide with data, and write it down | Episodes 2, 5
+**COACH:** Seven practices recur. Preparedness and disaster testing: simulations and live drills, with training and certification. Swing capacity: spare capacity you can roll out for known events and disasters, and the telecom industry's example is a switch on wheels, a mobile telephone exchange. Defence in depth and breadth: several independent layers, in more than one place. Detailed requirements and design: knowing what the system must do before you build it. Postmortem culture. Automating repetitive work. And structured, rational decision making. The right-hand column tells you which episode covered each.
+
+
+## 16.1 A summary of best practices
+
+### Slide 4 · Appendix B · Best practices — A selection, with the reason   `[table · sm]`
+> Practice | In one line
+> Fail sanely | Validate configuration. On a bad input, keep running on the previous state and alert
+> Progressive rollouts | Stage changes by capacity and by geography. If something is unexpected, roll back first, diagnose after
+> Define objectives like a user | Measure at the user's point of view, for example at the client
+> > The appendix has more: monitoring, postmortems, capacity, overload, and the shape of SRE teams.
+**COACH:** Here is a compact summary of best practices, and three entries repay a close reading. Fail sanely: validate configuration, and on a bad input, keep running on the previous state and raise an alert. Progressive rollouts: stage changes by capacity and by geography, and if anything unexpected happens, roll back first and diagnose after. And define objectives like a user: measure at the point of view of the user, for example at the client. There is more, on monitoring, postmortems, capacity, overload, and the shape of S-R-E teams.
+
+### Slide 5 · Appendix B · Two examples — Why validation is a reliability feature   `[cards · c2]`
+> red An empty file :: A global traffic system accepted an empty configuration file, caused by a file permissions problem. For about six minutes it answered that every name did not exist.
+> red A single character :: A list of suspect addresses was replaced by a single forward slash. It matched every address, and the whole web was marked as dangerous.
+> > Both were valid files with implausible content. Check meaning, size and change, not only syntax.
+**COACH:** Two examples from the appendix. A global traffic system accepted an empty configuration file, caused by a file permissions problem, and for about six minutes it answered that every name did not exist. In another, a list of suspect addresses was replaced by a single forward slash, which matched every address, and the whole web was marked as dangerous. Both files were valid, and both were implausible. Check the meaning, the size and the size of the change, not only the syntax. And remember the empty list in episode three: it is the same failure.
+
+### Slide 6 · Appendix B · the line to say — If a new input looks implausible, keep the old one, and tell a human.   `[th]`
+**SAY THIS:** When configuration changes look implausible, keep running on the previous version, and tell a human. A system that accepts any input will one day accept the worst one.
+*[pause: 0.8]*
+
+
+## 16.2 One map of the whole course
+
+### Slide 7 · The whole course — Sixteen episodes in five layers   `[dia]`
+*Diagram:* `svg/e16-course-map.svg`
+**COACH:** Here is the map of everything. At the base, foundations: what you promise, which is episode two, and how you see it, episode four. On top of that, change: releases and simplicity in episode five, testing in episode eight, and launches in episode fourteen. Then failure: overload and cascades in episode ten, consensus in eleven, and data integrity in thirteen, with balancing in nine and scheduled work in twelve. Then operations: toil in episode three, on call in six, and incidents in seven.
+**COACH:** At the top, people: training, engagement and organisation, in episodes fifteen and sixteen. If you can say one sentence for each box, you can answer most operational questions in a design round.
+
+### Slide 8 · The whole course — The sentence to say for each topic   `[table · sm]`
+> Topic | The sentence
+> Risk and objectives | Pick the reliability a user can feel, write the budget, and let it decide the pace of change
+> Monitoring | Page on symptoms, debug with causes, and never average a percentile
+> Release | Small, reproducible, staged, reversible
+> Toil and automation | Automate repeating work, and bound the blast radius of the automation
+> Overload | Fail early and cheaply, shed the least critical work, and never retry into overload
+> Consensus | One agreed history, as long as a majority can talk; use it for the small state that must be right
+> Data integrity | Replication copies mistakes; only a rehearsed restore protects you
+> > The thesis lines from the episodes, shortened.
+**COACH:** And the sentence to say for each. Risk and objectives: pick the reliability a user can feel, write the budget, and let it decide the pace of change. Monitoring: page on symptoms, debug with causes, and never average a percentile. Release: small, reproducible, staged and reversible. Toil and automation: automate repeating work, and bound the blast radius of the automation. Overload: fail early and cheaply, shed the least critical work first, and never retry into overload.
+**COACH:** Consensus: one agreed history as long as a majority can talk, used for the small state that must be right. And data integrity: replication copies mistakes, and only a rehearsed restore protects you.
+
+
+## 16.3 What nobody could say in 2016
+
+### Slide 9 · The whole course · the line to say — Name the failure. Bound the blast radius. Rehearse the recovery.   `[th]`
+**SAY THIS:** Name the failure, bound the blast radius, and rehearse the recovery. That is the whole course in one sentence.
+*[pause: 0.8]*
+
+### Slide 10 · New material · AI serving — The same ideas applied to a model-serving system   `[dia]`
+*Diagram:* `svg/e16-ai-serving.svg`
+**COACH:** Machine-learning serving did not exist at this scale in 2016, and these ideas apply directly. Take a request to a service that runs a large model. It enters through a gateway, where admission control can limit work in units of tokens or compute, not requests, since one request can be a hundred times the cost of another, which is the lesson of queries per second from episode ten. It waits in a queue, which must be bounded, with deadlines.
+**COACH:** It runs on accelerators, which are scarce and slow to scale. It may use a cache of earlier results. And the model, the prompt and the data around it are all changes that can fail, so they go through a staged rollout, with evaluation as the health gate.
+
+### Slide 11 · New material · AI serving — The ideas, translated   `[table · sm]`
+> Idea | In a model-serving system
+> Indicators (ep 2) | Time to first output, throughput, cost per request, and a quality score from evaluation, not just availability
+> Overload (ep 10) | Admission control by tokens or compute; a smaller model or a cached answer as the degraded mode
+> Releases (ep 5) | Staged rollouts of model and prompt versions, with automated evaluation as the gate and an instant revert
+> Capacity (ep 14) | Accelerator capacity is the scarce resource: forecast it, reserve it, and plan for loss of a zone
+> Data (ep 13) | Freshness of retrieval data, provenance, and a way to delete on request
+> Incidents (ep 7) | Treat a model or prompt regression as a change-induced emergency, with a rollback path
+> > Mappings, not claims about any one product.
+**COACH:** Here are the translations. Indicators: time to first output, throughput, cost per request, and a quality score from evaluation, not only availability. Overload: admission control by tokens or compute, with a smaller model or a cached answer as the degraded mode. Releases: staged rollouts of model and prompt versions, with automated evaluation as the gate, and an instant revert. Capacity: accelerators are the scarce resource, so forecast them, reserve them, and plan for the loss of a zone. Data: freshness, provenance, and deletion on request.
+**COACH:** Incidents: a model or prompt regression is a change-induced emergency, with a rollback path. These are mappings, not claims about any particular product.
+
+
+## 16.4 Putting it together
+
+### Slide 12 · Interviewer probe — You have three minutes. Describe the operations layer of a new payments service.   `[probe]`
+**INTERVIEWER:** You have three minutes. Describe the operations layer of a new payments service.
+*A strong answer on screen:*
+> - Objective: availability and latency measured at the client, with an error budget
+> - Monitoring: golden signals, with symptom-based pages and a burn-rate alert
+> - Releases: staged, with automatic rollback; idempotency keys make retries safe
+> - Failure: overload controls, a budgeted retry, graceful degradation, a restore drill
+> - People: on-call rota, runbooks, and a postmortem practice
+**CANDIDATE:** I start with the objective: availability and latency measured at the client, with an error budget that governs the pace of change. Monitoring on the golden signals, with symptom-based pages and a burn rate alert. Releases are staged, with automatic rollback, and idempotency keys make retries safe. For failure, I plan overload controls, a budgeted retry policy, graceful degradation, and a restore drill. And for people, an on-call rota, runbooks and a postmortem practice.
+
+### Slide 13 · Interviewer probe — The error budget is spent and the chief executive wants to ship. What do you do?   `[probe]`
+**INTERVIEWER:** The error budget is spent and the chief executive wants to ship. What do you do?
+*A strong answer on screen:*
+> - Apply the agreed policy, which was written before
+> - Offer ways to ship safely: smaller scope, staged rollout, kill switch
+> - Put the risk in numbers, and let the business owner decide in writing
+> - Afterwards, review whether the objective was right
+**CANDIDATE:** I apply the policy that was agreed in advance, because the middle of an argument is the wrong time to write one. I offer ways to ship more safely: a smaller scope, a staged rollout, a kill switch. I put the risk in numbers, and ask the person who owns the business outcome to decide, in writing. And afterwards we review whether the objective was set at the right level.
+
+### Slide 14 · Interviewer probe — What would you cut with half the time and half the budget?   `[probe]`
+**INTERVIEWER:** What would you cut with half the time and half the budget?
+*A strong answer on screen:*
+> - Keep what protects users and data: objectives, rollback, backups with a tested restore
+> - Cut breadth: fewer dashboards, fewer custom tools, fewer features
+> - Defer: multi-region, fancy automation, until the objective needs it
+> - Write down what you chose not to do, and the trigger to revisit
+**CANDIDATE:** I keep what protects users and data: a clear objective, a fast rollback, and backups with a tested restore. I cut breadth: fewer dashboards, fewer custom tools, fewer features. I defer multi-region and clever automation until the objective needs them. And I write down what I chose not to do, with the trigger that would make me revisit it. A justified omission is a design decision, not a gap.
+
+
+## 16.5 What to do next
+
+### Slide 15 · Where to go from here — A study plan for the next four weeks   `[list]`
+> ~ The course is a map. The exercises are the territory.
+> - Week one: read about risk, objectives and monitoring, then write an objective for a service you know
+> - Week two: overload and cascading failure, then draw the retry amplification of a design you work on
+> - Week three: consensus and data integrity, then run a restore of something real
+> - Week four: incidents and postmortems, then read three public postmortems and rewrite one blamelessly
+> - Throughout: Google's free S-R-E workbook, which gives templates and worked examples
+**COACH:** What to do next. The course is a map, and the exercises are the territory. In week one, read about risk, objectives and monitoring, then write an objective for a service you know. In week two, read overload and cascading failure, then draw the retry amplification of a design you work on. In week three, consensus and data integrity, then run a restore of something real. In week four, incidents and postmortems: read three public postmortems and rewrite one without blame. And throughout, use Google's S-R-E workbook, for templates and worked examples.
+
+### Slide 16 · Episode 16 · the last line — Make failure ordinary, and then make it boring.   `[th]`
+**SAY THIS:** The goal of site reliability engineering is to make failure ordinary, and then make it boring. Plan for it, practise it, measure it, and learn from it.
+*[pause: 0.8]*
+

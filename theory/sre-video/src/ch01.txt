@@ -1,0 +1,136 @@
+#! title: What SRE is, and the world it runs in
+#! short: What SRE is
+
+= th | SRE course · Episode 1 of 16 · Priority 2 | What SRE is, and the world it runs in | Operations as a software problem. The vocabulary of a planet-scale production environment, and what each piece looks like today.
+N: Welcome to the course. Sixteen episodes on site reliability engineering, built on what Google learned running production at planet scale, and brought up to date. Each episode takes one argument, tells it as a story with numbers, and then adds what has changed in the ten years since. This first episode answers two questions. What is S-R-E, and what is the world it runs in?
+V: Reliability is the most important feature. A system nobody can use does not have other features.
+[pause: 0.8]
+
+## 1.0 How this course works
+
+= panel note | How to use it | Nothing is assumed
+Sixteen episodes, each one argument told as a story, with the numbers and with what has changed since 2016. Where the design-room course assumes an idea from SRE, this series is the way to get it by ear.
+Every episode ends with the questions a Staff-level interviewer asks, and a pointer to the design-room course part that builds on it.
+N: A word on how this works. The field is large, so I will not walk through it topic by topic. Each episode keeps one argument, adds the numbers, and then tells you what has changed in the last ten years. Every episode ends with interview probes, and points to the design-room course part that builds on it.
+
+## 1.1 The sysadmin approach and its cost
+
+= cards c2 | Two ways to run a service | Same service, same traffic, different bet
+red Sysadmin model :: Developers write code. A separate team runs it. Manual tasks, tickets, runbooks. **Headcount grows with the load.**
++++
+grn SRE model :: Engineers write software to run the service. Operations work is **capped**, and the rest of the time goes into automation that removes it.
+> The difference is not tools. It is what the team is **paid to do**.
+N: Start with the model SRE was built to replace. Developers write the code. A separate group of system administrators runs it. They work by tickets, runbooks and manual steps, and they scale by hiring.
+[reveal]
+N: Now the S-R-E model. The people who run the service are software engineers, and their operations work is capped, so the rest of their time must go into automation that removes the work. The difference is not the tooling. It is what the team is paid to do.
+
+= dia | The cost curve | Operations that scales with load, against operations that does not
+e01-ops-scaling
+N: Here is why the cap matters. The red line is a traditional operations team. If the product succeeds, traffic grows, the manual work grows with it, and so does the team. The green line is the S-R-E bet. The number of engineers needed grows sublinearly with the size of the system, because every repeated task becomes code. The gap between the two lines is the budget for the whole idea.
+
+= tiles | The numbers to remember | Three rules that make the model hold
+50 % | ceiling on operations work for an SRE team
+25 % | ceiling on time spent on call
+8 | engineers to sustain a week-long, two-person, single-site rotation
+N: Three numbers carry the model. Operations work, meaning tickets, on call and manual tasks, is capped at fifty percent of each engineer's time. On call itself is capped at twenty-five percent. And if you do the arithmetic with a primary and a secondary on call, week-long shifts, and a single site, you need at least eight engineers. Fewer than that and the cap is broken before the rota starts.
+
+= panel trap | The trap | A cap that is not enforced is a wish
+When a team exceeds the cap, some of the operations burden shifts back to the developers, or staff is added without operational duties.
+Without that consequence the model quietly turns into the sysadmin model with a better job title.
+> Ask what happens, concretely, the week the cap is exceeded.
+N: And here is the trap. A cap that nobody enforces is a wish. When the team goes over the limit, some of the burden shifts back to the developers, so that the people who built the service feel the cost of running it, or staff is added without operational duties. Without that consequence you get the old model with a new job title. When you describe this model in an interview, say what happens the week the cap is exceeded.
+
+## 1.2 The tenets
+
+= th | The line to say | A cap on operations work is what forces automation.
+V: Cap the operations work, and the team is forced to automate. Without a consequence for exceeding the cap, you have the old model with a new job title.
+[pause: 0.8]
+
+= list | The tenets of SRE | Eight areas the team owns end to end
+~ Notice what is on the list, and what is not.
+- Availability, latency and performance, **as a measured objective**
+- Change management and release safety
+- Monitoring and emergency response
+- Capacity planning and provisioning
+- Efficiency: cost per request
+N: Here are the duties. Availability and latency, measured against an objective. Change management. Monitoring and emergency response. Capacity planning and provisioning. And efficiency, which is cost per request. Notice what is on the list: the whole life of the service in production. Notice what is missing: feature work. The principle is that the people who answer the pager also decide how fast changes may go.
+
+= th | The line to say | The team that gets paged is the team that decides the pace of change.
+V: The team that carries the pager also owns the rate of change. That is the whole mechanism, because it puts the cost of unreliability and the benefit of velocity in the same room.
+[pause: 0.8]
+
+## 1.3 The production environment
+
+= dia | Life of a request | One request through an example service
+e01-request-life
+N: Start with the world these systems run in, using a small example service that looks words up in Shakespeare. Follow one request. The browser asks D-N-S. Google's D-N-S answers using a global load balancer, which knows how loaded each region is. The browser then connects to a front end, a reverse proxy that terminates the connection. It finds the right service, and sends it a remote procedure call. That front end calls a backend, found through the same load balancer, and the backend reads a row from a storage system. The answer returns the same way.
+
+= table | The vocabulary | Five internal systems, and what plays their role today
+Role | At Google | Open or cloud analogue
+Cluster scheduler | Borg | Kubernetes, which grew from Borg's lessons
+Distributed file system | Colossus | Object stores and distributed file systems
+Lock service | Chubby | etcd, ZooKeeper, Consul
+RPC framework | Stubby | gRPC
+Monitoring | Borgmon | Prometheus, and managed metrics services
+N: This is a vocabulary lesson, and the table gives each name its role. A cluster scheduler, called Borg, that starts and restarts tasks across thousands of machines. A distributed file system, called Colossus. A lock service, called Chubby, used for leader election and small critical state. An R-P-C framework, called Stubby. And a monitoring system, called Borgmon. The right-hand column is what you would reach for today. Learn the role first, and the product name second.
+
+= panel now | Then and now | The substrate became a product anyone can rent
+In 2016 this was a description of internal systems. Today the same ideas are the default: containers scheduled by a control plane, desired state reconciled continuously, service identity and traffic managed by a mesh.
+The lesson that travels is not the product. It is that **machines are cattle**: the unit you operate is the service, not the host.
+Source for the lineage: the Borg paper (EuroSys 2015) and "Borg, Omega, and Kubernetes" (ACM Queue 2016).
+N: What has changed since 2016? The substrate became a product. In 2016 these were internal systems. Today containers scheduled by a control plane, with desired state reconciled continuously, are the default way to run software. The lesson that travels is not any product. It is that machines are cattle. The thing you operate is the service, and a machine that misbehaves is replaced, not repaired.
+
+= table | One level down | The hierarchy of failure domains
+Level | Typical blast radius | What fixes it
+Machine, rack | one task, one rack's tasks | The scheduler restarts elsewhere
+Cluster | all tasks in one cluster | Traffic moves to another cluster
+Region | a metro area | Load balancing across regions
++++
+Software version | **every** replica at once | Staged rollout, a fast rollback
+N: One level down. Reliability is mostly the art of choosing the blast radius. A machine or a rack fails, and the scheduler restarts the task elsewhere. A cluster fails, and traffic moves to another cluster. A region fails, and global load balancing moves it again.
+[reveal]
+N: Now look at the last row. A bad software version is the only failure that hits every replica at the same moment, in every failure domain. That is why release engineering gets its own episode.
+
+## 1.4 What to take away
+
+= panel key | The alternative and the price | When the SRE model does not fit
+It needs engineers who can code and operate. They are scarce and expensive.
+It needs product teams who accept a budget instead of a veto. That is a cultural cost, and some organisations will not pay it.
+A small service with a stable load may be better served by a simple on-call rota and good defaults. **Do not build an SRE team to run a cron job.**
+N: Be honest about the price. The model needs engineers who can both code and operate, and they are scarce. It needs product teams who accept a budget instead of a veto, which is a cultural cost. And for a small, stable service, a simple rota and good defaults are enough. Nobody should build an S-R-E team to run a cron job.
+
+= th | Episode 1 · the line to say | S-R-E is what happens when you ask software engineers to design the operations function.
+V: Site reliability engineering is what you get when you ask software engineers to design an operations function. The cost of operations is capped, so the team is forced to automate.
+[pause: 0.8]
+
+## 1.5 Probe drills
+
+= probe | Why not just hire more operations engineers as the service grows?
+- Manual work scales linearly with load, so cost and error rate grow with success
+- Hand-offs between dev and ops create a **wall**: devs ship faster, ops resist change
+- The cap forces the team to remove toil instead of absorbing it
+C: Because manual work scales linearly with load. Every success of the product becomes more tickets, so cost and error rate grow together. Splitting development and operations also builds a wall. Developers are rewarded for shipping, operations for stability, and they pull in opposite directions. The cap on operations work forces the team to remove the work instead of absorbing it.
+
+= probe | The cap is fifty percent. The team is at seventy. What do you do?
+- Burden shifts back to the developers, and the ticket queue is shown to them
+- Or **new feature launches pause** until the load is back under the cap
+- Then find the top three sources of work and automate or delete them
+C: I treat it as a signal, not a failure. Some of the operations work shifts back to the product developers, so they see what their service costs to run, or launches pause until we are under the cap. Then I find the top three sources of work by volume and either automate or delete them. A team that sits at seventy for a quarter has stopped being an S-R-E team.
+
+= probe | Name five things a cluster scheduler gives you that a fleet of hand-managed servers does not.
+- Restarts failed tasks automatically, on other machines
+- Bin-packs many jobs onto shared hardware for higher utilisation
+- Enforces priority and quota between teams
+- Rolls out changes gradually and drains machines for maintenance
+- Gives every task a **name** that survives the machine it runs on
+C: It restarts failed tasks on other machines without a human. It packs many jobs onto shared hardware, which raises utilisation. It enforces priority and quota between teams. It performs gradual rollouts and drains machines for maintenance. And it gives every task a stable name that outlives the machine it happens to run on.
+
+## 1.6 Where this shows up
+
+= list | Where this shows up | Read, watch and build next
+~ Course part 15 in design-room covers scheduling and control planes in depth.
+- **Episode 2**: how the budget behind the cap is defined, and spent
+- **Episode 3**: toil, and how automation actually removes it
+- **Google's SRE books**: the first two chapters are short and worth reading whole
+- **Papers**: the Borg paper, and "Borg, Omega, and Kubernetes"
+N: To place this in your own study. The design-room course covers scheduling and control planes in part fifteen, which assumes the vocabulary from this episode. Next, episode two defines the budget behind the cap, and how it is spent. Episode three is about toil, and how automation removes it. Google's free S-R-E books start with two short chapters worth reading whole, and the Borg paper is the best companion to this episode.

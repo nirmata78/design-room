@@ -1,0 +1,96 @@
+#! title: Partitions and brokers
+#! short: Partitions and brokers
+
+= th | Kafka in system design · Module 3 of 6 | Partitions and brokers | Sizing from arithmetic instead of folklore: partitions, durability settings, disks, zones and recovery time.
+N: Module three is the arithmetic. How many partitions, how many brokers, and which settings make the durability real. Each answer comes from a short calculation on our marketplace numbers.
+
+## 3.1 How many partitions
+N: We start with partitions, because that number is the hardest one to change later.
+
+= math | How many partitions? | Divide the peak by the slowest stage, then allow for growth
+$$ P \ge \max\!\left(\dfrac{T}{T_{\text{produce}}},\ \dfrac{T}{T_{\text{consume}}}\right) \times g $$ :: \(T\) is the topic's peak, \(g\) the growth you plan for
+$$ \dfrac{12{,}000}{500} = 24 $$ :: order events at peak, over what one consumer handles
+$$ 24 \times 2 = 48\ \text{partitions} $$ :: room to double before the topic must be migrated
+N: The formula is short. Take the topic's peak throughput, and divide it by what one partition can absorb on the producing side, and by what one consumer can process on the reading side. The larger result wins, and then you multiply by the growth you plan for. Our order events topic peaks at twelve thousand events a second, and one fulfilment consumer handles five hundred, because each event touches a database. That gives twenty-four. Doubling for growth gives forty-eight partitions.
+
+= table | The price of more | Partitions are not free
+Too few | Too many
+A group cannot scale past the partition count | More files, memory and metadata on every broker
+A hot key hurts more | Slower recovery after a broker failure
+Increasing later moves keyed data | Smaller batches, so worse compression and more requests
+> Kafka can never reduce a topic's partition count. Choose for the plan, not for the fantasy.
+N: So why not choose a thousand? Because partitions cost something. Each replica means more open files, memory and metadata, recovery after a failure takes longer, and traffic spread thinly makes smaller batches, which compress worse. The long-standing rule of thumb was about four thousand partitions per broker, and the newer metadata layer has raised what a cluster can hold. It has not made partitions free. And Kafka can never reduce a topic's partition count, so choose for the plan.
+
+## 3.2 What durability really needs
+N: Next, the three settings that decide whether an acknowledged write can be lost.
+
+= dia | Durability | Replication factor 3 with a minimum of 2 in sync
+k-rf-states
+N: With three replicas and a minimum of two in sync, follow what happens as brokers fail. With all three healthy, writes succeed. Lose one broker, and writes still succeed, but there is no spare left. Lose a second, and the cluster rejects writes for that partition rather than accept data held on a single disk. Reads continue, and nothing acknowledged is lost. That is the trade you are choosing: availability of writes, given up on purpose, to protect durability.
+
+= code ini | Durability | The settings to write down
+# topic
+replication.factor=3
+min.insync.replicas=2           # the default is 1
+unclean.leader.election.enable=false
+
+# producer
+acks=all                        # default since Kafka 3.0
+enable.idempotence=true         # default since Kafka 3.0
+N: Here are the settings to write down. Replication factor three, and a minimum of two in sync, which you must set yourself, because the default is one. With a minimum of one, acks set to all can mean a single copy. Unclean leader election stays off, so that an out-of-date replica never becomes leader and erases acknowledged writes. On the producer, acks set to all and idempotence are already the defaults on modern clients.
+
+= th | The line to say | Three replicas and a minimum of two in sync: we survive one broker with writes on, and two with no acknowledged data lost.
+V: Three replicas, and a minimum of two in sync. We survive one broker failure with writes still on, and a second failure stops writes rather than risking acknowledged data.
+[pause: 0.8]
+
+## 3.3 How many brokers
+N: Next, the broker count, computed from three separate limits.
+
+= math | How many brokers? | Disk usually decides
+$$ 10\ \text{MB/s} \times 86{,}400 \times 7 \approx 6.05\ \text{TB} $$ :: one copy of seven days, at the average rate
+$$ 6.05 \times 3 \approx 18.1\ \text{TB} $$ :: with three replicas
+$$ 18.1 \div 0.7 \approx 25.9\ \text{TB} $$ :: keep disks at most 70% full
+$$ 25.9 \div 6\ \text{TB} = 4.3 \Rightarrow 5\ \text{brokers} $$ :: with six terabytes usable per broker
+N: Start with disk. Ten megabytes a second for seven days is about six terabytes for one copy. Three replicas make eighteen. We keep disks at most seventy percent full, so we need about twenty-six terabytes. With six terabytes per broker, that is four point three, so five brokers. Retention uses the average rate, because disk fills over days. Throughput, in the next step, must use the peak.
+
+= dia | How many brokers? | Take the largest limit, then add a spare
+k-sizing
+N: Now the other limits. At peak, thirty megabytes a second becomes ninety once replicated, and with a budget of thirty per broker, that is three brokers. Network out carries three consumer groups plus replication, a hundred and fifty megabytes a second, which is again three. The largest limit is disk, at five. Then add one spare, so that a failure or a rolling restart does not push the others past their budget. Six brokers, and six also divides evenly across three zones.
+
+## 3.4 Zones, controllers and local setups
+N: Next, where those brokers go, and what runs beside them.
+
+= dia | Placement | One replica in each zone, and three controllers
+k-zones
+N: Spread the six brokers over three availability zones, and tell Kafka which zone each broker is in, so that the replicas of every partition land in different zones. Beside them run three controllers. They hold the cluster's metadata using a built-in consensus protocol called KRaft, and a majority must stay alive, so three controllers survive one failure. Now lose an entire zone. Each partition still has two replicas, the controllers still have a majority, and writes continue.
+
+= table | From laptop to production | How many nodes, for what purpose
+Setup | Brokers | Controllers | Use
+Laptop | 1 | Same process | Development only
+Smallest production | 3 | 3, dedicated | Survives one failure, with no spare
+Our marketplace | 6 | 3, dedicated | One broker can fail with room to spare
+> ZooKeeper is gone: Kafka 4.0 runs only in KRaft mode. Combined broker and controller nodes are not recommended for critical systems.
+N: On a laptop, one process acting as both broker and controller is fine. The smallest honest production cluster is three brokers and three controllers. It survives one failure, but it has no spare, so a failure during a rolling restart stops writes. Our marketplace runs six. And if an older guide tells you to install ZooKeeper, it is out of date. Kafka four removed it completely.
+
+## 3.5 Recovery and catch-up
+N: Finally, two numbers almost nobody computes until the outage: rebuild time and catch-up time.
+
+= math | Rebuild time | How long are we exposed after losing a broker?
+$$ 18.1\ \text{TB} \div 6 \approx 3\ \text{TB} $$ :: the data held by one broker
+$$ 3\ \text{TB} \div 100\ \text{MB/s} \approx 8.3\ \text{h} $$ :: copied with replication throttled, to protect live traffic
+N: When a broker dies for good, its three terabytes must be copied to a replacement. We throttle that copy to a hundred megabytes a second, to protect live traffic, so it takes more than eight hours. During those hours the affected partitions run with no spare replica, and one more failure stops their writes. That is why more brokers holding less data each can be safer, even when the disks would fit on fewer machines.
+
+= dia | Tiered storage | Keep recent data on brokers, and the rest in object storage
+k-tiered
+N: Tiered storage attacks that number. Brokers keep only recent data on local disks, here one day, and older segments move to object storage. Consumers read old data through the same interface, with the same offsets. Now a replacement broker copies less than half a terabyte, and the rebuild takes about seventy minutes instead of eight hours. It does not work for compacted topics, and Kafka does not ship the storage plugin, so you bring your own or use a vendor's.
+
+= math | Catch-up time | A consumer that was down must run faster than the stream
+$$ 10\ \text{MB/s} \times 3600\ \text{s} = 36\ \text{GB} $$ :: backlog after a one-hour consumer outage
+$$ 10 + \dfrac{36{,}000\ \text{MB}}{1800\ \text{s}} = 30\ \text{MB/s} $$ :: rate needed to clear it in 30 minutes, while new data keeps arriving
+N: One more number. A consumer that was down for an hour comes back to thirty-six gigabytes of backlog. To clear that in thirty minutes while new data keeps arriving, it must process thirty megabytes a second, three times the average. So size consumers for recovery, and not just for the normal rate. A consumer that only just keeps up will never catch up.
+
+= probe | Why is three brokers not automatically enough?
+- Three brokers with a minimum of two in sync have **no spare**: one failure plus one restart stops writes
+- The count must also satisfy **disk, throughput and rebuild time**
+- Compute each limit, take the largest, then add a spare
+C: Three is the minimum that lets replication factor three work, and it says nothing about load. With three brokers there is no spare, so one failure during a rolling restart stops writes. The real count comes from disk, write throughput, network and rebuild time. I compute each limit, take the largest, and then add a spare.

@@ -1,0 +1,170 @@
+#! title: Risk, SLIs, SLOs and error budgets
+#! short: Risk and SLOs
+
+= th | SRE course · Episode 2 of 16 · Priority 1 | Risk, SLIs, SLOs and error budgets | Why one hundred percent is the wrong target, and how a number turns an argument into a decision.
+N: Episode two. This is the idea that the rest of the course hangs from. Reliability is not a virtue to maximise. It is a budget to spend. We cover risk and service level objectives, and then the part that came later: how modern teams alert on the budget.
+V: One hundred percent is the wrong reliability target for almost everything.
+[pause: 0.8]
+
+## 2.0 Why this decides interviews
+
+= cards c2 | The opening story | The outage that was good for Google
+red The false comfort :: A global lock service was so reliable that teams stopped planning for its failure. They built hard dependencies on it, assuming it would never be down.
+grn The fix :: The service owners made sure it **met but did not far exceed** its objective. When a quarter went too well, they took it down on purpose, in a controlled outage.
+> Over-delivering on reliability creates dependencies you will pay for later.
+N: A story about a lock service. The company's global lock service was so reliable that other teams stopped planning for its failure. They wrote services that could not work without it. Then, on the rare day it failed, the damage was far greater than the failure deserved. The fix is the opposite of what you would expect. The owners made sure the service met, but did not greatly exceed, its objective. When a quarter went too well, they took it down on purpose, in a controlled outage, to flush out the hidden dependencies.
+
+= panel note | What this episode covers | Risk, objectives and the budget
+Embracing risk, and service level objectives. The design-room course treats both as read-first for the observability part and the manager layer.
+N: This episode covers risk and service level objectives. In the design-room course they are marked read first, so this is the way to get them by ear. Let us begin with risk.
+
+## 2.1 Risk is a continuum
+
+= table | The nines in minutes | What each target allows, over a year and a thirty-day month
+Target | Per year | Per 30 days | Per day
+99% | 3.65 days | 7.2 hours | 14.4 minutes
+99.9% | 8.76 hours | 43.2 minutes | 86 seconds
+99.99% | 52.56 minutes | 4.32 minutes | 8.6 seconds
+99.999% | 5.26 minutes | 26 seconds | 0.86 seconds
+> Worth remembering: 99.99 percent allows 52.56 minutes a year.
+N: First, the nines in minutes. Ninety-nine percent allows about three and a half days of downtime a year. Ninety-nine point nine allows about eight and three quarter hours, or forty-three minutes in a thirty-day month. Ninety-nine point nine nine allows fifty-two and a half minutes a year, which is the figure worth memorising, and about four minutes a month. Five nines allows about five minutes a year. Notice that each extra nine is ten times less room for error, and it is much more than ten times the cost.
+
+= tiles | The definition that scales | Availability as request success, not uptime
+yield | successful requests divided by total requests
+2.5 M | requests in the example day
+250 | errors allowed at 99.99 percent for that day
+N: Now the definition. A global service is almost never completely down, so a count of uptime minutes makes little sense. Define availability as the fraction of requests that succeed. Take their example. A service handles two and a half million requests in a day, with a target of ninety-nine point nine nine percent. That allows two hundred and fifty failed requests. That is a budget you can count.
+
+= panel watch | Easy to confuse | Not every request is equal
+A failed sign-up and a failed background poll count the same in the formula, and they are not the same to a user.
+Weight by importance, or define separate objectives per request class, before you trust one global number.
+> One average hides the request that mattered.
+N: One warning. In that formula a failed sign-up and a failed background poll count the same, and they are very different to a user. Weight by importance, or define separate objectives per request class. One global average hides the request that mattered.
+
+= table | The price of a nine | Is the next nine worth what it costs?
+Step | Revenue now | Value of the extra availability | Verdict
+99.9 to 99.99 | one million dollars | one million times 0.0009 = **900 dollars** | Only worth it if it costs less than 900 dollars
+> A different anchor: if users cannot tell, the target is high enough. The error rate of the internet between them and you is the floor.
+N: And the price. The arithmetic is blunt. A service earns a million dollars. Improving it from ninety-nine point nine to ninety-nine point nine nine percent adds point zero nine percent of requests, worth nine hundred dollars. If that nine costs more than nine hundred dollars, do not buy it. There is a second anchor. If your errors are smaller than the background failure rate of the user's own internet connection, the user cannot tell the difference, and you have reached the floor.
+
+= th | The line to say | Pick the reliability a user can feel and a business will pay for, and then stop.
+V: Choose the reliability target a user can feel and the business will pay for. Beyond that, extra nines buy nothing, and cost both money and speed of change.
+[pause: 0.8]
+
+## 2.2 The error budget
+
+= dia | The mechanism | A quarter of budget, spent by incidents and releases
+e02-budget-burndown
+N: Here is the mechanism that makes the number useful. The product team and the S-R-E team agree an objective, say ninety-nine point nine percent over a quarter. The error budget is what is left over: point one percent of requests. Follow the line. It starts full. A bad release takes a slice. A network incident takes another.
+N: At the dashed line the budget is nearly spent, and the rule the teams agreed to in advance applies: releases slow down or stop, and the team works on reliability. When a new quarter begins, the budget refills. The number made the argument for them.
+
+= table | One level down | What actually happens as the budget moves
+Budget left | Release policy | Who decides
+Plenty | Ship at normal pace, take risks, run experiments | Product team
+Under a quarter | Smaller changes, more testing, canaries only | Both teams
+Exhausted | Freeze, except security and critical fixes. Spend time on reliability | The pre-agreed policy, not a meeting
+> The simple on-off version is called bang-bang control. Better policies slow down gradually.
+N: One level down, here is what changes as the budget moves. With plenty left, the team ships at its normal pace, and may take risks. When it is low, changes get smaller and more cautious, with canaries. When it is exhausted, releases freeze except for security and critical fixes, and effort goes into reliability. The crucial word is pre-agreed. The policy is written before the incident, so nobody argues about it in the middle. This on-off rule is called bang-bang control, and gentler policies, which slow down gradually, work better.
+
+= panel trap | The trap | A budget with no consequence is a decoration
+If exhausting the budget changes nothing, teams learn that the number is optional.
+If **every** exhausted budget freezes the company, teams learn to game the measurement.
+Write down who can override the freeze, and how the override is recorded.
+N: The trap has two sides. If exhausting the budget changes nothing, then teams learn that the number is decoration. If every exhausted budget freezes the whole company, teams learn to game the measurement instead. The answer is to write down in advance who can override a freeze, and how the override is recorded. That is a management mechanism, not just a technical one.
+
+## 2.3 SLIs, SLOs and SLAs
+
+= th | The line to say | The error budget turns an argument into a number.
+V: The error budget turns an argument about risk into a number agreed in advance. While there is budget, ship. When it is spent, slow down and invest in reliability.
+[pause: 0.8]
+
+= cards c3 | The three terms | An indicator, an objective, an agreement
+grn SLI :: A **measurement**. For example, the fraction of requests served in under 300 milliseconds.
+amb SLO :: A **target** for that measurement, over a window. For example, 99.9 percent over 30 days.
+red SLA :: A **contract** with consequences, usually money. Always looser than the SLO.
+> SLI is the ruler. SLO is the goal. SLA is what you promised, with a penalty.
+N: Now the vocabulary, and it is worth being precise. A service level indicator, S-L-I, is a measurement. For example, the fraction of requests answered in under three hundred milliseconds. A service level objective, S-L-O, is a target for that measurement over a window, say ninety-nine point nine percent over thirty days. A service level agreement, S-L-A, is a contract with consequences, usually money, and it is always looser than the objective, because you want to notice trouble long before you owe anyone a refund.
+
+= table | Choosing indicators | The right measurement depends on what the system does
+System type | Indicators that matter | The question behind it
+User-facing serving | Availability, latency, throughput | Could we respond, how fast, how many?
+Storage | Latency, availability, durability | Is the data there when I ask?
+Data pipelines | Throughput, end-to-end latency | How fresh is the output?
+Everything | **Correctness** | Was the answer right?
+N: Which indicators? It depends on what the system does. User-facing serving cares about availability, latency and throughput. Storage cares about latency, availability and durability, which is the chance the data is still there. A data pipeline cares about throughput and how fresh the output is. And every system should care about correctness: was the answer right. Start from what the user does and wants, then work backwards to the measurement.
+
+= table | One level down | Percentiles, not averages, and where you measure
+Choice | Weak | Strong
+Latency statistic | Mean | A **percentile** over a window, and a tail percentile as well
+Request classes | One global number | Separate objectives for interactive and batch
+Where measured | Server logs | As close to the user as you can: client or load balancer
+Targets | Aim as high as possible | Start loose, tighten with evidence
+N: One level down, the choices that separate weak from strong. Use percentiles, not averages, because the average hides the slow tail that users actually feel, and use more than one percentile. Define separate objectives for interactive and batch traffic, because they want different things. Measure as close to the user as you can, such as at the load balancer or in the client, because a server that never saw the request cannot count it as a failure. And start with a loose target, then tighten it from evidence.
+
+= th | The line to say | An indicator measures. An objective targets. An agreement binds.
+V: An indicator is a measurement. An objective is a target for it. An agreement is a contract, and it is always looser than the objective.
+[pause: 0.8]
+
+= panel key | The alternative | Three rules for choosing objectives
+**Keep few.** Every SLO is a promise you must watch.
+**Keep a safety margin.** An internal target tighter than the published one gives you room to react before users notice.
+**Do not overachieve.** If you far exceed the SLO, users build on the better behaviour and you cannot take it back.
+N: There are a few rules for choosing objectives. Keep few of them, because each one is a promise somebody must watch. Keep a safety margin: an internal target tighter than the published one gives you room to react. And do not overachieve, because if you perform far better than your objective, users build on the better behaviour and you cannot take it back. That is the lock service story again.
+
+## 2.4 Then and now
+
+= th | Episode 2 · the line to say | Alert on how fast the budget burns.
+V: Do not alert on a threshold. Alert on how fast the budget is burning, over a short window and a long one together.
+[pause: 0.8]
+
+= panel now | Since 2016 | Alerting on the budget, not on the threshold
+The practical form is: alert when the budget is burning fast, over **several windows at once**.
+With a ninety-nine point nine percent objective over thirty days, a burn rate of 14.4 for one hour spends two percent of the month. A rate of 6 for six hours spends five percent. A rate of 1 for three days spends ten percent.
+The first two page a human. The last opens a ticket.
+N: Now the part that came later. Modern teams turn the budget into alerts. Instead of paging when errors exceed a threshold, page when the budget is burning fast. A burn rate of one means you would spend exactly the whole budget by the end of the window. Take a thirty-day window. A burn rate of fourteen point four sustained for one hour spends two percent of the month, and that pages someone.
+N: A rate of six for six hours spends five percent, and that pages too. A rate of one for three days spends ten percent, and that opens a ticket instead.
+
+= table | Then and now | The arithmetic behind the burn-rate thresholds
+Window | Burn rate | Share of 30-day budget spent | Check
+1 hour | 14.4 | 2% | 14.4 × 1 ÷ 720 = 0.02
+6 hours | 6 | 5% | 6 × 6 ÷ 720 = 0.05
+3 days | 1 | 10% | 1 × 72 ÷ 720 = 0.10
+> 720 is the hours in 30 days. Each alert is a share of the budget, translated into a rate.
+N: Where do those numbers come from? A thirty-day window has seven hundred and twenty hours. A burn rate of fourteen point four for one hour is fourteen point four divided by seven hundred and twenty, which is two percent. Six for six hours is thirty-six over seven hundred and twenty, five percent. One for seventy-two hours is ten percent. So each alert is just a share of the budget, translated into a rate. Pick the share you are willing to lose before waking someone, and the rate follows.
+
+= panel now | Since 2016 | What else changed in ten years
+Objectives are now written down as code and reviewed like code. Open specifications and tooling exist for this.
+Teams measure **freshness and correctness** for data and machine-learning pipelines, not only availability.
+More teams agree an objective with each dependency owner instead of assuming one.
+Verify product claims against current documentation before you rely on them.
+N: What else has changed? Objectives are now written as code, reviewed like code, and fed straight into dashboards and alerts. Teams measure freshness and correctness for data and machine-learning pipelines, not just availability. And more teams agree an objective with each dependency owner, instead of assuming one. As always, check product claims against current documentation.
+
+## 2.5 Probe drills
+
+= probe | Your service has a ninety-nine point nine percent objective. A dependency has ninety-nine point nine. What can you promise?
+- Hard dependencies in series: **multiply**: 0.999 × 0.999 ≈ 99.8 percent at best
+- Your own failures come on top of that
+- So decouple: degrade gracefully, cache, retry, or make the dependency optional
+C: If my service needs the dependency for every request, the two multiply. Point nine nine nine times point nine nine nine is about ninety-nine point eight percent, and that is before my own failures. So I cannot honestly promise ninety-nine point nine. I either make the dependency soft, with caching or degraded results, so that its failure does not become mine, or I negotiate a tighter objective with its owner.
+
+= probe | The budget is spent in week two. Product says the launch cannot slip. What do you do?
+- Apply the pre-agreed policy, not a new negotiation
+- Ask what is **cheap to reduce**: scope, rollout speed, blast radius of the launch
+- Escalate the risk decision to the person who owns both, with numbers
+C: I do not reopen the policy in the middle of the argument. I apply what we agreed in advance. Then I ask what is cheap to reduce: the launch scope, the rollout speed, or the blast radius, for example a smaller initial audience. If the business still wants the launch, that is a risk decision for the executive who owns both the product and the reliability, and I bring them the numbers, including how much budget remains.
+
+= probe | Why would you sometimes take your own service down on purpose?
+- Over-delivery creates **hidden hard dependencies**
+- A controlled outage shows users what the SLO really means
+- It is a test of the failure path, with an owner and a time window
+C: Because if a service is much more reliable than its objective, users build on that, and the first real outage is a surprise. A controlled outage, with an owner, a time window and a rollback, keeps the real behaviour close to the published one and tests the failure path. It is the same reason we run drills.
+
+## 2.6 Where this shows up
+
+= list | Where this shows up | Read, watch and build next
+~ Design-room course part 14 teaches S-L-I, S-L-O and error budget as read-first. Part 16 uses the budget as a contract.
+- **Episode 4**: turn the SLO into alerts, dashboards and a page
+- **Episode 5**: the budget as the brake on releases
+- **Google's SRE books**: the chapters on risk and objectives, then the workbook chapters on objectives and alerting
+- **Appendices**: an example SLO document and an error budget policy to adapt
+N: To place this in your own study. The design-room course teaches the S-L-I, S-L-O and error budget as read-first material in part fourteen, and uses the budget as a contract in part sixteen. Next in this series, episode four turns the objective into alerts and dashboards, and episode five uses the budget as the brake on releases. Google's free S-R-E books cover this in depth, and their workbook appendices are good templates for your own documents.

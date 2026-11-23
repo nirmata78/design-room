@@ -1,0 +1,96 @@
+#! title: Topics and keys
+#! short: Topics and keys
+
+= th | Kafka in system design · Module 2 of 6 | Topics and keys | How many topics you need, which key each event carries, and the quiet ways that order gets lost.
+N: Module two. Two decisions that are cheap today and very expensive to change later: how you divide events into topics, and which key each event carries.
+
+## 2.1 The rule that sounds right
+N: We start with a popular rule for topics, and the failure it causes.
+
+= panel trap | The common advice | One topic per event type
+It sounds tidy: `order-created`, `order-paid` and `order-shipped`, each in its own topic.
+Kafka orders events only **inside one partition of one topic**. Across topics there is no order at all.
+So this rule silently throws away the order of an entity's life.
+N: A popular rule says: create one topic per event type. Order created, order paid, and order shipped, each in its own topic. It sounds tidy, and it hides a serious problem. Kafka orders events only inside one partition of one topic. Across topics there is no order at all. So this rule silently throws away the order of an entity's life.
+
+= dia | The failure | Three topics, three lags, and an order that ships before it exists
+k-split-race
+N: On the left, the fulfilment consumer reads three topics. Each has its own lag: forty seconds on one, nine on another, one on the third. So it can see shipped, then paid, then created, for the same order. Now every consumer needs buffering and reordering code. On the right, all three event types share one topic, keyed by order ID. They land in one partition, in the order they happened, and a type field inside the event tells them apart.
+
+= th | The rule | Events that must stay in order relative to each other belong in the same topic, under the same key.
+V: Events that must stay in order relative to each other belong in the same topic, under the same key.
+[pause: 0.8]
+
+## 2.2 When to split and when to merge
+N: Next, the forces that decide how many topics you really need.
+
+= table | How many topics? | Start from the ordering domain, then split only for a reason
+Force | Pushes you to | Example
+Order within an entity | **Merge** | All events of one order
+Different retention or compaction | Split | Clickstream for 3 days, ledger events for a year
+Different access control | Split | Payment data read by few teams
+Very different volume | Split | A firehose beside a trickle of rare events
+Most readers want only a fraction | Split | Readers should not discard 95% of what they fetch
+N: Start from the ordering domain, which is the set of events that must stay in order relative to each other. Then split only for a real reason. Different retention or compaction needs a separate topic, because those are topic settings. So does different access control. Very different volumes should not share partitions, and if most readers would throw away nearly everything they fetch, split it. For our marketplace that gives about a dozen topics, roughly one per business domain, and not hundreds.
+
+= table | Naming | A name you can filter, secure and evolve
+Part | Example | Why
+Domain | `orders` | Prefix-based access rules and ownership
+Stream | `order-events` | Says what the stream holds
+Major version | `v1` | Bumped only for a breaking change
+Together | `orders.order-events.v1` | Sorts by owner, not by version
+> Do not start a name with the version: `v1.order-events` defeats prefix rules. And never mix dots and underscores.
+N: Names deserve a convention. Put the owning domain first, then the stream, then a major version, such as orders dot order events dot v one. The domain comes first because access rules and ownership work on prefixes. A version at the front would defeat that. The version changes only for a breaking change, which in practice means a new topic and a migration. And never mix dots and underscores, because Kafka's metric names treat them as the same character.
+
+## 2.3 What the key does
+N: Next, the key: the one field that decides where an event lands.
+
+= dia | From the ground up | The key picks the partition
+k-key-hash
+N: The producer hashes the key, and takes the result modulo the number of partitions. The same key always gives the same partition, as long as the partition count does not change. So every event of order ninety-eight fourteen lands in partition seventeen, in the order it was produced. A different order may land elsewhere, and between those two orders there is no defined sequence. That is the whole contract: order per key, and nothing wider.
+
+= panel note | No key at all | When order does not matter, send no key
+Records with a **null key** are spread for you. Today's producer fills one partition for a batch, then moves on, which keeps batches large and efficient.
+Use it for independent events such as page views or logs, where only throughput matters.
+N: You can also send no key at all. Today's producer sticks to one partition until a batch fills, and then moves on, which keeps batches large and efficient. Use that for independent events such as page views or logs, where only throughput matters. But decide it deliberately, because adding a key later does not reorder what is already stored.
+
+## 2.4 Choosing the key
+N: Next, how to choose a key, and what happens when you choose badly.
+
+= table | Choosing the key | The key is the unit that needs order
+Stream | Key | Why
+Order events | `order_id` | Each order's life stays in sequence
+Account ledger | `account_id` | Balance changes must apply in order
+Chat messages | `conversation_id` | A conversation reads in sequence
+Driver locations | `driver_id` | The latest position must win
+Page views | none | No order needed
+N: The key is the smallest unit that needs order. For order events that is the order ID. For a ledger it is the account, because balance changes must apply in sequence. For chat it is the conversation, and for driver locations it is the driver, so that the latest position wins. Choosing something wider than you need costs throughput, and choosing something narrower breaks the order you were trying to keep.
+
+= dia | The hot-key trap | One big seller overloads one partition
+k-hot-key
+N: Here is what a wider key costs. Someone keys order events by seller, so that one seller's orders stay together. But the largest seller makes eight percent of all orders. Eight percent of twelve thousand events a second is nine hundred and sixty a second, all in one partition, and one consumer can handle five hundred. That partition falls behind and never recovers. Keyed by order ID, the same traffic spreads evenly, at about two hundred and fifty a second per partition.
+
+= math | The hot-key trap | Check the largest key before you commit
+$$ 0.08 \times 12{,}000 = 960\ \text{events/s} $$ :: the largest seller, in a single partition
+$$ 960 - 500 = 460\ \text{events/s} $$ :: the backlog grows at this rate
+$$ 460 \times 3600 \approx 1.7\ \text{million} $$ :: events behind after one hour
+N: So check your largest key before you commit. Nine hundred and sixty arriving, five hundred consumed, leaves four hundred and sixty more behind every second. After one hour, that is about one point seven million events of lag, and it keeps growing. If you truly cannot change the key, you can split a hot key into sub-keys, but only if that key does not need strict order. Otherwise make its consumer faster, or give that seller its own topic.
+
+## 2.5 Two quiet ways to lose order
+N: Finally for this module, two ways order disappears without anyone noticing.
+
+= dia | Trap one | Adding partitions moves existing keys
+k-resize
+N: Trap one. A key's partition depends on the partition count. This key hashes to seventeen. With four partitions it lands in partition one, and four events are waiting there unread. Now someone adds two partitions. Seventeen modulo six is five, so new events go to partition five, and a consumer can read them before the older ones. Kafka lets you add partitions, but it never moves existing data. For a keyed topic, plan the count up front, or migrate to a new topic.
+
+= panel trap | Trap two | Two client libraries, two hash functions
+The Java client hashes keys with **murmur2**. The widely used C library, librdkafka, defaults to **CRC32**.
+A Java service and a Python or Go service using that library can send the **same key to different partitions**.
+Set `partitioner=murmur2_random` in those clients, so every producer of a topic agrees.
+N: Trap two is rarely noticed until it hurts. The Java client hashes keys with one function, called murmur two. The widely used C library, which many Python and Go clients are built on, defaults to a different one. So two services producing to the same topic can send the same key to different partitions. Configure those clients to use murmur two as well, so that every producer of a topic agrees.
+
+= probe | Product wants all events of one customer in order. The key is customer ID. What do you check?
+- The **largest customer's** share of traffic against one consumer's capacity
+- Whether order is really needed **per customer**, or only per order
+- If a customer is too big: narrow the key, or isolate that customer
+C: I check the largest customer's share of traffic against what one consumer can handle, because that customer's events all land in one partition. Then I challenge the requirement. Usually order is needed per order, not per customer, and a narrower key spreads much better. If order per customer is truly required and one customer is too large, I isolate that customer in its own topic.

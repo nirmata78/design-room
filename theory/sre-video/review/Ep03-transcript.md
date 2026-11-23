@@ -1,0 +1,147 @@
+# Episode 3 · Toil and automation
+
+Reader transcript generated from `src/ch03.txt`. Voices: **COACH** narrates; **SAY THIS** is the slower key-line voice; **INTERVIEWER** and **CANDIDATE** play the probe drills; **ASIDE** is a fifth voice for traps, stories and the then-and-now panels. `[pause]` is silence in seconds; `[reveal]` is where the rest of the slide fades in. Each section also gets an automatic title card and a one-second pause. On-screen text is shown as quoted lines.
+
+### Slide 1 · SRE course · Episode 3 of 16 · Priority 2 — Toil and automation   `[th]`
+> What counts as toil, why the cap exists, and how automation both removes work and creates new disasters.
+**COACH:** Episode three. Toil, and the way automation evolves, answer a practical question: when you decide to automate something, what are you actually buying, and what can go wrong?
+**SAY THIS:** Automation is a force multiplier. That is also exactly why it is dangerous.
+*[pause: 0.8]*
+
+
+## 3.0 The story that starts it
+
+### Slide 2 · The opening story — The empty list that meant everything   `[dia]`
+*Diagram:* `svg/e03-empty-set.svg`
+**ASIDE:** A story about automation. An automation job was decommissioning a rack of machines. One step was to securely erase the disks. The job failed after that step succeeded, so an engineer restarted it from the beginning to debug. This time, the list of machines still needing erasure was correctly empty. And in this tool, an empty list was a special value that meant everything. So the automation sent nearly every machine in the content delivery network to be erased.
+**COACH:** Within minutes the disks were wiped. Users were still served from the main datacenters, with only a small rise in latency. The cause was one empty list, and the lesson is about blast radius.
+
+### Slide 3 · What this episode covers — Toil, and the evolution of automation   `[panel · note]`
+> Eliminating toil, and how automation evolves at Google. Google's workbook has a long chapter on toil with measurement methods.
+**COACH:** This episode covers eliminating toil, and the evolution of automation. There is a longer treatment of how to measure toil, and I will point to it at the end.
+
+
+## 3.1 What toil is
+
+### Slide 4 · Six properties — Work that looks like this is probably toil   `[cards · c3]`
+> red Manual :: A human runs the steps, even if by running a script.
+> red Repetitive :: The same task, again and again.
+> red Automatable :: A machine could do it just as well.
+> amb Tactical :: Interrupt-driven and reactive, not planned.
+> amb No enduring value :: The service is no better afterwards.
+> amb Scales linearly :: Twice the traffic, twice the work.
+**COACH:** What is toil? It has six properties. Toil is manual, repetitive, and automatable. It is tactical, meaning it arrives as an interruption instead of being planned. It leaves no enduring value, because the service is no better afterwards. And it scales linearly with the size of the service. Not every task has all six, but the more of them it has, the more likely it is toil.
+
+### Slide 5 · The line between toil and the rest — Four kinds of work that are not toil   `[table]`
+> Kind of work | Example | Why it is not toil
+> Overhead | Team meetings, goal setting, paperwork | Not tied to running the service, but still necessary
+> Grungy but valuable | Cleaning up a noisy alerting configuration | It improves the service afterwards
+> Engineering project work | Writing the tool that removes a task | It has enduring value
+> Judgement calls | Deciding how to respond to a novel failure | A human is needed
+> > Toil is a precise word. Do not use it for work you merely dislike.
+**COACH:** The word needs care. Overhead, such as meetings and paperwork, is not toil. Grungy work with a lasting benefit, such as cleaning up a noisy alerting configuration, is not toil. Engineering work that removes a task is not toil. And judgement calls, where a human is truly needed, are not toil either. If you call everything toil, the budget means nothing.
+
+### Slide 6 · Why less toil is better — The cost is not only the hours   `[panel · key]`
+> Toil caps career growth and breeds boredom, and a team that is mostly toil attracts no engineers.
+> It sets a precedent: when people see a fix done by hand, they ask for it again.
+> It creates friction between the team and everyone whose requests arrive as tickets.
+> And a little toil is fine: it can give a calming sense of accomplishment. The aim is the cap, not zero.
+**COACH:** Why care so much? Hours are only part of the cost. Toil stalls careers and breeds boredom, and a team that is mostly toil attracts no engineers. It sets a precedent: once people see a problem fixed by hand, they ask for it again. And it creates friction with everyone whose requests arrive as tickets. But be fair. A little toil is fine. The aim is a cap, not zero.
+
+### Slide 7 · The line to say — Toil is work that scales with the service and leaves nothing behind.   `[th]`
+**SAY THIS:** Toil is work tied to running a service that is manual, repetitive and automatable, and it grows in step with the service. The goal is not zero toil. The goal is a ceiling, and a plan to remove the largest source first.
+*[pause: 0.8]*
+
+
+## 3.2 What automation buys
+
+### Slide 8 · The value of automation — Five things, and the first is not speed   `[table]`
+> Value | What it means
+> Consistency | A machine runs the same steps every time. Humans cannot
+> A platform | The automation can be extended, reused and applied to more systems
+> Faster repairs | Mean time to repair drops when the fix is one command
+> Faster action | Machines react in seconds; people take minutes
+> Time saving | The most obvious value, and the weakest argument alone
+> > The order puts consistency first.
+**COACH:** What does automation buy? There are five things, and the order matters. First is consistency. A machine runs the same steps every time, and a human cannot. Second, a platform: automation that can be extended and reused. Third, faster repairs, because a fix that is one command is quicker. Fourth, faster action, because a machine reacts in seconds. And only fifth, time saving, which is the obvious benefit and the weakest argument alone.
+
+### Slide 9 · The hierarchy — Where automation lives, from no automation to none needed   `[dia]`
+*Diagram:* `svg/e03-automation-ladder.svg`
+**COACH:** Now the ladder, using a database failover example. At the bottom, no automation: an engineer fails the database over by hand. Next, a script that lives in one engineer's home directory. Then a generic failover script that everyone uses, with database support added. Then the database ships with its own failover script. And at the top, a database that notices a problem and fails over by itself. Why climb? The answer is bit rot.
+**COACH:** Automation maintained outside the system drifts when the system changes, and automation that runs rarely, like failover, is the most fragile, because nobody finds out it is broken until the day it matters. So the direction is always to move the intelligence into the system.
+
+### Slide 10 · The alternative and the price — When not to automate yet   `[table]`
+> Situation | Better move | Why
+> Procedure still changing every week | Write it down as a runbook first | Automating a moving target creates rework
+> Rare, high-stakes, irreversible action | Automate the checks, keep a human gate | The cost of a wrong action is too high
+> One-off task | Do it by hand once, with review | Not a repeating cost
+> Task needs real judgement | Improve the tooling around the human | You cannot encode what you do not understand
+**COACH:** The price. Do not automate a procedure that is still changing every week, because you will rewrite the automation each time. Write it down as a runbook first. For a rare, high-stakes, irreversible action, automate the checks and keep a human gate. A one-off task is better done by hand, with review. And where real judgement is needed, improve the tooling around the human, because you cannot encode what you do not understand.
+
+
+## 3.3 Automation can break everything faster
+
+### Slide 11 · The line to say — Consistency is the first value of automation. The blast radius is its first risk.   `[th]`
+**SAY THIS:** The first value of automation is consistency, and the first risk is blast radius. Decide how much any one run may touch before you write the first line.
+*[pause: 0.8]*
+
+### Slide 12 · Lessons from the empty set — What bounds the blast radius of an automation   `[table]`
+> Guardrail | What it does
+> A rate limit | No more than N machines per hour, however the command is phrased
+> A fraction limit | Never more than a few percent of any pool at once
+> Sanity checks on input | An empty set, or a set larger than usual, stops the job
+> A human gate | Large or unusual actions need a second person to approve
+> A dry run | Show what would change before it changes
+**COACH:** What bounds the blast radius? First, a rate limit: the tool will touch no more than a small number of machines per hour, however the command is phrased. Second, a fraction limit: never more than a small percentage of any pool at once. Third, sanity checks on input, so that an empty list or an unusually large list stops the job. Fourth, a human gate for large or unusual actions. And fifth, a dry run that shows what would change before anything does. In the story, any one of these would have turned a global event into a small one.
+
+### Slide 13 · Since 2016 — Reconciliation loops, policy and infrastructure as code   `[panel · now]`
+> Declarative systems now state the desired result and a controller converges to it. That removes a class of "run it twice" bugs, and adds a new one: a wrong desired state is applied everywhere, quickly.
+> Infrastructure is described as code and goes through review, which helps with consistency and audit.
+> Policy engines check changes before they are applied.
+> The control-plane idea also appears in the design-room course, part fifteen.
+**ASIDE:** What has changed since 2016? Declarative systems let you state the desired result, and a controller converges to it. That removes a class of run-it-twice bugs. It adds a new one: a wrong desired state is applied everywhere, quickly. Infrastructure is now described as code, reviewed like code, and policy engines check changes before they apply. The S-R-E lesson is the same, because the control loop is still an automation, and it still needs guardrails.
+
+### Slide 14 · Episode 3 · the line to say — Automate the repeating work, and bound the blast radius of the automation.   `[th]`
+**SAY THIS:** Automation removes toil, and it also turns one mistake into a fleet-wide event. So every automation needs a limit on how much it can touch at once, and a way to stop it.
+*[pause: 0.8]*
+
+
+## 3.4 Probe drills
+
+### Slide 15 · Interviewer probe — You inherit a team at seventy percent toil. Where do you start?   `[probe]`
+**INTERVIEWER:** You inherit a team at seventy percent toil. Where do you start?
+*A strong answer on screen:*
+> - Measure first: log each task, how often, how long, who asks
+> - Rank by hours per quarter, then by how easy to remove
+> - Pick the top item, remove it for good, and show the hours returned
+> - Say no to new sources of toil
+**CANDIDATE:** I measure before I change anything. For a few weeks the team logs each task, how often it happens, how long it takes and who asks. Then I rank by hours per quarter and by how easy it is to remove, and pick the top item. I remove it properly, show the hours returned, and use that to earn the room for the next one. And I start refusing new sources of toil, because otherwise I am bailing a boat while somebody drills holes.
+
+### Slide 16 · Interviewer probe — An engineer proposes automating a procedure that runs twice a year. Do you agree?   `[probe]`
+**INTERVIEWER:** An engineer proposes automating a procedure that runs twice a year. Do you agree?
+*A strong answer on screen:*
+> - Estimate the cost to build and maintain against the hours saved
+> - Twice a year with high stakes may justify checks, not full automation
+> - A well-tested runbook may be the better answer
+**CANDIDATE:** Not automatically. I compare the cost to build and maintain the automation against the hours saved. Twice a year, the saving is tiny. But if the procedure is high-stakes, the right investment may be automated checks and a rehearsed runbook, not full automation. The question is whether the effort removes enough risk or time to pay for the code that must be kept alive.
+
+### Slide 17 · Interviewer probe — Your auto-remediation system restarts a crashing service. Last night it restarted it forty times. What is wrong?   `[probe]`
+**INTERVIEWER:** Your auto-remediation system restarts a crashing service. Last night it restarted it forty times. What is wrong?
+*A strong answer on screen:*
+> - It treats the symptom, and hides the underlying fault
+> - Add a limit and an escalation: after N restarts, stop and page
+> - Record every action, so the pattern is visible
+> - Fix the crash, then the automation can retire
+**CANDIDATE:** The remediation is treating a symptom and hiding the underlying fault. First, it needs a limit: after a few restarts in a window, it stops and pages a human, so a crash loop is not quietly absorbed. Second, every action it takes should be recorded, so the pattern is visible in the morning. And third, someone must fix the crash itself, so the automation can retire.
+
+
+## 3.5 Where this shows up
+
+### Slide 18 · Where this shows up — Read, watch and build next   `[list]`
+> ~ Design-room course part 16 covers kill switches and safe limits on automation, and part 15 covers control planes.
+> - Episode 5: release engineering is automation with the biggest blast radius
+> - Episode 12: distributed cron is automation that must not run twice, or not at all
+> - Google's SRE books: the chapters on toil and automation, then the workbook chapter on toil
+> - Exercise: log one week of your own operational work, and rank it
+**COACH:** In your own study. The design-room course covers safe limits on automation in part sixteen, and control planes in part fifteen. Episode five takes this to release engineering, which is automation with the largest blast radius there is. Episode twelve covers distributed cron, which is automation that must not run twice, and must not skip. And the best exercise is to log one week of your own operational work, and rank it by hours.
+

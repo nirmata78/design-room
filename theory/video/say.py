@@ -15,6 +15,7 @@ _S = {
  "MessagePack":"message-pack","Protobuf":"proto-buf","BSON":"B-son","B-trees":"bee-trees","B-tree":"bee-tree","LSM-tree":"L-S-M tree","LSM-trees":"L-S-M trees","SSTable,":"S-S-table,","Bloom":"bloom","Cypher":"sigh-fer","SPARQL":"sparkle","Datalog":"data-log","ETL":"E-T-L","ERD":"E-R-D","VM":"V-M","TTL":"T-T-L","PG":"P-G",
  "InnoDB":"inno-D-B","Kafka":"Kahf-kuh","RPCs":"R-P-Cees","DDSketch":"D-D-sketch","Count-Min":"count min","IPv4":"I-P-v-four","IPv6":"I-P-v-six",
  "KRaft":"K-raft","URL":"U-R-L","URLs":"U-R-Ls","QR":"Q-R","CQRS":"C-Q-R-S","SQS":"S-Q-S","RabbitMQ":"rabbit M-Q","Elasticsearch":"elastic-search","PostgreSQL":"post-gres-Q-L","Protobuf":"proto-buf","Kinesis":"kin-EE-sis",
+ "endpoint":"end-point","endpoints":"end-points","Endpoint":"End-point","Endpoints":"End-points","endpoint's":"end-point's",
  "ms":"milliseconds","vs":"versus","etag":"E-tag","ETag":"E-tag","M/M/1":"M-M-one","N+1":"N plus one","N+2":"N plus two",
  "auth":"authorisation","auths":"authorisations","Auth":"Authorisation","Auths":"Authorisations","chargeback":"charge-back","chargebacks":"charge-backs","Chargeback":"Charge-back","Chargebacks":"Charge-backs",
 }

@@ -1,0 +1,88 @@
+#! title: What can be lost or duplicated
+#! short: Guarantees
+
+= th | Kafka in system design · Module 4 of 6 | What can be lost or duplicated | Delivery guarantees, what exactly once really covers, the dual-write bug, and the record that blocks a partition.
+N: Module four. Kafka can be configured perfectly and your system can still lose an order or charge a customer twice. Most of those bugs live at the two edges of Kafka: where data comes in, and where it goes out.
+
+## 4.1 Three delivery guarantees
+N: We start with the three delivery guarantees, and why the order of two lines of code decides between them.
+
+= table | From the ground up | The order of two steps decides the guarantee
+Consumer does | Crash between the steps | Guarantee
+Commit the offset, then process | The event is **never processed** | At most once
+Process, then commit the offset | The event is **processed twice** | At least once
+Process and commit in one transaction | Neither can happen alone | Effectively once
+N: A consumer does two things: it processes an event, and it commits its offset. If it commits first and crashes, the event is never processed. That is at most once. If it processes first and crashes before committing, it reads the event again after restart and processes it twice. That is at least once. Only when both steps happen in one transaction do you get the effect of exactly once. Almost every real system chooses at least once, and then makes duplicates harmless.
+
+= panel trap | The default that loses data | Automatic commits and worker threads
+`enable.auto.commit` is **true** by default: offsets are committed in the background.
+Hand records to a thread pool, and the offset can be committed **before the work finishes**. A crash then loses those events without any error.
+With asynchronous processing, turn it off and commit only what has completed.
+N: Here is a default that can lose data. Automatic offset commit is on by default. That is fine if you finish processing before the next poll. But hand records to a thread pool, and the offset can be committed before the work has finished. A crash then loses those events, without any error. So with asynchronous processing, turn automatic commit off, and commit only what has completed.
+
+## 4.2 What exactly once really covers
+N: Next, the most misunderstood phrase in Kafka: exactly once.
+
+= dia | Exactly once | Kafka's transaction ends at Kafka's edge
+k-eos
+N: Kafka does offer exactly once, inside a clear boundary. A processor reads from an input topic, writes to an output topic, and commits its consumer offset, all in one Kafka transaction. Either all of that becomes visible, or none of it does. Readers must set their isolation level to read committed, because the default also shows aborted data. Now look to the right. Your database, a card network and an email provider are outside the box. Kafka cannot take back a charge, so there delivery is at least once.
+
+= table | Exactly once | Each tool removes one kind of duplicate
+Tool | Removes | Does not remove
+Idempotent producer | Duplicates from a producer's **retries** | A service that sends the same business event twice
+Kafka transactions | Partial results in **topic to topic** processing | Effects in any outside system
+Idempotent receiver | Duplicates **at the final effect** | Nothing further: this is the last line of defence
+N: Each tool removes one kind of duplicate. The idempotent producer numbers its batches, so a retry after a lost acknowledgement is not written twice. It cannot help if your service decides to send the same business event twice. Transactions cover processing from topic to topic, and no further. The idempotent receiver is the last line of defence, because it stands where the effect really happens.
+
+## 4.3 Where the duplicate dies
+N: Next, how a receiver actually makes a duplicate harmless.
+
+= code sql | The idempotent receiver | Record the event ID in the same transaction as the effect
+BEGIN;
+
+INSERT INTO processed_events (event_id)
+VALUES ('evt-7f3a')
+ON CONFLICT (event_id) DO NOTHING;
+-- no row inserted? This is a duplicate: stop here.
+
+UPDATE orders SET status = 'PAID' WHERE order_id = 9814;
+
+COMMIT;
+N: Here is the pattern in SQL. Every event carries a stable identifier, set when the event was first created. In one database transaction, the receiver inserts that identifier into a table of processed events, and applies the effect. If the insert finds the identifier already there, this is a duplicate, and the receiver stops. Because both writes share a transaction, a crash leaves either both or neither. For an outside provider, send the same identifier as an idempotency key.
+
+= th | The line to say | Delivery is at least once; the receiver makes a duplicate harmless, using a stable event ID.
+V: Delivery is at least once. The receiver makes a duplicate harmless, using a stable event identifier in the same transaction as the effect.
+[pause: 0.8]
+
+## 4.4 The dual-write bug
+N: Next, the bug at the entrance to Kafka, which appears in a large share of designs.
+
+= dia | The dual-write bug | Two systems, no shared transaction
+k-dual-write
+N: On the left, a service commits an order to its database, and then publishes an event to Kafka. Those are two systems with no shared transaction. If the service crashes between the two steps, the order exists and nobody ever hears about it. Reversing the steps only reverses the bug. On the right is the outbox pattern. The service writes the order and an outbox row in one database transaction. A separate relay, often change data capture reading the database log, publishes each outbox row to Kafka.
+
+= code sql | The outbox | The event is committed with the business change
+BEGIN;
+
+INSERT INTO orders (order_id, status)
+VALUES (9814, 'CREATED');
+
+INSERT INTO outbox (event_id, topic, event_key, payload)
+VALUES ('evt-7f3a', 'orders.order-events.v1', '9814',
+        '{"type":"OrderCreated","order_id":9814}');
+
+COMMIT;
+N: The code is two inserts in one transaction. Either the order and its event both exist, or neither does. The relay may publish a row twice if it crashes after sending, so the outbox gives you at least once, and the idempotent receiver you just saw removes the duplicate. Together, those two patterns close both edges of Kafka.
+
+## 4.5 The record that blocks a partition
+N: Finally, what to do with an event that can never be processed.
+
+= dia | The poison record | Give every failure a way out
+k-retry
+N: One malformed event can stop a whole partition, because the consumer retries it forever and never moves on. So separate two kinds of failure. A transient error, such as a timeout, goes to a retry topic with a delay. When the attempts are used up, or the record can never succeed, it goes to a dead-letter topic, which raises an alert and can be replayed after a fix. There is one catch. A retry topic gives up order for that key, so if order matters, later events of the same key must wait as well.
+
+= probe | The payment consumer crashed and restarted. How do you know no customer was charged twice?
+- Delivery is **at least once**, so the event may arrive again
+- The charge carries a **stable idempotency key** from the event ID
+- The provider and our table both **reject the repeat**
+C: I assume the event will arrive again, because delivery is at least once. The charge is sent with an idempotency key derived from the stable event identifier, so the provider returns the original result instead of charging again. We also record the event identifier in the same transaction as our own state, so our side of the work is applied once.

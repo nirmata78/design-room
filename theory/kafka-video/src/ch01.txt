@@ -1,0 +1,102 @@
+#! title: The log, and where it fits
+#! short: The log
+
+= th | Kafka in system design · Module 1 of 6 | The log, and where it fits | What Kafka is, how a write becomes durable, how readers share a stream, and when Kafka does not belong in the design.
+N: This course is about one moment in a design review. Someone draws a box in the middle of the diagram, writes Kafka on it, and everyone nods. Then the real questions start. In this course we will answer them with reasoning and with numbers, so that you can defend that box, or remove it.
+
+## 1.1 Six questions in a design review
+N: We begin with the six questions this course answers, and the system we will use to answer them.
+
+= list | The map of the course | Six questions behind one box on the diagram
+- **Should Kafka be here at all?** Module 1
+- **How many topics, and which key?** Module 2
+- **How many partitions and brokers?** Module 3
+- **What can be lost or duplicated?** Module 4
+- **Can Kafka be the database?** Module 5
+- **What does the finished design look like?** Module 6
+N: Six questions. Should Kafka be here at all? How many topics do we need, and which key does each event carry? How many partitions and brokers? What can be lost or duplicated, and who deals with it? Can Kafka be the database? And finally, what does the finished design look like, in a form you could present?
+
+= tiles | One running example | An online marketplace's order platform
+10 MB/s | average, across all topics
+30 MB/s | peak, about 30,000 events a second
+3 | consumer groups read everything
+7 days | retention
+> Every decision in this course is worked on these numbers. They are illustrative, and the method is what carries over.
+N: One example runs through the whole course: the order platform of an online marketplace. Events are about one kilobyte each after compression. Traffic averages ten megabytes a second and peaks at thirty, which is about thirty thousand events a second. Three consumer groups read everything, and we keep seven days of history. These numbers are illustrative. The method is what you will carry to your own system.
+
+## 1.2 What Kafka actually is
+N: Next, what Kafka actually is, starting from nothing.
+
+= cards c3 | From the ground up | Three words explain most of Kafka
+An event :: A small fact that already happened: *order 9814 was paid*. It is never changed afterwards.
+A topic :: A named stream of related events, such as all order events.
+A partition :: One ordered, append-only file of a topic. Topics are split into partitions so they can grow past one machine.
+> A server that stores partitions is a **broker**. A group of brokers is a **cluster**.
+N: Three words explain most of Kafka. An event is a small fact that already happened: order ninety-eight fourteen was paid. It is never changed afterwards. A topic is a named stream of related events, such as all order events. A partition is one ordered, append-only file belonging to a topic. Topics are split into partitions so that they can grow beyond one machine. A server that stores partitions is called a broker, and a group of brokers is a cluster.
+
+= dia | From the ground up | A topic is a set of append-only logs, and readers keep a position
+k-anatomy
+N: Here is a topic with three partitions. Producers append at the right-hand end, and each new event gets the next number in that partition, called its offset. Now look at partition two. The fulfilment group has read up to offset seven, and the analytics group only up to offset two. Reading deletes nothing. Each group simply remembers its own position, and can even move it backwards to read history again. That single design choice is what makes Kafka different from a classic message queue.
+
+= table | Log or queue | What each one remembers decides what it can do
+ | Classic queue | Kafka log
+After a message is read | Deleted once acknowledged | Kept until retention expires
+What the system tracks | The state of every message | One offset per partition per group
+A second reader | Needs its own copy of the queue | Just another group
+Replay last week | Impossible | Move the offset back
+Order | Usually none across workers | Strict inside a partition
+N: Compare it with a classic queue. A queue deletes a message once it is acknowledged, and tracks the state of each message. A log keeps everything until retention expires, and tracks one number per partition for each group. So a second reader is cheap, because it is just another group. Replaying last week is simply moving an offset back. And order is strict inside a partition. The price is that one slow message holds up everything behind it in that partition.
+
+## 1.3 Events or calls
+N: Next, the choice that puts Kafka into a design in the first place: an event, or a call.
+
+= dia | The system design context | The same outage, with a call and with an event
+k-sync-event
+N: On the left, checkout calls payments, and payments calls email. Email goes down, the failure travels back up the chain, and a customer cannot buy something because a confirmation message could not be sent. On the right, checkout records the fact on a log and moves on. Email is down, the order is still taken, and when email returns it continues from its offset. The two services no longer need to be healthy at the same moment.
+
+= panel watch | The system design context | Decoupled does not mean independent
+Events remove the coupling in **time**: the writer and the reader need not be up together.
+They keep the coupling in **data**: every reader depends on the shape of the event.
+And they add **delay**: the writer cannot know whether any reader has acted yet.
+N: Be careful with the word decoupled. Events remove the coupling in time. They do not remove the coupling in data, because every reader depends on the shape of the event, and module six deals with that. They also add delay. The writer cannot know whether any reader has acted yet. So if checkout must know that the payment succeeded before it shows the confirmation page, that step stays a call.
+
+## 1.4 How a write becomes durable
+N: Next, what actually happens to one event between the producer and the disk.
+
+= dia | One level down | Followers copy the leader, and the high watermark marks what is safe
+k-replicate
+N: Each partition has one leader and some followers on other brokers. The producer writes to the leader, and followers fetch from it. Followers that are keeping up form the in-sync replica set. With acks set to all, the producer is acknowledged once every in-sync replica has the record. The high watermark marks that point, and consumers can read only below it. So a consumer never sees an event that a leader failure could still take back. Here, offsets one hundred and seven and one hundred and eight are still waiting for broker three.
+
+= th | The line to say | Acknowledged means held by every in-sync replica, and consumers only ever read below the high watermark.
+V: Acknowledged means held by every in-sync replica, and consumers only ever read below the high watermark.
+[pause: 0.8]
+
+## 1.5 Consumer groups and lag
+N: Next, how many readers share one stream of events.
+
+= dia | From the ground up | A group divides the partitions among its consumers
+k-groups
+N: A consumer group shares the work of a topic. Inside a group, each partition has exactly one reader at a time, which is how order survives. Fulfilment runs two consumers with two partitions each. Analytics is a separate group with one consumer, reading the same data at its own pace. Add a fifth consumer to a group with four partitions and it sits idle. So the partition count is the ceiling on a group's parallelism, and that number comes back in module three.
+
+= panel key | The two numbers to watch | Lag and rebalances
+**Lag** is the distance between the end of the partition and the group's position. It is the health signal of every consumer.
+A **rebalance** moves partitions between consumers when a member joins, leaves or stalls. A consumer that takes longer than `max.poll.interval.ms`, five minutes by default, is treated as dead.
+The newer consumer protocol, generally available since Kafka 4.0, moves partitions **incrementally** instead of stopping the whole group. Clients opt in with `group.protocol=consumer`.
+N: Two numbers to watch. Lag is the distance between the end of the partition and the group's position, and it is the main health signal of any consumer. A rebalance moves partitions between consumers when a member joins, leaves or stalls. A consumer that spends more than five minutes between polls is treated as dead, by default. The newer consumer protocol, generally available since Kafka four, moves partitions incrementally instead of stopping the whole group, and clients must opt in to it.
+
+## 1.6 When Kafka belongs in the design
+N: Now the first question of the six: should Kafka be in this design at all?
+
+= dia | The decision | Four questions, in this order
+k-decide
+N: Ask four questions, in this order. Does the caller need the answer now? Then use a call. Do several teams need the same facts, or do you need to replay history? That is what Kafka is for. Is it work to be done once per item, with retries or delays? Then use a task queue, or Kafka's newer share groups, which module six explains. And if none of those is true, a table in the database you already run is probably enough. Kafka is a serious system to operate, so it has to earn its place.
+
+= th | The line to say | I add Kafka when several consumers need the same ordered facts, or when we must replay them.
+V: I add Kafka when several independent consumers need the same ordered facts, or when we must be able to replay them. If a caller needs an answer now, it stays a call.
+[pause: 0.8]
+
+= probe | The team has one producer and one consumer. Do they need Kafka?
+- Probably **not**: there is no fan-out and no replay requirement
+- A task queue, or a table polled by a worker, is simpler to run
+- Revisit when a **second independent reader** or a replay need appears
+C: Probably not. With one producer, one consumer and no need to replay, Kafka gives us operational cost without its main benefits. I would use a task queue, or a table polled by a worker. I would revisit that when a second independent reader appears, or when someone needs to replay history.
