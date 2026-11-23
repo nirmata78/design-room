@@ -1,7 +1,6 @@
 # SD-82 · Instant credit at the point of sale: reference-solution video
 
-Staff bar (L6/L7), manager layer marked AUX. **Length 69:59**, 18 chapters, **149 numbered slides**, **8,574 spoken
-words** (candidate 86.0 %, interviewer 4.5 %, key line 4.7 %, coach 4.8 %). Scripted walkthrough with synthetic voices;
+Staff bar (L6/L7), manager layer marked AUX. **Length 1:32:04**, 20 chapters, **168 numbered slides** in **567 reveal frames**, **10,932 spoken words** (candidate 86.0 %, interviewer 4.1 %, key line 4.0 %, coach 6.0 %). Scripted walkthrough with synthetic voices;
 figures are illustrative, not any lender's numbers, and statements about lending rules are general, not legal advice.
 **The technical content has not been reviewed by a person, and the video has not been watched end to end.** It replaces
 problem 1 of the earlier course-builder fintech video (retired) as the reference for this question. Written companion:
@@ -12,23 +11,25 @@ problem 1 of the earlier course-builder fintech video (retired) as the reference
 | Time | Chapter |
 |---|---|
 | 00:00 | 0 Cold open |
-| 02:30 | 1 Requirements and scope |
-| 07:37 | 2 Estimates |
-| 12:05 | 3 Theory |
-| 20:11 | 4 API and entities |
-| 23:47 | 5 High-level design |
-| 31:30 | 6 Bridge |
-| 32:14 | 7 Challenges |
-| 32:31 | 7.1 The bureau is slow |
-| 37:05 | 7.2 The bureau is down for everyone |
-| 41:26 | 7.3 The phone drops |
-| 45:48 | 7.4 Funding fails after booking |
-| 49:32 | 7.5 Explain a decision fourteen months later |
-| 53:52 | 7.6 A new model approves six percent more |
-| 57:32 | 7.7 Where identity data lives |
-| 61:08 | 7.8 How would you know it is broken? |
-| 64:49 | 8 Build cost (AUX) |
-| 67:24 | 9 Recap |
+| 02:32 | 1 Requirements and scope |
+| 07:43 | 2 Estimates |
+| 12:15 | 3 Theory |
+| 20:34 | 4 API and entities |
+| 24:19 | 5 High-level design |
+| 32:35 | 5.1 Components and technologies |
+| 44:47 | 5.2 When you don't need all this |
+| 46:28 | 6 Bridge |
+| 47:13 | 7 Challenges |
+| 47:30 | 7.1 Challenge 1: The bureau is slow |
+| 53:54 | 7.2 Challenge 2: The bureau is down for everyone |
+| 58:36 | 7.3 Challenge 3: The phone drops |
+| 1:03:16 | 7.4 Challenge 4: Funding fails after booking |
+| 1:07:18 | 7.5 Challenge 5: Explain a decision fourteen months later |
+| 1:13:28 | 7.6 Challenge 6: A new model approves six percent more |
+| 1:17:23 | 7.7 Challenge 7: Where identity data lives |
+| 1:21:15 | 7.8 Challenge 8: How would you know it is broken? |
+| 1:25:16 | 8 Build cost |
+| 1:29:17 | 9 Recap |
 
 ## The eight challenges
 
@@ -93,3 +94,28 @@ never copy it to a cloud folder or anywhere outside the repository.
 
 `publish/`: YouTube title (96/100), description with chapters (3,183/5,000), tags, thumbnail (checked), LinkedIn post
 (hook 104 characters) and first comment. Not uploaded, not posted.
+
+## Retrofit, 2026-11-22
+
+Brought to the current standard by `RETROFIT.md`: the Google theme (`video.css`, `google-theme.css`), progressive reveal (every table row,
+card, trace event and figure step appears as it is spoken), sidecar captions (`.srt` and `.vtt` beside the MP4, nothing burned in), the
+technology chapter **5.1** generated from `../stack.json` (container view with technologies, one slide per technology with its rejected
+alternatives, the stack on one slide, the drill interlude) and a **Rejected** line on every challenge's fix slide.
+
+**93 of the 161 slides were written before reveal markers existed; their markers were placed automatically** (`dsl.META["automark"]`:
+the narration is cut at sentences and dealt to the reveal units by word overlap). Watch those slides and move a marker by hand where one
+lands badly. Not done in this pass: the C4 context moved to the end of chapter 1, a mechanism map in the theory chapter, extra sequences per
+requirement, component views. The previous sources are kept in `.v1-retrofit-2026-11-22/` until the author has watched this version.
+
+## Review for a lending EM loop, 2026-11-22
+
+Reviewed against an EM-level lending checklist and rebuilt (`.v2-review-2026-11-22/` held the previous sources during the run and has been removed). Changes:
+
+- Challenge 1: cost tiers (tier-0 in-house checks before one parallel gather; full waterfall rejected at the counter); soft inquiry recorded.
+- Challenge 5: the rulebook by name (ECOA / Regulation B, FCRA, fair lending, model risk), each mapped to fields of the decision record.
+- 5.1: a C4 component view of the decision orchestrator. 5.2: the alternate path (one bureau and refer; crossover ≈ 330,000 applications a month).
+- Build cost: contracts between teams (owner → consumers → change rule), Conway's law stated; LoanBooked consumed by SD-95 and SD-99.
+- Consistency: stack.json no longer says the orchestrator awaits bank data, and late calls are recorded, not cancelled; the gather code is labelled pseudocode (the service is Go).
+- Layout gate: 57 failures → **0** (C4 views redrawn wide, overlay notes dropped where the strip repeated them, code ≤ 56 × 12, ERD sizes).
+
+QA of this build: `check_layout.py` 0 failures; `ffprobe` H.264 + AAC 1920×1080, 20 chapters, no subtitle stream; `.srt`/`.vtt` beside the MP4, no line over 42 characters, every VTT cue with a voice span; Whisper check on 20 excerpts found only transcription noise; frames of the new slides read as images. **Not watched end to end.**

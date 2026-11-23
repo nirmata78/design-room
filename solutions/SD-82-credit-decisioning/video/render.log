@@ -1,0 +1,63 @@
+stack sync: up to date
+automarked 93 legacy slides (hand-place markers to refine): ['ch0_2.py:15', 'ch0_2.py:28', 'ch0_2.py:41', 'ch0_2.py:41', 'ch0_2.py:41', 'ch0_2.py:41'] …
+slides 161 frames 535 words {'C': 8509, 'I': 446, 'V': 402, 'N': 631} total 9988
+by chapter {'0': 328, '1': 639, '2': 580, '3': 1014, '4': 443, '5': 2199, '6': 86, '7': 4085, '8': 301, '9': 313}
+  voice 20/767
+  voice 40/767
+  voice 60/767
+  voice 80/767
+  voice 100/767
+  voice 120/767
+  voice 140/767
+  voice 160/767
+  voice 180/767
+  voice 200/767
+  voice 220/767
+  voice 240/767
+  voice 260/767
+  voice 280/767
+  voice 300/767
+  voice 320/767
+  voice 340/767
+  voice 360/767
+  voice 380/767
+  voice 400/767
+  voice 420/767
+  voice 440/767
+  voice 460/767
+  voice 480/767
+  voice 500/767
+  voice 520/767
+  voice 540/767
+  voice 560/767
+  voice 580/767
+  voice 600/767
+  voice 620/767
+  voice 640/767
+  voice 660/767
+  voice 680/767
+  voice 700/767
+  voice 720/767
+  voice 740/767
+  voice 760/767
+/Users/neo.bsuir/Projects/design-room/solutions/SD-82-credit-decisioning/video/credit-decisioning-reference.mp4  1080p  84:45  19 chapters  535 frames
+  00:00  0 Cold open
+  02:32  1 Requirements and scope
+  07:43  2 Estimates
+  12:15  3 Theory
+  20:34  4 API and entities
+  24:11  5 High-level design
+  32:28  5.1 Components and technologies
+  43:24  6 Bridge
+  44:09  7 Challenges
+  44:26  7.1 Challenge 1: The bureau is slow
+  49:21  7.2 Challenge 2: The bureau is down for everyone
+  54:05  7.3 Challenge 3: The phone drops
+  58:46  7.4 Challenge 4: Funding fails after booking
+  62:49  7.5 Challenge 5: Explain a decision fourteen months later
+  67:28  7.6 Challenge 6: A new model approves six percent more
+  71:26  7.7 Challenge 7: Where identity data lives
+  75:20  7.8 Challenge 8: How would you know it is broken?
+  79:22  8 Build cost
+  81:59  9 Recap
+EXIT 0 elapsed 5846s

@@ -7,7 +7,7 @@ Post from a computer, after the YouTube video is public. The link is still pendi
 ```text
 Eight loan applications a second. Any database takes that. So why does this round fail strong engineers?
 
-I've published a 70-minute reference solution for instant credit at the point of sale, at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on 149 numbered slides.
+I've published a 92-minute reference solution for instant credit at the point of sale, at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on 567 numbered slides.
 
 The idea that unlocks it: the core is small and boring on purpose, one database and one atomic step. The design lives at the slow edges and in what you keep.
 
@@ -36,5 +36,5 @@ Written reference design, stage by stage: https://github.com/nirmata78/design-ro
 Run this round yourself, with an AI interviewer that won't help you: https://github.com/nirmata78/design-room
 ```
 
-**Media: attach the reference design.** In the post composer, More (+) → Add a document → `../../SD-82_Credit_Decisioning_Reference_Design.pdf` (41 pages, 3.5 MB; limit 300 pages, 100 MB).
+**Media: attach the reference design.** In the post composer, More (+) → Add a document → `../../SD-82_Credit_Decisioning_Reference_Design.pdf` (51 pages, 2.3 MB; limit 300 pages, 100 MB).
 Document title, shown on the viewer: **Instant credit at the point of sale: a Staff-level reference design**. A post carries one attachment, so the video stays a link in the text, and the document is what shows in the feed.

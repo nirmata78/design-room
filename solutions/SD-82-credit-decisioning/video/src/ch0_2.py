@@ -17,7 +17,7 @@ S(plain("Before the design", "What this question grades", table(["Axis", "Weak s
   ["<b>Correctness</b>", "A saga that “compensates” every step", "A state machine with one atomic step, accept to book, with an outbox"],
   ["<b>Trade-offs</b>", "Hedged bureau calls; “approve with partial data”", "One deadline; a missing-data policy owned by credit risk, capped"],
   ["<b>Depth</b>", "“The model returns a score”", "Frozen inputs and versions; a capped challenger; a vault with tokens"],
-  ["<b>Operations</b>", "CPU and error rate", "Offers in 3 s, approval per merchant per hour, fallback against cap, owners"]], "bt sm sig") +
+  ["<b>Operations</b>", "CPU and error rate", "Offers in 3 s, approval per merchant per hour, fallback against cap, owners"]], "bt xs sig") +
   grade("Every degraded path is a credit decision with an owner and a cap, not an engineering default.")), [
  "N: Five axes. The weak answer shards a database that sees eight writes a second. The strong answer knows a credit pull cannot be undone, and that a timeout is a credit decision someone has to own.",
  "C: One rule I'll keep for the whole round: every degraded path is a credit decision with an owner and a cap, never an engineering default."])

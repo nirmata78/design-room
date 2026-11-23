@@ -36,14 +36,14 @@ b.node("ana", X[2], 50, W, 130, "ext", "Analytics", "wants the data", tag="ch7")
 
 REQ = dict(src="r:0.25", dst="l:0.25"); RSP = dict(src="l:0.75", dst="r:0.75", kind="resp")
 mid = lambda i: (X[i] + W + X[i + 1]) / 2          # label position between column i and i+1
-b.edge("p-a", "pos", "api", "apply · accept", **REQ, at=(mid(0), 322))
+b.edge("p-a", "pos", "api", "submit", **REQ, at=(mid(0), 322))
 b.edge("a-p", "api", "pos", "offers · loan", **RSP, at=(mid(0), 420))
 b.edge("a-ap", "api", "app", "create", **REQ, at=(mid(1), 322))
 b.edge("ap-a", "app", "api", "status", **RSP, at=(mid(1), 420))
 # V1: the application service calls the vendors itself, one after another
 b.edge("ap-v1", "app", "ven", "identity, then bureau", until=1, **REQ, at=(1136, 322))
 b.edge("v-ap1", "ven", "app", "answers, in turn", until=1, **RSP, at=(1136, 420))
-b.edge("ap-db", "app", "db", "state · loan", src="b:0.5", dst="t:0.5", at=(870, 500))
+b.edge("ap-db", "app", "db", "state", src="b:0.5", dst="t:0.5", at=(870, 500))
 # V2: the orchestrator, the model step, the outbox relay
 b.edge("ap-o", "app", "orch", "decide", since=2, **REQ, at=(mid(2), 322))
 b.edge("o-ap", "orch", "app", "decision", since=2, **RSP, at=(mid(2), 420))
@@ -54,13 +54,13 @@ b.edge("db-l", "db", "log", "outbox relay", src="l:0.5", dst="r:0.5", kind="asyn
 # V3: vault, records, funding
 b.edge("a-vt", "api", "vault", "tokenise", src="t:0.5", dst="b:0.5", since=3, at=(530, 236))
 b.edge("o-vt", "orch", "vault", "detokenise in adapter", src="t:0.2", dst="r:0.6", via=[(1079, 236), (600, 236), (600, 128)],
-       since=3, at=(880, 224))
+       since=3, at=(1000, 224))
 b.edge("o-r", "orch", "rec", "decision record", src="b:0.85", dst="t:0.5", via=[(1202, 470), (1478, 470)], kind="async",
        since=3, at=(1340, 458))
 b.edge("l-f", "log", "fund", "LoanBooked", src="l:0.5", dst="r:0.5", kind="async", since=3, at=(mid(0), 588))
 # tagged edges
 b.edge("o-c", "orch", "chal", "shadow score", src="t:0.7", dst="b:0.5", tag="ch6", at=(1210, 236))
-b.edge("ap-an", "app", "ana", "export", src="t:0.8", dst="b:0.8", tag="ch7", at=(800, 236))
+b.edge("ap-an", "app", "ana", "export", src="t:0.8", dst="b:0.8", tag="ch7", at=(780, 250))
 
 TOP = {"chal", "ana", "vault"}
 def sv(name, h, **view):
@@ -80,6 +80,8 @@ sv("base-v1.svg", 780, upto=1, legend=True)
 sv("base-v2.svg", 780, upto=2, new=2, legend=True)
 sv("base-v3.svg", 780, upto=3, new=3, legend=True)
 sv("base-final.svg", 780, upto=3, legend=True)
+# 5.2 the alternate path: one box changes (one bureau, refer whatever is missing)
+sv("alt.svg", 800, upto=3, keep=["app", "orch", "ven", "model"], alt=["ven"])
 sv("map.svg", 780, upto=3, legend=True, attack=["ven", "model", "app", "fund", "rec", "vault", "orch"], keep=None)
 sv("flow-fr1.svg", 700, upto=3, flow=["p-a", "a-vt", "a-ap", "ap-db", "ap-a", "a-p"], keep=["pos", "api", "vault", "app", "db"])
 sv("flow-fr2.svg", 700, upto=3, flow=["ap-o", "o-vt", "o-v", "v-o", "o-m", "o-r", "o-ap", "a-p"],
@@ -88,83 +90,77 @@ sv("flow-fr3.svg", 700, upto=3, flow=["p-a", "a-ap", "ap-db", "ap-a", "a-p"], ke
 sv("flow-fr4.svg", 700, upto=3, flow=["ap-db", "db-l", "l-f"], keep=["app", "db", "log", "fund"])
 # challenge overlays
 N = 640  # note row for the 700-high views
-sv("ch1-attack.svg", 800, upto=2, attack=["ven"], keep=["pos", "api", "app", "orch", "ven"], hot=["o-v", "v-o"],
-   notes=[(40, 715, 1520, "Bureau A: one call in ten takes 4 s. Wait, and offers miss 3 s; race bureau B, and pay twice.", "red")])
-sv("ch1-fix.svg", 800, upto=2, fix=["orch"], keep=["pos", "api", "app", "orch", "ven"], ok=["o-v", "v-o"],
-   notes=[(40, 715, 1520, "All calls at once, decide at 2.0 s, a breaker per vendor; bureau B only on an error or an open breaker.", "green")])
-sv("ch2-attack.svg", 800, upto=3, attack=["ven", "model"], keep=["app", "orch", "ven", "model"], hot=["o-v"],
-   notes=[(40, 715, 1520, "Bureau A down 20 min: 9,600 applications. Approve all: $11.5M unscored. Decline all: 4,000 lost loans.", "red")])
-sv("ch2-fix.svg", 800, upto=3, fix=["model"], keep=["app", "orch", "ven", "model"], ok=["o-m"],
-   notes=[(40, 715, 1520, "A signed policy table: bureau B · small and known under a cap · refer · decline with a real reason.", "green")])
-sv("ch3-attack.svg", 800, upto=2, attack=["app", "db"], keep=["pos", "api", "app", "db"], hot=["p-a", "a-ap", "ap-db"],
-   notes=[(40, 715, 1520, "Two taps, two workers, both read OFFERED v7: two loans.", "red")])
-sv("ch3-fix.svg", 800, upto=2, fix=["db"], keep=["pos", "api", "app", "db", "log"], ok=["ap-db", "db-l"],
-   notes=[(40, 715, 1520, "UPDATE … WHERE version = 7 · UNIQUE(application_id) · loan + outbox in one commit.", "green")])
-sv("ch4-attack.svg", 800, upto=3, attack=["fund"], keep=["app", "db", "log", "fund"], hot=["l-f"],
-   notes=[(40, 715, 1520, "Transfer rejected after booking; another times out. Undo the credit pull?", "red")])
-sv("ch4-fix.svg", 800, upto=3, fix=["fund"], keep=["app", "db", "log", "fund"], ok=["db-l", "l-f"],
-   notes=[(40, 715, 1520, "Only funding can be undone: its own states, UNKNOWN included; reconcile daily.", "green")])
-sv("ch5-attack.svg", 800, upto=2, attack=["model"], keep=["app", "orch", "model"], hot=["o-m"],
-   notes=[(40, 715, 1520, "Re-run today's model v14 on today's file: it approves a customer v9 declined. The notice said otherwise.", "red")])
-sv("ch5-fix.svg", 800, upto=3, fix=["rec"], keep=["app", "orch", "model", "rec"], ok=["o-r", "o-m"],
-   notes=[(40, 715, 1520, "Freeze inputs, versions and ranked reasons; keep old models loadable; replay a sample nightly.", "green")])
-sv("ch6-attack.svg", 800, upto=3, attack=["model"], keep=["app", "orch", "model", "rec"], hot=["o-m"],
-   notes=[(40, 715, 1520, "+6 % approvals: 84,000 more loans, about $100M a month. Losses show at 90 to 120 days.", "red")])
-sv("ch6-fix.svg", 800, upto=3, show=["ch6"], fix=["chal"], keep=["app", "orch", "model", "rec", "chal"], ok=["o-c", "o-m"],
-   notes=[(40, 715, 1520, "Backtest → shadow → a 5 % slice under its own cap → early signals at 30 days → widen by policy change.", "green")])
-sv("ch7-attack.svg", 800, upto=2, show=["ch7"], attack=["app", "db", "ana"], keep=["pos", "api", "app", "db", "ana", "orch", "ven"], hot=["ap-an", "ap-db"],
-   notes=[(40, 715, 1520, "Identity in rows, in adapter logs, in the support tool and in the training extract.", "red")])
-sv("ch7-fix.svg", 800, upto=3, show=["ch7"], fix=["vault"], keep=["pos", "api", "app", "db", "ana", "vault", "orch", "ven"], ok=["a-vt", "o-vt", "ap-an"],
-   notes=[(40, 715, 1520, "Only the vault and the vendor adapters see real values; everything else, analytics included, sees tokens.", "green")])
-sv("ch8-attack.svg", 800, upto=3, attack=["model"], keep=["pos", "api", "app", "orch", "model"],
-   notes=[(40, 715, 1520, "Friday 18:00, a pricing change: approvals 62 % → 41 %, no errors, latency fine. Found Saturday at 09:00.", "red")])
-sv("ch8-fix.svg", 800, upto=3, fix=["orch", "model", "fund"], keep=["pos", "api", "app", "orch", "model", "fund", "log", "db"],
-   notes=[(40, 715, 1520, "Watch the decision: offers in 3 s · approval per merchant per hour · fallback against cap · booked not funded.", "green")])
+sv("ch1-attack.svg", 800, upto=2, attack=["ven"], keep=["pos", "api", "app", "orch", "ven"], hot=["o-v", "v-o"])
+sv("ch1-fix.svg", 800, upto=2, fix=["orch"], keep=["pos", "api", "app", "orch", "ven"], ok=["o-v", "v-o"])
+sv("ch2-attack.svg", 800, upto=3, attack=["ven", "model"], keep=["app", "orch", "ven", "model"], hot=["o-v"])
+sv("ch2-fix.svg", 800, upto=3, fix=["model"], keep=["app", "orch", "ven", "model"], ok=["o-m"])
+sv("ch3-attack.svg", 800, upto=2, attack=["app", "db"], keep=["pos", "api", "app", "db"], hot=["p-a", "a-ap", "ap-db"])
+sv("ch3-fix.svg", 800, upto=2, fix=["db"], keep=["pos", "api", "app", "db", "log"], ok=["ap-db", "db-l"])
+sv("ch4-attack.svg", 800, upto=3, attack=["fund"], keep=["app", "db", "log", "fund"], hot=["l-f"])
+sv("ch4-fix.svg", 800, upto=3, fix=["fund"], keep=["app", "db", "log", "fund"], ok=["db-l", "l-f"])
+sv("ch5-attack.svg", 800, upto=2, attack=["model"], keep=["app", "orch", "model"], hot=["o-m"])
+sv("ch5-fix.svg", 800, upto=3, fix=["rec"], keep=["app", "orch", "model", "rec"], ok=["o-r", "o-m"])
+sv("ch6-attack.svg", 800, upto=3, attack=["model"], keep=["app", "orch", "model", "rec"], hot=["o-m"])
+b.size = 32
+sv("ch6-fix.svg", 800, upto=3, show=["ch6"], fix=["chal"], keep=["orch", "model", "rec", "chal"], ok=["o-c", "o-m"])
+b.size = 27
+sv("ch7-attack.svg", 800, upto=2, show=["ch7"], attack=["app", "db", "ana"], keep=["pos", "api", "app", "db", "ana", "orch", "ven"], hot=["ap-an", "ap-db"])
+sv("ch7-fix.svg", 800, upto=3, show=["ch7"], fix=["vault"], keep=["api", "app", "ana", "vault", "orch", "ven"], ok=["a-vt", "o-vt", "ap-an"])
+sv("ch8-attack.svg", 800, upto=3, attack=["model"], keep=["pos", "api", "app", "orch", "model"])
+sv("ch8-fix.svg", 800, upto=3, fix=["orch", "model", "fund"], keep=["pos", "api", "app", "orch", "model", "fund", "log", "db"])
 bs.budget_bar(OUT / "budget.svg", [("phone, state", 200, "client"), ("vendors, one deadline", 2000, "ext"),
                                    ("model, policy, price", 250, "service"), ("record, push", 250, "edge")],
               total=3000, unit="ms", title="Submit to offers on screen, p95 (initial target 3 s)")
 
 # ───────────────────────────── 2 · C4 ────────────────────────────────────────────────────────────────
-d = c4.Diagram(1600, 820)
-d.node("cus", 60, 90, 300, 150, "person", "Customer", "Person", "At the counter, on their phone.")
-d.node("mer", 60, 520, 300, 150, "person", "Merchant", "Person", "Point of sale; gets paid.")
-d.node("sys", 620, 290, 360, 200, "system", "Credit decisioning", "Software System", "Apply, decide, book, fund.")
-d.node("ven", 1230, 60, 320, 140, "ext", "Credit vendors", "External", "Bureaus, identity, bank data.")
-d.node("bank", 1230, 320, 320, 140, "ext", "Partner bank", "External", "Lender of record; pays out.")
-d.node("svc", 1230, 580, 320, 140, "ext", "Servicing (SD-95)", "Internal system", "Schedule, repayments.")
-d.edge("cus", "sys", "Apply, accept", "HTTPS", src="r:0.8", dst="l:0.25", at=(480, 255))
-d.edge("mer", "sys", "Start a sale, see status", "HTTPS API", src="r:0.2", dst="l:0.8", at=(480, 560))
-d.edge("sys", "ven", "Reports, checks", "HTTPS, paid", src="r:0.2", dst="l:0.6", at=(1110, 210))
-d.edge("sys", "bank", "Funding, loan sale", "files, API", src="r:0.5", dst="l:0.5", at=(1105, 375))
-d.edge("sys", "svc", "LoanBooked", "event", src="r:0.8", dst="l:0.4", at=(1110, 560))
-d.legend(40, 780, ("person", "system", "ext"))
+d = c4.Diagram(1830, 760)
+d.node("cus", 40, 80, 340, 170, "person", "Customer", "Person", "At the counter, on a phone.", size=26)
+d.node("mer", 40, 500, 340, 170, "person", "Merchant", "Person", "Point of sale; gets paid.", size=26)
+d.node("sys", 700, 280, 420, 200, "system", "Credit decisioning", "Software System", "Apply, decide, book, fund.", size=28)
+d.node("ven", 1450, 40, 360, 160, "ext", "Credit vendors", "External", "Bureau, identity, bank data.", size=26)
+d.node("bank", 1450, 300, 360, 160, "ext", "Partner bank", "External", "Lender of record.", size=26)
+d.node("svc", 1450, 560, 360, 160, "ext", "Servicing (SD-95)", "Internal system", "Schedule, repayments.", size=26)
+d.edge("cus", "sys", "Apply, accept", "HTTPS", src="r:0.8", dst="l:0.25", at=(540, 250), size=22)
+d.edge("mer", "sys", "Start a sale, status", "HTTPS API", src="r:0.2", dst="l:0.8", at=(540, 545), size=22)
+d.edge("sys", "ven", "Reports, checks", "HTTPS, paid", src="r:0.2", dst="l:0.6", at=(1285, 205), size=22)
+d.edge("sys", "bank", "Funding, loan sale", "files, API", src="r:0.5", dst="l:0.5", at=(1285, 360), size=22)
+d.edge("sys", "svc", "LoanBooked", "event", src="r:0.8", dst="l:0.4", at=(1285, 555), size=22)
 d.save(OUT / "c4-context.svg")
 
-d = c4.Diagram(1600, 950)
-d.boundary(30, 50, 1180, 810, "Credit decisioning", "Software System")
-d.node("vlt", 60, 90, 230, 150, "db", "Identity vault", "Tokenisation", "The only raw identity.", size=21)
-d.node("lg", 340, 90, 230, 150, "queue", "Event log", "Log", "LoanBooked, decisions.", size=21)
-d.node("fnd", 620, 90, 230, 150, "container", "Funding", "Service", "Transfers, reconciliation.", size=21)
-d.node("api", 60, 360, 230, 160, "container", "API edge", "Gateway", "Merchant auth, idempotency keys.", size=21)
-d.node("app", 340, 360, 230, 160, "container", "Application service", "Service", "State machine, booking, outbox.", size=21)
-d.node("orc", 620, 360, 230, 160, "container", "Decision orchestrator", "Service", "Scatter, deadline, breakers.", size=21)
-d.node("db", 340, 660, 230, 160, "db", "Application DB", "Relational, replicated", "Apps, loans, outbox.", size=21)
-d.node("pol", 620, 660, 230, 160, "container", "Policy engine", "Service", "Model, policy, pricing; versioned.", size=21)
-d.node("rec", 900, 660, 260, 160, "db", "Decision records", "Object storage", "Encrypted, 7 years.", size=21)
-d.node("bank", 1270, 90, 290, 150, "ext", "Partner bank", "External", "Pays merchants.")
-d.node("ven", 1270, 360, 290, 160, "ext", "Credit vendors", "External", "Bureaus, identity, bank data.")
-d.edge("api", "app", "create, accept", "", src="r", dst="l", at=(315, 340))
-d.edge("app", "orc", "decide", "", src="r", dst="l", at=(595, 340))
-d.edge("orc", "ven", "parallel calls, one deadline", "HTTPS", src="r", dst="l", at=(1060, 420))
-d.edge("api", "vlt", "tokenise", "", src="t", dst="b", at=(220, 300))
-d.edge("app", "db", "one commit", "SQL", src="b", dst="t", at=(500, 600))
-d.edge("orc", "pol", "score", "", src="b", dst="t", at=(780, 600))
-d.edge("orc", "rec", "record", "async", src="r:0.85", dst="t", via=[(1030, 496)], at=(1080, 600))
-d.edge("db", "lg", "outbox relay", "async", src="l", dst="l", via=[(315, 740), (315, 165)], at=(250, 600))
-d.edge("lg", "fnd", "LoanBooked", "async", src="r", dst="l", at=(595, 70))
-d.edge("fnd", "bank", "transfers", "files, API", src="r", dst="l", at=(1060, 140))
-d.legend(40, 915, ("person", "container", "db", "ext"))
-d.save(OUT / "c4-containers.svg")
+CX, CW, CY, CH, CS = [50, 420, 790, 1160], 280, [90, 340, 590], 170, 25
+def containers(name):
+    d = c4.Diagram(1830, 800)
+    d.boundary(20, 30, 1450, 750, "Credit decisioning", "Software System", top="left")
+    d.node("vlt", CX[0], CY[0], CW, CH, "db", "Identity vault", "Tokenisation", "The only raw identity.", size=CS)
+    d.node("lg", CX[1], CY[0], CW, CH, "queue", "Event log", "Log", "LoanBooked, decisions.", size=CS)
+    d.node("fnd", CX[2], CY[0], CW, CH, "container", "Funding", "Service", "Transfers, reconcile.", size=CS)
+    d.node("api", CX[0], CY[1], CW, CH, "container", "API edge", "Gateway", "Merchant auth, keys.", size=CS)
+    d.node("app", CX[1], CY[1], CW, CH, "container", "Application service", "Service", "State machine, outbox.", size=CS)
+    d.node("orc", CX[2], CY[1], CW, CH, "container", "Decision orchestrator", "Service", "Deadline, breakers.", size=CS)
+    d.node("db", CX[1], CY[2], CW, CH, "db", "Application DB", "Relational", "Apps, loans, outbox.", size=CS)
+    d.node("pol", CX[2], CY[2], CW, CH, "container", "Policy engine", "Service", "Model, policy, pricing.", size=CS)
+    d.node("rec", CX[3], CY[2], CW, CH, "db", "Decision records", "Object storage", "Encrypted, 7 years.", size=CS)
+    d.node("bank", 1540, CY[0], 280, CH, "ext", "Partner bank", "External", "Pays merchants.", size=CS)
+    d.node("ven", 1540, CY[1], 280, CH, "ext", "Credit vendors", "External", "Bureau, identity, fraud.", size=CS)
+    d.edge("api", "app", "", "", src="r", dst="l")
+    d.edge("app", "orc", "", "", src="r", dst="l")
+    d.edge("orc", "ven", "all at once, one deadline", "HTTPS", src="r", dst="l", at=(1305, 405), size=22)
+    d.edge("api", "vlt", "tokenise", "", src="t", dst="b", at=(260, 302), size=22)
+    d.edge("app", "db", "one commit", "SQL", src="b", dst="t", at=(640, 552), size=22)
+    d.edge("orc", "pol", "score", "", src="b", dst="t", at=(990, 552), size=22)
+    d.edge("orc", "rec", "record", "async", src="r:0.8", dst="t", via=[(1300, 476)], at=(1360, 552), size=22)
+    d.edge("db", "lg", "outbox relay", "async", src="l", dst="l", via=[(380, 675), (380, 175)], at=(300, 552), size=22)
+    d.edge("lg", "fnd", "", "", src="r", dst="l")
+    d.edge("fnd", "bank", "transfers", "files, API", src="r", dst="l", at=(1305, 155), size=22)
+    d.save(OUT / name)
+
+containers("c4-containers.svg")
+# the same container view with the technologies (labels from ../stack.json)
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / 'src')); import stack
+c4.Diagram.OVERRIDE = {k: (v[1], v[2]) for k, v in stack.C4.items()}
+containers("c4-containers-tech.svg")
+c4.Diagram.OVERRIDE = {}
+
 
 # ───────────────────────────── 3 · sequences ─────────────────────────────────────────────────────────
 def seq(name, parts, steps, **kw):
@@ -238,7 +234,7 @@ seq("seq-ch5-replay",
      ("r", "rp", "rg", "DECLINE: high utilisation, short history (match)", dict(hl=True))])
 
 # ───────────────────────────── 4 · data models ───────────────────────────────────────────────────────
-c = er.Chen(1600, 900, size=26)
+c = er.Chen(1600, 900, size=29)
 c.entity("ap", 200, 120, "APPLICANT"); c.entity("a", 680, 120, "APPLICATION"); c.entity("vc", 1200, 120, "VENDOR CALL", weak=True)
 c.entity("dc", 680, 470, "DECISION"); c.entity("of", 1200, 470, "OFFER", weak=True); c.entity("ln", 200, 470, "LOAN")
 c.entity("ft", 200, 780, "FUNDING TRANSFER", weak=True)
@@ -257,16 +253,16 @@ c.link("a", "dd", "1", src="b", dst="t"); c.link("dd", "dc", "1", src="b", dst="
 c.link("dc", "ho", "1"); c.link("ho", "of", "N")
 c.link("a", "bk", "1", src="b", dst="t"); c.link("bk", "ln", "0..1")
 c.link("ln", "pd", "1", src="b", dst="t"); c.link("pd", "ft", "N", src="b", dst="t")
-c.legend(1380, 760)
-c.note(560, 820, 760, "One application books at most one loan; the decision is written once.")
+c.legend(1260, 700, size=22, rows=["rect", "rect2", "dia", "dia2", "oval", "key"])
+c.note(470, 820, 740, "One application books at most one loan; the decision is written once.")
 c.save(OUT / "erd-chen.svg")
 
-e = er.ERD(1600, 860, size=22)
+e = er.ERD(1600, 860, size=24)
 e.entity("app", 30, 40, 470, "application", [("id", "text", "PK"), ("merchant_id", "text", "IX"), ("applicant_tok", "text", ""),
          ("amount_cents", "int", ""), ("status", "text", ""), ("version", "int", "")],
          kind="focus", caption="the state machine; optimistic version")
 e.entity("dec", 570, 40, 470, "decision", [("application_id", "text", "PK"), ("outcome", "text", ""), ("reasons", "text[]", ""),
-         ("model_v · policy_v · pricing_v", "text", ""), ("record_uri", "text", "")],
+         ("versions", "jsonb", ""), ("record_uri", "text", "")],
          caption="written once, never updated")
 e.entity("ln", 1110, 40, 460, "loan", [("id", "text", "PK"), ("application_id", "text", "UQ"), ("offer_id", "text", ""),
          ("disclosure_v", "text", ""), ("terms", "jsonb", "")],
@@ -415,3 +411,28 @@ def teams():
 teams()
 
 print(sorted(p.name for p in OUT.glob("*.svg")))
+
+# ───────────── C4 level 3: the decision orchestrator, one level down (5.1; the box challenges 1, 2 and 8 open) ─────────────
+CS = 25
+d = c4.Diagram(1830, 770, canon="comp-orch")
+d.boundary(275, 30, 1250, 720, "Decision orchestrator", "Container: Go", top="left")
+d.node("app", 20, 300, 220, 160, "container", "Application service", "Go", "Asks for a decision.", size=CS)
+d.node("pre", 310, 80, 300, 160, "component", "Tier-0 checks", "in-process", "Eligibility, blocklist, own book.", size=CS)
+d.node("gat", 310, 300, 300, 160, "component", "Gather", "errgroup + deadline", "One 2.0 s deadline.", size=CS)
+d.node("late", 310, 540, 300, 160, "component", "Late answers", "Component", "Kept after 2.0 s.", size=CS)
+d.node("ad", 720, 80, 320, 160, "component", "Vendor adapters", "one per vendor", "Breaker; token bucket.", size=CS)
+d.node("pc", 720, 300, 320, 160, "component", "Policy client", "gRPC", "Features + what is missing.", size=CS)
+d.node("rw", 1150, 540, 320, 160, "component", "Record writer", "Component", "One per decision.", size=CS)
+d.node("ven", 1580, 80, 240, 160, "ext", "Credit vendors", "bureau, ID, fraud", "", size=CS)
+d.node("pol", 1580, 300, 240, 160, "container", "Policy engine", "rules + models", "", size=CS)
+d.node("rec", 1580, 540, 240, 160, "db", "Decision records", "write once", "", size=CS)
+d.edge("app", "gat", "", "", src="r", dst="l")
+d.edge("gat", "pre", "first", "", src="t", dst="b", at=(500, 275), size=22)
+d.edge("gat", "ad", "", "", src="r:0.2", dst="l:0.8")
+d.edge("ad", "ven", "HTTPS, mTLS", "", src="r", dst="l", at=(1300, 145), size=22)
+d.edge("gat", "pc", "", "", src="r", dst="l")
+d.edge("pc", "pol", "score", "", src="r", dst="l", at=(1300, 365), size=22)
+d.edge("pc", "rw", "", "", src="b:0.7", dst="l:0.5", via=[(944, 620)])
+d.edge("rw", "rec", "", "", src="r", dst="l")
+d.edge("gat", "late", "after 2.0 s", "", src="b", dst="t", at=(530, 505), size=22)
+d.save(OUT / "c4-comp-orch.svg", order=["app", "gat", "pre", "ad", "ven", "pc", "pol", "rw", "rec", "late"])

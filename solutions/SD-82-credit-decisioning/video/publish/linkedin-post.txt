@@ -1,6 +1,6 @@
 Eight loan applications a second. Any database takes that. So why does this round fail strong engineers?
 
-I've published a 70-minute reference solution for instant credit at the point of sale, at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on 149 numbered slides.
+I've published a 92-minute reference solution for instant credit at the point of sale, at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on 567 numbered slides.
 
 The idea that unlocks it: the core is small and boring on purpose, one database and one atomic step. The design lives at the slow edges and in what you keep.
 

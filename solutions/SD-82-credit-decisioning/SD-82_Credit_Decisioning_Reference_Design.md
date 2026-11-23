@@ -7,8 +7,8 @@ documentclass: article
 fontsize: 10pt
 geometry: a4paper,top=0.7in,bottom=0.75in,left=0.75in,right=0.75in
 colorlinks: true
-linkcolor: blue
-urlcolor: blue
+linkcolor: gblueink
+urlcolor: gblueink
 toc: true
 toc-depth: 2
 numbersections: false
@@ -351,6 +351,7 @@ sixty thousand, so what we do then is a policy, not an exception handler."
 | Bureau bill | 2 × 10^6^ × $1 $\approx$ **$2M/month** | illustrative | The largest cost line |
 | Report reuse | 4 × 10^5^ × $1 $\approx$ **$400k/month** saved | illustrative | A report store with a retention rule |
 | Identity checks | 2 × 10^6^ × $0.05 $\approx$ **$100k/month** | illustrative | Also paid per call; not raced either |
+| Tier-0 stops (free in-house checks) | 2 × 10^6^ × 6 % × $1.05 $\approx$ **$126k/month** saved | illustrative | Cheap checks first, then one parallel gather (6.1) |
 | Decision records | 2 × 10^6^ × 50 KB $\approx$ **100 GB/month**; × 84 $\approx$ **8.4 TB** | illustrative | Object storage, encrypted, referenced from the database |
 | Loans | 2 × 10^6^ × 60 % × 70 % $\approx$ **840,000/month**; × $1,200 $\approx$ **$1.0B/month**; $\approx$ **28,000/day** | illustrative | Funding is a daily batch per merchant |
 | Missing data at the deadline | $\approx$ 3 % $\approx$ **60,000/month** | illustrative, to measure | The policy table is a busy path |
@@ -668,6 +669,173 @@ purpose of every detokenise; detokenise allowed only to named callers (the vendo
 **Alternatives.** Encrypting the database at rest (protects stolen disks, not a leaked query, log or
 export); a bought tokenisation service (a fine choice; the boundary matters more than who built it).
 
+## Technologies, one level down
+
+Every container with the technology it runs on, how it is built, the alternatives rejected and why, and the question an interviewer asks about it. Generated from `stack.json`.
+
+## The orchestrator, one level down
+
+![C4 level 3, the decision orchestrator: the gather owns one deadline; tier-0 checks run first; one adapter per vendor with a breaker and a token bucket; the policy client sends the features and the list of what is missing; one record per decision; late answers are kept.](diagrams/video-c4-comp-orch.pdf){width=100%}
+
+The orchestrator is the box the challenges open most (6.1, 6.2, 6.8), so it gets a component view. The **gather**
+holds one context deadline for the whole decision. **Tier-0 checks** run in process before anything is paid for.
+The **vendor adapters**, one per vendor, each own a circuit breaker and a token bucket at the contracted rate and
+are the only code that receives detokenised values. The **policy client** sends the feature vector and the list
+of calls that missed the deadline; the policy decides what missing means. The **record writer** writes one
+immutable record per decision. The **late-answer recorder** keeps every answer that arrives after the deadline,
+because it was paid for and may finish a refer.
+
+<!-- stack:sections -->
+
+## Application DB: PostgreSQL with constraints
+
+*How it is built.* A unique constraint on the application ID means a second booking cannot exist. State changes are conditional updates that name the state they expect. The loan row and the outbox row are written in the same transaction. A synchronous standby in another zone keeps a committed booking through a failover. Revisit at a hundred times the volume.
+
+*Why PostgreSQL 16, one primary, a synchronous standby, point-in-time recovery:* Fifty transitions a second is small. The correctness lives in constraints and conditional updates, which a relational database does in one transaction with the outbox row.
+
+*Rejected:*
+
+- **A distributed SQL database**: Correct and unneeded at this scale, and more to run.
+- **A key-value store**: No multi-row transaction for the loan and its outbox row.
+
+*Course:* theory/04 (replication and consistency) and theory/07 (correctness under failure).
+
+*Drill.* "The customer's phone drops and the app retries the booking. How many loans exist?" One. The unique constraint on the application ID decides; the retry reads the existing loan. The trap is a check-then-insert in the service.
+
+## Decision orchestrator: owns the deadline
+
+*How it is built.* The orchestrator runs the free in-house checks first (about 50 ms), then starts one deadline and calls one bureau, identity and fraud in parallel; bank data is never awaited. Each vendor has a breaker that opens on an error rate or a latency percentile and half-opens with a trickle of probes, and a token bucket at the contracted rate. Whatever has arrived at the deadline is what the policy engine decides with. A slow paid call is not cancelled at the deadline: it was billed anyway, so its late answer and cost are recorded and may finish a refer.
+
+*Why A Go service: scatter-gather, per-vendor breakers and token buckets:* The customer's wait is set by the slowest vendor unless something owns the time. The three-second promise needs an owner.
+
+*Rejected:*
+
+- **A durable workflow engine**: Right when steps last hours or days. An honest equal here, with more machinery for a three-second flow.
+- **A service mesh's timeouts**: They cut calls but do not decide what happens next.
+
+*Course:* theory/08 (reliability and operations).
+
+*Drill.* "The bureau is slow for everyone tonight. What does an applicant see at three seconds?" The orchestrator's deadline fires and the policy engine decides with what it has. If that is not enough for a safe decision, a text follows when the data arrives. The trap is waiting.
+
+## Policy engine: versioned, with a challenger
+
+*How it is built.* The engine holds versioned policy, model and pricing. The champion decides; a challenger runs beside it on a capped share of traffic and is logged, not acted on, until it is promoted. Every decision stores the inputs it saw, the versions it used and the outcome, so it can be shown again exactly. A signed fallback table decides inside credit policy when a bureau is down.
+
+*Why A rules and model service, every decision stamped with the versions:* A decision must be explainable fourteen months later and a new model must be introducible without a leap of faith.
+
+*Rejected:*
+
+- **Rules and model baked into the service**: A release per policy change and no way to replay a decision.
+- **Switching the model for everyone**: An approval-rate jump is a risk jump.
+
+*Course:* theory/08 (reliability and operations).
+
+*Drill.* "A new model approves six percent more applicants. Do you ship it?" Not to everyone. It runs as a capped challenger, its approvals are watched against loss, and a promotion needs the risk team's sign-off. The trap is treating a higher approval rate as a win.
+
+## Event log: outbox into Kafka
+
+*How it is built.* The outbox row is written in the booking transaction. A relay publishes it to Kafka at least once, and funding and the alert consumers deduplicate by event ID. Funding listens for LoanBooked and does its own work, with its own state machine. A change data capture relay or a polling relay; both give the same guarantee.
+
+*Why Outbox row, Kafka, consumers deduplicating by event ID:* Booking and the event must be one fact without a distributed transaction.
+
+*Rejected:*
+
+- **Publishing directly after the commit**: A crash between the two loses the event.
+- **Two-phase commit with the broker**: Slow, rarely supported, and unnecessary.
+
+*Course:* theory/06 (messaging and streams).
+
+*Drill.* "Funding fails after the loan was booked. What does the customer have, and what happens next?" A booked loan. Funding is its own state machine, with retries and an alert at a deadline; the booking is not undone. The trap is putting booking and funding in one transaction.
+
+## Decision records: locked object storage
+
+*How it is built.* Each decision's inputs, versions and outcome are written as one versioned object under a retention lock, so it cannot be deleted early. Each record is encrypted with its own key, so destroying the key at the end of retention makes every copy unreadable. An index in the database points to it. Reads are for disputes and audit, a few a minute.
+
+*Why Object storage with a retention lock, a key per record:* About eight terabytes over seven years, written once, read rarely, deleted on a schedule.
+
+*Rejected:*
+
+- **The application database**: Expensive, and every backup multiplies copies of identity-adjacent data.
+- **A data warehouse**: Fine for analytics, wrong as the record of truth.
+
+*Course:* theory/08 (reliability and operations).
+
+## Identity vault: tokenisation
+
+*How it is built.* The vault replaces identity values with random tokens and stores the mapping with field-level encryption, with keys in a hardware-backed key service. Every read is logged with who and why. Vendors that need real values receive them from the vault directly; every other service handles only tokens. Format-preserving tokens are used where a vendor validates the shape.
+
+*Why A tokenisation vault, keys in a hardware-backed key service, an access log:* Regulated data should exist in one small place. Everything else sees tokens.
+
+*Rejected:*
+
+- **Raw identity in every service**: Every copy is regulated, every log a risk.
+- **Encrypting columns in each database**: Keys spread across teams, and every service can decrypt.
+
+*Course:* theory/08 (reliability and operations).
+
+## API edge: merchant auth and idempotency
+
+*How it is built.* The edge authenticates the merchant, rate limits per merchant and requires an idempotency key on every create. The key is recorded with the application under a unique constraint, and a repeat returns the stored response. When a decision exceeds three seconds the response is a pending one and a text message follows when it is ready. Webhooks to the merchant are signed and retried.
+
+*Why An API gateway, merchant keys, an idempotency key on every create:* Merchants and networks retry. The same request must give the same application and the same answer.
+
+*Rejected:*
+
+- **No idempotency, retry on the client**: A flaky phone creates two applications and pulls two bureau reports.
+- **Long polling on the connection**: The customer's wait is held on one connection that can drop.
+
+*Course:* theory/07 (correctness under failure).
+
+<!-- /stack:sections -->
+
+## The stack on one page
+
+<!-- stack:summary -->
+
+| Container | Choice | Rejected | The deciding reason |
+|---|---|---|---|
+| Application DB | PostgreSQL, constraints | Distributed SQL; key-value | One transaction books once |
+| Orchestrator | Go, deadline, breakers | Workflow engine; mesh timeouts | One owner of time |
+| Policy engine | Versioned; champion, challenger | In-code rules; flip | Explainable; capped change |
+| Event log | Outbox into Kafka | Publish after; 2PC | One fact, no distributed commit |
+| Decision records | Object storage, lock, key each | Database; warehouse | Immutable, deletable by key |
+| Identity vault | Tokenisation, HSM keys | Raw identity; per-DB crypto | Two readers only |
+| API edge | Gateway, idempotency key | No key; long polling | Same request, same answer |
+
+Each fix in Stage 6 rejects one tool by name:
+
+| Deep dive | Rejected | Because |
+|---|---|---|
+| 6.1 | Waiting for the slowest vendor | the customer's wait becomes the slowest vendor's; one deadline decides with what arrived. |
+| 6.2 | A hard dependency on one bureau | its outage declines every applicant; a signed fallback table inside credit policy keeps deciding. |
+| 6.3 | Check, then book, in the service | two retries can both pass the check; the database decides in one transaction. |
+| 6.4 | Booking and funding in one transaction | the partner bank cannot join it; funding is its own state machine. |
+| 6.5 | Rebuilding a decision from today's data | the bureau data and the model have moved on; record what we knew, once. |
+| 6.6 | Switching to the new model for everyone | an approval-rate jump is a risk jump; run a capped challenger. |
+| 6.7 | Raw identity in every service | every copy is regulated; only the vault and the vendors see real values. |
+| 6.8 | Dashboards of server health | the servers are fine while approvals fall; watch the decision itself. |
+
+<!-- /stack:summary -->
+
+## When you don't need all this (the alternate path)
+
+![The alternate path changes one box: one bureau, and refer whatever is missing at the deadline.](diagrams/video-alt.pdf){width=90%}
+
+**The simpler design.** Keep the orchestrator, the deadline, the state machine and the atomic booking. Contract
+**one bureau**, and give the missing-data policy one rule: anything missing at the deadline is referred.
+
+**What it gives up, precisely.** About 3 % of applications reach the deadline without a bureau answer (Stage 2),
+and all of them are referred. If about one referred customer in five walks away before the text arrives, those
+are lost sales. There is no small-known-customer row and no second bureau to fall back on during an outage.
+
+**The crossover number.** Lost margin a month $\approx$ A × 3 % × 20 % (walk away) × 42 % (approved and take
+the loan) × about $70 of margin $\approx$ $0.18 × A. A second bureau costs about $60k a month in contract
+minimums, integration and its adapter's on-call. The two meet at A $\approx$ 330,000 applications a month
+(illustrative). At the scale line's 2 million a month, the second bureau pays for itself several times.
+
+> "Below about three hundred thousand applications a month I'd ship one bureau and refer. At two million, the
+> refer path costs more than the second bureau does."
+
 # Stage 6: Deep dives
 
 The bridge sentence, said aloud: **"It works. Where does it break first?"** Then show the challenge map
@@ -750,6 +918,20 @@ three vendors each on a three-second timeout in sequence, the wait is nine secon
 still allows three seconds and leaves nothing for the model and the push. Derive one deadline from the
 promise.
 :::
+
+**Cheap first, or all at once?** A second cost question hides in the gather: why pay a dollar for an applicant
+that a free check would have stopped? Three shapes:
+
+| Shape | Saves a month (illustrative) | Costs at the counter | Verdict |
+|---|---|---|---|
+| Everything in parallel | nothing: we pay for people a free check would stop | nothing | no |
+| Full waterfall: identity and fraud first, bureau only on a pass | ≈ 4 % × 2M × $1 ≈ $80k | ≈ 400 ms of identity p99 in front of the bureau: about 3.1 s, past the promise | not at the counter; right for the at-home pre-approval |
+| **Tier 0 in-house (≈ 50 ms), then identity, fraud and bureau in parallel** | ≈ 6 % × 2M × $1.05 ≈ $126k | 50 ms of the 300 ms spare | **pick** |
+
+Tier 0 is free and ours: eligibility (age, state, amount against the merchant's limits), the blocklist and
+velocity checks (the same device or identity applying many times an hour), our own loan book (a customer in
+arrears), and a stored report still inside its reuse window. The pull itself is a **soft inquiry**, recorded as
+such in the decision record, so checking does not mark the customer's credit file.
 
 ## 6.2 The bureau is down for everyone (failure and policy)
 
@@ -966,6 +1148,19 @@ loadable in a registry. A replay job runs every night on a sample of records: it
 re-scores the frozen features and alarms on any difference.
 
 ![The replay: load the record, load the old versions, re-score, compare.](diagrams/video-seq-ch5-replay.pdf){width=95%}
+
+**The rulebook, by name.** A record rather than a log line, because each rule reads a specific part of it.
+General, not legal advice: compliance owns the reading of each rule.
+
+| Rule (United States) | What it asks of a decline | Where it lives in the record |
+|---|---|---|
+| ECOA and Regulation B | A notice of action taken within 30 days of a complete application, with the specific principal reasons (usually four at most) | Ranked reasons from the model and from every policy rule that fired |
+| FCRA | When a credit report was used: the bureau's name and contact, the credit score used and its key factors, the right to a free report and to dispute it; a permissible purpose for every pull | Bureau, report reference, score, key factors, inquiry type (soft or hard), purpose |
+| Fair lending | No decision on a prohibited basis; disparate-impact testing | The exact feature vector and the model version |
+| Model risk management (the partner bank's) | A validated, documented and monitored model | Model version and its validation record in the registry |
+
+The record also stores **every rule evaluated with its result**, not only the ones that fired, and each feature
+with its source and as-of time, so a training set built later from records is point-in-time correct.
 
 **Why it works.** S2: the same inputs and the same versions give the same answer. And the nightly replay
 proves it continuously, instead of on the day the regulator asks.
@@ -1237,6 +1432,21 @@ orchestrator, the policy engine and model serving. Vendor integrations own the a
 the spend. Security owns the vault. Credit risk and data science own the models and every degraded path
 and its cap. Compliance owns disclosures, notices and retention. The contracts between them are the
 decision interface, the decision record and the LoanBooked event.
+
+**Contracts between teams.** The seams are only real if each contract has one owner and a rule for change.
+
+| Contract | Owner → consumers | The rule that keeps teams independent |
+|---|---|---|
+| Decision API | decisioning → origination | Versioned; additive changes only; the 2 s deadline is part of the contract |
+| LoanBooked event | origination → servicing ledger (SD-95), funding, merchant webhooks (SD-99) | A schema registry, backward compatible; each consumer's contract tests run in the producer's build |
+| Decision record | decisioning → compliance, model risk | Written once; a new field is a new schema version; the nightly replay must pass |
+| Vendor adapter | vendor integrations → orchestrator | One normalised answer plus its cost; a new vendor is a new adapter, not an orchestrator change |
+| Policy version | credit risk → decisioning | Signed by two people and the partner bank; shipped as data behind a canary |
+
+This is Conway's law used on purpose: draw the contracts first, give each team one side of each, and require
+both sides' review for a contract change. The checkout and origination team owns the synchronous promise and
+the state machine; the risk and model platform owns serving, features and the records; the servicing and ledger
+team (SD-95) starts at LoanBooked and never reads the application tables.
 
 **With half the team.** Keep the deadline, the policy table, the atomic booking and the records. Buy the
 vault. Defer champion and challenger (run one model; change it rarely, with a backtest and shadow) and

@@ -1,0 +1,1 @@
+[["n:pos", "n:api", "n:app", "n:orch", "n:ven", "n:vault", "n:db", "n:log", "n:fund", "n:model", "n:rec", "e:p-a", "e:a-ap", "e:ap-a", "e:ap-db", "e:db-l", "e:a-vt", "e:l-f"], ["e:ap-o"], ["e:o-vt"], ["e:o-v"], ["e:v-o"], ["e:o-m"], ["e:o-r"], ["e:o-ap"], ["e:a-p"]]

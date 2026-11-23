@@ -1,0 +1,302 @@
+{
+  "_doc": "Single source for SD-82's technology choices; see SD-08/stack.json for the format. `how` is spoken, so it carries no code; keep summary cells under 36 characters.",
+  "c4": {
+    "vlt": [
+      "Identity vault",
+      "Tokenisation, HSM keys",
+      "The only raw identity."
+    ],
+    "lg": [
+      "Event log",
+      "Kafka via outbox",
+      "LoanBooked, decisions."
+    ],
+    "fnd": [
+      "Funding",
+      "Go, own state machine",
+      "Transfers, reconciliation."
+    ],
+    "api": [
+      "API edge",
+      "API gateway",
+      "Merchant auth, idempotency."
+    ],
+    "app": [
+      "Application service",
+      "Go, state machine",
+      "Booking, outbox."
+    ],
+    "orc": [
+      "Decision orchestrator",
+      "Go, deadlines, breakers",
+      "Scatter, gather."
+    ],
+    "db": [
+      "Application DB",
+      "PostgreSQL",
+      "Apps, loans, outbox."
+    ],
+    "pol": [
+      "Policy engine",
+      "Versioned rules and model",
+      "Champion, challenger."
+    ],
+    "rec": [
+      "Decision records",
+      "Object storage, locked",
+      "Key per record, 7 years."
+    ]
+  },
+  "stack": [
+    {
+      "id": "app-db",
+      "heading": "Application DB: PostgreSQL with constraints",
+      "kicker": "Technology · application database",
+      "title": "The database decides, in one transaction: application, loan and outbox",
+      "pick": "PostgreSQL 16, one primary, a synchronous standby, point-in-time recovery",
+      "why": "Fifty transitions a second is small. The correctness lives in constraints and conditional updates, which a relational database does in one transaction with the outbox row.",
+      "how": "A unique constraint on the application ID means a second booking cannot exist. State changes are conditional updates that name the state they expect. The loan row and the outbox row are written in the same transaction. A synchronous standby in another zone keeps a committed booking through a failover.",
+      "detail": "Revisit at a hundred times the volume.",
+      "rejected": [
+        [
+          "A distributed SQL database",
+          "Correct and unneeded at this scale, and more to run."
+        ],
+        [
+          "A key-value store",
+          "No multi-row transaction for the loan and its outbox row."
+        ]
+      ],
+      "summary": [
+        "Application DB",
+        "PostgreSQL, constraints",
+        "Distributed SQL; key-value",
+        "One transaction books once"
+      ],
+      "course": "theory/04 (replication and consistency) and theory/07 (correctness under failure)",
+      "parts": "04, 07",
+      "drill": [
+        "The customer's phone drops and the app retries the booking. How many loans exist?",
+        "One. The unique constraint on the application ID decides; the retry reads the existing loan. The trap is a check-then-insert in the service.",
+        "a unique constraint, in one transaction with the outbox row"
+      ]
+    },
+    {
+      "id": "orchestrator",
+      "heading": "Decision orchestrator: owns the deadline",
+      "kicker": "Technology · decision orchestrator",
+      "title": "One deadline per application, a breaker per vendor",
+      "pick": "A Go service: scatter-gather, per-vendor breakers and token buckets",
+      "why": "The customer's wait is set by the slowest vendor unless something owns the time. The three-second promise needs an owner.",
+      "how": "The orchestrator runs the free in-house checks first (about 50 ms), then starts one deadline and calls one bureau, identity and fraud in parallel; bank data is never awaited. Each vendor has a breaker that opens on an error rate or a latency percentile and half-opens with a trickle of probes, and a token bucket at the contracted rate. Whatever has arrived at the deadline is what the policy engine decides with.",
+      "detail": "A slow paid call is not cancelled at the deadline: it was billed anyway, so its late answer and cost are recorded and may finish a refer.",
+      "rejected": [
+        [
+          "A durable workflow engine",
+          "Right when steps last hours or days. An honest equal here, with more machinery for a three-second flow."
+        ],
+        [
+          "A service mesh's timeouts",
+          "They cut calls but do not decide what happens next."
+        ]
+      ],
+      "summary": [
+        "Orchestrator",
+        "Go, deadline, breakers",
+        "Workflow engine; mesh timeouts",
+        "One owner of time"
+      ],
+      "course": "theory/08 (reliability and operations)",
+      "parts": "08",
+      "drill": [
+        "The bureau is slow for everyone tonight. What does an applicant see at three seconds?",
+        "The orchestrator's deadline fires and the policy engine decides with what it has. If that is not enough for a safe decision, a text follows when the data arrives. The trap is waiting.",
+        "deadline fires; decide with what arrived; text later"
+      ]
+    },
+    {
+      "id": "policy",
+      "heading": "Policy engine: versioned, with a challenger",
+      "kicker": "Technology · policy engine",
+      "title": "Model, policy and pricing as versioned data, with a champion and a challenger",
+      "pick": "A rules and model service, every decision stamped with the versions",
+      "why": "A decision must be explainable fourteen months later and a new model must be introducible without a leap of faith.",
+      "how": "The engine holds versioned policy, model and pricing. The champion decides; a challenger runs beside it on a capped share of traffic and is logged, not acted on, until it is promoted. Every decision stores the inputs it saw, the versions it used and the outcome, so it can be shown again exactly.",
+      "detail": "A signed fallback table decides inside credit policy when a bureau is down.",
+      "rejected": [
+        [
+          "Rules and model baked into the service",
+          "A release per policy change and no way to replay a decision."
+        ],
+        [
+          "Switching the model for everyone",
+          "An approval-rate jump is a risk jump."
+        ]
+      ],
+      "summary": [
+        "Policy engine",
+        "Versioned; champion, challenger",
+        "In-code rules; flip",
+        "Explainable; capped change"
+      ],
+      "course": "theory/08 (reliability and operations)",
+      "parts": "08",
+      "drill": [
+        "A new model approves six percent more applicants. Do you ship it?",
+        "Not to everyone. It runs as a capped challenger, its approvals are watched against loss, and a promotion needs the risk team's sign-off. The trap is treating a higher approval rate as a win.",
+        "a capped challenger; watch loss; promote on sign-off"
+      ]
+    },
+    {
+      "id": "outbox-log",
+      "heading": "Event log: outbox into Kafka",
+      "kicker": "Technology · event log",
+      "title": "The loan exists and funding will hear about it are one fact",
+      "pick": "Outbox row, Kafka, consumers deduplicating by event ID",
+      "why": "Booking and the event must be one fact without a distributed transaction.",
+      "how": "The outbox row is written in the booking transaction. A relay publishes it to Kafka at least once, and funding and the alert consumers deduplicate by event ID. Funding listens for LoanBooked and does its own work, with its own state machine.",
+      "detail": "A change data capture relay or a polling relay; both give the same guarantee.",
+      "rejected": [
+        [
+          "Publishing directly after the commit",
+          "A crash between the two loses the event."
+        ],
+        [
+          "Two-phase commit with the broker",
+          "Slow, rarely supported, and unnecessary."
+        ]
+      ],
+      "summary": [
+        "Event log",
+        "Outbox into Kafka",
+        "Publish after; 2PC",
+        "One fact, no distributed commit"
+      ],
+      "course": "theory/06 (messaging and streams)",
+      "parts": "06",
+      "drill": [
+        "Funding fails after the loan was booked. What does the customer have, and what happens next?",
+        "A booked loan. Funding is its own state machine, with retries and an alert at a deadline; the booking is not undone. The trap is putting booking and funding in one transaction.",
+        "funding is its own state machine; booking stands"
+      ]
+    },
+    {
+      "id": "decision-records",
+      "heading": "Decision records: locked object storage",
+      "kicker": "Technology · decision records",
+      "title": "Write down what we knew, once, and keep it for seven years",
+      "pick": "Object storage with a retention lock, a key per record",
+      "why": "About eight terabytes over seven years, written once, read rarely, deleted on a schedule.",
+      "how": "Each decision's inputs, versions and outcome are written as one versioned object under a retention lock, so it cannot be deleted early. Each record is encrypted with its own key, so destroying the key at the end of retention makes every copy unreadable. An index in the database points to it.",
+      "detail": "Reads are for disputes and audit, a few a minute.",
+      "rejected": [
+        [
+          "The application database",
+          "Expensive, and every backup multiplies copies of identity-adjacent data."
+        ],
+        [
+          "A data warehouse",
+          "Fine for analytics, wrong as the record of truth."
+        ]
+      ],
+      "summary": [
+        "Decision records",
+        "Object storage, lock, key each",
+        "Database; warehouse",
+        "Immutable, deletable by key"
+      ],
+      "course": "theory/08 (reliability and operations)",
+      "parts": "08"
+    },
+    {
+      "id": "vault",
+      "heading": "Identity vault: tokenisation",
+      "kicker": "Technology · identity vault",
+      "title": "Only two things see real identity values",
+      "pick": "A tokenisation vault, keys in a hardware-backed key service, an access log",
+      "why": "Regulated data should exist in one small place. Everything else sees tokens.",
+      "how": "The vault replaces identity values with random tokens and stores the mapping with field-level encryption, with keys in a hardware-backed key service. Every read is logged with who and why. Vendors that need real values receive them from the vault directly; every other service handles only tokens.",
+      "detail": "Format-preserving tokens are used where a vendor validates the shape.",
+      "rejected": [
+        [
+          "Raw identity in every service",
+          "Every copy is regulated, every log a risk."
+        ],
+        [
+          "Encrypting columns in each database",
+          "Keys spread across teams, and every service can decrypt."
+        ]
+      ],
+      "summary": [
+        "Identity vault",
+        "Tokenisation, HSM keys",
+        "Raw identity; per-DB crypto",
+        "Two readers only"
+      ],
+      "course": "theory/08 (reliability and operations)",
+      "parts": "08"
+    },
+    {
+      "id": "api-edge",
+      "heading": "API edge: merchant auth and idempotency",
+      "kicker": "Technology · API edge",
+      "title": "An edge that makes the merchant's retries safe",
+      "pick": "An API gateway, merchant keys, an idempotency key on every create",
+      "why": "Merchants and networks retry. The same request must give the same application and the same answer.",
+      "how": "The edge authenticates the merchant, rate limits per merchant and requires an idempotency key on every create. The key is recorded with the application under a unique constraint, and a repeat returns the stored response. When a decision exceeds three seconds the response is a pending one and a text message follows when it is ready.",
+      "detail": "Webhooks to the merchant are signed and retried.",
+      "rejected": [
+        [
+          "No idempotency, retry on the client",
+          "A flaky phone creates two applications and pulls two bureau reports."
+        ],
+        [
+          "Long polling on the connection",
+          "The customer's wait is held on one connection that can drop."
+        ]
+      ],
+      "summary": [
+        "API edge",
+        "Gateway, idempotency key",
+        "No key; long polling",
+        "Same request, same answer"
+      ],
+      "course": "theory/07 (correctness under failure)",
+      "parts": "07"
+    }
+  ],
+  "challenges": {
+    "1": [
+      "Waiting for the slowest vendor",
+      "the customer's wait becomes the slowest vendor's; one deadline decides with what arrived."
+    ],
+    "2": [
+      "A hard dependency on one bureau",
+      "its outage declines every applicant; a signed fallback table inside credit policy keeps deciding."
+    ],
+    "3": [
+      "Check, then book, in the service",
+      "two retries can both pass the check; the database decides in one transaction."
+    ],
+    "4": [
+      "Booking and funding in one transaction",
+      "the partner bank cannot join it; funding is its own state machine."
+    ],
+    "5": [
+      "Rebuilding a decision from today's data",
+      "the bureau data and the model have moved on; record what we knew, once."
+    ],
+    "6": [
+      "Switching to the new model for everyone",
+      "an approval-rate jump is a risk jump; run a capped challenger."
+    ],
+    "7": [
+      "Raw identity in every service",
+      "every copy is regulated; only the vault and the vendors see real values."
+    ],
+    "8": [
+      "Dashboards of server health",
+      "the servers are fine while approvals fall; watch the decision itself."
+    ]
+  }
+}

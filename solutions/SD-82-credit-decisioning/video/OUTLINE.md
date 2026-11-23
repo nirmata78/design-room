@@ -413,3 +413,33 @@ vault."
 | 8 Build cost (AUX) | 3 | 360 | 5 |
 | 9 Recap | 3 | 330 | 5 |
 | **Total** | **80** | **9,440** | **145** |
+
+## 5.1 Components and technologies (retrofit, 2026-11-22)
+
+<!-- stack:outline -->
+
+| Container | Choice | How it is built | Rejected | Theory part |
+|---|---|---|---|---|
+| Application DB | PostgreSQL 16, one primary, a synchronous standby, point-in-time recovery | A unique constraint on the application ID means a second booking cannot exist | A distributed SQL database; A key-value store | 04, 07 |
+| Decision orchestrator | A Go service: scatter-gather, per-vendor breakers and token buckets | The orchestrator runs the free in-house checks first (about 50 ms), then starts one deadline and calls one bureau, identity and fraud in parallel; bank data is never awaited | A durable workflow engine; A service mesh's timeouts | 08 |
+| Policy engine | A rules and model service, every decision stamped with the versions | The engine holds versioned policy, model and pricing | Rules and model baked into the service; Switching the model for everyone | 08 |
+| Event log | Outbox row, Kafka, consumers deduplicating by event ID | The outbox row is written in the booking transaction | Publishing directly after the commit; Two-phase commit with the broker | 06 |
+| Decision records | Object storage with a retention lock, a key per record | Each decision's inputs, versions and outcome are written as one versioned object under a retention lock, so it cannot be deleted early | The application database; A data warehouse | 08 |
+| Identity vault | A tokenisation vault, keys in a hardware-backed key service, an access log | The vault replaces identity values with random tokens and stores the mapping with field-level encryption, with keys in a hardware-backed key service | Raw identity in every service; Encrypting columns in each database | 08 |
+| API edge | An API gateway, merchant keys, an idempotency key on every create | The edge authenticates the merchant, rate limits per merchant and requires an idempotency key on every create | No idempotency, retry on the client; Long polling on the connection | 07 |
+
+Fix-slide rejections: 1: Waiting for the slowest vendor; 2: A hard dependency on one bureau; 3: Check, then book, in the service; 4: Booking and funding in one transaction; 5: Rebuilding a decision from today's data; 6: Switching to the new model for everyone; 7: Raw identity in every service; 8: Dashboards of server health.
+
+<!-- /stack:outline -->
+
+## Revision 2026-11-22 (review for a lending / BNPL EM loop)
+
+| Change | Where |
+|---|---|
+| Cost tiers in the gather: tier-0 in-house checks (≈ 50 ms, ≈ 6 % stopped, ≈ $126k a month) before one parallel gather; full waterfall rejected at the counter (identity p99 pushes past 3 s), kept for pre-approval; soft inquiry recorded | Challenge 1, new slide; booklet 6.1; estimates table |
+| The rulebook by name: ECOA / Regulation B, FCRA, fair lending, model risk management, each mapped to fields of the decision record; every rule evaluated stored; features with source and as-of time | Challenge 5, new slide; booklet 6.5 |
+| 5.2 alternate path: one bureau and refer; crossover ≈ 330,000 applications a month | new sub-chapter 5.2; booklet Stage 5 |
+| C4 component view of the decision orchestrator | 5.1; booklet Stage 5 |
+| Contracts between teams (owner → consumers → change rule), Conway's law stated; LoanBooked consumed by SD-95 and SD-99 | Build cost; booklet Stage 10 |
+| Consistency fixes: orchestrator no longer "awaits bank data" (stack.json); late calls are recorded, not cancelled (stack.json detail); the gather code is labelled pseudocode (the service is Go) | stack.json, Challenge 1 |
+| Layout gate: 57 failures → 0 (C4 views redrawn wide at size 25, overlay notes dropped where the strip said the same, code ≤ 56 columns, ERD sizes) | diagrams.py, chapter files |

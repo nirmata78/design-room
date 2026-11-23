@@ -60,7 +60,7 @@ S(plain("Theory · 5 of 6 · the options", "Six ways to run an application", tab
   ("rej", ["C · A saga, a compensation per step", "yes", "yes", "yes", "partly", "a pull cannot be undone"]),
   ("", ["D · A durable workflow engine", "yes", "yes", "yes", "yes", "not a failure: another system to run"]),
   ("pick", ["<b>E · State machine + one deadline + policy table + atomic book</b>", "yes", "yes", "yes", "yes", "steps grow to days"]),
-  ("rej", ["F · A manual underwriting queue", "no", "yes", "yes", "yes", "ten seconds is a lost sale"])], "bt sm")), [
+  ("rej", ["F · A manual underwriting queue", "no", "yes", "yes", "yes", "ten seconds is a lost sale"])], "bt xs")), [
  "C: The options matrix. A, sequential calls in the request: the bureau's tail alone breaks three seconds. B, parallel with hedging, racing two bureaus: fast, but every race is two paid pulls and two inquiries. C, a saga with a compensation for every step: a credit pull cannot be undone, so the compensations do nothing but add code. F, a manual queue: ten seconds is already a lost sale.",
  "C: D, a durable workflow engine, is the honest equal: it works, and I'd choose it when steps last hours or days, like document upload or manual review. I pick E: a database state machine, one deadline, the policy table, and an atomic booking with an outbox. What it gives up: the timers, retries and relay that a workflow engine would give us for free."], cls="theory")
 
@@ -68,7 +68,7 @@ S(plain("Theory · 6 of 6 · the failure catalogue", "What will go wrong, in the
   ["1", "The bureau is slow", "latency · crux"], ["2", "The bureau is down for everyone", "failure, policy · crux"],
   ["3", "The phone drops; two taps", "correctness · crux"], ["4", "Funding fails after booking", "failure recovery · crux"],
   ["5", "A decision nobody can explain", "correctness, regulation"], ["6", "A new model approves more", "trade-off"],
-  ["7", "Identity data spreading", "security"], ["8", "A silent approval drop", "observability"]], "bt sm") +
-  line("Out of scope, named: merchant fraud, a merchant ringing up fake sales. Merchant risk owns it.", "")), [
+  ["7", "Identity data spreading", "security"], ["8", "A silent approval drop", "observability"]], "bt xs") +
+  line("Out of scope, named: merchant fraud. Merchant risk owns it.", "")), [
  "C: The failure catalogue, which becomes the challenge list. The bureau slow, then down for everyone. The phone drops, then funding fails after booking. A decision nobody can explain. A new model that approves more. Identity data spreading. And a silent approval drop.",
  "C: One more I'll name and leave: merchant fraud, a merchant ringing up fake sales. That's a merchant-risk system, and it plugs in at onboarding and at funding."], cls="theory")

@@ -25,6 +25,19 @@ S(dia(K(5, "what a record holds"), "Inputs, versions, outputs", "record"), [
  "C: What a record holds. Inputs, frozen: the bureau report stored encrypted and referenced, the identity and fraud results, our own history as of that moment, the exact feature vector, and which calls were missing. Versions: model, policy including the missing-data table, pricing, disclosure, and the orchestrator build.",
  "C: Outputs: the outcome and offers, the ranked reasons, the degraded path taken, the timings, and who signed the policy. About fifty kilobytes, written once."], cls="dia")
 
+S(plain(K(5, "the rulebook, by name"), "Each rule reads one part of the record", table(["Rule (United States)", "What it asks of a decline", "Where it lives in the record"], [
+  ["ECOA, Regulation B", "a notice within 30 days of a complete application; the specific principal reasons (usually four at most)", "ranked reasons: model and every rule that fired"],
+  ["FCRA", "if a credit report was used: the bureau, the score and its key factors, a free report and the right to dispute", "bureau, report, score, factors, inquiry type, purpose"],
+  ["Fair lending", "no prohibited basis; disparate-impact testing", "feature vector and model version"],
+  ["Model risk (the partner bank's)", "a validated, documented, monitored model", "model version and its validation record"]], "bt xs") +
+  line("General, not legal advice: compliance owns the reading.", "g")), [
+ "C: Why a record, and not a log line? Because each rule reads a specific part of it, so name them.",
+ "[+]", "C: The Equal Credit Opportunity Act and its Regulation B: a notice within thirty days of a complete application, with the specific principal reasons. Four at most is the usual practice. Those are the ranked reasons, from the model and from every rule that fired.",
+ "[+]", "C: The Fair Credit Reporting Act: when a credit report was used, the notice names the bureau, gives the score and its key factors, and tells the customer they can get a free report and dispute it. So the record keeps the bureau, the report reference, the score and factors, whether the inquiry was soft or hard, and the permissible purpose for the pull.",
+ "[+]", "C: Fair lending: no decision on a prohibited basis, tested for disparate impact. The fairness tests need the exact feature vector and the model version.",
+ "[+]", "C: And model risk management at the partner bank: a model that is validated, documented and monitored. The registry holds each version with its validation record.",
+ "[+]", "C: This is general, not legal advice. Compliance owns the reading of each rule. Engineering's job is to make each answer a field that is written once."])
+
 S(dia(K(5, "sequence"), "The replay matches the notice", "seq-ch5-replay"), [
  "C: The replay as a sequence. The request: explain two-oh-four from January. Load the record: the features, the report reference, model nine, policy thirty-one. Load those versions from the registry. Re-score the frozen features. Decline: high utilisation, short history. It matches the notice, because it is what we knew and how we decided then."], cls="dia")
 
@@ -59,8 +72,7 @@ S(plain(K(6, "the trace"), "Approvals today, losses in four months", '<pre class
  "C: A week of shadow shows the approval rate. It shows nothing about whether the newly approved people repay. And a fifty-fifty test bets fifty million a month to find out."])
 
 S(dia(K(6, "the fix"), "A challenger beside the champion, capped", "ch6-fix",
-      extra=strip(("fixb", "Mechanism", "Backtest → shadow → a 5 % challenger slice under its own exposure cap → early signals at 30–45 days → widen by a policy version change, with a kill switch."),
-                  ("whyb", "Property", "S2 kept: every record says which model decided. The cost of learning is bounded by the slice cap, not by optimism."))), [
+      extra=strip(("fixb", "Mechanism", "Backtest → shadow → a capped 5 % slice → early signals at 30–45 days → widen by policy change, with a kill switch."), cols="one")), [
  "C: The fix: champion and challenger, outlined green. The challenger sits beside the champion, and decides only a capped slice. Every record says which model decided, so S-two holds, and the cost of learning is bounded by the cap."], cls="dia")
 
 S(dia(K(6, "the steps"), "Each step sees what the one before cannot", "rollout"), [
@@ -186,6 +198,21 @@ S(plain("Build cost · releases", "Three versions, three budgets", table(["", "V
 S(dia("Build cost · team seams", "Six owners, three contracts", "teams"), [
  "C: Six owners. Applications and origination own the state machine and booking. The decisioning platform owns the orchestrator, the policy engine and serving. Vendor integrations own the adapters, contracts and spend. Security owns the vault. Credit risk and data science own the models and every degraded path. Compliance owns disclosures, notices and retention.",
  "C: The contracts between them are three: the decision interface, the decision record, and the loan booked event."], cls="dia aux")
+
+S(plain("Build cost · contracts between teams", "A team owns one side of each contract", table(["Contract", "Owner → consumers", "The rule that keeps teams independent"], [
+  ["Decision API", "decisioning → origination", "versioned; additive changes only; the 2 s deadline is part of the contract"],
+  ["LoanBooked event", "origination → servicing, funding, webhooks", "schema registry, backward compatible; consumers' contract tests in the producer's build"],
+  ["Decision record", "decisioning → compliance, model risk", "written once; a new field is a new version; replay must pass"],
+  ["Vendor adapter", "vendor integrations → orchestrator", "one normalised answer plus its cost; a new vendor is a new adapter"],
+  ["Policy version", "credit risk → decisioning", "signed by two people and the bank; shipped as data, canaried"]], "bt xs") +
+  grade("Conway's law on purpose: contracts first, one side per team; a change needs both sides.")), [
+ "C: The seams are only real if each contract has one owner and a rule for change.",
+ "[+]", "C: The decision interface: decisioning owns it, origination consumes it. Versioned, additive changes only, and the two-second deadline is part of the contract, not a hope.",
+ "[+]", "C: The loan booked event: origination produces it, and the servicing ledger, funding and the merchant webhooks consume it. It sits in a schema registry, backward compatible, and each consumer's contract tests run in the producer's build, so origination cannot break servicing by accident.",
+ "[+]", "C: The decision record: written once, read by compliance and model risk. A new field is a new schema version, and the nightly replay must still pass.",
+ "[+]", "C: The vendor adapter: one normalised answer plus what it cost. A new vendor is a new adapter, not a change to the orchestrator.",
+ "[+]", "C: And the policy version: credit risk signs it, with two people and the bank, and it ships as data behind a canary.",
+ "[+]", "N: That's Conway's law used on purpose. Draw the contracts first, give each team one side, and make a contract change need both sides' review."], cls="aux")
 
 S(plain("Build cost · buy or build", "Buy what is not the decision", '<div class="cards c3">'
   '<div class="cd"><h3>Buy</h3><p>Bureaus, identity and bank data. A tokenisation vault is a reasonable buy. A workflow engine, if steps grow to days.</p></div>'
