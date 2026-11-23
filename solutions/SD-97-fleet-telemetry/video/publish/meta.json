@@ -1,0 +1,57 @@
+{
+  "mp4": "fleet-telemetry-reference.mp4",
+  "teaser_chapter": null,
+  "thumbnail": {
+    "kicker": "Staff reference solution",
+    "title": "One log.<br><em>Two</em> views.",
+    "sub": "A live fleet map and two years of history, built from three questions you know.",
+    "id": "design-room · SD-97"
+  },
+  "youtube": {
+    "title": "Fleet Telemetry & Live Map System Design: Staff Reference (Geo Index, Hot/Cold Paths)",
+    "playlist": "System design reference solutions · design-room (create it once, reuse it)",
+    "tags": [
+      "system design",
+      "system design interview",
+      "fleet tracking",
+      "telemetry",
+      "live map",
+      "geospatial",
+      "h3",
+      "kafka",
+      "flink",
+      "autonomous vehicles",
+      "staff engineer",
+      "distributed systems"
+    ],
+    "description_top": [
+      "A live map of two million vehicles sounds like one database of positions. It's two products off one stream, and it's built from three questions you may already know: event counting, nearby drivers and a device fleet. A compact reference solution at the Staff bar (L6/L7): theory, a three-version design, an alternate path, and six challenges. {DURATION} minutes, {SLIDES} numbered slides.",
+      "The thesis: one log keyed by vehicle, read twice: an overwrite view by cell for the map, and an append history by vehicle for replay. Sequence numbers decide what is newer; lanes decide what goes first.",
+      "IN THIS VIDEO\n• Estimates: 1 M positions a second, 400 MB of live state, 52 TB of history a month, 9 M messages after a city-wide outage\n• Theory: one log two views, per-vehicle sequence numbers, cells at three resolutions, lanes and backpressure, cell subscriptions, and the seams to SD-03, SD-39 and SD-29\n• Six challenges: out of the tunnel, downtown at six, five thousand viewers, a city coming back online, one vehicle's exact hour, and a map that is stale while everything is green",
+      "HOW TO USE IT\nRun the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first."
+    ],
+    "description_bottom": [
+      "LINKS\nWritten reference design: https://github.com/nirmata78/design-room/blob/main/solutions/SD-97-fleet-telemetry/SD-97_Fleet_Telemetry_Reference_Design.md\nRun this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room\nAll videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md",
+      "ABOUT THIS VIDEO\nThis is a scripted walkthrough, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script, diagrams and the written design were produced with Claude Code. Numbers are back-of-the-envelope estimates for the exercise, labelled as given, illustrative or initial targets, not any company's real figures, and this is not any company's actual design. The technical content has not been reviewed by a person.",
+      "#SystemDesign #SoftwareEngineering #DistributedSystems"
+    ]
+  },
+  "linkedin": {
+    "post": [
+      "A live fleet map is not one database of positions. It's two products off one stream, and most of it you've already designed.",
+      "I've published a {DURATION}-minute reference solution for fleet telemetry and a live location map at the Staff bar: theory, a three-version design and six challenges, on {SLIDES} numbered slides.",
+      "The idea that unlocks it: one log keyed by vehicle, read twice. A live view that overwrites by cell for the map, and a history that appends by vehicle for replay. The vehicle numbers its own messages and decides what goes first when it reconnects.",
+      "What it goes into:\n→ A vehicle leaving a tunnel with three minutes of buffer\n→ Why not key the log by geo cell\n→ 100,000 vehicles reconnecting at once\n→ A map that's stale while every dashboard is green",
+      "It composes three earlier reference solutions: event counting, ride matching and a device fleet.",
+      "▶ {YOUTUBE_URL}",
+      "It's a scripted walkthrough with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator.",
+      "Which part of your system orders data by arrival when it should order by sequence?",
+      "#SystemDesign #SoftwareEngineering #DistributedSystems"
+    ],
+    "first_comment": "Written reference design, stage by stage: https://github.com/nirmata78/design-room/blob/main/solutions/SD-97-fleet-telemetry/SD-97_Fleet_Telemetry_Reference_Design.md\n\nRun this round yourself, with an AI interviewer that won't help you: https://github.com/nirmata78/design-room",
+    "document": {
+      "pdf": "../../SD-97_Fleet_Telemetry_Reference_Design.pdf",
+      "title": "Device telemetry and a live location map: a Staff-level reference design"
+    }
+  }
+}
