@@ -1,0 +1,1 @@
+[["n:user", "m:user"], ["n:redir", "m:redir", "e:u-r1", "e:r-u1"], ["n:store", "m:store", "e:r-s1", "e:s-r1"]]

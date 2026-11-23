@@ -8,10 +8,11 @@ import basesvg as bs
 import c4svg as c4
 import seqsvg as sq
 import erdsvg as er
+from gtheme import ink
 
 OUT = pathlib.Path(__file__).resolve().parent / "svg"; OUT.mkdir(exist_ok=True)
-FONT = "Inter, Helvetica, Arial, sans-serif"
-INK, RED, GREEN, BLUE, PURPLE, GREY, AMBER = "#24292f", "#c8341f", "#1f8a4c", "#2f6fb5", "#6b4fc4", "#8c959f", "#d18f1c"
+FONT = "Inter, Roboto, sans-serif"
+INK, RED, GREEN, BLUE, PURPLE, GREY, AMBER = "#202124", "#ea4335", "#34a853", "#4285f4", "#1967d2", "#5f6368", "#fbbc05"
 def esc(s): return html.escape(str(s))
 
 # ───────────────────────────── 1 · the carried baseline ──────────────────────────────────────────────
@@ -66,16 +67,24 @@ b.edge("t-s", "take", "store", "status = blocked", src="b:0.5", dst="r:0.5", via
 b.edge("s-rep", "store", "replica", "replicate", src="t:0.5", dst="b:0.5", kind="async", tag="ch7", at=(1505, 236))
 b.edge("p-u", "probe", "user", "create, follow", src="b:0.3", dst="t:0.3", tag="ch8", at=(140, 236))
 
-def sv(name, h, **view):
+def sv(name, h, order=None, **view):
     b.h = h
-    b.save(OUT / name, **view)
+    b.save(OUT / name, order=order, **view)
+
+import json
+def restep(name, units):
+    """Override a figure's default reveal plan (svg/<name>.steps.json): a list of key lists."""
+    (OUT / name).with_suffix(".steps.json").write_text(json.dumps(units))
+FLOW_ORDER = ["user", "edge", "redir", "cache", "store", "replica", "safety", "create", "alloc", "clog", "agg", "stats", "take", "inval", "probe"]
 
 ALL = ["ch7", "ch8"]
 sv("base-v1.svg", 470, upto=1, legend=True)
-sv("base-v2.svg", 470, upto=2, new=2, legend=True)
-sv("base-v3.svg", 790, upto=3, new=3, legend=True)
-sv("base-final.svg", 790, upto=3, show=ALL, legend=True)
+sv("base-v2.svg", 470, upto=2, new=2, legend=True, order=["cache", "create", "alloc"])
+sv("base-v3.svg", 790, upto=3, new=3, legend=True, order=["edge", "safety", "clog", "agg", "stats", "take", "inval"])
+sv("base-final.svg", 790, upto=3, show=ALL, legend=True, order=FLOW_ORDER)
 sv("map.svg", 790, upto=3, show=ALL, legend=True, attack=["create", "cache", "edge", "clog", "store", "redir"], keep=None)
+_m = json.loads((OUT / "map.steps.json").read_text())
+restep("map.svg", [_m[0], ["m:create"], ["m:cache"], ["m:edge"], ["m:redir"], ["m:clog"], ["m:store"]])
 sv("flow-fr1.svg", 470, upto=3, flow=["u-cr", "cr-sf", "cr-a", "cr-s"], keep=["user", "create", "safety", "alloc", "store"],
    )
 sv("flow-fr2.svg", 470, upto=3, flow=["u-e", "e-r", "r-c", "c-s", "s-c", "c-r", "r-e", "e-u"], keep=["user", "edge", "redir", "cache", "store"])
@@ -126,7 +135,7 @@ d.edge("own", "sys", "Create links, stats", "HTTPS API", src="r:0.2", dst="l:0.8
 d.edge("ts", "sys", "Takedown", "console, API", src="l:0.5", dst="t:0.7", at=(1120, 170))
 d.edge("sys", "cls", "Is this URL bad?", "HTTPS", src="r:0.7", dst="l:0.3", at=(1110, 440))
 d.legend(40, 780, ("person", "system", "ext"))
-d.save(OUT / "c4-context.svg")
+d.save(OUT / "c4-context.svg", order=["vis", "sys", "own", "ts", "cls"])
 
 d = c4.Diagram(1600, 950)
 d.boundary(30, 60, 1180, 780, "URL shortener", "Software System")
@@ -150,11 +159,106 @@ d.edge("tk", "db", "status", "", src="r", dst="b:0.5", via=[(1030, 700)], at=(96
 d.edge("cs", "cl", "check", "HTTPS", src="t:0.7", dst="t:0.5", via=[(781, 50), (1415, 50)], at=(1100, 40))
 d.edge("vis", "cdn", "GET /code", "HTTPS", src="b:0.5", dst="b:0.5", via=[(1415, 860), (175, 860)], at=(800, 850))
 d.legend(40, 915, ("person", "container", "db", "ext"))
-d.save(OUT / "c4-containers.svg")
+C4_ORDER = ["vis", "cdn", "rd", "ca", "db", "cs", "al", "cl", "pipe", "tk"]
+d.save(OUT / "c4-containers.svg", order=C4_ORDER)
+
+def containers(name, labels, order=C4_ORDER, title=None):
+    """The same container layout, with other type and description lines (technologies, mechanisms)."""
+    d = c4.Diagram(1600, 950)
+    d.boundary(30, 60, 1180, 780, "URL shortener", "Software System")
+    pos = dict(cdn=(60, 330, 230, 160, "container"), rd=(340, 330, 230, 160, "container"), ca=(620, 330, 230, 160, "container"),
+               db=(900, 330, 260, 160, "db"), cs=(620, 90, 230, 150, "container"), al=(900, 90, 260, 150, "db"),
+               pipe=(340, 620, 230, 160, "queue"), tk=(620, 620, 230, 160, "container"))
+    for k, (x, y, w, h, kind) in pos.items():
+        t, typ, desc = labels[k]
+        d.node(k, x, y, w, h, kind, t, typ, desc, size=20)
+    d.node("cl", 1270, 90, 290, 150, "ext", *labels["cl"])
+    d.node("vis", 1270, 520, 290, 150, "person", "Visitor", "Person", "Opens a short link.")
+    d.edge("cdn", "rd", "miss", "HTTPS", src="r", dst="l", at=(315, 310))
+    d.edge("rd", "ca", "get", "", src="r", dst="l", at=(595, 310))
+    d.edge("ca", "db", "miss", "", src="r", dst="l", at=(875, 310))
+    d.edge("cs", "al", "lease", "", src="r", dst="l", at=(875, 140))
+    d.edge("cs", "db", "INSERT", "", src="b", dst="t:0.2", at=(780, 285))
+    d.edge("rd", "pipe", "click event", "async", src="b", dst="t", at=(475, 570))
+    d.edge("tk", "db", "status", "", src="r", dst="b:0.5", via=[(1030, 700)], at=(960, 690))
+    d.edge("cs", "cl", "check", "HTTPS", src="t:0.7", dst="t:0.5", via=[(781, 50), (1415, 50)], at=(1100, 40))
+    d.edge("vis", "cdn", "GET /code", "HTTPS", src="b:0.5", dst="b:0.5", via=[(1415, 860), (175, 860)], at=(800, 850))
+    d.legend(40, 915, ("person", "container", "db", "ext"))
+    d.save(OUT / name, order=order)
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / "src"))
+import stack                      # labels come from ../stack.json, with the 5.1 slides and the booklet
+containers("c4-containers-tech.svg", stack.C4)
+containers("th-map.svg", dict(
+    cdn=("Edge", "M6 · lifetime", "60 s cache, purgeable."),
+    rd=("Redirect service", "M4 · M5", "Layered cache; click after."),
+    ca=("Shared cache", "M4 · M6", "Cache-aside; deleted directly."),
+    db=("Link store", "M3 · authority", "UNIQUE(code) decides."),
+    cs=("Create service", "M1 · M2", "Ranges; keyed permutation."),
+    al=("Range allocator", "M1 · consensus", "One CAS per 1,000 IDs."),
+    pipe=("Click pipeline", "M5 · async log", "Counted per minute."),
+    tk=("Takedown service", "M6 · invalidation", "Status, events, purge."),
+    cl=("URL classifier", "External", "Checked on create.")),
+    order=[("vis", "cdn", "cl"), "cs", "al", "db", "rd", "ca", "pipe", "tk"])
+
+# component views (C4 level 3): every in-scope block one level deep, with the technology inside it
+d = c4.Diagram(1600, 880)
+d.boundary(260, 60, 920, 780, "Redirect service", "Container: Go")
+d.node("edge", 30, 360, 200, 140, "ext", "Edge", "CDN", "Forwards misses.")
+d.node("kinv", 30, 110, 200, 140, "queue", "Invalidations", "Kafka topic", "Codes to drop.")
+d.node("inv", 300, 110, 240, 150, "component", "Invalidation listener", "Component", "Own consumer group; rewinds 5 min.")
+d.node("lc", 610, 110, 240, 150, "component", "In-process cache", "ristretto", "TinyLFU; 300k codes; 60 s.")
+d.node("h", 300, 360, 240, 150, "component", "HTTP handler", "Component", "302 · 404 · 410; headers.")
+d.node("res", 610, 360, 240, 150, "component", "Resolver", "singleflight", "One lookup per code.")
+d.node("scl", 920, 250, 230, 140, "component", "Cache client", "go-redis cluster", "Slot map; 2 ms timeout.")
+d.node("stc", 920, 470, 230, 140, "component", "Store client", "pgx pool", "Code → shard; 20 ms.")
+d.node("em", 300, 620, 240, 150, "component", "Click emitter", "Component", "Ring buffer; 1 s batches.")
+d.node("redis", 1250, 250, 320, 140, "db", "Shared cache", "Redis Cluster", "")
+d.node("pg", 1250, 470, 320, 140, "db", "Link store", "PostgreSQL shards", "")
+d.node("kcl", 1250, 680, 320, 130, "queue", "Click log", "Kafka topic", "")
+d.edge("edge", "h", "", "", src="r", dst="l")
+d.edge("h", "res", "resolve", "", src="r", dst="l", at=(575, 415))
+d.edge("res", "lc", "get · put", "", src="t", dst="b", at=(780, 315))
+d.edge("res", "scl", "miss", "", src="r:0.3", dst="l:0.5", at=(885, 380))
+d.edge("scl", "redis", "", "", src="r", dst="l")
+d.edge("res", "stc", "miss", "", src="r:0.75", dst="l:0.5", at=(885, 500))
+d.edge("stc", "pg", "", "", src="r", dst="l")
+d.edge("h", "em", "after the 302", "", src="b", dst="t", at=(445, 580))
+d.edge("em", "kcl", "batch, async", "", src="r", dst="l", at=(900, 725))
+d.edge("kinv", "inv", "", "", src="r", dst="l")
+d.edge("inv", "lc", "", "", src="r", dst="l")
+d.legend(40, 850, ("component", "db", "queue", "ext"))
+d.save(OUT / "c4-comp-redirect.svg", order=["edge", "h", "res", "lc", "scl", "redis", "stc", "pg", "em", "kcl", ("kinv", "inv")])
+
+d = c4.Diagram(1600, 880)
+d.boundary(260, 60, 920, 780, "Create service", "Container: Go")
+d.node("cli", 30, 380, 200, 140, "person", "Integrator", "API client", "Bulk creates.")
+d.node("rl", 30, 110, 200, 140, "db", "Rate limits", "Redis", "Token buckets.")
+d.node("lim", 300, 110, 240, 150, "component", "Rate limiter", "Component", "Per API key.")
+d.node("h", 300, 375, 240, 150, "component", "API handler", "Component", "Idempotency key; 201 · 409 · 422.")
+d.node("sf", 300, 640, 240, 150, "component", "Safety client", "Component", "150 ms timeout; breaker.")
+d.node("rh", 610, 110, 240, 150, "component", "Range holder", "etcd client", "Next ID; re-lease at half.")
+d.node("enc", 610, 375, 240, 150, "component", "Encoder", "Component", "Feistel, then base-62.")
+d.node("wr", 920, 375, 230, 150, "component", "Store writer", "pgx", "ON CONFLICT DO NOTHING.")
+d.node("etcd", 1250, 110, 320, 140, "db", "Range allocator", "etcd cluster", "")
+d.node("pg", 1250, 375, 320, 150, "db", "Link store", "PostgreSQL shard", "")
+d.node("wrk", 1250, 650, 320, 130, "ext", "URL classifier", "Web risk API", "")
+d.edge("cli", "h", "", "", src="r", dst="l")
+d.edge("h", "lim", "allow?", "", src="t", dst="b", at=(470, 320))
+d.edge("lim", "rl", "", "", src="l", dst="r")
+d.edge("h", "sf", "known-bad?", "", src="b", dst="t", at=(475, 590))
+d.edge("sf", "wrk", "lookup", "HTTPS", src="r", dst="l", at=(900, 700))
+d.edge("h", "enc", "", "", src="r", dst="l")
+d.edge("enc", "rh", "next ID", "", src="t", dst="b", at=(780, 320))
+d.edge("rh", "etcd", "Txn: lease 1,000", "gRPC", src="r", dst="l", at=(1010, 160))
+d.edge("enc", "wr", "", "", src="r", dst="l")
+d.edge("wr", "pg", "", "", src="r", dst="l")
+d.legend(40, 850, ("person", "component", "db", "ext"))
+d.save(OUT / "c4-comp-create.svg", order=["cli", "h", ("lim", "rl"), ("sf", "wrk"), "enc", ("rh", "etcd"), ("wr", "pg")])
 
 # ───────────────────────────── 3 · sequences ─────────────────────────────────────────────────────────
 def seq(name, parts, steps, **kw):
-    s = sq.Seq(1500, size=22, row=50, **kw)
+    s = sq.Seq(1500, size=24, row=54, **kw)
     for p in parts: s.part(*p)
     for st in steps:
         k = st[0]
@@ -183,6 +287,44 @@ seq("seq-redirect",
      ("r", "db", "rd", "url, live; fill both caches"),
      ("r", "rd", "br", "302 Location: long URL", dict(hl=True)),
      ("m", "rd", "lg", "click event, after the answer", dict(kind="async"))])
+
+seq("seq-count",
+    [("rd", "Redirect server", "container"), ("bf", "Local buffer", "db"), ("lg", "Kafka: clicks", "queue"), ("fl", "Flink job", "container"),
+     ("ch", "ClickHouse", "db"), ("ow", "Owner's dashboard", "person")],
+    [("n", "rd", "rd", "302 already sent", "green"),
+     ("m", "rd", "bf", "append {code, country, minute}"),
+     ("n", "bf", "bf", "pre-aggregate per code and country each second", "amber"),
+     ("m", "bf", "lg", "one batch a second, keyed by code", dict(kind="async")),
+     ("m", "lg", "fl", "consume; partitions by code", dict(kind="async")),
+     ("n", "fl", "fl", "1-minute windows; 30 s late data allowed", "blue"),
+     ("m", "fl", "ch", "INSERT counts (code, minute, country)"),
+     ("m", "ow", "ch", "stats for aZ3kQ9x by day"),
+     ("r", "ch", "ow", "counts, asOf 14:05", dict(hl=True))])
+
+seq("seq-th-lease",
+    [("a", "Create server A", "container"), ("ld", "etcd leader", "db"), ("f1", "etcd follower 1", "db"), ("f2", "etcd follower 2", "db"), ("b", "Create server B", "container")],
+    [("m", "a", "ld", "Txn: if mod_rev(next) = 17, put next = 41,000"),
+     ("m", "ld", "f1", "append entry 18", dict(kind="async")),
+     ("m", "ld", "f2", "append entry 18", dict(kind="async")),
+     ("r", "f1", "ld", "ack"),
+     ("n", "ld", "ld", "2 of 3 have it: committed", "green"),
+     ("r", "ld", "a", "ok: you own 40,000 – 40,999"),
+     ("m", "b", "ld", "Txn: if mod_rev(next) = 17, put next = 41,000"),
+     ("r", "ld", "b", "fails: mod_rev is now 18", dict(hl=True)),
+     ("n", "b", "b", "read again; next Txn wins 41,000 – 41,999", "amber")])
+
+seq("seq-th-cache",
+    [("br", "3 browsers", "person"), ("rd", "Redirect server", "container"), ("rc", "Redis Cluster", "db"), ("pg", "PostgreSQL", "db"), ("tk", "Takedown", "container")],
+    [("m", "br", "rd", "GET /k7Pq2mZ, three at once"),
+     ("n", "rd", "rd", "in-process miss: the first leads, two wait", "amber"),
+     ("m", "rd", "rc", "GET k7Pq2mZ"),
+     ("r", "rc", "rd", "miss"),
+     ("m", "rd", "pg", "SELECT url, status WHERE code = $1"),
+     ("r", "pg", "rd", "url, live"),
+     ("m", "rd", "rc", "SET EX 3600 ± 10 %", dict(kind="async")),
+     ("r", "rd", "br", "3 × 302 from one lookup", dict(hl=True)),
+     ("m", "tk", "rd", "invalidate k7Pq2mZ", dict(kind="async")),
+     ("n", "rd", "rd", "dropped now; if lost, the 60 s lifetime ends it", "green")])
 
 seq("seq-takedown",
     [("ts", "Trust and safety", "person"), ("tk", "Takedown", "container"), ("db", "Link store", "db"), ("iv", "Invalidation", "queue"), ("ly", "Caches + edge", "container")],
@@ -226,7 +368,7 @@ seq("seq-ch7-region",
     [("br", "Browser in Europe", "person"), ("eu", "Redirect, Europe", "container"), ("ap", "Link store, Asia", "db")],
     [("n", "eu", "eu", "code 9Hc… created in Asia 200 ms ago; not yet replicated", "amber"),
      ("m", "br", "eu", "GET /9Hc2…"),
-     ("n", "eu", "eu", "local miss; the code's region prefix says: Asia", "amber"),
+     ("n", "eu", "eu", "local miss; invert the permutation: the ID's slice says Asia", "amber"),
      ("m", "eu", "ap", "one cross-region lookup"),
      ("r", "ap", "eu", "url, live; cache it here"),
      ("r", "eu", "br", "302, one round trip slower, no error", dict(hl=True))])
@@ -281,7 +423,7 @@ e.save(OUT / "erd-physical.svg")
 def svgdoc(w, h, body): return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">'
                                f'<rect width="{w}" height="{h}" fill="#ffffff"/>{body}</svg>')
 def T(x, y, s, size=24, fill=INK, w=500, anchor="start"):
-    return f'<text x="{x}" y="{y}" text-anchor="{anchor}" font-family="{FONT}" font-size="{size}" font-weight="{w}" fill="{fill}">{esc(s)}</text>'
+    return f'<text x="{x}" y="{y}" text-anchor="{anchor}" font-family="{FONT}" font-size="{size}" font-weight="{w}" fill="{ink(fill)}">{esc(s)}</text>'
 def R(x, y, w, h, fill, stroke, dash=False, rx=8, sw=2.2):
     return (f'<rect x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h:.1f}" rx="{rx}" fill="{fill}" stroke="{stroke}" '
             f'stroke-width="{sw}"{" stroke-dasharray=\"10 6\"" if dash else ""}/>')
@@ -297,38 +439,38 @@ def codespace():
             ("7 characters: 62⁷", 3.5e12, GREEN, "3.5 × 10¹² · about 290×")]
     for i, (lab, v, col, txt) in enumerate(rows):
         y = 100 + i * 90
-        fill = {BLUE: "#dbeafe", AMBER: "#fdf3e1", GREEN: "#d3f3e6"}[col]
+        fill = {BLUE: "#e8f0fe", AMBER: "#fef7e0", GREEN: "#e6f4ea"}[col]
         p += [T(40, y + 36, lab, 25, INK, 700), R(x0, y, lg(v), 54, fill, col), T(x0 + lg(v) + 14, y + 37, txt, 24, col, 800)]
     for v, lab in ((1e9, "10⁹"), (1e10, "10¹⁰"), (1e11, "10¹¹"), (1e12, "10¹²"), (1e13, "10¹³")):
-        x = x0 + lg(v); p += [L(x, 375, x, 388, GREY, 2), T(x, 414, lab, 20, "#57606a", 600, "middle")]
+        x = x0 + lg(v); p += [L(x, 375, x, 388, GREY, 2), T(x, 414, lab, 20, "#5f6368", 600, "middle")]
     p.append(L(x0, 381, x0 + W, 381, GREY, 2))
-    p += [T(40, 470, "Random 7-character codes: a new code collides with probability 1.2 × 10¹⁰ ÷ 3.5 × 10¹² ≈ 0.34 % at the end of year ten.", 23, "#173d24", 700)]
+    p += [T(40, 470, "Random 7-character codes: a new code collides with probability 1.2 × 10¹⁰ ÷ 3.5 × 10¹² ≈ 0.34 % at the end of year ten.", 23, "#202124", 700)]
     (OUT / "codespace.svg").write_text(svgdoc(1600, 510, "".join(p)))
 codespace()
 
 def tension():
     p = [T(40, 44, "Speed of the answer against control over it: every layer closer to the user", 28, INK, 800)]
-    layers = [("Browser (301)", RED, "#fdecea", "0 ms", "never seen again"), ("Edge (302, 60 s)", AMBER, "#fdf3e1", "~5 ms near the user", "counted from logs; purgeable"),
-              ("Redirect + caches", GREEN, "#d3f3e6", "~1 ms at the server", "every click; recallable"), ("Link store", BLUE, "#dbeafe", "~5 ms, misses only", "the truth")]
+    layers = [("Browser (301)", RED, "#fce8e6", "0 ms", "never seen again"), ("Edge (302, 60 s)", AMBER, "#fef7e0", "~5 ms near the user", "counted from logs; purgeable"),
+              ("Redirect + caches", GREEN, "#e6f4ea", "~1 ms at the server", "every click; recallable"), ("Link store", BLUE, "#e8f0fe", "~5 ms, misses only", "the truth")]
     for i, (lab, col, fill, sp, ctl) in enumerate(layers):
         x = 60 + i * 385
         p += [R(x, 110, 345, 120, fill, col, rx=12), T(x + 172, 165, lab, 25, INK, 800, "middle"), T(x + 172, 205, sp, 21, col, 700, "middle"),
               T(x + 172, 270, ctl, 21, INK, 600, "middle")]
     p += [L(80, 330, 1520, 330, BLUE, 4), T(80, 370, "← faster and cheaper", 24, BLUE, 800), T(1520, 370, "more control: counting, takedown →", 24, GREEN, 800, "end")]
-    p += [R(60, 410, 1480, 70, "#fdf3e1", AMBER), T(800, 455, "301 against 302 is where on this line you let the answer live. A product decision, not a tweak.", 25, "#4a3207", 800, "middle")]
+    p += [R(60, 410, 1480, 70, "#fef7e0", AMBER), T(800, 455, "301 against 302 is where on this line you let the answer live. A product decision, not a tweak.", 25, "#202124", 800, "middle")]
     (OUT / "tension.svg").write_text(svgdoc(1600, 510, "".join(p)))
 tension()
 
 def ranges():
     p = [T(40, 44, "Counter ranges: coordination once per thousand links, not once per link", 28, INK, 800)]
-    p += [R(60, 170, 300, 160, "#d3f3e6", GREEN, rx=14), T(210, 235, "Range allocator", 25, INK, 800, "middle"), T(210, 275, "next = 41,000", 23, "#173d24", 700, "middle")]
+    p += [R(60, 170, 300, 160, "#e6f4ea", GREEN, rx=14), T(210, 235, "Range allocator", 25, INK, 800, "middle"), T(210, 275, "next = 41,000", 23, "#202124", 700, "middle")]
     srv = [("Server A", "40,000 – 40,999", "40,017"), ("Server B", "39,000 – 39,999", "39,522"), ("Server C", "38,000 – 38,999", "38,904")]
     for i, (n, r, nx) in enumerate(srv):
         y = 90 + i * 140
-        p += [R(560, y, 380, 110, "#e6dcfb", PURPLE, rx=12), T(750, y + 45, n, 24, INK, 800, "middle"), T(750, y + 82, "holds " + r, 21, "#2a1d66", 600, "middle"),
-              L(362, 250, 556, y + 55, GREEN, 3), R(1100, y, 440, 110, "#dbeafe", BLUE, rx=12), T(1320, y + 45, "next ID " + nx, 24, INK, 800, "middle"),
-              T(1320, y + 82, "→ permute → base-62", 21, "#0b2540", 600, "middle"), L(942, y + 55, 1096, y + 55, BLUE, 3)]
-    p += [T(40, 540, "A server that crashes wastes the rest of its range: a gap, never a collision. There are 290 times more codes than links.", 23, "#173d24", 700)]
+        p += [R(560, y, 380, 110, "#d2e3fc", PURPLE, rx=12), T(750, y + 45, n, 24, INK, 800, "middle"), T(750, y + 82, "holds " + r, 21, "#202124", 600, "middle"),
+              L(362, 250, 556, y + 55, GREEN, 3), R(1100, y, 440, 110, "#e8f0fe", BLUE, rx=12), T(1320, y + 45, "next ID " + nx, 24, INK, 800, "middle"),
+              T(1320, y + 82, "→ permute → base-62", 21, "#202124", 600, "middle"), L(942, y + 55, 1096, y + 55, BLUE, 3)]
+    p += [T(40, 540, "A server that crashes wastes the rest of its range: a gap, never a collision. There are 290 times more codes than links.", 23, "#202124", 700)]
     (OUT / "ranges.svg").write_text(svgdoc(1600, 580, "".join(p)))
 ranges()
 
@@ -338,11 +480,11 @@ def regions():
     for i, (n, sl) in enumerate(regs):
         x = 60 + i * 510
         bad = n == "Americas"
-        p += [R(x, 100, 460, 330, "#fdecea" if bad else "#f6f8fa", RED if bad else GREY, dash=True, rx=16), T(x + 230, 140, n + ("  (primary lost)" if bad else ""), 25, RED if bad else INK, 800, "middle"),
-              R(x + 30, 170, 400, 70, "#e6dcfb", PURPLE), T(x + 230, 214, "redirect servers + caches", 22, INK, 700, "middle"),
-              R(x + 30, 260, 400, 70, "#d3f3e6", GREEN), T(x + 230, 304, "link store replica", 22, INK, 700, "middle"),
-              R(x + 30, 350, 400, 60, "#dbeafe", BLUE), T(x + 230, 388, sl, 21, "#0b2540", 700, "middle")]
-    p += [T(40, 490, "Redirects never cross regions. A brand-new code clicked elsewhere before it replicates costs one cross-region lookup, not an error.", 22, "#173d24", 700)]
+        p += [R(x, 100, 460, 330, "#fce8e6" if bad else "#f8f9fa", RED if bad else GREY, dash=True, rx=16), T(x + 230, 140, n + ("  (primary lost)" if bad else ""), 25, RED if bad else INK, 800, "middle"),
+              R(x + 30, 170, 400, 70, "#d2e3fc", PURPLE), T(x + 230, 214, "redirect servers + caches", 22, INK, 700, "middle"),
+              R(x + 30, 260, 400, 70, "#e6f4ea", GREEN), T(x + 230, 304, "link store replica", 22, INK, 700, "middle"),
+              R(x + 30, 350, 400, 60, "#e8f0fe", BLUE), T(x + 230, 388, sl, 21, "#202124", 700, "middle")]
+    p += [T(40, 490, "Redirects never cross regions. A brand-new code clicked elsewhere before it replicates costs one cross-region lookup, not an error.", 22, "#202124", 700)]
     (OUT / "regions.svg").write_text(svgdoc(1600, 530, "".join(p)))
 regions()
 
@@ -351,11 +493,11 @@ def feistel():
     ins = ["40,017", "40,018", "40,019"]; outs = ["aZ3kQ9x", "Pq07mWd", "3fLx9Tb"]
     for i, (a, o) in enumerate(zip(ins, outs)):
         y = 110 + i * 110
-        p += [R(60, y, 260, 80, "#dbeafe", BLUE, rx=10), T(190, y + 50, "ID " + a, 25, INK, 800, "middle"), L(322, y + 40, 556, 250, GREY, 2.5),
-              L(1044, 250, 1276, y + 40, GREY, 2.5), R(1280, y, 260, 80, "#d3f3e6", GREEN, rx=10), T(1410, y + 50, o, 26, "#0d3b2a", 800, "middle")]
-    p += [R(560, 170, 480, 160, "#e6dcfb", PURPLE, rx=16), T(800, 225, "4-round Feistel over 42 bits", 24, INK, 800, "middle"),
-          T(800, 262, "secret round key · cycle-walk below 62⁷", 21, "#2a1d66", 600, "middle"), T(800, 298, "then base-62, 7 characters", 21, "#2a1d66", 600, "middle")]
-    p += [T(40, 480, "A bijection: two different IDs can never give the same code. The counter gives uniqueness; the key gives unpredictability.", 23, "#173d24", 700)]
+        p += [R(60, y, 260, 80, "#e8f0fe", BLUE, rx=10), T(190, y + 50, "ID " + a, 25, INK, 800, "middle"), L(322, y + 40, 556, 250, GREY, 2.5),
+              L(1044, 250, 1276, y + 40, GREY, 2.5), R(1280, y, 260, 80, "#e6f4ea", GREEN, rx=10), T(1410, y + 50, o, 26, "#202124", 800, "middle")]
+    p += [R(560, 170, 480, 160, "#d2e3fc", PURPLE, rx=16), T(800, 225, "4-round Feistel over 42 bits", 24, INK, 800, "middle"),
+          T(800, 262, "secret round key · cycle-walk below 62⁷", 21, "#202124", 600, "middle"), T(800, 298, "then base-62, 7 characters", 21, "#202124", 600, "middle")]
+    p += [T(40, 480, "A bijection: two different IDs can never give the same code. The counter gives uniqueness; the key gives unpredictability.", 23, "#202124", 700)]
     (OUT / "feistel.svg").write_text(svgdoc(1600, 520, "".join(p)))
 feistel()
 

@@ -393,3 +393,65 @@ counting, takedowns, the edge — lives beside the redirect, with a number on ho
 | 8 Build cost (AUX) | 3 | 360 | 5 |
 | 9 Recap | 3 | 350 | 6 |
 | **Total** | **77** | **9,100** | **142** |
+
+## Revision 2026-11-21 (revised standard: progressive disclosure, components and technologies)
+
+**Moved earlier and expanded.** C4 context now closes chapter 1 (after scope). The C4 container view follows V3 directly and is
+walked container by container (≈ 45 words each, 10 reveal steps). Every functional requirement has a flow **and** a sequence
+(new: `seq-count` for FR3; `seq-takedown` now shown in chapter 5).
+
+**Theory, mechanisms at work (new, 3 slides).** `th-map`: the container view labelled M1–M6. `seq-th-lease`: two create servers
+race through an etcd Txn on `ModRevision`; the Raft log commits on a majority; no clock, no lock. `seq-th-cache`: three
+concurrent misses → one lookup (singleflight) → Redis `SET EX 3600 ± 10 %`; an invalidation, or the 60 s lifetime, ends the copy.
+
+### 5.1 · Components and technologies
+
+C4 component views: `c4-comp-redirect` (HTTP handler, resolver/singleflight, ristretto, Redis cluster client 2 ms, pgx pool
+20 ms, click emitter, invalidation listener rewinding 5 min) and `c4-comp-create` (API handler with idempotency key, rate
+limiter on Redis token buckets, safety client 150 ms + breaker, Feistel encoder keyed from KMS, etcd range holder, store writer
+`ON CONFLICT DO NOTHING` + idempotency row in one transaction).
+
+<!-- stack:outline -->
+
+| Container | Choice | How it is built | Rejected | Theory part |
+|---|---|---|---|---|
+| Link store | PostgreSQL 16, 16 shards per region | `link(code char(7) PRIMARY KEY, …)` | Cassandra / ScyllaDB; DynamoDB; One big PostgreSQL | 5, 6 |
+| Range allocator | etcd, 3 nodes per region across zones | Key `/alloc/{region}/next` | ZooKeeper; Redis INCRBY; Cassandra counter or LWT; A PostgreSQL sequence (INCREMENT 1000) | 2 §2.11, 3 |
+| Shared cache | Redis Cluster, 6 primaries + 6 replicas per region | 16,384 hash slots over 6 shards, about 17 GB of the hot set each | Memcached; Hazelcast; No shared cache, store replicas only | 9 |
+| In-process cache and single flight | ristretto (Go) + golang.org/x/sync/singleflight | 300,000 entries × ~300 B, about 100 MB per server; lifetime 60 s, 10 s for a not-found | A plain LRU map; A sidecar cache per host; No local cache | 9 §9.7, 6 §6.5 |
+| Click log | Kafka, 3 brokers per region, replication factor 3 | Topic `clicks`, 32 partitions, keyed by code, 7 days' retention | RabbitMQ; Kinesis or Pub/Sub; Write straight into the stats store | 8 |
+| Aggregator and stats store | Flink job → ClickHouse (SummingMergeTree) | Keyed by code; 1-minute tumbling windows; 30 s allowed lateness | Spark Structured Streaming; A nightly batch job; Cassandra counters; A PostgreSQL table | 8 |
+| Invalidation and the edge | Kafka topic link-invalidations + CDN purge by surrogate key | Each redirect server reads with its own consumer group, from the latest offset, rewinding 5 minutes on start | Redis Pub/Sub; Polling the store for changes; Purge by URL only | 9 |
+| Services | Go on Kubernetes, 3 zones per region; a bought CDN | Redirect pods scale on requests per second; a pod warms its in-process cache from the last hour's top codes before it passes readiness | Java (Caffeine); Serverless functions for the redirect; Build our own edge | 1, 9 |
+
+Fix-slide rejections: 1: Redis INCRBY as the counter; 2: A hash of the long URL; 3: Redis replica reads alone; 4: A CDN without a purge API; 5: Redis Pub/Sub for the invalidation; 6: Cassandra counters; 7: One global consensus database (Spanner, CockroachDB); 8: An outside uptime checker alone.
+
+<!-- /stack:outline -->
+
+### Second pass, 2026-11-21 (single source, drill, rejections, captions)
+
+- **`stack.json` is the one place a technology is written.** The 5.1 technology slides, the stack slide, the drill table, the
+  fix-slide rejections and the container view with technologies read it; `stack.py sync` writes the booklet's Stage 5
+  sections and stack table and the table above.
+- **Drill interlude** after the stack slide (~2.3 min): the coach hands the viewer the interviewer's seat, then five boxes
+  (link store, allocator, shared cache, click log, invalidation), each read as interviewer probe and coach answer.
+- **Every fix slide names a rejected tool** (`rejl`), with one candidate sentence: Redis `INCRBY`, a URL hash, Redis replica
+  reads, a CDN without purge, Redis Pub/Sub, Cassandra counters, a global consensus database, an outside uptime checker.
+- **New design fact**: a custom alias has a home region fixed by a hash of the alias; alias creates are forwarded there.
+- **Captions**: SRT speaker prefix inside the 42-character budget; VTT voice spans.
+
+### Budget, measured
+
+| Chapter | Minutes | Words |
+|---|---|---|
+| 0 Cold open | 3.3 | 423 |
+| 1 Requirements | 5.8 | 699 |
+| 2 Estimates | 4.8 | 630 |
+| 3 Theory | 13.7 | 1,664 |
+| 4 API and entities | 4.0 | 519 |
+| 5 Design + 5.1 | 28.1 | 3,417 |
+| 6 Bridge | 1.0 | 118 |
+| 7 Challenges | 35.5 | 4,137 |
+| 8 Build cost | 2.6 | 288 |
+| 9 Recap | 3.2 | 338 |
+| **Total** | **101.9** | **12,222** (169 slides, 627 frames) |

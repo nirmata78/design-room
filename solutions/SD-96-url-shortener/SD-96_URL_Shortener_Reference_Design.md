@@ -7,8 +7,8 @@ documentclass: article
 fontsize: 10pt
 geometry: a4paper,top=0.7in,bottom=0.75in,left=0.75in,right=0.75in
 colorlinks: true
-linkcolor: blue
-urlcolor: blue
+linkcolor: gblueink
+urlcolor: gblueink
 toc: true
 toc-depth: 2
 numbersections: false
@@ -392,7 +392,11 @@ the shared cache. Create calls a safety check on the URL first.
 
 ![FR3 count: after the answer, a local buffer, a log by code, an aggregator, a stats store.](diagrams/video-flow-fr3.pdf){width=95%}
 
+![Counting as a sequence: pre-aggregated per second at the server, Kafka keyed by code, one-minute windows in Flink, counts in ClickHouse with an as-of time.](diagrams/video-seq-count.pdf){width=95%}
+
 ![FR4 withdraw: status, publish, the shared cache deleted, every server drops it, the edge purged.](diagrams/video-flow-fr4.pdf){width=95%}
+
+![Takedown as a sequence: status first, a direct delete of the shared-cache key, then the invalidation; lifetimes are the backstop.](diagrams/video-seq-takedown.pdf){width=92%}
 
 **Code for the redirect path**, the part interviewers ask to see:
 
@@ -412,43 +416,181 @@ def redirect(code):
 
 ![The C4 container view: the redirect path is four boxes in a row; everything else is above or below it.](diagrams/video-c4-containers.pdf){width=95%}
 
-# Stage 5: Why these choices
+# Stage 5: Components and technologies
 
-## A sharded key-value or relational store, keyed by code
+The container view says *what* runs. The interviewer's next question is "you said Redis: how exactly?", one
+level down on any box you named. This stage answers it ahead of time, for every in-scope container: the
+technology, how it is built, and the alternatives an interviewer will name, each with the property or failure
+that rules it out. It goes past what a 45-minute round has time to say; it is here so that whichever box
+they pick, you can go one level down. Background for each mechanism is in the building-blocks course
+(`theory/video/src/`), cited per section.
 
-*Why here:* every redirect is a single-key lookup by code, and every create is a single-row insert with a
-uniqueness check. Both are what any sharded store does best. *Internals to explain:* sharding by code
-spreads writes evenly because codes are permuted; the unique constraint is local to the shard that owns the
-code, so it needs no cross-shard coordination. *Alternative:* one relational primary. Writes would fit
-(400 a second) but reads, storage growth and a single failure domain argue against it at ten years.
+![The container view with technologies.](diagrams/video-c4-containers-tech.pdf){width=95%}
 
-## An in-memory shared cache, cache-aside
+![C4 level 3: inside the redirect service. Every miss path has its own timeout: Redis 2 ms, PostgreSQL 20 ms.](diagrams/video-c4-comp-redirect.pdf){width=95%}
 
-*Why here:* the hot set (about 100 GB, illustrative) fits in memory. Cache-aside rather than
-read-through-in-the-store because the cache must keep answering when the store is slow. *Internals:* a
-lifetime per entry, eviction by least-recent use, sharding by key, which is exactly why a single viral key
-lands on one shard. *Alternative:* no shared cache, only in-process caches: works, but a restart of the
-fleet sends every miss to the store.
+![C4 level 3: inside the create service. Nothing here is on the redirect path.](diagrams/video-c4-comp-create.pdf){width=95%}
 
-## A small consensus-backed store for the allocator
+<!-- stack:sections -->
 
-*Why here:* 0.4 leases a second needs no throughput, only correctness: two servers must never receive the
-same range. A compare-and-set on one key in a replicated, consensus-backed store gives that and survives
-the loss of one replica. *Alternative:* a counter row in the link store, which couples creates to the
-busiest store and has no natural lease semantics.
+## Link store: PostgreSQL, sharded by code
 
-## A local buffer, a partitioned log, an aggregator
+*How it is built.* `link(code char(7) PRIMARY KEY, …)`. A code maps to a shard by hash. Each region is the primary for the links it creates (its slice of the ID space) and holds asynchronous replicas of the others. Each primary has a synchronous standby in another zone. `INSERT … ON CONFLICT (code) DO NOTHING RETURNING code`. The full row is `(code, long_url, owner_id, created_at, expires_at, status)`. No row back means the code was taken: a `409` for an alias. The idempotency row is written in the same transaction. A custom alias has no ID, so it belongs to no region's slice: its home region is fixed by a hash of the alias, and an alias create is forwarded there (one cross-region hop, for aliases only).
 
-*Why here:* the click path must never delay the redirect and must absorb 40,000 events a second for one
-code. A log partitioned by code spreads codes across partitions and keeps one code's events in order.
-*Alternative:* a counter per link (the hot row) or a synchronous write to an analytics store (latency on the
-critical path).
+*Why PostgreSQL 16, 16 shards per region:* Primary key on the code is the unique constraint; one insert wins, the other gets no row back. 6 TB is boring for it; we know how it fails.
 
-## A bought edge with a purge API
+*Rejected:*
 
-*Why here:* points of presence in dozens of cities are not our business. What we need from it: honouring
-`CDN-Cache-Control`, a purge API that completes in seconds, and logs. *Alternative:* building our own edge:
-no.
+- **Cassandra / ScyllaDB**: Fits the reads well. But uniqueness needs a lightweight transaction (`IF NOT EXISTS`), a Paxos round per insert, and its multi-region serial modes are easy to get wrong. Its strength, leaderless writes everywhere, buys us nothing at 400 writes a second.
+- **DynamoDB**: A conditional put is exactly the constraint, in one region. Global tables resolve concurrent writes by last writer wins, so an alias created in two regions at once could succeed twice. Cloud lock-in too.
+- **One big PostgreSQL**: Writes fit. 18 TB with replicas on one primary, one failure domain, and vacuum on a 12-billion-row table: no.
+
+*Course:* building-blocks course, part 5 (replication) and part 6 (partitioning).
+
+*Drill.* "Two regions accept the same alias in the same second. Which write wins, and where is that decided?" Neither region decides alone. An alias has a home region fixed by a hash of the alias; both creates are forwarded to that one primary, and the primary key rejects the second with a 409. The trap is answering 'last writer wins'.
+
+## Range allocator: etcd
+
+*How it is built.* Key `/alloc/{region}/next`. A lease is one transaction: `If(ModRevision(next) == r) Then(Put(next, n + 1000)) Else(Get(next))`. Committed when a majority of the Raft group has it. No expiring lock, so no clock assumption and no fencing token: a crashed server just leaves a gap.
+
+*Why etcd, 3 nodes per region across zones:* Linearizable compare-and-set by revision; survives one node; tiny load (0.4 leases a second). Often already run for Kubernetes.
+
+*Rejected:*
+
+- **ZooKeeper**: The same guarantee (a conditional `setData` on the znode version, replicated by ZAB). An honest equal; rejected only for running a JVM ensemble for this alone.
+- **Redis INCRBY**: Fast, but replication is asynchronous: after a failover the new primary may not have seen the last `INCRBY` and hands out the same range twice. That breaks S1 silently.
+- **Cassandra counter or LWT**: Counters cannot compare-and-set; an LWT works but ties create to the busiest store.
+- **A PostgreSQL sequence (INCREMENT 1000)**: Durable and simple, a defensible choice. Rejected because creates would then depend on one link-store shard's fail-over.
+
+*Course:* building-blocks course, part 2 §2.11 (leases and fencing) and part 3 (consensus, Raft).
+
+*Drill.* "The etcd leader dies mid-lease. Can two servers end up holding the same thousand IDs?" No. The transaction commits only on a majority; a new leader has every committed entry, and an uncommitted one is retried against the new revision. The worst case is a wasted block, a gap.
+
+![Mechanism M1 at protocol level: two servers race; the revision decides; the log commits on a majority.](diagrams/video-seq-th-lease.pdf){width=95%}
+
+## Shared cache: Redis Cluster
+
+*How it is built.* 16,384 hash slots over 6 shards, about 17 GB of the hot set each. Values: URL and status, ~300 B. `SET code v EX 3600±10%` on a miss; the takedown deletes the key directly. `maxmemory-policy allkeys-lfu`. Replica reads allowed for the hottest slots.
+
+*Why Redis Cluster, 6 primaries + 6 replicas per region:* A replica per shard, so a shard's loss is a promotion, not a cold slice. LFU eviction. Bought managed.
+
+*Rejected:*
+
+- **Memcached**: An honest equal: simpler and multi-threaded. Rejected because a node's loss is a cold slice with no replica, which is the stampede of challenge 3, and it has no LFU policy.
+- **Hazelcast**: An in-memory data grid with a near cache. Its near cache duplicates our in-process cache, its clients are JVM-first, and its split-brain merge policies solve a problem a cache-aside copy does not have.
+- **No shared cache, store replicas only**: Works at 4,000 a second, until a region's redirect servers restart together and every miss lands on the store.
+
+*Course:* building-blocks course, part 9 (caching: patterns, eviction, stampedes).
+
+*Drill.* "A Redis primary fails over. What does a redirect see in the next two seconds?" Requests for that shard's slots time out at 2 ms and fall through to the store, already cut down by the in-process cache and single flight; then the client refreshes its slot map. A takedown delete may hit the old primary, so it is retried until confirmed.
+
+## In-process cache and single flight: ristretto + singleflight
+
+*How it is built.* 300,000 entries × ~300 B, about 100 MB per server; lifetime 60 s, 10 s for a not-found. A 404 storm of random codes is admitted only if its frequency beats a resident code's.
+
+*Why ristretto (Go) + golang.org/x/sync/singleflight:* TinyLFU admission keeps the hot set under scans; singleflight coalesces concurrent misses per key. In Java the same pair is Caffeine with an async loading cache.
+
+*Rejected:*
+
+- **A plain LRU map**: A scan of random codes evicts exactly the hot set: LRU admits everything.
+- **A sidecar cache per host**: One more hop and one more process to run, for the job a library does in-process.
+- **No local cache**: Every viral click becomes a network call to one Redis shard: challenge 3.
+
+*Course:* building-blocks course, part 9 §9.7 (stampede control) and part 6 §6.5 (hot keys).
+
+![Mechanisms M4 and M6 at work: three concurrent misses become one lookup; an invalidation, or the lifetime, ends the copy.](diagrams/video-seq-th-cache.pdf){width=95%}
+
+## Click log: Kafka
+
+*How it is built.* Topic `clicks`, 32 partitions, keyed by code, 7 days' retention. Today: `acks=1`, a 1 s linger, pre-aggregated per code and country each second. Billed: `acks=all`, an idempotent producer, a disk buffer and an event ID per click. Pre-aggregation means a viral code is about forty small messages a second, not a hot partition.
+
+*Why Kafka, 3 brokers per region, replication factor 3:* A replayable, ordered log per partition: a bug in counting is fixed by replaying a week. Already the company's event backbone in most shops.
+
+*Rejected:*
+
+- **RabbitMQ**: A queue: a message is gone once acknowledged. Recounting after a bug needs replay, which a log has and a queue does not.
+- **Kinesis or Pub/Sub**: Honest equals if we are on that cloud: buy, not build.
+- **Write straight into the stats store**: No buffer against a viral spike, and the redirect's health would depend on the analytics database.
+
+*Course:* building-blocks course, part 8 (logs and streams).
+
+*Drill.* "Counting had a bug for three days. How do you fix the numbers?" Replay: reset the counting job's consumer group to three days ago, write corrected counts to a new table, and switch reads over. That is why it is a log, not a queue, and why retention is a week.
+
+## Aggregator and stats store: Flink → ClickHouse
+
+*How it is built.* Keyed by code; 1-minute tumbling windows; 30 s allowed lateness. Billed: de-duplicate by event ID in keyed state kept 24 h. ClickHouse table `ORDER BY (code, day, country)`; rows with the same key are summed in the background.
+
+*Why Flink job → ClickHouse (SummingMergeTree):* Event-time windows with a bound on lateness; exactly-once state with checkpoints; a columnar store that sums on merge and answers by code and day in milliseconds.
+
+*Rejected:*
+
+- **Spark Structured Streaming**: An honest equal; micro-batches add seconds, which is fine for 'within minutes'.
+- **A nightly batch job**: FR3 says minutes, not a day.
+- **Cassandra counters**: Not idempotent: a retried increment counts twice. Wrong for anything that may be billed.
+- **A PostgreSQL table**: Fine on day one; counts by code, day and country grow into billions of rows, which a columnar store compresses ten times better.
+
+*Course:* building-blocks course, part 8 (stream processing: windows, watermarks).
+
+## Invalidation and the edge: a Kafka topic and a surrogate-key purge
+
+*How it is built.* Each redirect server reads with its own consumer group, from the latest offset, rewinding 5 minutes on start. The takedown service calls the CDN purge API with the surrogate key and retries; the 60 s edge lifetime is the backstop. The redirect response carries `Surrogate-Key: c/{code}`, so one purge call finds every edge copy.
+
+*Why Kafka topic link-invalidations + CDN purge by surrogate key:* We already run Kafka; a reconnecting server replays the last minutes instead of silently missing them. The edge purges every copy tagged c/{code} in one call.
+
+*Rejected:*
+
+- **Redis Pub/Sub**: At most once: a server that was disconnected for a second misses the message and never knows. Acceptable only because the lifetime backstops it, and Kafka's replay costs nothing extra.
+- **Polling the store for changes**: 40 servers asking every second adds load and a second of latency, and a slow store makes takedowns slower exactly when it hurts.
+- **Purge by URL only**: Works, but every edge variant of a URL must be listed; a surrogate key names them all.
+
+*Course:* building-blocks course, part 9 (invalidation and the stale-set race).
+
+*Drill.* "One redirect server was partitioned for ten minutes during a takedown. Is it still serving the blocked link?" At most for sixty seconds after it lost the event: the in-process lifetime ends the copy, and on reconnecting it rewinds five minutes. Ten minutes is past the rewind, so the lifetime, not the topic, is what guarantees S2 here.
+
+## Services: Go on Kubernetes, behind a bought CDN
+
+*How it is built.* Redirect pods scale on requests per second; a pod warms its in-process cache from the last hour's top codes before it passes readiness. Rollouts are one zone at a time. The CDN routes cache rules by response header, so only links over a click-rate threshold are edge-cached.
+
+*Why Go on Kubernetes, 3 zones per region; a bought CDN:* Small static binaries, low and predictable pause times for a 20 ms p99, singleflight in the standard extensions. Points of presence are not our business.
+
+*Rejected:*
+
+- **Java (Caffeine)**: An honest equal: Caffeine is the best in-process cache there is. Choose it if the team is a JVM team; tune the collector for the p99.
+- **Serverless functions for the redirect**: Cold starts break a 20 ms p99, and per-invocation pricing at 10 billion a month is the most expensive way to run a loop.
+- **Build our own edge**: Hundreds of points of presence and anycast routing, for a product whose core is a map lookup.
+
+*Course:* building-blocks course, part 1 (availability) and part 9 (tiers).
+
+<!-- /stack:sections -->
+
+## The stack on one page
+
+<!-- stack:summary -->
+
+| Container | Choice | Rejected | The deciding reason |
+|---|---|---|---|
+| Link store | PostgreSQL, sharded by code | Cassandra, DynamoDB | PK is the uniqueness authority; no last-writer-wins across regions |
+| Allocator | etcd (Raft) | ZooKeeper, Redis `INCRBY` | linearizable CAS; async replication can reissue a range |
+| Shared cache | Redis Cluster | Memcached, Hazelcast | a replica per shard: no cold slice |
+| Local cache | ristretto + singleflight | plain LRU | TinyLFU admission survives scans |
+| Click log | Kafka | RabbitMQ | replay to recount |
+| Counting | Flink → ClickHouse | Cassandra counters | idempotent, windowed, columnar |
+| Invalidation | Kafka topic + CDN surrogate purge | Redis Pub/Sub | a reconnecting server replays |
+
+Each fix in Stage 6 rejects one tool by name:
+
+| Deep dive | Rejected | Because |
+|---|---|---|
+| 6.1 | Redis `INCRBY` as the counter | after a fail-over the new primary can hand out a range it already gave away. |
+| 6.2 | A hash of the long URL | truncated to seven characters it collides, and one URL would get one code for every owner. |
+| 6.3 | Redis replica reads alone | they spread the hot key over two nodes, not forty, and every click is still a network hop. |
+| 6.4 | A CDN without a purge API | the 60-second edge copy could not be taken back early. |
+| 6.5 | Redis Pub/Sub for the invalidation | at most once: a server disconnected for a second never learns. |
+| 6.6 | Cassandra counters | they remove the row lock but count a retried increment twice. |
+| 6.7 | One global consensus database (Spanner, CockroachDB) | every create would pay a cross-region quorum; right for money, wrong for a 400-a-second link create. |
+| 6.8 | An outside uptime checker alone | one vantage point that sees only the edge, never create-to-redirect or a takedown. |
+
+<!-- /stack:summary -->
 
 # Stage 6: Deep dives
 

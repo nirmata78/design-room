@@ -1,57 +1,61 @@
 {
-  "mp4": "url-shortener-reference.mp4",
-  "teaser_chapter": null,
-  "thumbnail": {
-    "kicker": "Staff reference solution",
-    "title": "The redirect is<br><em>the product</em>",
-    "sub": "Codes that never collide, a viral link, 301 or 302, and a takedown in five minutes.",
-    "id": "design-room · SD-96"
-  },
-  "youtube": {
-    "title": "URL Shortener System Design: Staff-Level Reference Solution (Codes, Hot Keys, 301 vs 302)",
-    "playlist": "System design reference solutions · design-room (create it once, reuse it)",
-    "tags": [
-      "system design",
-      "system design interview",
-      "url shortener",
-      "tinyurl system design",
-      "bitly system design",
-      "301 vs 302",
-      "base62",
-      "hot key",
-      "caching",
-      "staff engineer",
-      "distributed systems",
-      "software architecture"
-    ],
-    "description_top": [
-      "Everyone has drawn the URL shortener: a hash, a table, a cache. It is still asked at every level, because the grade is on what comes after the diagram. This is a full reference solution at the Staff bar (L6/L7): theory, a three-version design, eight challenges that break it, and the build cost. {DURATION} minutes, {SLIDES} numbered slides, with an interviewer, a candidate and a coach.",
-      "The thesis: a URL shortener is a read path with a write path attached. Codes must be unique without a lock per create and unguessable without a lookup, the redirect must be one memory read, and nothing else (counting, abuse, analytics) may stand between the click and the answer.",
-      "IN THIS VIDEO\n• Estimates as arithmetic: why seven characters (3.5 trillion codes for 12 billion links), 4,000 redirects a second but 40 at the store, 7 of 20 milliseconds\n• Theory: safety and liveness, six mechanisms, an options matrix for code generation with a pick (and an honest equal)\n• Eight challenges: two servers and one code, codes that can be walked, one link at 40,000 clicks a second, 301 or 302, a takedown everywhere in five minutes, counting without slowing the redirect, a region lost, and how you would know\n• The build cost and team split (marked AUX, the manager layer)",
-      "HOW TO USE IT\nRun the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first. Slides badged AUX are the manager layer: skip them in a Staff round."
-    ],
-    "description_bottom": [
-      "LINKS\nWritten reference design: https://github.com/nirmata78/design-room/blob/main/solutions/SD-96-url-shortener/SD-96_URL_Shortener_Reference_Design.md\nRun this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room\nAll videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md",
-      "ABOUT THIS VIDEO\nThis is a scripted walkthrough, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script, diagrams and the written design were produced with Claude Code. Numbers are back-of-the-envelope estimates for the exercise, labelled as given, derived, illustrative or initial targets, not any company's real figures, and this is not any company's actual design. The technical content has not been reviewed by a person.",
-      "#SystemDesign #SoftwareEngineering #DistributedSystems"
-    ]
-  },
-  "linkedin": {
-    "post": [
-      "Everyone has drawn the URL shortener. The grade is on what happens after the diagram.",
-      "I've published a {DURATION}-minute reference solution for the URL shortener question, at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on {SLIDES} numbered slides.",
-      "The idea that unlocks it: the redirect is the product. It is one memory read, and counting, takedowns and the edge all live beside it, each with a number on how late it may be.",
-      "What it goes into:\n→ Why base-62 of a counter is still a counter, and a keyed shuffle that keeps codes unique\n→ One link at 40,000 clicks a second: a hot key, not a load problem\n→ 301 or 302 as a product decision\n→ A phishing link dead everywhere in five minutes, as a sum of cache lifetimes",
-      "Best on a second pass: pause after each question and answer it first.",
-      "▶ {YOUTUBE_URL}",
-      "It's a scripted walkthrough with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator.",
-      "301 or 302 for a short link: which would you ship, and who should decide?",
-      "#SystemDesign #SoftwareEngineering #DistributedSystems"
-    ],
-    "first_comment": "Written reference design, stage by stage: https://github.com/nirmata78/design-room/blob/main/solutions/SD-96-url-shortener/SD-96_URL_Shortener_Reference_Design.md\n\nRun this round yourself, with an AI interviewer that won't help you: https://github.com/nirmata78/design-room",
-    "document": {
-      "pdf": "../../SD-96_URL_Shortener_Reference_Design.pdf",
-      "title": "A URL shortener: a Staff-level reference design"
-    }
+ "mp4": "url-shortener-reference.mp4",
+ "teaser_chapter": null,
+ "thumbnail": {
+  "kicker": "Staff reference solution",
+  "title": "The redirect is<br><em>the product</em>",
+  "sub": "Codes that never collide, a viral link, 301 or 302, and a takedown in five minutes.",
+  "id": "design-room · SD-96"
+ },
+ "youtube": {
+  "title": "URL Shortener System Design: Staff-Level Reference Solution (Codes, Hot Keys, 301 vs 302)",
+  "playlist": "System design reference solutions · design-room (create it once, reuse it)",
+  "tags": [
+   "system design",
+   "system design interview",
+   "url shortener",
+   "tinyurl system design",
+   "bitly system design",
+   "301 vs 302",
+   "base62",
+   "hot key",
+   "caching",
+   "staff engineer",
+   "distributed systems",
+   "software architecture",
+   "etcd",
+   "redis cluster",
+   "kafka",
+   "c4 model"
+  ],
+  "description_top": [
+   "Everyone has drawn the URL shortener: a hash, a table, a cache. It is still asked at every level, because the grade is on what comes after the diagram. This is a full reference solution at the Staff bar (L6/L7): theory with the mechanisms at work, a three-version design with C4 context, container and component views, every component one level down with the technology picked and the alternatives rejected (PostgreSQL vs Cassandra and DynamoDB, etcd vs ZooKeeper and Redis, Redis Cluster vs Memcached and Hazelcast, Kafka, Flink, ClickHouse), eight challenges that break it, and the build cost. {DURATION} minutes, {SLIDES} numbered slides, with an interviewer, a candidate and a coach.",
+   "The thesis: a URL shortener is a read path with a write path attached. Codes must be unique without a lock per create and unguessable without a lookup, the redirect must be one memory read, and nothing else (counting, abuse, analytics) may stand between the click and the answer.",
+   "IN THIS VIDEO\n• Estimates as arithmetic: why seven characters (3.5 trillion codes for 12 billion links), 4,000 redirects a second but 40 at the store, 7 of 20 milliseconds\n• Theory: safety and liveness, six mechanisms, an options matrix for code generation with a pick (and an honest equal)\n• Components and technologies: what each box runs on, how it is built one level down, and why each rival is ruled out\n• Eight challenges: two servers and one code, codes that can be walked, one link at 40,000 clicks a second, 301 or 302, a takedown everywhere in five minutes, counting without slowing the redirect, a region lost, and how you would know\n• The build cost and team split (marked AUX, the manager layer)",
+   "HOW TO USE IT\nRun the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first. Slides badged AUX are the manager layer: skip them in a Staff round.\nCaptions: turn on CC (English, translatable). Every table and diagram is built up step by step, the way you would draw it at a whiteboard."
+  ],
+  "description_bottom": [
+   "LINKS\nWritten reference design: https://github.com/nirmata78/design-room/blob/main/solutions/SD-96-url-shortener/SD-96_URL_Shortener_Reference_Design.md\nRun this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room\nAll videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md",
+   "ABOUT THIS VIDEO\nThis is a scripted walkthrough, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script, diagrams and the written design were produced with Claude Code. Numbers are back-of-the-envelope estimates for the exercise, labelled as given, derived, illustrative or initial targets, not any company's real figures, and this is not any company's actual design. The technical content has not been reviewed by a person.",
+   "#SystemDesign #SoftwareEngineering #DistributedSystems"
+  ]
+ },
+ "linkedin": {
+  "post": [
+   "Everyone has drawn the URL shortener. The grade is on what happens after the diagram.",
+   "I've published a {DURATION}-minute reference solution for the URL shortener question, at the Staff bar: theory, a three-version design, every component one level down with the technology picked and the rivals rejected, eight challenges, and the build cost, on {SLIDES} numbered slides.",
+   "The idea that unlocks it: the redirect is the product. It is one memory read, and counting, takedowns and the edge all live beside it, each with a number on how late it may be.",
+   "What it goes into:\n→ Why base-62 of a counter is still a counter, and a keyed shuffle that keeps codes unique\n→ One link at 40,000 clicks a second: a hot key, not a load problem\n→ 301 or 302 as a product decision\n→ A phishing link dead everywhere in five minutes, as a sum of cache lifetimes\n→ etcd, not Redis INCRBY, for ID ranges: asynchronous replication can hand out the same range twice",
+   "Best on a second pass: pause after each question and answer it first.",
+   "▶ {YOUTUBE_URL}",
+   "It's a scripted walkthrough with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator.",
+   "301 or 302 for a short link: which would you ship, and who should decide?",
+   "#SystemDesign #SoftwareEngineering #DistributedSystems"
+  ],
+  "first_comment": "Written reference design, stage by stage: https://github.com/nirmata78/design-room/blob/main/solutions/SD-96-url-shortener/SD-96_URL_Shortener_Reference_Design.md\n\nRun this round yourself, with an AI interviewer that won't help you: https://github.com/nirmata78/design-room",
+  "document": {
+   "pdf": "../../SD-96_URL_Shortener_Reference_Design.pdf",
+   "title": "A URL shortener: a Staff-level reference design"
   }
+ }
 }

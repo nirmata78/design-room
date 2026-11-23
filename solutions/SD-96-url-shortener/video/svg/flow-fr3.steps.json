@@ -1,0 +1,1 @@
+[["n:user", "n:edge", "n:redir", "n:cache", "n:store", "n:create", "n:alloc", "n:safety", "n:clog", "n:agg", "n:stats", "n:take", "n:inval", "e:r-c", "e:c-r", "e:c-s", "e:s-c", "e:u-cr", "e:cr-a", "e:cr-s", "e:e-u", "e:r-e", "e:cr-sf", "e:t-i", "e:i-e", "e:i-r", "e:i-c", "e:t-s"], ["e:u-e"], ["e:e-r"], ["e:r-cl"], ["e:cl-ag"], ["e:ag-st"]]
