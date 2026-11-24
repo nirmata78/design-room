@@ -190,6 +190,7 @@ round stops being scoreable. That's a deliberate trade, not a failure.
 | Mode | Time | Use it when |
 |---|---|---|
 | **full** | 75 min | The real thing. Full scorecard. Default |
+| **blitz** | 35 min | **A short certifying round.** All five phases, half the probes, same bar. Say `blitz` (or `blitz SD-82`) |
 | **framing** | 15 min | **The best value-per-minute drill.** Three prompts, scope + estimate only, no design. Trains the #1 failure mode |
 | **hld** | 30 min | Through the diagram, stop before deep dives |
 | **deep-dive** | untimed | One component, drilled to the bone |
@@ -197,6 +198,13 @@ round stops being scoreable. That's a deliberate trade, not a failure.
 | **wrap** | 12 min | Failure modes, SLOs, cost and the four-sentence summary — the EM-bar phase alone |
 | **review** | 20 min | **Inverted:** Claude presents a design, you critique it. Tests the skill an EM uses weekly |
 | **loop** | — | Two or three rounds back to back with a cross-round pattern note |
+
+**Every round draws fresh numbers.** The interviewer generates a scenario card (`scripts/scenario.py`):
+the cue sheet's volumes scaled by a random factor, money, latencies and percentages moved, derived
+figures removed, some questions answered roughly or with *"you pick"*, plus a random interviewer
+persona, probe order and curveball. Memorising the reference solution's figures does not help — the
+estimate and the decisions it drives have to be redone each time. Say `sheet numbers` to turn it off,
+or `replay seed N` to rerun an earlier card.
 
 If you have twenty minutes, run `framing`. If you have one hour, run `full`. If you have a loop next
 week, run `loop` with the company's flagship questions.
@@ -343,7 +351,8 @@ design-room/
 │   ├── report-kit.html         report layout for the PDF kit
 │   └── report.css              print styling for the fallback engines
 ├── scripts/
-│   ├── clock.py             the real-time round clock: start · status · watch · wait · pause · stop
+│   ├── clock.py             the real-time round clock: start · status · watch · wait · seen · pause · stop
+│   ├── scenario.py          the per-round scenario card: varied numbers, persona, probes, curveball
 │   └── build-report.sh      report.md → report.pdf (PDF kit if set up, else Chrome / weasyprint / LaTeX)
 ├── pdf-kit/                 HTML + SVG → booklet-style A4 PDFs; three worked examples
 ├── Scorecard-Template.md    the nine-dimension rubric
@@ -353,7 +362,8 @@ design-room/
 ├── guides/
 │   ├── interviewer-guide.md the persona — also usable by a human mock partner
 │   ├── playbook.md          how to behave in the room; estimation number kit; phrasebook
-│   └── tool-depth-crib.md   what "in depth" means for the default tools
+│   ├── tool-depth-crib.md   what "in depth" means for the default tools
+│   └── runbooks/            turn-by-turn interviewer procedure: certifying (full, blitz), practice, drills
 ├── prompts/                 paste-into-any-chat fallbacks (system design, behavioural, coding)
 │
 │   ── private, gitignored ──

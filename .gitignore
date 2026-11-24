@@ -3,6 +3,7 @@ profile.md
 Progress-Log.md
 interview.md
 .clock.json
+.scenario.json
 board/
 private/
 sessions/*
