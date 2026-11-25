@@ -292,3 +292,4 @@ e.rel("dl", "ev", "N", "1", src="r:0.1", dst="b:0.3", via=[(820, 500)], label=""
 e.note(1220, 470, 550, "The timer is a column: a partial index on next_attempt_at WHERE state = 'PENDING'.")
 e.save(OUT / "erd-physical.svg")
 print("ok")
+import diagrams_puml  # PlantUML (2026-11-25): C4 versions, mechanisms, options, objections

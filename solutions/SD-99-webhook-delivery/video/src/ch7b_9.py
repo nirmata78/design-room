@@ -27,10 +27,10 @@ S(dia(K(5, "the fix"), "Check the address you connect to; sign what you send", "
       extra=strip(("fixb", "Mechanism", "Egress proxy: resolve, refuse private and metadata ranges, connect to the checked IP; no other route out. HMAC-SHA256 over id.timestamp.body with a per-endpoint secret; reject if |now − t| > 5 min."), cols="one")), [
  "C: The fix, version five: the egress proxy joins the baseline, and the signer changes.",
  "C: One level down on the proxy. Every call leaves through it. It resolves the name itself, refuses private, loopback, link-local and metadata ranges, and connects to the exact address it checked, so a name that changes between check and use gains nothing. Network policy gives dispatchers no other route out. And answers are truncated and scrubbed before they reach a log.",
- "C: On the signature: an H-MAC, SHA two-fifty-six, over the event I-D, the timestamp and the body, with a secret per endpoint from the key service. The till recomputes it, compares in constant time, and rejects anything more than five minutes old. A copied request fails the timestamp; a replayed one inside five minutes is caught by its I-D. S-two and S-three hold.",
+ "C: On the signature: an H-MAC, SHA two-fifty-six, over the event I-D, the timestamp and the body, with a secret per endpoint from the key service. The till recomputes it, compares in constant time, and rejects anything more than five minutes old. A copied request fails the timestamp; a replayed one inside five minutes is caught by its I-D. " + ps("S2") + " and " + ps("S3") + " hold.",
  "C: What it doesn't cover: a leaked secret, which is rotation. And it's not the tool under it: an A-P-I key in a header proves nothing about the body and can be replayed forever."], cls="dia")
 
-S(dia(K(5, "version 5"), "The egress proxy joins the baseline", "base-v5", vtag="V5"), [
+S(dia(K(5, "version 5"), "The egress proxy joins the baseline", "hld-v5", vtag="V5"), [
  "[+]", "C: On the baseline: the dispatcher and the merchant endpoint are carried.",
  "[+]", "C: The egress proxy is new, and it now sits on the only path between them."], cls="dia")
 
@@ -94,7 +94,7 @@ S(dia(K(6, "the fix"), "The public contract is rendered, versioned and owned", "
  "C: Additive fields go into the current version. A rename or a split is a new dated version, and old versions are supported for twelve months. The rename on Tuesday now changes one mapping in the renderer, and no merchant notices.",
  "C: What it doesn't cover: a change in meaning with the same field name. That's review, not tooling. And it's not the tool under it: freezing one payload forever, which only moves the breakage to the product roadmap."], cls="dia")
 
-S(dia(K(6, "version 6"), "The contract renderer joins the baseline", "base-v6", vtag="V6"), [
+S(dia(K(6, "version 6"), "The contract renderer joins the baseline", "hld-v6", vtag="V6"), [
  "[+]", "C: On the baseline: the log, fan-out and the delivery store are carried.",
  "[+]", "C: The contract renderer is new, beside fan-out. Every delivery row now holds the public version its endpoint pinned."], cls="dia")
 
@@ -247,3 +247,14 @@ S(plain("Recap · common mistakes", "What costs points in this round", cards(
 
 key("The close", "We promise <em>at-least-once</em> and give every endpoint its <em>own failure budget</em>. Exactly-once is the <em>consumer's</em> job, and the <em>contract</em> that makes it possible is the product.", [
  "V: We promise at-least-once delivery, and give every endpoint its own failure budget. Exactly-once is the consumer's job, and the contract that makes it possible is the product.", "[pause: 1.2]"])
+
+followups([
+ ("What if a merchant's endpoint is down for a week?", "Challenge 3 and the 72-hour rule"),
+ ("How do you stop a hostile endpoint attacking us?", "Challenge 5; mechanism six"),
+ ("How do you change a payload shape without breaking merchants?", "Challenge 6; mechanism five"),
+ ("When would you buy instead of build?", "Option F; the alternate path"),
+ ("How do you prove to a merchant that you sent it?", "Challenge 7; the attempt log"),
+ ("What changes at ten times the volume?", "Option D, its write cost; the shard count")], [
+ "N: Questions you should be ready for next. Each points back to where this video answers it.", "[+]", "C: An endpoint down for a week: challenge three, and the seventy-two-hour rule.", "[+]",
+ "C: A hostile endpoint: challenge five, and the egress proxy.", "[+]", "C: A payload change: challenge six, and the consumer contract.", "[+]",
+ "C: Buy against build: option F, and the alternate path.", "[+]", "C: Proving we sent it: challenge seven, and the attempt log.", "[+]", "C: And ten times the volume: option D's write cost, and the shard count."])

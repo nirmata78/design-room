@@ -1,14 +1,13 @@
 # SD-99 · Outbound webhooks and partner event delivery: reference-solution video
 
-Staff bar (L6/L7), manager layer marked AUX. **Length 1:29:02**, 19 chapters, **158 numbered slides** in **549 reveal frames**,
-**10,573 spoken words** (candidate 85.9 %, interviewer 4.0 %, key line 4.0 %, coach 6.0 %). Built 2026-11-22 with
+Staff bar (L6/L7), manager layer marked AUX. **Length 1:35:23**, 19 chapters, **163 numbered slides** in **637 reveal frames**, **11,318 spoken words** (candidate 85.9 %, interviewer 4.0 %, key line 4.0 %, coach 6.0 %). Built 2026-11-22, re-cut 2026-11-25 with
 `/reference-solution`, set in the world of SD-82 and SD-95 (a point-of-sale lender's loan and payment events to merchants and a partner bank);
 the build-cost chapter and challenge 6 carry the SD-59 overlay (team seams, contracts, API governance). Scripted walkthrough with
 synthetic voices; numbers and prices are illustrative. **The technical content has not been reviewed by a person, and the video has not
 been watched end to end.**
 
 Output: `webhook-delivery-reference.mp4` with `.srt` and `.vtt` beside it (local only, gitignored). Written companion:
-`../SD-99_Webhook_Delivery_Reference_Design.md` (and PDF). Technologies: `../stack.json`. Plan: `OUTLINE.md`. Publish kit: `publish/`.
+`../SD-99_Webhook_Delivery_Reference_Design.md` (Markdown only). Technologies: `../stack.json`. Plan: `OUTLINE.md`. Publish kit: `publish/`.
 
 ## Chapters
 
@@ -18,21 +17,21 @@ Output: `webhook-delivery-reference.mp4` with `.srt` and `.vtt` beside it (local
 | 02:28 | 1 Requirements and scope |
 | 08:51 | 2 Estimates |
 | 11:46 | 3 Theory |
-| 21:08 | 4 API and entities |
-| 24:00 | 5 High-level design |
-| 32:14 | 5.1 Components and technologies |
-| 46:56 | 5.2 When you don't need all this |
-| 48:47 | 6 Bridge |
-| 49:30 | 7 Challenges |
-| 49:48 | 7.1 Challenge 1: Why not publish after the commit? |
-| 54:05 | 7.2 Challenge 2: One slow endpoint |
-| 58:48 | 7.3 Challenge 3: Down for two days, then back |
-| 1:04:17 | 7.4 Challenge 4: Twice, and out of order |
-| 1:08:19 | 7.5 Challenge 5: Hostile URLs and forged calls |
-| 1:14:11 | 7.6 Challenge 6: A producer changes the payload |
-| 1:19:27 | 7.7 Challenge 7: “You never sent it” |
-| 1:23:37 | 8 Build cost |
-| 1:26:30 | 9 Recap |
+| 25:03 | 4 API and entities |
+| 29:28 | 5 High-level design |
+| 37:48 | 5.1 Components and technologies |
+| 52:30 | 5.2 When you don't need all this |
+| 54:21 | 6 Bridge |
+| 55:04 | 7 Challenges |
+| 55:22 | 7.1 Challenge 1: Why not publish after the commit? |
+| 59:40 | 7.2 Challenge 2: One slow endpoint |
+| 1:04:25 | 7.3 Challenge 3: Down for two days, then back |
+| 1:09:55 | 7.4 Challenge 4: Twice, and out of order |
+| 1:13:57 | 7.5 Challenge 5: Hostile URLs and forged calls |
+| 1:19:52 | 7.6 Challenge 6: A producer changes the payload |
+| 1:25:08 | 7.7 Challenge 7: “You never sent it” |
+| 1:29:18 | 8 Build cost |
+| 1:32:11 | 9 Recap |
 
 ## The seven challenges
 
@@ -65,3 +64,7 @@ solutions/SD-99-webhook-delivery/build-sd-booklet.sh SD-99_Webhook_Delivery_Refe
 
 See `OUTLINE.md` (covered: queue, backoff with jitter, idempotency, signatures and rotation, dead letters and disabling, isolation,
 replay, ordering, SSRF, customer logs, payload versioning, buy; dismissed aloud: multi-region, booklet Stage 7).
+
+## Reworked on 2026-11-25 (the new engine)
+
+Theory rendered first and rewritten: five parts, no failure catalogue; every mechanism is a composite infographic paired with the diagram type that fits (sequence, state machine, ERD, C4); each option of the matrix has its own infographic with pros, cons, a C4 view and red pitfall boxes. Properties are named by slug (`[S1-…]`), never bare codes. V1 to V3 are C4 container deltas (PlantUML), the version objections are sequence diagrams, event versus HTTPS boundaries are drawn distinctly, and the external rail or endpoint shapes are on the wire slides. Chapter 9 ends with follow-up questions. The written design is Markdown only. Challenge overlays (`ch*-attack` / `ch*-fix`) are unchanged from the earlier native diagrams. Not watched end to end.

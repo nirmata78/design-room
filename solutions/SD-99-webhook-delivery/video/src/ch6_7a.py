@@ -38,7 +38,7 @@ S(trace(K(1, "the trace"), "A booked loan that nobody hears about", [
 S(dia(K(1, "the fix"), "The event is a row in the same commit", "ch1-fix",
       extra=strip(("fixb", "Mechanism", "INSERT outbox(event_id, loan_id, seq, type, body) in the loan's transaction; the relay reads unsent rows by ID, publishes keyed by loan, marks sent after the ack."), cols="one")), [
  "C: The fix, one level down. The producer inserts an outbox row in the loan's own transaction: the event I-D, the loan, its sequence number, the type and the body.",
- "C: The relay, outlined green, reads unsent rows in I-D order, publishes each keyed by loan, and marks it sent only after the log acknowledges. S-one holds: the event exists exactly when the commit does.",
+ "C: The relay, outlined green, reads unsent rows in I-D order, publishes each keyed by loan, and marks it sent only after the log acknowledges. " + ps("S1") + " holds: the event exists exactly when the commit does.",
  "C: What it does not cover: a relay that dies between the acknowledgement and the mark publishes twice. That's why every consumer de-duplicates by event I-D. And it's not the tool under it, a distributed transaction across the database and the log, which neither supports well and which would couple their availability."], cls="dia")
 
 S(plain(K(1, "the relay, as code"), "Publish, then mark; never the other way round",
@@ -86,7 +86,7 @@ S(trace(K(2, "the trace"), "Twelve hundred sockets for one till vendor", [
 S(dia(K(2, "the fix"), "A cap per endpoint, pools per tier, a breaker", "ch2-fix",
       extra=strip(("fixb", "Mechanism", "Claim only where in_flight < cap (10 by default); in_flight changes in the claim and the result commits. Bank, large and long-tail pools never share. Breaker after 5 failures."), cols="one")), [
  "C: The fix, inside the dispatcher, with no new container. The claim query only takes rows for endpoints whose in-flight count is below their cap, ten by default. The count goes up in the claim's commit and down in the result's commit, so it lives in the same database as the rows and can't drift.",
- "C: Tier pools are bulkheads: the bank, large merchants and the long tail run on separate workers. And a breaker per endpoint opens after five failures in a row. L-two holds: the slow endpoint queues in its own rows, and everyone else's p ninety-nine doesn't move.",
+ "C: Tier pools are bulkheads: the bank, large merchants and the long tail run on separate workers. And a breaker per endpoint opens after five failures in a row. " + ps("L2") + " holds: the slow endpoint queues in its own rows, and everyone else's p ninety-nine doesn't move.",
  "C: What it doesn't cover: a flood of events from one merchant's own activity, which fills rows, not sockets. That's a fair-share limit at fan-out. And it's not the tool under it: a thread pool per endpoint would be twenty thousand mostly idle pools for the same isolation."], cls="dia")
 
 S(plain(K(2, "the arithmetic"), "Little's law sets every cap", table(["Endpoint", "Rate at the peak", "× answer time", "In flight needed", "Cap"], [
@@ -141,10 +141,10 @@ S(dia(K(3, "the fix"), "Time is spread, recovery is earned", "ch3-fix", vtag="V4
       extra=strip(("fixb", "Mechanism", "next = now + random(0, min(1 h, 10 s × 2ⁿ)); dead after 72 h. A breaker pauses the endpoint; one probe a minute; on success 1/s, doubling each clean minute to the cap; over 5 % errors halves it."), cols="one")), [
  "C: The fix, version four: a new container, endpoint health, a control loop beside the dispatcher.",
  "C: One level down. The result writer sets the next attempt to now plus a random time below a ceiling that doubles each attempt, capped at an hour. That's full jitter, so a quarter of a million rows don't retry in step. After seventy-two hours a delivery is dead, visibly.",
- "C: The breaker pauses the whole endpoint after five failures, so its rows stop being claimed at all, and health probes one oldest delivery a minute. On success it opens at one a second and doubles each clean minute up to the cap. Over five percent errors, it halves. L-three holds: recovery is earned, not dumped.",
+ "C: The breaker pauses the whole endpoint after five failures, so its rows stop being claimed at all, and health probes one oldest delivery a minute. On success it opens at one a second and doubles each clean minute up to the cap. Over five percent errors, it halves. " + ps("L3") + " holds: recovery is earned, not dumped.",
  "C: What it doesn't cover: an endpoint that is up but answers four hundred to everything, a bug on their side. Those die per delivery after the window, and the dashboard says why. And it's not a fixed retry count, which a weekend outlasts."], cls="dia")
 
-S(dia(K(3, "version 4"), "Endpoint health joins the baseline", "base-v4", vtag="V4"), [
+S(dia(K(3, "version 4"), "Endpoint health joins the baseline", "hld-v4", vtag="V4"), [
  "[+]", "C: On the baseline: the dispatcher, the delivery store and the attempt log are carried.",
  "[+]", "C: Endpoint health is new. It reads outcomes from the attempt log, and pauses, probes and ramps each endpoint by writing to the delivery store."], cls="dia")
 

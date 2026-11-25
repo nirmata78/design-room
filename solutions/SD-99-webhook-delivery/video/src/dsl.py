@@ -21,7 +21,7 @@ SL = []          # list of dict(kind, html, say, name, chapter, steps)
 STAGES = ["Requirements", "Estimates", "Theory", "API + data", "Design", "Challenges", "Cost · AUX", "Recap"]
 META = dict(title="SD-NN: slides", heading="# SD-NN: reference solution", stem="reference", svg=None,
             voices="N=af_heart@0.92 I=bf_emma@0.95 C=am_michael@0.9 V=am_michael@0.84", names="C=Candidate V=Candidate N=Coach I=Interviewer",
-            say="", automark=False)
+            say="", automark=False, chapters=9)   # chapters: the last chapter number ("Chapter n of N"); 8 in the compact cut
 _cur = {"n": None}
 
 def e(s): return _h.escape(s, quote=False)
@@ -40,7 +40,7 @@ def chapter(n, title, stage, sub, say, aux=False):
     """A chapter card: a ribbon slide that also opens the script chapter."""
     _cur["n"] = (n, title)
     ribbon = "".join(f'<span class="{"done" if i < stage else ("on" if i == stage else "")}">{s}</span>' for i, s in enumerate(STAGES))
-    body = (f'<div class="lbl">Chapter {n} of 9</div><div class="s">{title}</div><div class="sub">{sub}</div>'
+    body = (f'<div class="lbl">Chapter {n} of {META.get("chapters", 9)}</div><div class="s">{title}</div><div class="sub">{sub}</div>'
             f'<div class="ribbon">{ribbon}</div>')
     S(body, say if isinstance(say, list) else [say], cls="th" + (" aux" if aux else ""), name="card " + title, steps=False)
 
@@ -107,6 +107,80 @@ def tech(kicker, title, pick, how, rejected, cite=None, cls=""):
              (f'<div class="cite">Background: {cite}</div>' if cite else ""))
     return plain(kicker, title, inner)
 
+
+# ══ 2026-11-25 additions: descriptive property ids, mechanism and option infographics, PlantUML, objections, follow-ups ══
+# Properties carry a slug, never a bare code: [S1-no-twice-coll], not S1. Declare them once; use pid() on slides and ps() in speech.
+PROPS = {}      # "S1" -> "no-twice-coll"
+def props(**kw):
+    """props(S1="no-twice-coll", S2="no-late-recall", L1="create-never-waits"): the one declaration; slugs are lower-case words with hyphens."""
+    for k, v in kw.items():
+        if not re.fullmatch(r"[SL]\d", k) or not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", v): raise SystemExit(f"props: bad id/slug {k}={v!r}")
+        PROPS[k] = v
+def pid(k):
+    """On-screen tag: [S1-no-twice-coll], coloured by kind (red safety, green liveness)."""
+    return f'<b class="pid {"safe" if k[0] == "S" else "live"}">[{k}-{PROPS[k]}]</b>'
+_N = {"1": "one", "2": "two", "3": "three", "4": "four", "5": "five", "6": "six"}
+def ps(k):
+    """Spoken tag: 'S-one, no twice coll' — the speech engine reads the slug as words, so the listener hears the meaning."""
+    return f"{k[0]}-{_N[k[1]]}, {PROPS[k].replace('-', ' ')}"
+_BARE_H = re.compile(r"(?<![\w-])(?:S[1-9]|L[1-4])(?![\w-])")
+def lint_props():
+    """Fail the build on a bare S1 / L2 on a slide or a bare 'S-one' in narration: every property is named by its slug (pid / ps)."""
+    bad = []
+    for s in SL:
+        txt = re.sub(r"<[^>]+>", " ", re.sub(r'<b class="pid[^>]*>.*?</b>', "", s["html"]))
+        if _BARE_H.search(txt): bad.append((s["src"], "slide", _BARE_H.search(txt).group(0)))
+        for ln in s["say"]:
+            m = re.match(r"^[A-Z]: (.*)$", ln)
+            if m and re.search(r"(?<![\w-])[SL]-(?:one|two|three|four|five|six)(?![\w-])(?!,)", m.group(1)):
+                bad.append((s["src"], "speech", ln[:60]))
+    if bad: raise SystemExit("bare property codes (use pid('S1') on slides and ps('S1') in speech):\n" + "\n".join(map(str, bad[:12])))
+
+_KIND = {"c4": "C4", "seq": "SEQUENCE", "erd": "ERD", "state": "STATE MACHINE", "none": ""}
+def dtag(kind):
+    """The diagram-type pill: which picture type fits this mechanism or option (C4 · SEQUENCE · ERD · STATE MACHINE)."""
+    return f'<span class="dtag {kind}">{_KIND[kind]}</span>' if kind != "none" else ""
+
+def mech_slide(n, total, name, protects, how, rules, costs, say, diagram=None, live=True, short=None, part="4 of 5"):
+    """A theory mechanism as a composite infographic: the shorthand name with its diagram type, the four fixed blocks on the left
+    (property protected · how it works · failure ruled out · cost) and the picture on the right.
+    diagram = ("c4"|"seq"|"erd"|"state", svg_name, "Figure caption") or None (text-only, then the four blocks span the slide).
+    protects: pass pid("S1") etc. so the property carries its slug. Units: four blocks, then the figure's own steps."""
+    kind, svg, cap = diagram if diagram else ("none", None, None)
+    blocks = (f'<div class="prop {"live" if live else "safe"}"><div class="lbl">Protects</div><p>{protects}</p></div>'
+              f'<div class="prop"><div class="lbl">How it works</div><p>{how}</p></div>'
+              f'<div class="prop safe"><div class="lbl">Rules out</div><p>{rules}</p></div>'
+              f'<div class="prop cost"><div class="lbl">Costs</div><p>{costs}</p></div>')
+    head = f'<div class="k">Theory · {part} · mechanism {n} of {total}</div><h1>{short or name} {dtag(kind)}</h1>'
+    inner = f'<div class="info"><div class="infol">{blocks}</div><div class="infor">{fig(svg, cap)}</div></div>' if svg else blocks
+    S(head + inner, say, cls="theory" + (" infocomp" if svg else ""), name=f"mech {n} {name}")
+
+def option_slide(letter, name, verdict, pros, cons, pits, svg, say, pick=False, kind="c4", cap=None, part="5 of 5"):
+    """One option of the options matrix as its own infographic: pros, cons, the architecture drawn (C4 by default) and red pitfall boxes.
+    pros, cons: lists of short strings (one reveal unit each). pits: pitfalls and edge cases, each a red box.
+    The compact matrix table still follows these slides as the summary; it is not the place to explain an option."""
+    li = lambda cls, xs: "".join(f'<div class="{cls}">{x}</div>' for x in xs)
+    inner = (f'<div class="opt"><div class="optl"><div class="verdict {"pick" if pick else "rej"}">{verdict}</div>'
+             f'<div class="pc"><div class="col"><b class="t">Pros</b>{li("pro", pros)}</div><div class="col"><b class="t">Cons</b>{li("con", cons)}</div></div>'
+             f'<div class="pits"><b class="t">Pitfalls and edge cases</b>{li("pit", pits)}</div></div>'
+             f'<div class="optr">{fig(svg, cap)}</div></div>')
+    S(f'<div class="k">Theory · {part} · option {letter}</div><h1>{letter} · {name} {dtag(kind)}</h1>' + inner, say,
+      cls="theory infocomp" + (" pickopt" if pick else ""), name=f"option {letter} {name}")
+
+def objection(v, objection_text, svg, say, kind="seq", cap=None, extra=""):
+    """The objection that forces the next version, shown as a diagram (a sequence of the failing case), never a timetable:
+    the viewer watches the sequence break, then the next version's C4 delta answers it."""
+    S(dia(f"Objection to V{v}", objection_text, svg, extra=extra, q=True, red=True, cap=cap), say, cls="dia objection")
+
+def followups(items, say):
+    """Recap chapter: the follow-up questions an interviewer asks next, each a reveal unit. items: [(question, where_to_look)]."""
+    S(plain("Recap · follow-ups", "Questions you should be ready for next", table(["Follow-up question", "Where this video answers it"],
+      [[q, w] for q, w in items], "bt sm")), say, cls="theory")
+
+def wire(req, resp, kicker, title, say, lang="http", cap=None):
+    """A concrete external API shape (a card network, a bank rail): request over response, as on the wire; each is one reveal unit."""
+    S(plain(kicker, title, f'<div class="wirepair"><div class="line">{code(req, lang)}</div><div class="line">{code(resp, lang)}</div></div>'), say, cls="wirepair")
+
 # ── older-format traces: <pre class="trace"> → a timeline table (kept for retrofitted solutions; new slides use trace()) ──
 _TR = re.compile(r'<pre class="trace">(.*?)</pre>', re.S)
 def timeline(m):
@@ -121,9 +195,10 @@ def timeline(m):
 
 # ── pacing (ported from theory/video/course.py, 2026-11-17 rework) ──
 PACE = dict(section_out=1.4, card_in=1.2, card_out=1.8)
-PAUSE_AFTER = {"card": 0.0, "th": 1.6, "dia": 1.1, "table": 1.0, "code": 1.0, "tl": 1.0, "qs": 0.6}
-PAUSE_BEFORE = {"dia": 1.3, "table": 1.0, "code": 1.0, "tl": 1.0, "th": 0.7}
+PAUSE_AFTER = {"sm": 0.5, "card": 0.0, "th": 1.6, "dia": 1.1, "table": 1.0, "code": 1.0, "tl": 1.0, "qs": 0.6}
+PAUSE_BEFORE = {"sm": 0.4, "dia": 1.3, "table": 1.0, "code": 1.0, "tl": 1.0, "th": 0.7}
 DEFAULT_AFTER, DEFAULT_BEFORE = 0.8, 0.6
+MAX_STEPS = 12            # a slide with more reveal steps is two slides (GUIDELINES §7.2)
 REVEAL_BEAT = 0.45        # after a reveal, a beat so the eye lands on the new element before the voice explains it
 
 def kind(s):
@@ -131,6 +206,7 @@ def kind(s):
     if s["name"].startswith("card "): return "card"
     if "qs" in c: return "qs"
     if "th" in c: return "th"
+    if "sm" in c: return "sm"
     if "<figure" in h: return "dia"
     if "<table" in h and 'class="tl' not in h: return "table"
     if 'class="tl' in h: return "tl"
@@ -138,7 +214,7 @@ def kind(s):
     return "plain"
 
 # ── reveal units ──
-UNIT_DIV = re.compile(r'<div class="(?:cd|tile|prop|case|fixb|whyb|rejb|hedge|line|grade|ans|techhow)\b')
+UNIT_DIV = re.compile(r'<div class="(?:cd|tile|prop|case|fixb|whyb|rejb|hedge|line|grade|ans|techhow|pro|con|pit|mchip)\b')
 TOKENS = re.compile(r'<table[^>]*>|</table>|<tr\b|' + UNIT_DIV.pattern + r'|<!--SVG:([\w.-]+)-->')
 
 def tag_units(h, svgdir):
@@ -311,8 +387,11 @@ def write(outdir):
     for s in SL: s["html"] = _TR.sub(timeline, s["html"])
     if os.environ.get("REVEAL_REPORT"):
         report(svgdir)
+    lint_props()
+    only = os.environ.get("ONLY_CHAPTER")          # ONLY_CHAPTER=3 → the theory pass: video-theory.html + theory.script.md (SKILL §4: theory is rendered first)
+    sl = [s for s in SL if not only or (s["chapter"] and str(s["chapter"][0]).split(".")[0] == only)]
     plan = []
-    for s in SL:
+    for s in sl:
         h, units = tag_units(s["html"], svgdir)
         if not s["steps"]:
             units = []          # shown whole; any data-u stays inert
@@ -323,11 +402,14 @@ def write(outdir):
                 if automark(s, h, units): AUTOMARKED.append(s["src"])
         plan.append((s, h, units, pages(s, units)))
     total = sum(len(pg) for _, _, _, pg in plan)
+    big = [(s["src"], len(pg)) for s, _, _, pg in plan if len(pg) > MAX_STEPS]
+    if big:
+        print(f"warning: {len(big)} slides have more than {MAX_STEPS} reveal steps (split them): {big[:6]}")
     w = max(2, len(str(total)))
     nm = lambda i: f"v-{i:0{w}d}"
     head = (f'<!doctype html>\n<html lang="en"><head><meta charset="utf-8">\n<title>{e(META["title"])}</title>\n'
             '<link rel="stylesheet" href="style.css">\n<link rel="stylesheet" href="deck.css">\n<link rel="stylesheet" href="video.css">\n<link rel="stylesheet" href="google-theme.css">\n'
-            '</head><body>\n')
+            '<style>:root{--qid:"' + (re.search(r"SD-\d+", str(out.resolve())) or re.search(r"(.*)", "SD")).group(0) + '"}</style>\n</head><body>\n')
     parts, script = [head], [META["heading"] + "\n"]
     script.append("<!-- Video script for slide-video-kit/scripts/build_video.py. [slide: v-NNN] = frames/v-NNN.png; [reveal: v-NNN] = the next\n"
                   "     reveal step of the same slide. Generated from src/*.py: edit the sources, not this file. -->")
@@ -360,8 +442,8 @@ def write(outdir):
         script += tail; script.append("")
         prev = k
     parts.append("</body></html>\n")
-    (out / "video-slides.html").write_text("".join(parts), encoding="utf-8")
-    (out / f"{META['stem']}.script.md").write_text("\n".join(script), encoding="utf-8")
+    (out / ("video-theory.html" if only else "video-slides.html")).write_text("".join(parts), encoding="utf-8")
+    (out / (f"{META['stem']}-theory.script.md" if only else f"{META['stem']}.script.md")).write_text("\n".join(script), encoding="utf-8")
     if AUTOMARKED: print(f"automarked {len(AUTOMARKED)} legacy slides (hand-place markers to refine): {AUTOMARKED[:6]} …")
     return len(SL), total
 
@@ -398,8 +480,103 @@ def tex(src):
     m = _node("tex.js", "tex.json", f"1|{src}", [src, True]).replace(' display="block"', "")
     return f'<div class="fxone">{m}</div>'
 
-def code(src, lang):
-    """Real code, syntax-highlighted, with its language shown as the flag."""
-    names = {"python": "python", "sql": "sql", "http": "http", "json": "json"}
-    h = _node("hl.js", "hl.json", f"{names[lang]}|{src}", [src, names[lang]])
-    return f'<pre class="code hl" data-lang="{lang}">{h}</pre>'
+# Code on a 1080p slide (2026-11-22): pseudocode by default; a real language only when its idiom is the lesson (the exact
+# client call, the conditional write). Short lines, few of them, and the lines the narration is about marked as key lines.
+CODE_COLS, CODE_LINES = 56, 12
+_LANGS = {"python": "python", "sql": "sql", "http": "http", "json": "json", "go": "go", "java": "java", "rust": "rust",
+          "ts": "typescript", "typescript": "typescript", "bash": "bash", "yaml": "yaml"}
+_PSEUDO_KW = re.compile(r"\b(if|then|else|elif|for|each|in|while|until|repeat|return|function|def|try|catch|retry|and|or|not|"
+                        r"do|end|on|wait|emit|with|loop|break|continue|let|var)\b")
+
+def _pseudo_hl(src):
+    """A tiny highlighter for pseudocode: keywords, strings, numbers and comments (# or //)."""
+    out = []
+    for ln in src.split("\n"):
+        body, _, cm = ln.partition("#") if "#" in ln else ln.partition("//")
+        mark = "#" if "#" in ln else "//"
+        b = e(body)
+        b = re.sub(r"(&quot;[^&]*&quot;|\"[^\"]*\"|'[^']*')", r'<span class="hljs-string">\1</span>', b)
+        b = re.sub(r"(?<![\w.])(\d[\d_,.]*)(?![\w])", r'<span class="hljs-number">\1</span>', b)
+        b = _PSEUDO_KW.sub(r'<span class="hljs-keyword">\1</span>', b)
+        out.append(b + (f'<span class="hljs-comment">{mark}{e(cm)}</span>' if cm or ln.rstrip().endswith(mark) else ""))
+    return "\n".join(out)
+
+def _split_lines(h):
+    """Split highlighted HTML into lines, closing and reopening spans that cross a line break."""
+    lines, stack, cur = [], [], ""
+    for tok in re.split(r"(<span[^>]*>|</span>|\n)", h):
+        if tok == "\n":
+            lines.append(cur + "</span>" * len(stack)); cur = "".join(stack)
+        elif tok.startswith("<span"):
+            stack.append(tok); cur += tok
+        elif tok == "</span>":
+            stack and stack.pop(); cur += tok
+        else:
+            cur += tok
+    return lines + [cur + "</span>" * len(stack)]
+
+def code(src, lang="pseudo", hl=(), cols=None):
+    """Code on a slide, highlighted with the Google-theme token colours (video.css), its language shown as the flag.
+    lang: "pseudo" (default; the rule is pseudocode unless the idiom is the point) or go, python, sql, http, json, java …
+    hl:   1-based line numbers of the key lines (tinted and barred): the lines the narration is about.
+    Refuses a line longer than CODE_COLS (56) characters or more than CODE_LINES (12) lines: shorten it or split the slide."""
+    src = src.strip("\n"); lines = src.split("\n"); cols = cols or CODE_COLS
+    long = [l for l in lines if len(l) > cols]
+    if long or len(lines) > CODE_LINES:
+        raise SystemExit(f"{_where()}: code block too wide or too long for 1080p ({len(lines)} lines, max {CODE_LINES}; "
+                         f"longest {max(map(len, lines))} characters, max {cols}): {(long or lines)[0].strip()[:50]!r}")
+    if lang == "pseudo":
+        h = _pseudo_hl(src)
+    else:
+        h = _node("hl.js", "hl.json", f"{_LANGS[lang]}|{src}", [src, _LANGS[lang]])
+    keys = set(hl)
+    body = "".join(f'<span class="ln{" key" if i in keys else ""}">{l or " "}</span>' for i, l in enumerate(_split_lines(h), 1))
+    flag = "pseudocode" if lang == "pseudo" else lang
+    return f'<pre class="code hl{" keys" if keys else ""}" data-lang="{flag}">{body}</pre>'
+
+def pseudo(src, hl=()):
+    """Pseudocode (the default for code on a slide)."""
+    return code(src, "pseudo", hl)
+
+# ══ one source for the video and the GitHub Markdown design (2026-11-25): the theory chapter is written once, as slides ══
+def _md_inline(h):
+    h = re.sub(r"<br\s*/?>", " ", h); h = re.sub(r"</?(b|strong)[^>]*>", "**", h); h = re.sub(r"</?em>", "*", h)
+    h = re.sub(r'<b class="pid[^>]*>(.*?)</b>', r"`\1`", h)
+    h = re.sub(r"<[^>]+>", "", h)
+    return _h.unescape(h).replace("**  **", " ").strip()
+
+def slide_markdown(s, figdir="diagrams/video-", ext=".svg"):
+    """One theory slide as GitHub Markdown: heading, blocks as bullets, tables as tables, the figure as an image."""
+    h, out = s["html"], []
+    t = re.search(r"<h1[^>]*>(.*?)</h1>", h, re.S)
+    k = re.search(r'<div class="(?:k|lbl)[^"]*">(.*?)</div>', h, re.S)
+    if t: out.append("### " + re.sub(r"\s+", " ", _md_inline(re.sub(r'<span class="dtag[^>]*>(.*?)</span>', r" · \1", t.group(1)))))
+    if k: out.append("*" + _md_inline(k.group(1)) + "*")
+    s_ = re.search(r'<div class="s">(.*?)</div>', h, re.S)
+    if s_: out.append("> " + _md_inline(s_.group(1)))
+    for m in re.finditer(r'<div class="prop[^"]*"><div class="lbl">(.*?)</div><p>(.*?)</p></div>', h, re.S):
+        out.append(f"- **{_md_inline(m.group(1))}.** {_md_inline(m.group(2))}")
+    for m in re.finditer(r'<div class="verdict[^"]*">(.*?)</div>', h, re.S): out.append(f"**{_md_inline(m.group(1))}**")
+    for cls, lab in (("pro", "✅ Pro"), ("con", "➖ Con"), ("pit", "🔴 Pitfall")):
+        for m in re.finditer(rf'<div class="{cls}">(.*?)</div>', h, re.S): out.append(f"- {lab}: {_md_inline(m.group(1))}")
+    for m in re.finditer(r'<div class="cd[^"]*"><h3>(.*?)</h3><p>(.*?)</p></div>', h, re.S):
+        out.append(f"- **{_md_inline(m.group(1))}.** {_md_inline(m.group(2))}")
+    for tb in re.finditer(r"<table[^>]*>(.*?)</table>", h, re.S):
+        rows = [[_md_inline(c) for c in re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", r, re.S)] for r in re.findall(r"<tr[^>]*>(.*?)</tr>", tb.group(1), re.S)]
+        if rows:
+            out += ["", "| " + " | ".join(rows[0]) + " |", "|" + "---|" * len(rows[0])] + ["| " + " | ".join(r) + " |" for r in rows[1:]]
+    for m in re.finditer(r'<figure[^>]*data-f="([\w.-]+)"[^>]*>.*?(?:<figcaption>(.*?)</figcaption>)?</figure>', h, re.S):
+        out += ["", f"![{_md_inline(m.group(2) or m.group(1))}]({figdir}{m.group(1)}{ext})"]
+    return "\n".join(x for x in out) + "\n"
+
+def sync_theory_md(md_path, chapter="3"):
+    """Replace the region between <!-- theory:begin --> and <!-- theory:end --> in the Markdown design with the theory chapter
+    generated from the slides (mechanisms with their diagram type, each option with pros, cons and pitfalls, the matrix)."""
+    p = pathlib.Path(md_path)
+    if not p.exists(): return False
+    md = p.read_text(encoding="utf-8")
+    if "<!-- theory:begin -->" not in md: return False
+    parts = [slide_markdown(s) for s in SL if s["chapter"] and str(s["chapter"][0]).split(".")[0] == chapter and not s["name"].startswith("card ")]
+    body = "<!-- theory:begin -->\n<!-- generated from video/src/ch3.py by dsl.sync_theory_md: edit the slides, not this region -->\n\n" + "\n".join(parts) + "\n<!-- theory:end -->"
+    md = re.sub(r"<!-- theory:begin -->.*?<!-- theory:end -->", lambda m: body, md, flags=re.S)
+    p.write_text(md, encoding="utf-8"); return True
