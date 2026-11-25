@@ -400,3 +400,4 @@ d.edge("card", "post", "result", "", src="b", dst="t", at=(1340, 505), size=22)
 d.edge("post", "db", "one commit", "", src="l", dst="b", via=[(130, 620)], at=(700, 605), size=22)
 d.edge("post", "res", "", "", src="r", dst="l")
 d.save(OUT / "c4-comp-dsp.svg", order=["db", "poll", "bkt", "plan", "card", "proc", "file", "bank", "post", "res"])
+import diagrams_puml  # PlantUML diagrams (2026-11-25): mechanisms, options, objections, boundary

@@ -179,7 +179,7 @@ def followups(items, say):
 
 def wire(req, resp, kicker, title, say, lang="http", cap=None):
     """A concrete external API shape (a card network, a bank rail): request over response, as on the wire; each is one reveal unit."""
-    S(plain(kicker, title, f'<div class="wire"><div class="line">{code(req, lang)}</div><div class="line">{code(resp, lang)}</div></div>'), say, cls="wire")
+    S(plain(kicker, title, f'<div class="wirepair"><div class="line">{code(req, lang)}</div><div class="line">{code(resp, lang)}</div></div>'), say, cls="wirepair")
 
 # ── older-format traces: <pre class="trace"> → a timeline table (kept for retrofitted solutions; new slides use trace()) ──
 _TR = re.compile(r'<pre class="trace">(.*?)</pre>', re.S)
@@ -409,7 +409,7 @@ def write(outdir):
     nm = lambda i: f"v-{i:0{w}d}"
     head = (f'<!doctype html>\n<html lang="en"><head><meta charset="utf-8">\n<title>{e(META["title"])}</title>\n'
             '<link rel="stylesheet" href="style.css">\n<link rel="stylesheet" href="deck.css">\n<link rel="stylesheet" href="video.css">\n<link rel="stylesheet" href="google-theme.css">\n'
-            '</head><body>\n')
+            '<style>:root{--qid:"' + (re.search(r"SD-\d+", str(out.resolve())) or re.search(r"(.*)", "SD")).group(0) + '"}</style>\n</head><body>\n')
     parts, script = [head], [META["heading"] + "\n"]
     script.append("<!-- Video script for slide-video-kit/scripts/build_video.py. [slide: v-NNN] = frames/v-NNN.png; [reveal: v-NNN] = the next\n"
                   "     reveal step of the same slide. Generated from src/*.py: edit the sources, not this file. -->")
@@ -537,3 +537,46 @@ def code(src, lang="pseudo", hl=(), cols=None):
 def pseudo(src, hl=()):
     """Pseudocode (the default for code on a slide)."""
     return code(src, "pseudo", hl)
+
+# ══ one source for the video and the GitHub Markdown design (2026-11-25): the theory chapter is written once, as slides ══
+def _md_inline(h):
+    h = re.sub(r"<br\s*/?>", " ", h); h = re.sub(r"</?(b|strong)[^>]*>", "**", h); h = re.sub(r"</?em>", "*", h)
+    h = re.sub(r'<b class="pid[^>]*>(.*?)</b>', r"`\1`", h)
+    h = re.sub(r"<[^>]+>", "", h)
+    return _h.unescape(h).replace("**  **", " ").strip()
+
+def slide_markdown(s, figdir="diagrams/video-", ext=".svg"):
+    """One theory slide as GitHub Markdown: heading, blocks as bullets, tables as tables, the figure as an image."""
+    h, out = s["html"], []
+    t = re.search(r"<h1[^>]*>(.*?)</h1>", h, re.S)
+    k = re.search(r'<div class="(?:k|lbl)[^"]*">(.*?)</div>', h, re.S)
+    if t: out.append("### " + re.sub(r"\s+", " ", _md_inline(re.sub(r'<span class="dtag[^>]*>(.*?)</span>', r" · \1", t.group(1)))))
+    if k: out.append("*" + _md_inline(k.group(1)) + "*")
+    s_ = re.search(r'<div class="s">(.*?)</div>', h, re.S)
+    if s_: out.append("> " + _md_inline(s_.group(1)))
+    for m in re.finditer(r'<div class="prop[^"]*"><div class="lbl">(.*?)</div><p>(.*?)</p></div>', h, re.S):
+        out.append(f"- **{_md_inline(m.group(1))}.** {_md_inline(m.group(2))}")
+    for m in re.finditer(r'<div class="verdict[^"]*">(.*?)</div>', h, re.S): out.append(f"**{_md_inline(m.group(1))}**")
+    for cls, lab in (("pro", "✅ Pro"), ("con", "➖ Con"), ("pit", "🔴 Pitfall")):
+        for m in re.finditer(rf'<div class="{cls}">(.*?)</div>', h, re.S): out.append(f"- {lab}: {_md_inline(m.group(1))}")
+    for m in re.finditer(r'<div class="cd[^"]*"><h3>(.*?)</h3><p>(.*?)</p></div>', h, re.S):
+        out.append(f"- **{_md_inline(m.group(1))}.** {_md_inline(m.group(2))}")
+    for tb in re.finditer(r"<table[^>]*>(.*?)</table>", h, re.S):
+        rows = [[_md_inline(c) for c in re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", r, re.S)] for r in re.findall(r"<tr[^>]*>(.*?)</tr>", tb.group(1), re.S)]
+        if rows:
+            out += ["", "| " + " | ".join(rows[0]) + " |", "|" + "---|" * len(rows[0])] + ["| " + " | ".join(r) + " |" for r in rows[1:]]
+    for m in re.finditer(r'<figure[^>]*data-f="([\w.-]+)"[^>]*>.*?(?:<figcaption>(.*?)</figcaption>)?</figure>', h, re.S):
+        out += ["", f"![{_md_inline(m.group(2) or m.group(1))}]({figdir}{m.group(1)}{ext})"]
+    return "\n".join(x for x in out) + "\n"
+
+def sync_theory_md(md_path, chapter="3"):
+    """Replace the region between <!-- theory:begin --> and <!-- theory:end --> in the Markdown design with the theory chapter
+    generated from the slides (mechanisms with their diagram type, each option with pros, cons and pitfalls, the matrix)."""
+    p = pathlib.Path(md_path)
+    if not p.exists(): return False
+    md = p.read_text(encoding="utf-8")
+    if "<!-- theory:begin -->" not in md: return False
+    parts = [slide_markdown(s) for s in SL if s["chapter"] and str(s["chapter"][0]).split(".")[0] == chapter and not s["name"].startswith("card ")]
+    body = "<!-- theory:begin -->\n<!-- generated from video/src/ch3.py by dsl.sync_theory_md: edit the slides, not this region -->\n\n" + "\n".join(parts) + "\n<!-- theory:end -->"
+    md = re.sub(r"<!-- theory:begin -->.*?<!-- theory:end -->", lambda m: body, md, flags=re.S)
+    p.write_text(md, encoding="utf-8"); return True

@@ -175,7 +175,7 @@ will actually name (Cassandra, DynamoDB, ZooKeeper, Memcached, Hazelcast, Rabbit
 8. **PlantUML is a first-class renderer.** `pumlsvg.render(src, "svg/name.svg", kind="c4|seq|state|erd", level=…, order=…)` writes
    the themed SVG, its reveal plan and meta sidecar, so a PlantUML diagram reveals step by step exactly like a kit diagram and
    the same SVG goes into the Markdown. State machines and lifecycles use `kind="state"`; pacing class `sm` keeps their
-   transitions short (no long lead pause).
+   transitions short (no long lead pause). **C4-PlantUML draws the technology line at a fixed 12 px**, under the 18 px gate: leave the `techn` argument empty and write the technology into the description or label (`Container(api, "Servicing API", "", "Go · keys, quotes")`). A baseline carried across versions is declared once as a list and shown with `render_versions(prefix, items, out_dir, keep={4: [...]})` (carried boxes at once, new boxes outlined and revealed one by one, a close-up for a local delta). The composite mechanism and option slides put the picture full width under the blocks, so a diagram of up to about eight boxes clears the gate; wider ones need fewer labels or `Lay_D`/`Lay_R` hints.
 9. **No standalone failure catalogue in theory**; chapter 9 ends with the follow-up questions, and challenges stay the centre.
 
 ## 5 · The challenge grammar

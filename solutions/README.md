@@ -52,7 +52,7 @@ behind a term or decision · **The number that matters** · **Trap** — what br
 ## Videos
 
 **Reference-solution videos** (60–95 min, Staff bar, EM layer marked AUX: theory, V1→V2→V3, 6–8 interviewer
-challenges, build cost) exist for SD-03, SD-29, SD-39, SD-97 and SD-98 (compact cut), SD-08, SD-24, SD-44, SD-47, SD-77, SD-82, SD-94, SD-95, SD-96 and SD-99; see [VIDEOS.md](VIDEOS.md).
+challenges, build cost) exist for SD-03, SD-29, SD-39, SD-97 and SD-98 (compact cut), SD-08, SD-24, SD-44, SD-47, SD-77, SD-82, SD-94, SD-95, SD-96, SD-99 and SD-59 (compact cut); see [VIDEOS.md](VIDEOS.md).
 Each is rebuilt with `/reference-solution SD-NN`.
 
 **Mock-round videos.** A narrated mock round per solution at the **L6 Engineering Manager** bar (1080p, interviewer, candidate, key lines
@@ -88,6 +88,7 @@ internals appendix for the "how does that tool actually work?" probe.
 | [SD-82](SD-82-credit-decisioning/SD-82_Credit_Decisioning_Reference_Design.md) | Instant credit at the point of sale, Staff bar | `SD-82-credit-decisioning/` | The written companion to the reference-solution video: components and technologies (PostgreSQL, etcd, Redis Cluster, ristretto, Kafka, Flink, ClickHouse, each against named alternatives), eight deep dives (a slow bureau, a bureau down for everyone, a dropped phone, funding after booking, explaining a decline later, a new model, the identity vault, observability), the missing-data policy table, the decision record and replay, champion and challenger, a one-page cheat card |
 | [SD-95](SD-95-loan-servicing/SD-95_Loan_Servicing_Reference_Design.md) | Instalment loan servicing, Staff bar | `SD-95-loan-servicing/` | The written companion to the reference-solution video: double entry with a balance projection, UNKNOWN and RETURNED payment states, the rail budget on the 1st, refunds mid-loan, three-way reconciliation, build cost, a one-page cheat card |
 | [SD-99](SD-99-webhook-delivery/SD-99_Webhook_Delivery_Reference_Design.md) | Outbound webhooks and partner event delivery, Staff bar with the EM layer | `SD-99-webhook-delivery/` | The written companion to the reference-solution video: an outbox, a queue per endpoint as rows claimed under a cap, full jitter with a breaker and a ramp, signing and egress control, versioned public events and the team seams that own them, buy against build, a one-page cheat card |
+| [SD-59](SD-59-team-decomposition/SD-59_Team_Decomposition_Reference_Design.md) | Multi-team decomposition and API contracts, Principal / senior EM bar | `SD-59-team-decomposition/` | The written companion to the reference-solution video (compact cut, 2026-11-25 format): domain seams against layers, versioned contracts with consumer-driven tests, one owner per shared thing, an end-to-end skeleton by week four, split-health indicators. GitHub Markdown only; diagrams are PlantUML/C4 SVG. |
 | [SD-77](SD-77-card-authorisation/SD-77_Card_Authorisation_Reference_Design.md) | Card authorisation & issuer processing, Staff bar | `SD-77-card-authorisation/` | The written companion to the reference-solution video: holds not debits, idempotency on the network reference, a per-account reserve, the model cut-off and fail-policy table, inline counters, rules as versioned data, stand-in advices, decision SLIs |
 
 Build the PDF (needs `pandoc`, `xelatex`, `plantuml`, `rsvg-convert`; the PDF is gitignored):

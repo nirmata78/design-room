@@ -240,3 +240,15 @@ S(plain("Recap · the four sentences", "If you have thirty seconds", '<div class
 
 key("The thesis, again", "Correctness over months, not throughput: <em>immutable lines</em>, <em>unknown</em> and <em>returned</em> as states, the <em>rail</em> as the limit, and <em>three-way</em> proof every day.", [
  "V: Loan servicing is about correctness over months, not throughput. Lines that never change, unknown and returned as ordinary states, the rail as the limit, and a three-way proof every day that our books match the bank's.", "[pause: 1.5]"])
+
+followups([
+ ("What if the processor gives us no way to query by our key?", "Challenge 1 and the pitfall on option D"),
+ ("How do you migrate loans already running on a balance column?", "5.2 and the ledger mechanism"),
+ ("A bank adds an instant rail. What changes?", "The tension table: fewer pending days, same states"),
+ ("How do you test returns and unknowns that happen once a month?", "Challenge 3 and the observability challenge"),
+ ("Who owns a policy change that costs us money?", "Mechanism six and chapter 8"),
+ ("When would you buy the platform?", "Option E")], [
+ "N: Questions you should be ready for next. Each points back to where this video answers it.", "[+]", "C: The processor that cannot be queried by our key: challenge one, and the pitfall on option D.", "[+]",
+ "C: Migrating loans from a balance column: the alternate path, and the ledger mechanism.", "[+]", "C: An instant rail: fewer pending days, the same states.", "[+]",
+ "C: Testing rare paths: challenge three, and observability.", "[+]", "C: Who owns a policy change that costs money: mechanism six, and the build-cost chapter.", "[+]", "C: And when to buy: option E."])
+

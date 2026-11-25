@@ -14,7 +14,6 @@ toc-depth: 2
 numbersections: false
 ---
 
-\newpage
 
 # How to read this document
 
@@ -40,24 +39,32 @@ every line, so you can defend each choice when the interviewer asks *"why?"*, *"
 
 **The coloured boxes:**
 
-::: {.key title="Top-3 number"}
-One of the back-of-the-envelope numbers worth computing out loud in the round. In a real interview you
-have time for two or three calculations, not ten.
-:::
+> [!IMPORTANT]
+> **Top-3 number**
+>
+> One of the back-of-the-envelope numbers worth computing out loud in the round. In a real interview you
+> have time for two or three calculations, not ten.
 
-::: why
-Explains a term or a decision in plain words. This is for you, not for the interviewer.
-:::
+
+> [!NOTE]
+> **Why? What is it?**
+>
+> Explains a term or a decision in plain words. This is for you, not for the interviewer.
+
 
 > Words you can say in the room, nearly verbatim.
 
-::: warn
-A trap: something weak candidates do, or a claim that breaks under a follow-up question.
-:::
+> [!WARNING]
+> **Trap**
+>
+> A trap: something weak candidates do, or a claim that breaks under a follow-up question.
 
-::: load
-What this part of the system sees at peak, with numbers.
-:::
+
+> [!CAUTION]
+> **Under load**
+>
+> What this part of the system sees at peak, with numbers.
+
 
 **Practise in three passes.** (1) Read Part I and Part II once, end to end. (2) Close the document and
 run the [simulator](https://github.com/nirmata78/design-room) cold:
@@ -83,26 +90,29 @@ check them again before relying on them. **This is not legal, accounting or comp
 repayments, collects them by bank debit or card, handles refunds, late fees and early payoff, and
 reconciles with the bank."*
 
-::: {.key title="The one-sentence insight to land by minute 10"}
-**Settled is not final for a bank debit.** Throughput is never the problem here; correctness over
-months is. So the design is an immutable double-entry ledger, a payment state machine that admits
-*unknown* and *returned*, a scheduler bounded by the *rail* rather than the database, and a daily
-*three-way reconciliation*.
-:::
+> [!IMPORTANT]
+> **The one-sentence insight to land by minute 10**
+>
+> **Settled is not final for a bank debit.** Throughput is never the problem here; correctness over
+> months is. So the design is an immutable double-entry ledger, a payment state machine that admits
+> *unknown* and *returned*, a scheduler bounded by the *rail* rather than the database, and a daily
+> *three-way reconciliation*.
 
-::: why
-**Why is this the insight?** The prompt sounds like a batch job: on each due date, charge everyone who
-owes money. Candidates hear "600,000 collections on the 1st" and reach for a message broker to absorb a
-"thundering herd". But 600,000 over four hours is 42 a second, which one relational database handles
-without noticing. What actually goes wrong in loan servicing is slower and quieter: a card charge that
-times out and gets charged again, a bank debit that settles on the 2nd and is returned on the 3rd, or
-returned as unauthorised forty days later, a merchant refund that changes the schedule of a live loan, a
-customer paying off early while a debit is still in flight, and a month-end where the ledger says $400 more
-than the bank. Every one of those is a correctness problem over time. The candidate who names that, and
-designs a state or a mechanism for each point where the truth arrives, has found the question.
-:::
 
-\newpage
+> [!NOTE]
+> **Why? What is it?**
+>
+> **Why is this the insight?** The prompt sounds like a batch job: on each due date, charge everyone who
+> owes money. Candidates hear "600,000 collections on the 1st" and reach for a message broker to absorb a
+> "thundering herd". But 600,000 over four hours is 42 a second, which one relational database handles
+> without noticing. What actually goes wrong in loan servicing is slower and quieter: a card charge that
+> times out and gets charged again, a bank debit that settles on the 2nd and is returned on the 3rd, or
+> returned as unauthorised forty days later, a merchant refund that changes the schedule of a live loan, a
+> customer paying off early while a debit is still in flight, and a month-end where the ledger says $400 more
+> than the bank. Every one of those is a correctness problem over time. The candidate who names that, and
+> designs a state or a mechanism for each point where the truth arrives, has found the question.
+
+
 
 # Part I: The system in pictures
 
@@ -172,7 +182,7 @@ $150, collected by bank debit.
 
 ## The same story as a collection's states
 
-![The collection state machine. A timeout leads to UNKNOWN, which is resolved by querying with the same key, never by resending with a new one. SETTLED is not final for a bank debit: a return can arrive up to sixty days later and is posted as a reversal. An insufficient-funds return may be retried at most twice more; an unauthorised one never.](diagrams/video-states.pdf){width=96%}
+![The collection state machine. A timeout leads to UNKNOWN, which is resolved by querying with the same key, never by resending with a new one. SETTLED is not final for a bank debit: a return can arrive up to sixty days later and is posted as a reversal. An insufficient-funds return may be retried at most twice more; an unauthorised one never.](diagrams/video-states.svg)
 
 Read it left to right. SCHEDULED, SUBMITTED, PENDING, SETTLED is the happy path. Two red states are the
 point of the question. **UNKNOWN** is where a card charge goes when the processor does not answer: we do
@@ -182,7 +192,7 @@ insufficient funds; or a stop, for an unauthorised return, which needs the custo
 
 ## Why the truth keeps arriving
 
-![When is a collection final? Seconds for a card answer (or nothing); one to two days for a debit to settle; two banking days for an insufficient-funds return; sixty days for an unauthorised return; months for refunds and card disputes; seven years of audit.](diagrams/video-truth.pdf){width=94%}
+![When is a collection final? Seconds for a card answer (or nothing); one to two days for a debit to settle; two banking days for an insufficient-funds return; sixty days for an unauthorised return; months for refunds and card disputes; seven years of audit.](diagrams/video-truth.svg)
 
 A payment gateway (SD-44) deals with truth that arrives over a payment's life. Servicing deals with the same
 problem multiplied by a schedule: every instalment of every loan goes through this timeline, and the
@@ -192,33 +202,36 @@ for months, and reconciliation every day.
 
 ## One loan as entries
 
-![A $1,200 loan booked: principal receivable debited 1,200, merchant payable credited 1,164, discount income credited 36. One $150 instalment: cash clearing debited 150 and principal credited 150 while pending; then cash at bank debited 150 and clearing credited 150 at settlement.](diagrams/video-entries.pdf){width=92%}
+![A $1,200 loan booked: principal receivable debited 1,200, merchant payable credited 1,164, discount income credited 36. One $150 instalment: cash clearing debited 150 and principal credited 150 while pending; then cash at bank debited 150 and clearing credited 150 at settlement.](diagrams/video-entries.svg)
 
-::: why
-**Why a clearing account?** A pending bank debit has not moved money yet, but the loan's balance should
-show that a payment is on its way, or the customer would be chased for it. So the collection is posted
-twice: first into *cash clearing* (an account that says "money expected"), then from clearing into cash when
-the bank settles. A balance on the clearing account at any moment is exactly the money in flight; a
-clearing balance that never empties is a bug or a lost file, and reconciliation sees it.
-:::
+> [!NOTE]
+> **Why? What is it?**
+>
+> **Why a clearing account?** A pending bank debit has not moved money yet, but the loan's balance should
+> show that a payment is on its way, or the customer would be chased for it. So the collection is posted
+> twice: first into *cash clearing* (an account that says "money expected"), then from clearing into cash when
+> the bank settles. A balance on the clearing account at any moment is exactly the money in flight; a
+> clearing balance that never empties is a bug or a lost file, and reconciliation sees it.
+
 
 ## Where the load lands
 
-::: load
-**The 1st of the month (illustrative, from the cue sheet):** 600,000 collections. 480,000 bank debits go in
-one file (about 45 MB). 120,000 card charges go one by one under a contract of 100 a second: at 90 a second,
-about 22 minutes. Spread over four hours, the whole day is about **42 operations a second** on the database.
-Two days later: about 14,400 insufficient-funds returns (an illustrative 3 %). On the 1st itself, about 240
-card timeouts (an illustrative 0.2 %), each one a possible double charge.
-:::
+> [!CAUTION]
+> **Under load**
+>
+> **The 1st of the month (illustrative, from the cue sheet):** 600,000 collections. 480,000 bank debits go in
+> one file (about 45 MB). 120,000 card charges go one by one under a contract of 100 a second: at 90 a second,
+> about 22 minutes. Spread over four hours, the whole day is about **42 operations a second** on the database.
+> Two days later: about 14,400 insufficient-funds returns (an illustrative 3 %). On the 1st itself, about 240
+> card timeouts (an illustrative 0.2 %), each one a possible double charge.
 
-![The 1st, planned backwards from the bank's 14:00 cut-off: the card window from 06:00 at 90 a second, soft-decline retries around 07:00, the debit file built from 09:00 and submitted by 10:30, the bank's acknowledgement by 11:00, three hours of margin before the cut-off.](diagrams/video-dayplan.pdf){width=94%}
+
+![The 1st, planned backwards from the bank's 14:00 cut-off: the card window from 06:00 at 90 a second, soft-decline retries around 07:00, the debit file built from 09:00 and submitted by 10:30, the bank's acknowledgement by 11:00, three hours of margin before the cut-off.](diagrams/video-dayplan.svg)
 
 The load map has one surprise for most candidates: the database is the least loaded component. The binding
 constraints are outside the system: a processor contract measured in requests a second, and a bank clock
 that closes the door at 14:00. The design follows the constraints, not the volume.
 
-\newpage
 
 # Part II: The round, stage by stage
 
@@ -249,12 +262,14 @@ a list of questions into a scoping argument.
 | 6 | Audit and close? | Every cent explained 7 years; month-end close in 2 days | Immutable lines; differences found daily, not at month-end |
 | 7 | What must never happen, in order? | Your call | Propose: charge twice; an unexplained cent; a penalty for our failure; then lateness |
 
-::: why
-**Why ask "what must never happen, in order?"** Because the answer settles every later trade-off in one
-sentence. When the interviewer later asks "the processor is slow, do you retry or wait?", you can point to
-the order: a double charge is worse than a late collection, so you wait and ask. Candidates who never set
-the order end up arguing each trade-off from scratch.
-:::
+> [!NOTE]
+> **Why? What is it?**
+>
+> **Why ask "what must never happen, in order?"** Because the answer settles every later trade-off in one
+> sentence. When the interviewer later asks "the processor is slow, do you retry or wait?", you can point to
+> the order: a double charge is worse than a late collection, so you wait and ask. Candidates who never set
+> the order end up arguing each trade-off from scratch.
+
 
 **Functional requirements**, numbered, because each gets a flow in Stage 4:
 
@@ -286,11 +301,13 @@ selling the loans.
 > "The core is four things: a ledger that is never edited, a payment state machine with unknown and returned,
 > a scheduler bounded by the rail, and reconciliation against the outside. Everything else serves those four."
 
-::: warn
-**Trap: treating the prompt's silence as "no requirement".** The prompt does not mention returns. A candidate
-who does not ask how a bank debit fails will design a system in which settled means paid, and will lose the
-second half of the round to Challenge 3.
-:::
+> [!WARNING]
+> **Trap**
+>
+> **Trap: treating the prompt's silence as "no requirement".** The prompt does not mention returns. A candidate
+> who does not ask how a bank debit fails will design a system in which settled means paid, and will lose the
+> second half of the round to Challenge 3.
+
 
 # Stage 2: Back-of-the-envelope
 
@@ -298,27 +315,33 @@ second half of the round to Challenge 3.
 
 Three calculations are worth doing aloud; the rest go in the table. Each ends with a decision.
 
-::: {.key title="Top-3 number 1: the busy day is 42 a second"}
-**Arithmetic:** 600,000 collections ÷ (4 h × 3,600 s) = about **42 per second**. *Derived from a given.*
-**What it means:** one relational primary handles thousands of small transactions a second.
-**Decision:** the database is the work queue; a message broker is not needed for load.
-**Say:** "Six hundred thousand sounds like a herd, but it's forty-two a second. The database is fine. The
-limits are elsewhere."
-:::
+> [!IMPORTANT]
+> **Top-3 number 1: the busy day is 42 a second**
+>
+> **Arithmetic:** 600,000 collections ÷ (4 h × 3,600 s) = about **42 per second**. *Derived from a given.*
+> **What it means:** one relational primary handles thousands of small transactions a second.
+> **Decision:** the database is the work queue; a message broker is not needed for load.
+> **Say:** "Six hundred thousand sounds like a herd, but it's forty-two a second. The database is fine. The
+> limits are elsewhere."
 
-::: {.key title="Top-3 number 2: the card window is 22 minutes"}
-**Arithmetic:** 600,000 × 20 % = 120,000 card charges; ÷ 100/s = 1,200 s = **20 minutes** at the contract
-limit; at 90 % of the contract, = about **22 minutes**. *Derived; 90 % is an initial target.*
-**Decision:** a token bucket per rail set below the contract, and a day plan with a card window.
-**Say:** "The processor's contract sets the pace, so I plan the window, I don't burst into it."
-:::
 
-::: {.key title="Top-3 number 3: ninety million dollars on one morning"}
-**Arithmetic:** 600,000 × $150 average instalment = about **$90M**; a 0.1 % error = about **$90k**. *Illustrative
-average.*
-**Decision:** correctness beats speed; a day's delay is cheap, an error is not.
-**Say:** "Being late costs a little. Being wrong by a tenth of a percent costs ninety thousand dollars."
-:::
+> [!IMPORTANT]
+> **Top-3 number 2: the card window is 22 minutes**
+>
+> **Arithmetic:** 600,000 × 20 % = 120,000 card charges; ÷ 100/s = 1,200 s = **20 minutes** at the contract
+> limit; at 90 % of the contract, = about **22 minutes**. *Derived; 90 % is an initial target.*
+> **Decision:** a token bucket per rail set below the contract, and a day plan with a card window.
+> **Say:** "The processor's contract sets the pace, so I plan the window, I don't burst into it."
+
+
+> [!IMPORTANT]
+> **Top-3 number 3: ninety million dollars on one morning**
+>
+> **Arithmetic:** 600,000 × $150 average instalment = about **$90M**; a 0.1 % error = about **$90k**. *Illustrative
+> average.*
+> **Decision:** correctness beats speed; a day's delay is cheap, an error is not.
+> **Say:** "Being late costs a little. Being wrong by a tenth of a percent costs ninety thousand dollars."
+
 
 ## The full table, row by row
 
@@ -336,22 +359,202 @@ average.*
 | Seven years | 2 × 10^7 × 84 × 200 B = about 336 GB = about 340 GB | derived | one relational DB, partitioned by month, no sharding |
 | Daily accrual lines (rejected) | 5M × 30 × 2 = 3 × 10^8 a month | derived | accrue by calculation; post at events and month-end |
 
-::: why
-**Why "four lines per loan per month"?** Two for the collection itself (cash clearing against the loan's
-principal). The move from clearing to cash at settlement happens on system accounts, posted once per
-settlement batch rather than once per loan, so it adds little. Two more for the interest accrued at
-month-end, on loans that carry interest. Refunds, fees and returns add lines, but rarely. The point of the
-estimate is the order of magnitude: hundreds of
-gigabytes over seven years, not petabytes, which is why a single relational database with real constraints
-is the right home for the ledger.
-:::
+> [!NOTE]
+> **Why? What is it?**
+>
+> **Why "four lines per loan per month"?** Two for the collection itself (cash clearing against the loan's
+> principal). The move from clearing to cash at settlement happens on system accounts, posted once per
+> settlement batch rather than once per loan, so it adds little. Two more for the interest accrued at
+> month-end, on loans that carry interest. Refunds, fees and returns add lines, but rarely. The point of the
+> estimate is the order of magnitude: hundreds of
+> gigabytes over seven years, not petabytes, which is why a single relational database with real constraints
+> is the right home for the ledger.
 
-::: warn
-**Trap: posting interest every day.** It feels accurate, and it multiplies the ledger by fifteen. Accrual is a
-calculation from the balance, the rate and the days elapsed; it is *posted* when something happens (a
-payment, a payoff, a refund) and at month-end. The posted amount is exactly what the calculation gives, so
-nothing is lost.
-:::
+
+> [!WARNING]
+> **Trap**
+>
+> **Trap: posting interest every day.** It feels accurate, and it multiplies the ledger by fifteen. Accrual is a
+> calculation from the balance, the rate and the days elapsed; it is *posted* when something happens (a
+> payment, a payoff, a refund) and at month-end. The posted amount is exactly what the calculation gives, so
+> nothing is lost.
+
+
+# Stage 2b: Theory first
+
+What makes this problem hard, in words that outlive any product name. Safety and liveness are named by slug (`[S1-no-twice-collect]`), each mechanism is paired with the diagram type that fits it, and each option of the matrix has its own pros, cons, picture and pitfalls. The failure list is not a catalogue here: the failures are the challenges of Stage 6, and the open ones are the follow-ups at the end.
+
+<!-- theory:begin -->
+<!-- generated from video/src/ch3.py by dsl.sync_theory_md: edit the slides, not this region -->
+
+*Theory · 1 of 5 · what it is*
+> Turn each loan's *terms* into a schedule, collect each amount *once* through rails that answer in days and *reverse weeks later*, record every movement as *balanced, immutable* lines, and *prove daily* the books agree with the bank.
+
+### Four things it is confused with
+*Theory · 1 of 5 · what it is not*
+- **Not a payment gateway.** A gateway turns one intent into one payment in seconds (SD-44). Servicing drives many payments over months, against a schedule that changes.
+- **Not a cron job.** A cron job fires work. It does not know what was attempted, what is pending, or what came back.
+- **A ledger is not a balance table.** A balance is a sum of lines. A number updated in place cannot explain itself to an auditor.
+- **Settled is not final.** A bank debit can be returned after it settles. Final is a later, rule-defined point.
+
+### State safety and liveness separately
+*Theory · 2 of 5 · the two properties*
+- **Safety · must never happen.** **[S1-no-twice-collect]** One instalment collected twice. **[S2-ledger-balanced-immutable]** A ledger transaction that does not sum to zero in integer cents, or a line that is edited. **[S3-no-unfair-penalty]** A customer penalised beyond policy, or for our failure.
+- **Liveness · must eventually happen.** **[L1-attempt-by-cutoff]** Every due instalment is attempted on its due date, before the cut-off. **[L2-every-unknown-ends]** Every payment leaves UNKNOWN and PENDING for SETTLED or RETURNED, within a bound. **[L3-every-break-owned]** Every difference between ledger, processor and bank becomes an owned break within a day.
+
+### When is money final, and who decides?
+*Theory · 3 of 5 · the central tension*
+
+| When | What we know | Mechanism that lives there |
+|---|---|---|
+| **seconds** | a card answer, or nothing | UNKNOWN and the resolver; a key on every send |
+| **1–2 days** | the debit settled | PENDING to SETTLED, posted from the settlement file |
+| **2 bank days** | insufficient funds | RETURNED, a reversal, a re-presentment by policy |
+| **60 days** | unauthorised | RETURNED, never retried; exposure reported by age |
+| **months** | refunds, card disputes | a new schedule version; a reversal dated now |
+| **every day** | the bank's view | three-way reconciliation |
+
+### An immutable double-entry ledger, with a projection · ERD
+*Theory · 4 of 5 · mechanism 1 of 7*
+- **Protects.** **[S2-ledger-balanced-immutable]** and the audit.
+- **How it works.** Every movement is a transaction of two or more lines that sum to zero in integer cents. Lines are inserted, never updated. A balance row is updated in the same commit, at a version.
+- **Rules out.** Unexplainable balances, lost cents, two postings interleaving on one loan.
+- **Costs.** Storage that only grows. Every correction is a reversing transaction.
+
+![Figure 3.1 — one transaction, lines that sum to zero, a balance updated in the same commit](diagrams/video-m-ledger.svg)
+
+### A payment state machine with UNKNOWN and RETURNED · STATE MACHINE
+*Theory · 4 of 5 · mechanism 2 of 7*
+- **Protects.** **[S1-no-twice-collect]** and **[L2-every-unknown-ends]**.
+- **How it works.** Due, intent open, submitted, pending, settled. A timeout goes to UNKNOWN, a real state with exits. A return moves SETTLED to RETURNED and posts a reversal.
+- **Rules out.** A timeout treated as failure, then charged again. A return with nowhere to go.
+- **Costs.** More states and transitions to test. Statements show pending for days.
+
+![Figure 3.2 — the lifecycle of one payment; a timeout and a return both have exits](diagrams/video-m-states.svg)
+
+### Idempotency at three layers · SEQUENCE
+*Theory · 4 of 5 · mechanism 3 of 7*
+- **Protects.** **[S1-no-twice-collect]**.
+- **How it works.** The ledger transaction has a unique key: loan, instalment, attempt. The same key goes to the processor. And only one open intent may exist per instalment.
+- **Rules out.** A duplicate posting, a duplicate charge, two workers creating two intents.
+- **Costs.** Key discipline: only a new decision gets a new attempt number.
+
+![Figure 3.3 — a timeout, a query by the same key, and no second charge](diagrams/video-m-idem.svg)
+
+### The database as the queue · C4
+*Theory · 4 of 5 · mechanism 4 of 7*
+- **Protects.** **[L1-attempt-by-cutoff]**.
+- **How it works.** Due items are rows. Workers claim batches with FOR UPDATE SKIP LOCKED, and write the intent and an outbox row in the same commit. A sweeper returns stale claims.
+- **Rules out.** Lost or doubly claimed due items; a commit with no send, or a send with no record.
+- **Costs.** Polling, and a sweeper to run.
+
+![Figure 3.4 — C4 component view: claim, intent and outbox in one commit](diagrams/video-m-queue.svg)
+
+### A rail budget · C4
+*Theory · 4 of 5 · mechanism 5 of 7*
+- **Protects.** **[L1-attempt-by-cutoff]** and **[S3-no-unfair-penalty]**.
+- **How it works.** A token bucket per rail, set below the contract. A day plan back-scheduled from the cut-off. A pause switch per rail. Live limits from the adapter.
+- **Rules out.** Self-inflicted throttling that turns into declines; a missed cut-off.
+- **Costs.** Planning the day; spreading due dates at origination.
+
+![Figure 3.5 — C4 component view: the day plan sets the rate, the bucket enforces it](diagrams/video-m-budget.svg)
+
+### Policy as versioned data · ERD
+*Theory · 4 of 5 · mechanism 6 of 7*
+- **Protects.** **[S3-no-unfair-penalty]** and the audit.
+- **How it works.** Allocation waterfall, retry schedule, late fees and refund treatment are rules with versions and owners. Every posting records the version it used.
+- **Rules out.** Behaviour nobody can explain; a rule change applied to old loans by accident.
+- **Costs.** A rules component. Owners in risk and legal who must approve changes.
+
+![Figure 3.6 — every posting and every schedule names the policy version it used](diagrams/video-m-policy.svg)
+
+### Three-way reconciliation · SEQUENCE
+*Theory · 4 of 5 · mechanism 7 of 7*
+- **Protects.** **[L3-every-break-owned]**.
+- **How it works.** The ledger produces expectations. The processor's report and the bank's statement are matched to them by reference, then by amount and a date window. Every difference is a typed break with an owner and an age.
+- **Rules out.** Silent divergence; a plug posted at month-end to make totals agree.
+- **Costs.** A pipeline, a console, and people.
+
+![Figure 3.7 — the ledger's expectations against the processor and the bank](diagrams/video-m-recon.svg)
+
+### A · A midnight cron and a balance column · C4
+*Theory · 5 of 5 · option A*
+**Rejected · fails at the first timeout**
+- ✅ Pro: Trivially simple
+- ✅ Pro: Fine for a handful of loans
+- ➖ Con: No state for unknown or returned
+- ➖ Con: A balance in place: no history
+- 🔴 Pitfall: 2,000 charges a second against a contract of 100
+- 🔴 Pitfall: The first timeout and retry charges twice
+
+![opt-a](diagrams/video-opt-a.svg)
+
+### B · A message broker with 600,000 messages · C4
+*Theory · 5 of 5 · option B*
+**Rejected · solves a load that is not the problem**
+- ✅ Pro: Absorbs bursts
+- ✅ Pro: Familiar fan-out to workers
+- ➖ Con: Redelivery is the default
+- ➖ Con: Still needs its own state and ledger
+- 🔴 Pitfall: A redelivery after a crash charges again
+- 🔴 Pitfall: Unknown and returned have no home
+- 🔴 Pitfall: Built for a peak of 42 a second that a database handles
+
+![opt-b](diagrams/video-opt-b.svg)
+
+### C · An event-sourced loan aggregate · C4
+*Theory · 5 of 5 · option C*
+**Rejected · heavier than the need**
+- ✅ Pro: Full history by construction
+- ➖ Con: A payoff needs the current balance now
+- ➖ Con: Corrections mean replays
+- ➖ Con: Heavier operations
+- 🔴 Pitfall: A stale view quotes the wrong payoff
+- 🔴 Pitfall: A replay re-triggers side effects
+
+![opt-c](diagrams/video-opt-c.svg)
+
+### D · Relational ledger, state machine, database as the queue · C4
+*Theory · 5 of 5 · option D*
+**The pick · with an honest alternative in B-simple**
+- ✅ Pro: Intent and outbox commit atomically
+- ✅ Pro: Every cent explained, every break owned
+- ➖ Con: More states to test
+- ➖ Con: A reconciliation team
+- 🔴 Pitfall: A processor that cannot be queried by our key: the settlement file decides, a day late
+- 🔴 Pitfall: A claim with no sweeper strands rows
+
+![opt-d](diagrams/video-opt-d.svg)
+
+### E · Buy a servicing platform · C4
+*Theory · 5 of 5 · option E*
+**Rejected · for this scope; the honest first version for a small book**
+- ✅ Pro: Fastest to a first version
+- ✅ Pro: Standard products are covered
+- ➖ Con: Their refund rules, not ours
+- ➖ Con: We must own the books of record
+- 🔴 Pitfall: Product-specific refunds cannot be expressed
+- 🔴 Pitfall: The daily export is a reconciliation job by another name
+
+![opt-e](diagrams/video-opt-e.svg)
+
+### The matrix, as a summary
+*Theory · 5 of 5 · the options, side by side*
+
+| Approach | Once per instalment | Explains every cent | Fails when |
+|---|---|---|---|
+| A · midnight cron, balance column | no | no | the first timeout and retry |
+| B · a message broker | no | no | redelivery after a crash |
+| C · an event-sourced aggregate | with keys | yes | a payoff needs a balance now |
+| D · ledger, state machine, database as the queue | yes | yes | a processor we cannot query by our key |
+| E · buy a platform | yes | theirs | product-specific refunds, books of record |
+
+### D, and what it gives up
+*Theory · 5 of 5 · the pick*
+- **What D buys.** Never guessing. A retry is harmless, an unknown has an exit, a return has a place, every balance is a sum, and the bank is checked daily.
+- **What D gives up.** More states to test. A reconciliation team. “Pending” on statements for days. Every product change becomes a policy version with an owner.
+
+<!-- theory:end -->
 
 # Stage 3: API and data
 
@@ -394,19 +597,21 @@ before anything parses it.
 
 **Operations · FR5.** `GET /breaks?age>1d`, and `PUT /rails/{rail}/pause` (the rail switch).
 
-::: why
-**Why is the attempt number in the key?** Because a key identifies a *decision to collect*, not an
-instalment. Resending the same attempt after a timeout must reuse the key, so the processor returns the
-first result instead of charging again. But after a *definite decline*, trying again is a new decision, and
-needs a new key, or the processor would return the old decline forever. The rule is: same attempt, same
-key; new attempt only after a definite answer.
-:::
+> [!NOTE]
+> **Why? What is it?**
+>
+> **Why is the attempt number in the key?** Because a key identifies a *decision to collect*, not an
+> instalment. Resending the same attempt after a timeout must reuse the key, so the processor returns the
+> first result instead of charging again. But after a *definite decline*, trying again is a new decision, and
+> needs a new key, or the processor would return the old decline forever. The rule is: same attempt, same
+> key; new attempt only after a definite answer.
+
 
 ## The data model
 
-![Conceptual model in Chen notation. A loan has schedule versions; a version contains instalments; an instalment is collected by intents, at most one open at a time; a loan posts ledger transactions, each containing lines; an intent posts the transactions for its result.](diagrams/video-erd-chen.pdf){width=96%}
+![Conceptual model in Chen notation. A loan has schedule versions; a version contains instalments; an instalment is collected by intents, at most one open at a time; a loan posts ledger transactions, each containing lines; an intent posts the transactions for its result.](diagrams/video-erd-chen.svg)
 
-![Physical model. Ledger lines are partitioned by month and only inserted. Ledger transactions carry a unique idempotency key and the policy version used. The balance row has a version and is updated in the same commit. Due items are indexed by date, shard and status: the work queue. Payment intents have a partial unique index: one open intent per instalment.](diagrams/video-erd-physical.pdf){width=96%}
+![Physical model. Ledger lines are partitioned by month and only inserted. Ledger transactions carry a unique idempotency key and the policy version used. The balance row has a version and is updated in the same commit. Due items are indexed by date, shard and status: the work queue. Payment intents have a partial unique index: one open intent per instalment.](diagrams/video-erd-physical.svg)
 
 | Table | Changes? | Lose it? |
 |---|---|---|
@@ -463,7 +668,7 @@ every later picture is a view of the same baseline.
 
 ## Version 1: the simplest thing that works
 
-![V1. Origination books loans through the servicing API. At midnight a job in the schedule service charges everyone due today at the rails and updates a balance column in the loans database.](diagrams/video-base-v1.pdf){width=92%}
+![V1. Origination books loans through the servicing API. At midnight a job in the schedule service charges everyone due today at the rails and updates a balance column in the loans database.](diagrams/video-base-v1.svg)
 
 The objection, as a trace: at 00:00:00 the job sends 2,000 card charges a second against a contract of 100; at
 00:00:03 the processor throttles 95 % and the job retries at once; at 08:00:10 one charge times out and is
@@ -471,9 +676,13 @@ retried as new, and the customer is charged twice; on Dec 3 a debit returns, and
 already reduced, so there is nowhere to post it; at year end an auditor asks why a balance is 75,000 and there
 is no history.
 
+### The objection to V1, as a sequence
+
+![The failing case of V1, message by message: a burst, a throttle, a retry, a double charge, a return with nowhere to post.](diagrams/video-obj-v1.svg)
+
 ## Version 2: one collection per instalment, at the rail's pace, with books
 
-![V2. The servicing database holds the ledger with projections, due items, payment intents and an outbox. The schedule service claims due items and writes intents and outbox rows in one commit. A dispatcher drains the outbox under a budget per rail, sends each charge with its key, and posts the result.](diagrams/video-base-v2.pdf){width=92%}
+![V2. The servicing database holds the ledger with projections, due items, payment intents and an outbox. The schedule service claims due items and writes intents and outbox rows in one commit. A dispatcher drains the outbox under a budget per rail, sends each charge with its key, and posts the result.](diagrams/video-base-v2.svg)
 
 What V2 adds, and the objection each addition answers:
 
@@ -487,9 +696,13 @@ files days later and nothing reads them. Nothing ends an unknown: 240 on the 1st
 payoffs change schedules, while allocation and fees are buried in code. And nobody checks our books against the
 bank's.
 
+### The objection to V2, as a sequence
+
+![The four holes of V2: files nobody reads, unknowns nothing ends, rules buried in code, books nobody compares.](diagrams/video-obj-v2.svg)
+
 ## Version 3: close every loop
 
-![V3. File ingest posts settlements and reversals from the bank's and processor's files; a resolver queries every UNKNOWN by the same key; a policy service holds terms, allocation, retry and fee rules as versioned data; reconciliation matches all three views and hands breaks to finance operations; an outbox relay feeds customer notices.](diagrams/video-base-v3.pdf){width=92%}
+![V3. File ingest posts settlements and reversals from the bank's and processor's files; a resolver queries every UNKNOWN by the same key; a policy service holds terms, allocation, retry and fee rules as versioned data; reconciliation matches all three views and hands breaks to finance operations; an outbox relay feeds customer notices.](diagrams/video-base-v3.svg)
 
 The collect path, in code:
 
@@ -517,23 +730,59 @@ same key. No branch guesses.
 
 ## The numbered flows, one per functional requirement
 
-![FR1, schedule. 1 loan booked · 2 to the schedule service · 3 terms from policy · 4 schedule version, due items and booking lines in one transaction.](diagrams/video-flow-fr1.pdf){width=90%}
+![FR1, schedule. 1 loan booked · 2 to the schedule service · 3 terms from policy · 4 schedule version, due items and booking lines in one transaction.](diagrams/video-flow-fr1.svg)
 
-![FR2, collect. 1 claim, intent and outbox in one commit · 2 the dispatcher drains the outbox under the rail budget · 3 charge or debit file, with the key · 4 the result · 5 post the result: lines, balance, state.](diagrams/video-flow-fr2.pdf){width=90%}
+![FR2, collect. 1 claim, intent and outbox in one commit · 2 the dispatcher drains the outbox under the rail budget · 3 charge or debit file, with the key · 4 the result · 5 post the result: lines, balance, state.](diagrams/video-flow-fr2.svg)
 
-![FR3, adjust. 1 refund or payoff arrives · 2 to the schedule service · 3 policy: re-amortise or shorten, and the waterfall · 4 ledger lines and the new schedule version · 5 and 6 the answer.](diagrams/video-flow-fr3.pdf){width=90%}
+![FR3, adjust. 1 refund or payoff arrives · 2 to the schedule service · 3 policy: re-amortise or shorten, and the waterfall · 4 ledger lines and the new schedule version · 5 and 6 the answer.](diagrams/video-flow-fr3.svg)
 
-![FR4, returns. 1 the return file arrives and is stored raw · 2 ingest posts the reversal dated today and puts the instalment back to due · 3 the outbox relay emits the event · 4 the customer is told what happens next.](diagrams/video-flow-fr4.pdf){width=90%}
+![FR4, returns. 1 the return file arrives and is stored raw · 2 ingest posts the reversal dated today and puts the instalment back to due · 3 the outbox relay emits the event · 4 the customer is told what happens next.](diagrams/video-flow-fr4.svg)
 
-![FR5, reconcile. 1 the processor's report and bank statement arrive · 2 ingest passes the lines · 3 reconciliation reads the ledger's expectations and matches line by line · 4 every difference becomes an owned break.](diagrams/video-flow-fr5.pdf){width=90%}
+![FR5, reconcile. 1 the processor's report and bank statement arrive · 2 ingest passes the lines · 3 reconciliation reads the ledger's expectations and matches line by line · 4 every difference becomes an owned break.](diagrams/video-flow-fr5.svg)
+
+## Where an event ends and an API call begins
+
+![C4 container view: events dashed blue, HTTPS solid, files at the rail edge.](diagrams/video-hld-boundary.svg)
+
+Origination does not call us for a new loan: it emits `Loan Booked`, an event, so a retry cannot book twice. The merchant refunds with a synchronous HTTPS call because it needs an answer now. Between our own services a due payment travels as an outbox event. Out to the card processor it is one HTTPS call per attempt; to the bank it is a debit batch as a file; the answer comes back days later as a return file. Three transports, three failure modes.
+
+The card rail on the wire (one charge per attempt, then a lookup by reference after a timeout):
+
+```http
+POST /v1/charges
+Idempotency-Key: ln-5531-i3-a1
+
+{"amount": 15000, "source": "tok_81", "reference": "ln-5531-i3-a1"}
+
+HTTP/1.1 200 OK
+{"id": "ch_9X2", "status": "pending", "reference": "ln-5531-i3-a1"}
+
+GET /v1/charges?reference=ln-5531-i3-a1       -- after a timeout
+{"data": [{"id": "ch_9X2", "status": "succeeded"}]}   -- or {"data": []}
+```
+
+The bank rail (a batch out, an acceptance back, a return two days later):
+
+```http
+POST /v1/debit-batches
+Idempotency-Key: 2026-12-01-b1
+
+{"cutoff": "14:00", "entries": [{"ref": "ln-5531-i3-a1", "cents": 15000, "mandate": "md-204"}]}
+
+HTTP/1.1 202 Accepted
+{"batch": "bt_17", "status": "accepted"}
+
+GET /v1/returns?since=2026-12-01
+{"returns": [{"ref": "ln-5531-i3-a1", "code": "R01", "days": 2}]}
+```
 
 ## The C4 views and the sequence
 
-![C4 level 1. The customer repays and asks for payoffs; merchants refund; origination books loans; we charge and query at the card processor, send debit files to the bank and receive returns and statements; finance operations own breaks and the close.](diagrams/video-c4-context.pdf){width=92%}
+![C4 level 1. The customer repays and asks for payoffs; merchants refund; origination books loans; we charge and query at the card processor, send debit files to the bank and receive returns and statements; finance operations own breaks and the close.](diagrams/video-c4-context.svg)
 
-![C4 level 2. The servicing API owns keys, refunds and quotes; schedule and collect owns due items and the state machine; the servicing database holds ledger, intents and outbox; the dispatcher owns rail budgets; policy, file ingest, the resolver and reconciliation close the loops.](diagrams/video-c4-containers.pdf){width=96%}
+![C4 level 2. The servicing API owns keys, refunds and quotes; schedule and collect owns due items and the state machine; the servicing database holds ledger, intents and outbox; the dispatcher owns rail budgets; policy, file ingest, the resolver and reconciliation close the loops.](diagrams/video-c4-containers.svg)
 
-![One card instalment as a sequence: claim, intent and outbox in one commit; drain under 90 a second; charge with the key; approved; one transaction for state, lines and balance.](diagrams/video-seq-collect.pdf){width=92%}
+![One card instalment as a sequence: claim, intent and outbox in one commit; drain under 90 a second; charge with the key; approved; one transaction for state, lines and balance.](diagrams/video-seq-collect.svg)
 
 # Stage 5: Why these choices
 
@@ -578,7 +827,7 @@ Every container with the technology it runs on, how it is built, the alternative
 
 ## The dispatcher, one level down
 
-![C4 level 3, the dispatcher: the outbox poller claims sends by shard; the day plan sets each rail's rate; a token bucket per rail; the card client sends with our key and turns a timeout into UNKNOWN; the file builder checks counts and totals before the cut-off; the result poster writes to the ledger by key and hands unknowns to the resolver.](diagrams/video-c4-comp-dsp.pdf){width=100%}
+![C4 level 3, the dispatcher: the outbox poller claims sends by shard; the day plan sets each rail's rate; a token bucket per rail; the card client sends with our key and turns a timeout into UNKNOWN; the file builder checks counts and totals before the cut-off; the result poster writes to the ledger by key and hands unknowns to the resolver.](diagrams/video-c4-comp-dsp.svg)
 
 The dispatcher is the box challenges 1, 2 and 7 open. The **outbox poller** claims sends by shard with `SKIP
 LOCKED`. The **day plan** sets each rail's rate from windows planned backwards from the cut-off, and the **rail
@@ -722,7 +971,7 @@ Each fix in Stage 6 rejects one tool by name:
 
 ## When you don't need all this (the alternate path)
 
-![The alternate path changes one box: the dispatcher becomes one scheduled job.](diagrams/video-alt.pdf){width=90%}
+![The alternate path changes one box: the dispatcher becomes one scheduled job.](diagrams/video-alt.svg)
 
 **The simpler design.** Keep the ledger, the state machine with UNKNOWN and RETURNED, file ingest and
 reconciliation. Replace the dispatcher, its rail budgets and its day plan with **one scheduled job** that walks
@@ -745,7 +994,7 @@ The interviewer picks two or three of these; the video walks all eight. They are
 creates the next question, and each follows the same grammar: the question, the naive answer, a case with
 numbers, where it breaks, the fix, why it works, the push on the fix, and the answer to give in the room.
 
-![The challenge map: the carried baseline with every attack point outlined.](diagrams/video-map.pdf){width=92%}
+![The challenge map: the carried baseline with every attack point outlined.](diagrams/video-map.svg)
 
 ## 6.1 The processor timed out (the crux, part one)
 
@@ -782,13 +1031,13 @@ def resolve(i):                                    # runs at +30 s, +2 min, +10 
     schedule_again(i)                                           # still unknown
 ```
 
-![The fix on the baseline: the resolver queries the rail and hands the result to the dispatcher, which posts it once.](diagrams/video-ch1-fix.pdf){width=90%}
+![The fix on the baseline: the resolver queries the rail and hands the result to the dispatcher, which posts it once.](diagrams/video-ch1-fix.svg)
 
-![The next ten minutes as a sequence.](diagrams/video-seq-unknown.pdf){width=90%}
+![The next ten minutes as a sequence.](diagrams/video-seq-unknown.svg)
 
-**Why it works.** S1 (no instalment collected twice) holds at two layers: the processor de-duplicates by key,
+**Why it works.** `[S1-no-twice-collect]` (no instalment collected twice) holds at two layers: the processor de-duplicates by key,
 and the ledger's unique key means the result can only be posted once even if the resolver and a late answer
-race. L2 (every unknown ends) holds because the resolver runs on a schedule with a bounded number of tries,
+race. `[L2-every-unknown-ends]` (every unknown ends) holds because the resolver runs on a schedule with a bounded number of tries,
 and after that the settlement file decides.
 
 **The push.** *"The query says 'not found'. You resend. Tomorrow's settlement file shows the first charge went
@@ -804,18 +1053,22 @@ answers queries can only be checked by its file, a day late. That belongs in the
 > "A timeout is not a failure. The intent goes to unknown, the resolver queries by the same key, and a resend
 > reuses that key. The settlement file is the final arbiter."
 
-::: warn
-**Weak answers.** "Retry with exponential backoff" (with which key?). "Make the charge idempotent" (how, and
-at which layer?). "Use a distributed transaction with the processor" (the processor is not a participant in
-your transaction).
-:::
+> [!WARNING]
+> **Trap**
+>
+> **Weak answers.** "Retry with exponential backoff" (with which key?). "Make the charge idempotent" (how, and
+> at which layer?). "Use a distributed transaction with the processor" (the processor is not a participant in
+> your transaction).
 
-::: why
-**A race worth naming.** The processor's late answer and the resolver's query can both arrive at the
-dispatcher within milliseconds. Both try to post. The ledger's unique key on `coll:ln-5531:2:1` lets exactly
-one commit; the other gets a unique violation and reads the stored result. That is why the key is on the
-ledger transaction and not only at the processor.
-:::
+
+> [!NOTE]
+> **Why? What is it?**
+>
+> **A race worth naming.** The processor's late answer and the resolver's query can both arrive at the
+> dispatcher within milliseconds. Both try to post. The ledger's unique key on `coll:ln-5531:2:1` lets exactly
+> one commit; the other gets a unique violation and reads the stored result. That is why the key is on the
+> ledger transaction and not only at the processor.
+
 
 ## 6.2 The morning of the 1st (overload)
 
@@ -853,10 +1106,10 @@ RETURNING d.id, d.loan_id, d.amount_cents, d.rail;
 -- same transaction: one intent + one outbox row per claimed row
 ```
 
-![Two workers, one shard: the second skips the locked rows; a worker that dies before commit releases its locks; a sweeper returns stale claims.](diagrams/video-seq-claim.pdf){width=90%}
+![Two workers, one shard: the second skips the locked rows; a worker that dies before commit releases its locks; a sweeper returns stale claims.](diagrams/video-seq-claim.svg)
 
-**Why it works.** L1 (every instalment attempted before the cut-off) is designed in, with three hours of
-margin. S3 (no penalty for our failure) holds because the declines that a burst would cause were our fault.
+**Why it works.** `[L1-attempt-by-cutoff]` (every instalment attempted before the cut-off) is designed in, with three hours of
+margin. `[S3-no-unfair-penalty]` (no penalty for our failure) holds because the declines that a burst would cause were our fault.
 `SKIP LOCKED` gives exactly-one claiming without a distributed lock; the sweeper handles a worker that dies
 after its commit and before its send.
 
@@ -870,11 +1123,13 @@ The peak shrinks at the source.
 > "Forty-two a second is nothing for a database. The limits are the processor's contract and the bank's
 > cut-off, so I plan backwards from the cut-off, with a budget per rail."
 
-::: load
-**Under load, the 1st:** 42 operations a second on the database (claims, intents, postings); 90 a second to the
-card processor for 22 minutes; one 45 MB file to the bank; 240 timeouts for the resolver; about 14,400 returns
-arriving on days 2 and 3. Every one of these numbers is illustrative.
-:::
+> [!CAUTION]
+> **Under load**
+>
+> **Under load, the 1st:** 42 operations a second on the database (claims, intents, postings); 90 a second to the
+> card processor for 22 minutes; one 45 MB file to the bank; 240 timeouts for the resolver; about 14,400 returns
+> arriving on days 2 and 3. Every one of these numbers is illustrative.
+
 
 ## 6.3 It settled, then it came back (the crux, part two)
 
@@ -907,11 +1162,11 @@ and moves the instalment from PAID back to DUE with the reason. Then **policy** 
 | R10 and similar | unauthorised | up to 60 days | never retry; a new authorisation; dispute review |
 | late fee | after the grace period | — | capped by law where the customer lives; never for our failures |
 
-![One return, end to end: the raw file, the match to the attempt, the reversal dated the day it arrived, the policy decision, the customer notice.](diagrams/video-seq-return.pdf){width=90%}
+![One return, end to end: the raw file, the match to the attempt, the reversal dated the day it arrived, the policy decision, the customer notice.](diagrams/video-seq-return.svg)
 
-**Why it works.** S2 (no line edited) holds because a return is a new transaction. S3 (no penalty beyond the
+**Why it works.** `[S2-ledger-balanced-immutable]` (no line edited) holds because a return is a new transaction. `[S3-no-unfair-penalty]` (no penalty beyond the
 rules) holds because the network's rules live in one table, owned by risk and legal, and applied by one piece
-of code. L2 holds because RETURNED has defined exits.
+of code. `[L2-every-unknown-ends]` holds because RETURNED has defined exits.
 
 **The push.** *"Finance wants to recognise the cash on settlement day. Risk wants to wait sixty days. Who
 wins?"*
@@ -924,17 +1179,21 @@ process waits on it.
 > "Settled is not final for a bank debit. A return is a state and a reversal dated when it arrives, and
 > whether we retry is policy: never for unauthorised."
 
-::: warn
-**Trap: retrying an unauthorised return.** It looks like ordinary dunning (retrying a failed payment). It is
-not: the customer has said they did not authorise the debit. Retrying it breaks the network's rules and turns
-a dispute into a complaint, or worse.
-:::
+> [!WARNING]
+> **Trap**
+>
+> **Trap: retrying an unauthorised return.** It looks like ordinary dunning (retrying a failed payment). It is
+> not: the customer has said they did not authorise the debit. Retrying it breaks the network's rules and turns
+> a dispute into a complaint, or worse.
 
-::: why
-**What is a trace number?** Each entry in a debit file carries an identifier assigned when the file is built,
-and the bank returns it with any return. Storing it on the attempt is what lets ingest match a return to
-exactly one attempt, rather than guessing by amount and date.
-:::
+
+> [!NOTE]
+> **Why? What is it?**
+>
+> **What is a trace number?** Each entry in a debit file carries an identifier assigned when the file is built,
+> and the bank returns it with any return. Storing it on the attempt is what lets ingest match a return to
+> exactly one attempt, rather than guessing by amount and date.
+
 
 **The card rail's version: a dispute.** A card repayment can come back too, by a different clock. The customer
 disputes the charge with their card issuer, sometimes months later, and the processor nets the amount from our
@@ -984,9 +1243,9 @@ Every payment is also **allocated** by a versioned waterfall:
 | 3 | principal due | this instalment's share |
 | 4 | future principal | extra or early: shortens the loan |
 
-![The refund as a sequence: the terms version decides, the transaction is keyed by the merchant's refund ID, and schedule version 2 replaces version 1 from instalment 3. An instalment already in flight stays in flight; allocation applies when it settles.](diagrams/video-seq-refund.pdf){width=90%}
+![The refund as a sequence: the terms version decides, the transaction is keyed by the merchant's refund ID, and schedule version 2 replaces version 1 from instalment 3. An instalment already in flight stays in flight; allocation applies when it settles.](diagrams/video-seq-refund.svg)
 
-**Why it works.** S2 and the audit: every change is a transaction plus a version that says why. S3: the
+**Why it works.** `[S2-ledger-balanced-immutable]` and the audit: every change is a transaction plus a version that says why. `[S3-no-unfair-penalty]`: the
 customer pays what they owe, no more.
 
 **The push.** *"The customer has paid nine hundred. Now the merchant refunds the full twelve hundred."*
@@ -999,13 +1258,15 @@ the merchant contract, also versioned.
 > "A refund is a ledger transaction and a new schedule version. Re-amortise or shorten is a decision in the
 > terms, and any overpayment goes back to the customer."
 
-::: why
-**A race the first draft glosses over.** If instalment 3 is in the debit file when the refund arrives, the new
-schedule version must not cancel or resize it: the debit is already with the bank. It stays as it is; when it
-settles, the waterfall applies it to the new schedule, and any excess becomes a reduction of future principal
-(or customer payable, if nothing is left). Regenerating the schedule "from the next unclaimed instalment" is the
-rule that keeps the two from colliding.
-:::
+> [!NOTE]
+> **Why? What is it?**
+>
+> **A race the first draft glosses over.** If instalment 3 is in the debit file when the refund arrives, the new
+> schedule version must not cancel or resize it: the debit is already with the bank. It stays as it is; when it
+> settles, the waterfall applies it to the new schedule, and any excess becomes a reduction of future principal
+> (or customer payable, if nothing is left). Regenerating the schedule "from the next unclaimed instalment" is the
+> rule that keeps the two from colliding.
+
 
 ## 6.5 Paying off with a debit in flight (correctness, timing)
 
@@ -1037,10 +1298,10 @@ $150 reopens as a single due item, with no late mark.
 | a bank debit | balance − debit, conditional | PAID_PENDING | the debit is past its insufficient-funds window |
 | a debit not yet sent | full balance; cancel it | CLOSED | at payment |
 
-![The payoff as a sequence: the quote lists the debit in flight; paying it with the quote ID as the key moves the loan to PAID_PENDING; a return reopens one due item; no return by the deadline closes the loan.](diagrams/video-seq-payoff.pdf){width=90%}
+![The payoff as a sequence: the quote lists the debit in flight; paying it with the quote ID as the key moves the loan to PAID_PENDING; a return reopens one due item; no return by the deadline closes the loan.](diagrams/video-seq-payoff.svg)
 
-**Why it works.** S1: nothing is collected twice. S3: no penalty for a timing gap the customer did not create.
-L2: PAID_PENDING has a defined exit on a known date. The only uncertainty left is the 60-day unauthorised
+**Why it works.** `[S1-no-twice-collect]`: nothing is collected twice. `[S3-no-unfair-penalty]`: no penalty for a timing gap the customer did not create.
+`[L2-every-unknown-ends]`: PAID_PENDING has a defined exit on a known date. The only uncertainty left is the 60-day unauthorised
 window, which is handled as a dispute rather than by holding every paid-off loan open for two months.
 
 **The push.** *"The day after the payoff, a merchant refund arrives on the same loan."*
@@ -1084,9 +1345,9 @@ wrong amount) with an owner and an age.
 | +$150, never settled | missing at processor | payments team | query; reverse our posting |
 | −$150, settled, held declined | double charge | payments team | post it; refund the customer today |
 
-![Reconciliation as a sequence: expectations, the processor's report and the bank statement matched by reference, four typed breaks to finance operations, the timing break closing itself.](diagrams/video-seq-recon.pdf){width=90%}
+![Reconciliation as a sequence: expectations, the processor's report and the bank statement matched by reference, four typed breaks to finance operations, the timing break closing itself.](diagrams/video-seq-recon.svg)
 
-**Why it works.** L3 (every difference owned within a day) is a process with a clock. Totals cannot hide
+**Why it works.** `[L3-every-break-owned]` (every difference owned within a day) is a process with a clock. Totals cannot hide
 offsetting breaks, because nothing is matched by total.
 
 **The push.** *"It's month-end, and the processor's report is two days late. Close is in two days."*
@@ -1099,10 +1360,12 @@ the contract owner.
 > "I never reconcile by totals. I match the ledger, the processor and the bank line by line, by reference, and
 > every difference is a typed break with an owner and an age."
 
-::: warn
-**Trap: the plug.** Posting a $400 adjustment to make totals agree is the most common silent failure in this
-round. It closes the month and hides a double charge.
-:::
+> [!WARNING]
+> **Trap**
+>
+> **Trap: the plug.** Posting a $400 adjustment to make totals agree is the most common silent failure in this
+> round. It closes the month and hides a double charge.
+
 
 ## 6.7 The card processor is down on the 1st (failure and operations)
 
@@ -1134,8 +1397,8 @@ charges left. What do you do?"*
 Note what is missing: failover. The card tokens live at this processor, so card customers cannot move to
 another one this morning. Bank debit is a fallback only for customers with a debit mandate.
 
-**Why it works.** S1: no unknown is resent blindly. S3: no fee for our failure, because the late clock runs from
-our attempt window, not the due date. L1: collection resumes the same day.
+**Why it works.** `[S1-no-twice-collect]`: no unknown is resent blindly. `[S3-no-unfair-penalty]`: no fee for our failure, because the late clock runs from
+our attempt window, not the due date. `[L1-attempt-by-cutoff]`: collection resumes the same day.
 
 **The push.** *"It stays down until three in the afternoon, past the bank's cut-off for any fallback."*
 
@@ -1168,7 +1431,7 @@ returned. A page if the file is not acknowledged by 11:00, or if acknowledged ov
 baseline. UNKNOWN count and age. Returns by reason code against their baseline. Breaks by age and amount.
 Every night: every transaction sums to zero, and every balance equals the sum of its lines.
 
-![The funnel catches it at eleven: acknowledged over sent is 97.5 % against a 99.9 % baseline, with three hours left before the cut-off to correct and resend.](diagrams/video-seq-probe.pdf){width=90%}
+![The funnel catches it at eleven: acknowledged over sent is 97.5 % against a 99.9 % baseline, with three hours left before the cut-off to correct and resend.](diagrams/video-seq-probe.svg)
 
 | Metric A | Metric B | Conclusion |
 |---|---|---|
@@ -1342,7 +1605,17 @@ Four sentences, in the order *what · trade-off · risk · next*:
 a new key on every retry; reconciling by totals; late fees for our own outages; nobody owning the policy.
 
 
-\newpage
+
+## Follow-up questions to be ready for
+
+| Follow-up | Where this design answers it |
+|---|---|
+| What if the processor gives us no way to query by our key? | Challenge 1; the pitfall on option D |
+| How do you migrate loans already running on a balance column? | The alternate path; the ledger mechanism |
+| A bank adds an instant rail. What changes? | The central tension: fewer pending days, the same states |
+| How do you test returns and unknowns that happen once a month? | Challenge 3; the observability challenge |
+| Who owns a policy change that costs us money? | Mechanism six; the EM layer |
+| When would you buy the platform? | Option E |
 
 # Part III: The internals
 
@@ -1424,7 +1697,6 @@ differs*. Each break gets an owner and an age, and the ageing report is what mak
 possible. Matching by totals is never acceptable: two errors of opposite sign cancel in a total, and one of them
 may be a customer charged twice.
 
-\newpage
 
 # One-page cheat card
 

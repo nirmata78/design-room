@@ -37,7 +37,10 @@ skinparam backgroundColor #FFFFFF
 skinparam shadowing false
 skinparam roundCorner 10
 skinparam ArrowColor #202124
-skinparam ArrowFontSize 22
+skinparam ArrowFontSize 24
+skinparam StateArrowFontSize 22
+skinparam ranksep 28
+skinparam nodesep 20
 skinparam DefaultFontSize 22
 skinparam rectangleFontSize 24
 skinparam ParticipantBackgroundColor #E8F0FE
@@ -89,7 +92,14 @@ def run(src, svg_path):
         raise SystemExit(f"PlantUML failed for {svg_path}:\n{(p.stderr.decode()[-400:] or re.sub('<[^>]+>', ' ', svg)[:400])}")
     return svg
 
+def _grow(m, k=1.3):
+    t = m.group(0)
+    t = re.sub(r'font-size="(1[0-4])"', lambda x: f'font-size="{int(x.group(1)) * k:g}"', t)
+    return re.sub(r'textLength="([\d.]+)"', lambda x: f'textLength="{float(x.group(1)) * k:.1f}"', t)
+
 def _fit(svg):
+    svg = re.sub(r'<text [^>]*font-size="1[0-4]"[^>]*>', _grow, svg)          # PlantUML's fixed 12 px type: a little more, so scaled labels clear the 18 px gate
+    svg = re.sub(r'<text [^>]*>\[(?:system|container|component|software system)\]</text>', '', svg)     # C4 boundary stereotype: fixed tiny type, adds nothing
     """Responsive SVG: keep the viewBox, drop the fixed pixel size and `preserveAspectRatio=none`, so the figure scales to its area."""
     svg = re.sub(r'preserveAspectRatio="none"', 'preserveAspectRatio="xMidYMid meet"', svg)
     svg = re.sub(r'style="width:[\d.]+px;height:[\d.]+px;background:#FFFFFF;"', 'style="background:#FFFFFF;"', svg, count=1)
@@ -134,6 +144,36 @@ def render(src, out, kind="c4", level="container", direction="lr", order=None, c
     out.with_suffix(".steps.json").write_text(json.dumps(steps), encoding="utf-8")
     out.with_suffix(".meta.json").write_text(json.dumps({"canon": canon or f"puml:{out.stem}", "full": full}), encoding="utf-8")
     return str(out)
+
+def render_versions(prefix, items, out_dir, versions=(1, 2, 3), level="container", direction="lr", canon=None, keep=None):
+    """The carried C4 baseline drawn once as a list, shown as V1 → V2 → V3 deltas (2026-11-25).
+    items: dicts {"since": 1, "until": None, "alias": "api", "line": 'Container(api, "Servicing API", "", "keys")'}; a relationship has no alias.
+    Writes {prefix}-v1.svg … : version N shows every item with since <= N < until; items first appearing in N get the `new` tag
+    (amber outline); the reveal plan shows the carried boxes at once, then each new box with its links. The last version is the full
+    canonical drawing (meta full=True); earlier ones are deltas (full=False), so the layout check does not call them redraws.
+    keep={4: ["att", "hl"]}: crop that version to those boxes (and the links among them): a later version whose delta is local is
+    shown as a close-up, not as the whole picture again (GUIDELINES §7.5, `keep=`)."""
+    out_dir = pathlib.Path(out_dir); canon = canon or f"c4:{prefix}"; outs = []
+    for v in versions:
+        lines, carried, fresh = [], [], []
+        kp = set(keep.get(v, ())) if keep else set()
+        for it in items:
+            if it["since"] > v or (it.get("until") and it["until"] <= v): continue
+            line = it["line"]
+            if kp:
+                ends = re.match(r"\s*\w+\((\w+),\s*(\w+)", line)
+                if it.get("alias") and it["alias"] not in kp: continue
+                if not it.get("alias") and not (ends and ends.group(1) in kp and ends.group(2) in kp): continue
+            if it["since"] == v and it.get("alias"):
+                line = re.sub(r"\)\s*$", ', $tags="new")', line) if "$tags=" not in line else re.sub(r'\$tags="([^"]*)"', r'$tags="\1+new"', line)
+                if v != versions[0]: fresh.append(it["alias"])
+            elif it.get("alias"): carried.append(it["alias"])
+            lines.append(line)
+        order = ([tuple(carried + (fresh if v == versions[0] else []))] if (carried or v == versions[0]) else []) + [a for a in fresh]
+        if v == versions[0]: order = [a["alias"] for a in items if a.get("alias") and a["since"] <= v and not (a.get("until") and a["until"] <= v)]   # the first version builds box by box
+        src = 'AddElementTag("new", $borderColor="#F9AB00", $legendText="new in this version")\n' + "\n".join(lines)
+        outs.append(render(src, out_dir / f"{prefix}-v{v}.svg", kind="c4", level=level, direction=direction, order=order, canon=canon, full=(v == versions[-1] and not kp)))
+    return outs
 
 if __name__ == "__main__":
     a = sys.argv[1:]

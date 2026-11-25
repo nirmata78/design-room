@@ -1,0 +1,11 @@
+A clean org diagram and a dependency web look the same until month five.
+
+Forty engineers, five teams, six months: where do you cut, and what do you keep for yourself?
+
+A reference solution with theory, versioned contracts, and six ways the plan breaks.
+
+51-minute reference solution, 404 numbered slides: theory first, three versions of the team map, six challenges, and what the manager keeps.
+
+Written design (GitHub Markdown): https://github.com/nirmata78/design-room/blob/main/solutions/SD-59-team-decomposition/SD-59_Team_Decomposition_Reference_Design.md
+
+[YouTube link: rerun publish_kit.py with --youtube-url]

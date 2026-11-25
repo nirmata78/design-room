@@ -7,8 +7,8 @@
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"; kit="$HOME/.claude/skills/slide-video-kit/scripts"; root="$HOME/Projects/design-room"
 PY="$root/pdf-kit/.venv/bin/python"; TTS="$HOME/.cache/kokoro-tts/.venv/bin/python"
-stem="$(sed -n 's/^ *stem="\([^"]*\)".*/\1/p' "$here/src/gen.py" | head -1)"
-python3 "$here/src/stack.py" sync
+stem="$(python3 -c "import re,sys;print(re.search(r\"stem=['\\\"]([^'\\\"]+)\", open(sys.argv[1]).read()).group(1))" "$here/src/gen.py")"
+[[ -f "$here/src/stack.py" ]] && python3 "$here/src/stack.py" sync
 python3 "$here/diagrams.py" >/dev/null
 gate() {   # $1 html  $2 report
   lc=0; "$PY" "$kit/check_layout.py" --html "$1" --svg-dir "$here/svg" --css-dir "$here" > "$2" || lc=$?

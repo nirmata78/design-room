@@ -50,31 +50,83 @@ S(plain("Data · money and dates", "Three rules that are cheap to state", '<div 
  "C: Three rules that are cheap to say and expensive to forget. Never a float: integer cents, and how an instalment rounds is a rule, with the remainder on the last payment. Business days: a due date on a weekend or a bank holiday takes effect the next business day, and late fees count from there. And two dates on every line: when it happened, and when we booked it, so a return that arrives today never edits last month."])
 
 # ───────────────────────── 5 · high-level design ─────────────────────────
+import dsl as _d
+S(dia("API · the boundary", "Where an event ends and an API call begins", "hld-boundary", cap="Figure 4.3 — C4 container view: events dashed blue, HTTPS solid, files at the rail edge"), [
+ "C: One picture to settle the boundary, because it is where candidates blur things. A dashed blue line is an event. A solid line is a synchronous call over H-T-T-P-S. And at the rail, the bank speaks in files.", "[+]",
+ "C: The merchant refunds with an H-T-T-P-S call: it needs an answer now.", "[+]",
+ "C: Origination does not call us for a new loan. It emits loan booked, an event, so a retry cannot book twice.", "[+]",
+ "C: The servicing A-P-I is the one door for both.", "[+]",
+ "C: It calls the schedule service, which owns the schedule, the intents and the ledger.", "[+]",
+ "C: Between our own services, due payments travel as outbox events: payment due.", "[+]",
+ "C: Out to the card processor, one H-T-T-P-S call per attempt, with the key.", "[+]",
+ "C: To the bank, a debit batch as a file, built by half past ten.", "[+]",
+ "C: And the bank's answer comes back days later, as a return file, to file ingest. The three transports have three different failure modes, and the design treats them differently."], cls="dia")
+
+_d.wire("""POST /v1/charges
+Idempotency-Key: ln-5531-i3-a1
+
+{"amount": 15000, "source": "tok_81",
+ "reference": "ln-5531-i3-a1"}""", """HTTP/1.1 200 OK
+
+{"id": "ch_9X2", "status": "pending",
+ "reference": "ln-5531-i3-a1"}""", "API · the card rail", "One charge per attempt, with its key", [
+ "C: The card rail, as it looks on the wire. One charge per attempt, with the idempotency key in the header and the same string as our reference.", "[+]",
+ "C: A resend with that key returns the first result, not a second charge."])
+_d.wire("""GET /v1/charges?reference=ln-5531-i3-a1""", """HTTP/1.1 200 OK
+
+{"data": [{"id": "ch_9X2",
+  "status": "succeeded"}]}
+
+-- or, if it never arrived --
+{"data": []}""", "API · the card rail", "After a timeout we ask, we do not guess", [
+ "C: After a timeout we do not guess. We ask the processor by reference.", "[+]",
+ "C: The answer is the charge, or an empty list. Only an empty list makes it safe to send again, with the same key."])
+_d.wire("""POST /v1/debit-batches
+Idempotency-Key: 2026-12-01-b1
+
+{"cutoff": "14:00", "entries": [
+ {"ref": "ln-5531-i3-a1",
+  "cents": 15000, "mandate": "md-204"}]}""", """HTTP/1.1 202 Accepted
+
+{"batch": "bt_17", "status": "accepted"}""", "API · the bank rail", "A debit batch out, and only an acceptance back", [
+ "C: The bank rail. A batch of debits, submitted before the cut-off, with an idempotency key for the batch and a reference per entry.", "[+]",
+ "C: The answer is only that it was accepted. Whether the money moved comes later."])
+_d.wire("""GET /v1/returns?since=2026-12-01""", """HTTP/1.1 200 OK
+
+{"returns": [{"ref": "ln-5531-i3-a1",
+  "code": "R01", "days": 2}]}""", "API · the bank rail", "A return, two days later", [
+ "C: Two days later we ask for returns since the first. A return carries our reference and a reason code, here an insufficient-funds return.", "[+]",
+ "C: That reference is how a return finds its attempt, and the code tells policy whether a retry is allowed."])
+
 chapter(5, "High-level design", 4, "Three versions, each answering the objection to the one before", [
  "C: Now the design, in three versions, each introduced by the objection to the one before. The boxes never move: every later picture is a view of the same baseline."])
 
-S(dia("High-level design · version 1 of 3", "The simplest thing that works", "base-v1", vtag="V1",
+S(dia("High-level design · version 1 of 3", "The simplest thing that works", "hld-v1", vtag="V1", cap="Figure 5.0 — C4 container view, V1",
       chip=chips("a cron at 00:00", "a balance column", "a direct call")), [
  "C: Version one. Origination books a loan through the servicing A-P-I. At midnight, a job in the schedule service loops over every loan due today, charges each at the rails, and updates the loan's balance column. It is the simplest thing that works, and many first versions look exactly like this."], cls="dia")
 
-S(plain("V1 · the objection", "A midnight burst, a retry, and a return with nowhere to go",
-  '<pre class="trace"><span class="t">00:00:00  </span>job sends 2,000 card charges a second; the contract allows 100\n<span class="t">00:00:03  </span>processor throttles: <span class="bad">95 % rejected</span>, retried at once\n<span class="t">08:00:10  </span>ln-5531 times out; retried as new; <span class="bad">charged twice</span>\n<span class="t">Dec 3     </span>a debit returns; the balance column was already reduced: <span class="bad">nowhere to post it</span>\n<span class="t">Dec 31    </span>auditor: “why is this balance 75,000?” <span class="bad">no history</span></pre>', red=True), [
- "C: The objection, as a trace. At midnight the job sends two thousand card charges a second against a contract of a hundred. Three seconds later the processor throttles ninety-five percent, and the job retries them at once. At eight, one charge times out and is retried as a new charge: charged twice.",
- "C: On the third, a debit comes back, and the balance column was already reduced: there is nowhere to post it. And at year end, an auditor asks why a balance is what it is, and there is no history."])
+objection(1, "A midnight burst, a retry, and a return with nowhere to go", "obj-v1", [
+ "I: Walk me through how version one breaks.", "[+]", "C: At midnight the job sends two thousand charges a second. The contract allows a hundred.", "[+]",
+ "C: Three seconds later the processor throttles ninety-five percent.", "[+]", "C: And the job retries at once, into the same wall.", "[+]",
+ "C: At eight, one loan's charge goes out.", "[+]", "C: It times out.", "[+]", "C: And the job retries it as a new charge.", "[+]",
+ "C: The customer is charged twice.", "[+]", "C: On the third day a debit comes back.", "[+]",
+ "C: And the balance column was already reduced, so there is nowhere to post it. At year end an auditor asks why a balance is what it is, and there is no history."],
+ cap="Figure 5.1 — the failing case of V1, message by message")
 
-S(dia("High-level design · version 2 of 3", "One collection per instalment, at the rail's pace, with books", "base-v2", vtag="V2",
+S(dia("High-level design · version 2 of 3", "One collection per instalment, at the rail's pace, with books", "hld-v2", vtag="V2", cap="Figure 5.1 — the same view, V2: new boxes outlined",
       chip=chips("ledger + projection", "claim with SKIP LOCKED", "intent + outbox", "budget per rail")), [
  "C: Version two. The database becomes the servicing database: the ledger with its projection, due items, payment intents and an outbox. The schedule service claims due items and writes intents and outbox rows in one commit. A new dispatcher drains the outbox under a budget per rail, sends each charge with its key, and posts the result.",
  "C: A timeout now leaves the intent unknown instead of failed, and the rail sets the pace instead of a midnight burst."], cls="dia")
 
-S(plain("V2 · the objection", "Correct inside, and still four holes", '<div class="cards c2">'
-  '<div class="cd red"><h3>Later news</h3><p>Settlements and returns arrive as files, days later. Nothing reads them.</p></div>'
-  '<div class="cd red"><h3>Unknowns pile up</h3><p>Nothing ends an unknown: 240 on the 1st, pending forever.</p></div>'
-  '<div class="cd red"><h3>Changing terms</h3><p>Refunds and payoff change schedules. Allocation and fees live in code.</p></div>'
-  '<div class="cd red"><h3>Nobody checks</h3><p>Our books can differ from the bank’s, and nothing would notice.</p></div></div>'), [
- "C: The objection to version two. Inside the database it is correct. But settlements and returns arrive as files days later, and nothing reads them. Nothing ends an unknown: two hundred and forty on the first, pending forever. Refunds and payoffs change schedules, while allocation and fees are buried in code. And our books can differ from the bank's without anyone noticing."])
+objection(2, "Correct inside, and still four holes", "obj-v2", [
+ "I: Version two is correct inside the database. What is still missing?", "[+]",
+ "C: Settlements and returns arrive as files, days later. Nothing reads them.", "[+]",
+ "C: Nothing ends an unknown: two hundred and forty on the first, pending forever.", "[+]",
+ "C: Refunds and payoffs change schedules, while allocation and fees are buried in code.", "[+]",
+ "C: And our books can differ from the bank's, and nothing would notice. Those four holes are version three."],
+ cap="Figure 5.2 — the four holes of V2")
 
-S(dia("High-level design · version 3 of 3", "Close every loop", "base-v3", vtag="V3",
+S(dia("High-level design · version 3 of 3", "Close every loop", "hld-v3", vtag="V3", cap="Figure 5.2 — the same view, V3: the carried baseline",
       chip=chips("file ingest", "resolver", "policy", "reconciliation", "notices")), [
  "C: Version three closes those loops. File ingest takes the bank's and processor's files and posts settlements and reversals. A resolver asks the processor about every unknown, by the same key, and hands the answer to the dispatcher. A policy service holds terms, allocation, retry and fee rules as versioned data. Reconciliation matches all three views and gives breaks to finance operations. And an outbox relay feeds customer notices.",
  "C: This is the baseline. Every picture from here on is a view of it."], cls="dia")
