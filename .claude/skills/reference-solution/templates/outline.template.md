@@ -41,12 +41,12 @@ Volume per month: · Total over the retention period: · Peak and its cause:
 1. Is / is not:
 2. Safety (must never happen): · Liveness (must eventually happen):
 3. Central tension (and the picture for it):
-4. Mechanisms — property → how → failure ruled out → cost:
+4. Mechanisms — property (slug: `[S1-…]`, never a bare code) → how → failure ruled out → cost; diagram type per mechanism (c4 · seq · erd · state):
    | Mechanism | Protects | Rules out | Costs |
    |---|---|---|---|
-5. Options matrix (rows = approaches, columns = deciding properties, last column = fails when). Pick: · Gives up:
+5. Options: one infographic per option (pros · cons · C4 view · red pitfall boxes), then the matrix (rows = approaches, columns = deciding properties, last column = fails when). Pick: · Gives up:
    Mechanisms at work: the container view labelled by mechanism; 1–2 sequences at protocol level (which mechanism, which messages):
-6. Failure catalogue (becomes the challenge list):
+6. Failure list — outline only, no theory slide; it becomes the challenge map (ch. 6) and the follow-up questions (ch. 9):
 
 ## 4 · API and entities
 

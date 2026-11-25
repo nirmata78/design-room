@@ -1,6 +1,6 @@
 ---
 name: reference-solution
-description: Build, rebuild, re-cut or plan the design-room reference solution for one question-bank ID — outline, written reference design (booklet PDF), diagrams, slides, script, the 60–90 minute candidate-led video (scale line, theory chapter, V1→V2→V3 carried baseline drawn once as the C4 container view then shown as deltas, an alternate simpler path, 6–10 interviewer challenges that reach the mechanism one level down and carry the design on to V4, V5 …, numbered flows, options matrix, build cost; a measured layout gate before any frame is rendered) and the YouTube/LinkedIn publish kit — in one run, with no stages and no stop. Invoke as "/reference-solution SD-96" (new) or "/reference-solution SD-08" (reworks an existing solution or older-format video); a title fragment ("/reference-solution url-shortener") also works. Use whenever the author asks to create, regenerate, re-cut, re-render or publish a solution or its video for a bank question, for an outline or script only, or to analyse a new reference video or book chapter for the format. All output stays inside the repository (never ~/Movies); a rework retires the old version. Replaces the former /solution command and the former reference-solution-video skill.
+description: Build, rebuild, re-cut or plan the design-room reference solution for one question-bank ID — outline, written reference design (GitHub Markdown, no PDF), diagrams, slides, script, the 60–90 minute candidate-led video (scale line, theory chapter, V1→V2→V3 carried baseline drawn once as the C4 container view then shown as deltas, an alternate simpler path, 6–10 interviewer challenges that reach the mechanism one level down and carry the design on to V4, V5 …, numbered flows, options matrix, build cost; a measured layout gate before any frame is rendered) and the YouTube/LinkedIn publish kit — in one run, with no stages and no stop. Invoke as "/reference-solution SD-96" (new) or "/reference-solution SD-08" (reworks an existing solution or older-format video); a title fragment ("/reference-solution url-shortener") also works. Use whenever the author asks to create, regenerate, re-cut, re-render or publish a solution or its video for a bank question, for an outline or script only, or to analyse a new reference video or book chapter for the format. All output stays inside the repository (never ~/Movies); a rework retires the old version. Replaces the former /solution command and the former reference-solution-video skill.
 ---
 
 # /reference-solution SD-NN — one question, from the prompt to the publish kit
@@ -16,7 +16,7 @@ only and never copy anything from `profile.md`, `private/`, `sessions/` or `Prog
 
 The standard is **`GUIDELINES.md` in this folder. Read it in full first** and follow it exactly: the purpose, the fixed chapter
 order, the theory chapter, the nine-beat challenge grammar, voices, picture and language rules, the canon check and the acceptance
-checklist. The picture, sound, caption and QA rules are `~/.claude/skills/slide-video-kit/STANDARD.md`; the booklet rules are
+checklist. The picture, sound, caption and QA rules are `~/.claude/skills/slide-video-kit/STANDARD.md`; the Markdown design rules are
 `~/.claude/skills/slide-video-kit/REFERENCE-DESIGN.md`. Where GUIDELINES and STANDARD disagree on shape or length, GUIDELINES wins.
 
 ## Files in this skill
@@ -67,7 +67,7 @@ If `$KIT` is missing, write the outline, booklet and script only, and say that r
 
 `$V/OUTLINE.md` from `$SK/templates/outline.template.md`, every section filled (GUIDELINES §3–§9):
 thesis and definition; **the scale line** (GUIDELINES §3.1: monthly volume, total, peak and its cause); what this question
-grades; six clarifying answers; FRs and NFRs with numbers; estimates with arithmetic **from the scale line** and a label; the theory chapter (six parts, 4–7 mechanisms, the mechanisms-at-work pictures, an options matrix of 3–6 rows with a pick
+grades; six clarifying answers; FRs and NFRs with numbers; estimates with arithmetic **from the scale line** and a label; the theory chapter (five parts, theory rendered first, 4–7 mechanisms each with its diagram type and its own infographic, one infographic per option, the mechanisms-at-work pictures, an options matrix of 3–6 rows with a pick
 and its cost); API and entities; V1/V2/V3 with the objection each answers; **the canonical diagram plan** (one per level, and the delta each later slide shows,
 GUIDELINES §7.5); one numbered flow and one sequence per FR; **the alternate path** (§3.2: the simpler design, what it gives
 up, the crossover number); **components
@@ -95,17 +95,18 @@ to `$V/src/`. It feeds `tech(**TECH(id))`, `SUMMARY()`, `DRILL()`, `rejl(*REJ(n)
 outline's `<!-- stack:outline -->` region (both build scripts run it). **A technology is edited in `stack.json` only**; the
 narration stays hand-written, and the reveal check catches a slide whose row count changed under it.
 
-## 2 · Reference design (booklet)
+## 2 · Reference design (Markdown only; no PDF since 2026-11-25)
 
-Follow `$KIT/REFERENCE-DESIGN.md`. Output `$Q/SD-NN_<Title>_Reference_Design.md` (about 12–20 thousand words) and its PDF, built with
-the files copied from `$KIT/templates/reference-design/` (`build-sd-booklet.sh`, `sd-preamble.tex`, `sd-callouts.lua`) as in `$MODEL` (the build script passes the Google Fonts to pandoc and sets the font path for `rsvg-convert`).
+Follow `$KIT/REFERENCE-DESIGN.md`. Output `$Q/SD-NN_<Title>_Reference_Design.md` (about 12–20 thousand words) built with
+`$KIT/templates/reference-solution/build-md.sh` and `md_github.py` (copied into `$Q`; diagrams from PlantUML `.puml` or the video's SVGs; callouts as GitHub alerts, `> [!NOTE]`; **no pandoc, no LaTeX, no PDF**). Older solutions keep their `build-sd-booklet.sh` only until reworked (the build script passes the Google Fonts to pandoc and sets the font path for `rsvg-convert`).
 Same numbers, mechanisms, **technologies** and challenge order as the outline: the booklet carries the component views and a
 "technology choices" stage generated from `$Q/stack.json` (step 2a): put the two marker pairs where the sections and the stack
-table go, and write only the stage's introduction and figures by hand. Check: the PDF builds; read three
-pages spread across it as images.
+table go, and write only the stage's introduction and figures by hand. Check: `md_github.py` prints `GitHub-ready` (figures exist, no bare property codes, fences balanced); open three figures as images.
 Rework: update the existing booklet to the outline instead of starting again.
 
 ## 3 · Diagrams
+
+**PlantUML and C4 (2026-11-25).** `$KIT/scripts/pumlsvg.py` renders PlantUML (including the bundled C4 library, offline) to a themed SVG with a reveal plan and meta sidecar: `render(src, "svg/x.svg", kind="c4"|"seq"|"state"|"erd", level=…, order=…)`. Use it for sequences of the failing case behind each version objection, state machines, and any C4 view the native `c4svg` cannot lay out; the same SVG is copied into the Markdown design. Event versus HTTPS: `c4svg` edges take `proto="event"|"https"`, PlantUML has `ev()` / `https()`. **Pick the diagram type per mechanism**: state machine (lifecycle), sequence (protocol, race), C4 (placement), ERD (keys).
 
 `$V/diagrams.py` → `$V/svg/`, as `$MODEL/video/diagrams.py`:
 - **one canonical diagram per level** (GUIDELINES §7.5): the container view is the carried baseline, declared once in `c4svg`
@@ -128,6 +129,8 @@ Rework: update the existing booklet to the outline instead of starting again.
   text too small (a row of small boxes becomes a table slide instead). Repeat until clean. The measured check comes in step 4.
 
 ## 4 · Slides and script, from one source
+
+**Theory first (2026-11-25).** Write `ch3.py` first, run `ONLY_CHAPTER=3 python3 src/gen.py` and the layout gate on `video-theory.html`, read its frames, and only then write the other chapters (`build-video.sh` does this pass before the whole deck; `--theory` stops after it). New dsl helpers: `props()`/`pid()`/`ps()` (descriptive property slugs; bare `S1` fails the build), `mech_slide()`, `option_slide()`, `objection()`, `followups()`, `wire()`. Copy `dsl.py`, `video.css`, `build-video.sh`, `build-md.sh`, `md_github.py` from `$KIT/templates/reference-solution/`. Chapter 3 has no failure-catalogue slide; chapter 9 ends with `followups()`.
 
 Copy `$MODEL/video/src/` (`dsl.py`, `gen.py`, chapter files), `$MODEL/video/build-video.sh`, `$MODEL/video/video.css` (the
 Google theme, GUIDELINES §7.1 and `DESIGN-TOKENS.md`; do not restyle per question) and `deck.css`; the generated HTML links
@@ -176,7 +179,7 @@ Run `$V/build-video.sh` **in the background** (build_cached.py, `--dissolve 0.3 
 - a frame grab from the middle of a reveal (a crossfade) and one after it: nothing drawn over the slide;
 - `~/.claude/skills/audio-version/scripts/check_audio.py` on 20+ excerpts (6 inside 5.1, where the new vocabulary is); fix real mispronunciations in `say.py` and rebuild (the cache re-voices only changed
   lines); one sync probe late in the video; eight frames sampled across the length, read as images; the chapter list.
-- Everything stays inside the repository: the MP4 in `$V`, the booklet PDF in `$Q` (both gitignored). Never write to `~/Movies`,
+- Everything stays inside the repository: the MP4 in `$V`, the Markdown design and its `diagrams/` in `$Q`. Never write to `~/Movies`,
   Google Drive, any cloud folder or anywhere outside the repository (author's decisions, 2026-11-13 and 2026-11-21).
 
 ## 6 · Publish kit and links
@@ -195,7 +198,7 @@ Go through GUIDELINES §10 line by line: pass or fail with evidence; fix what fa
 **Retire the old version** once the new MP4 has passed QA: delete `$V/.v*/`, the older MP4 and its `*.script.md` (`git rm` if
 tracked), and any old SVG the new `diagrams.py` no longer writes; fix every link that pointed at them (`grep -rn` the old names).
 Never before QA passes. Then report: files written; length, slides and words; checks run and their results; anything skipped or
-failed; "not watched end to end"; the paths of the MP4, the booklet PDF and the publish kit.
+failed; "not watched end to end"; the paths of the MP4, the Markdown design and the publish kit.
 
 ## Partial runs
 

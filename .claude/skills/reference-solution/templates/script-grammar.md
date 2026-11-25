@@ -36,12 +36,15 @@ and header only). `gen.py` writes the `[slide:]`/`[reveal:]` cues and refuses a 
 [slide: th-is]        C: What this is: <definition>. What it is not: <neighbour>, because <difference>.
 [slide: th-props]     V: Safety: <must never happen>. Liveness: <must eventually happen>.   [pause: 0.8]
 [slide: th-tension]   C: The tension is <A against B>. <walk the picture>
-[slide: th-mech-N]    C: <Mechanism>. It protects <property>. It works like this: <steps>.
+[slide: th-mech-N]    (mech_slide: name + diagram-type pill, picture beside the four blocks; property spoken with ps())  C: <Mechanism>. It protects <property>. It works like this: <steps>.
                       C: It rules out <failure>. It costs <cost>.
 [slide: th-matrix]    C: <N> ways to do this. <Row 1> fails when <…>. <Row 2> fails when <…>.
                       V: I pick <row>. I give up <cost>.          [pause: 0.8]
 [slide: th-map]       C: Where each mechanism will live.  [+] C: <mechanism n>: <container>, <one clause>.  [+] … (a table, not a drawing: the system is drawn once, in chapter 5; the labels return as badges on it)
 [slide: th-seq]       C: Mechanism <n> at work.  [+] C: <message 1, at protocol level: the conditional write, the log append, the quorum>.  [+] …
+[slide: th-opt-X]     (option_slide: one per option, 3–6) C: Option <X>, <name>.  [+] pros, one per step.  [+] cons.  [+] each pitfall as a red box, said as what breaks.  Pick: V: I pick it, and it gives up <cost>.
+[slide: obj-vN]       (objection: a sequence of the failing case; the next version's C4 delta answers it) I: <the objection>.  [+] C: <message 1 of the failing case> … C: That is why V<N+1> adds <box>.
+[slide: ch9-followups] (followups) N: Questions to be ready for next.  [+] C: <question>, answered at <chapter / challenge>.
                       C: <what it needs and does not need: no clock, no lock, no timeout>.
 [slide: th-failures]  C: What will go wrong.  [+] C: <F1>.  [+] C: <F2> … I'll come back to each.
 
