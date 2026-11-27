@@ -77,3 +77,4 @@ def test_spatial_permanence_override_viewbox(tmp_path: pathlib.Path) -> None:
     meta = normalize_svg(raw, out, key="f1", override_viewbox=locked_vb)
     assert meta.viewbox == locked_vb
     assert 'viewBox="50.0 50.0 1200.0 400.0"' in out.read_text(encoding="utf-8")
+

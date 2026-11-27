@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Main CLI for the c4-structurizr skill:
+"""Main CLI for the c4-structurizr skill (Mode A: single master SVG + .steps.json):
   1. Validates Structurizr DSL inside the warm Docker container (c4_runtime.sh)
-  2. Batch-exports all views to raw SVG (and optional -animation true sequences)
+  2. Batch-exports all views to raw SVG
   3. Normalizes every view with svg_normalizer.py (DESIGN-TOKENS.md + 1080p legibility gate)
   4. Optionally renders @2x PNG previews via Playwright Chromium
   5. Emits structured JSON report; exits 0 (OK), 2 (DSL error), or 3 (legibility/token gate fail)
@@ -16,7 +16,6 @@ import re
 import shutil
 import subprocess
 import sys
-import tempfile
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -33,7 +32,6 @@ class ViewSpec(BaseModel):
     steps: list[Any] = Field(default_factory=list)
     canon: str = ""
     full: bool = True
-    animation: bool = False
 
 
 class WorkspaceSpec(BaseModel):
@@ -77,8 +75,7 @@ def _render_pngs(svg_paths: list[pathlib.Path], width: int = 1920) -> None:
             </style></head><body>{svg_txt}</body></html>"""
             page.set_content(html_doc, wait_until="load")
             page.evaluate("document.fonts.ready.then(() => true)")
-            svg_el = page.locator("svg").first
-            svg_el.screenshot(path=str(sp.with_suffix(".png")))
+            page.locator("svg").first.screenshot(path=str(sp.with_suffix(".png")))
         browser.close()
 
 
@@ -88,7 +85,6 @@ def run_render(
     spec_path: pathlib.Path | None = None,
     *,
     export_png: bool = False,
-    export_animation: bool = False,
     workspace_root: pathlib.Path | None = None,
 ) -> tuple[int, list[ViewMeta]]:
     runtime = SCRIPT_DIR / "c4_runtime.sh"
@@ -109,7 +105,6 @@ def run_render(
     env = os.environ.copy()
     env["C4_WORKSPACE_ROOT"] = str(workspace_root)
 
-    # Ensure warm container is up
     subprocess.run([str(runtime), "ensure"], env=env, check=True, stdout=subprocess.DEVNULL)
 
     spec = WorkspaceSpec()
@@ -118,15 +113,12 @@ def run_render(
 
     alias_by_title = _extract_dsl_aliases(dsl_path.read_text(encoding="utf-8"))
 
-    # Stage inside workspace_root so Docker bind mount sees it
     tmp_stage = workspace_root / f".c4-export-{os.getpid()}"
     raw_dir = tmp_stage / "raw"
-    anim_dir = tmp_stage / "anim"
     raw_dir.mkdir(parents=True, exist_ok=True)
 
     try:
         c_dsl = _container_path(dsl_path, workspace_root)
-        # 1. Validate DSL
         val = subprocess.run(
             [str(runtime), "exec", "validate", "-w", c_dsl],
             env=env,
@@ -137,7 +129,6 @@ def run_render(
             print(json.dumps({"status": "dsl_error", "stderr": val.stderr, "stdout": val.stdout}, indent=2), file=sys.stderr)
             return 2, []
 
-        # 2. Batch export static views
         c_raw = _container_path(raw_dir, workspace_root)
         exp = subprocess.run(
             [str(runtime), "exec", "export", "-w", c_dsl, "-f", "svg", "-o", c_raw],
@@ -149,18 +140,6 @@ def run_render(
             print(json.dumps({"status": "export_error", "stderr": exp.stderr, "stdout": exp.stdout}, indent=2), file=sys.stderr)
             return 2, []
 
-        # 3. Optional native -animation true export
-        if export_animation:
-            anim_dir.mkdir(parents=True, exist_ok=True)
-            c_anim = _container_path(anim_dir, workspace_root)
-            subprocess.run(
-                [str(runtime), "exec", "export", "-w", c_dsl, "-f", "svg", "-animation", "true", "-o", c_anim],
-                env=env,
-                check=True,
-                stdout=subprocess.DEVNULL,
-            )
-
-        # 4. Normalize all exported SVGs (skip *-key.svg)
         metas: list[ViewMeta] = []
         out_svgs: list[pathlib.Path] = []
         for raw_svg in sorted(raw_dir.glob("*.svg")):
@@ -181,22 +160,6 @@ def run_render(
             )
             metas.append(meta)
             out_svgs.append(dest)
-
-            # Normalize matching animation frames locked to the master SVG's exact viewBox
-            if export_animation:
-                aframes = sorted(anim_dir.glob(f"{key}-[0-9]*.svg"))
-                if aframes:
-                    a_out = out_dir / "anim" / key
-                    a_out.mkdir(parents=True, exist_ok=True)
-                    for af in aframes:
-                        normalize_svg(
-                            af,
-                            a_out / af.name,
-                            key=af.stem,
-                            slot=vspec.slot,
-                            alias_by_title=alias_by_title,
-                            override_viewbox=meta.viewbox,
-                        )
 
         if export_png and out_svgs:
             _render_pngs(out_svgs)
@@ -224,25 +187,14 @@ def run_render(
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Containerized Structurizr C4 renderer + 1080p normalizer")
-    ap.add_argument("--dsl", type=pathlib.Path, help="Path to Structurizr workspace.dsl")
+    ap = argparse.ArgumentParser(description="Containerized Structurizr C4 renderer + 1080p normalizer (Mode A)")
+    ap.add_argument("--dsl", type=pathlib.Path, required=True, help="Path to Structurizr workspace.dsl")
     ap.add_argument("--spec", type=pathlib.Path, help="Optional views.json spec")
-    ap.add_argument("--out", type=pathlib.Path, help="Output directory for normalized SVGs/PNGs")
+    ap.add_argument("--out", type=pathlib.Path, required=True, help="Output directory for normalized SVGs/PNGs")
     ap.add_argument("--png", action="store_true", help="Also render @2x PNG previews via Playwright")
-    ap.add_argument("--animation", action="store_true", help="Also export Structurizr native -animation true frames")
-    ap.add_argument("--dump-schema", type=pathlib.Path, help="Write JSON schema for views.json and exit")
     args = ap.parse_args()
 
-    if args.dump_schema:
-        args.dump_schema.parent.mkdir(parents=True, exist_ok=True)
-        args.dump_schema.write_text(json.dumps(WorkspaceSpec.model_json_schema(), indent=2), encoding="utf-8")
-        print(f"Wrote schema to {args.dump_schema}")
-        return
-
-    if not args.dsl or not args.out:
-        ap.error("--dsl and --out are required")
-
-    rc, _ = run_render(args.dsl, args.out, args.spec, export_png=args.png, export_animation=args.animation)
+    rc, _ = run_render(args.dsl, args.out, args.spec, export_png=args.png)
     sys.exit(rc)
 
 

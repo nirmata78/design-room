@@ -13,7 +13,6 @@ SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 IMAGE="${C4_STRUCTURIZR_IMAGE:-local/structurizr-c4:playwright}"
 UPSTREAM="${C4_STRUCTURIZR_UPSTREAM:-structurizr/structurizr:preview}"
 CONTAINER="${C4_STRUCTURIZR_CONTAINER:-structurizr-c4-daemon}"
-LOCAL_WAR="${C4_STRUCTURIZR_WAR:-$HOME/Projects/structurizr/structurizr-application/target/structurizr-1.0.0.war}"
 WORKSPACE_ROOT="${C4_WORKSPACE_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 
 require_docker() {
@@ -24,39 +23,16 @@ build_image() {
     if docker image inspect "$IMAGE" >/dev/null 2>&1; then
         return 0
     fi
-
-    echo "[c4_runtime] Checking upstream image: $UPSTREAM"
-    if docker pull "$UPSTREAM" >/dev/null 2>&1; then
-        echo "[c4_runtime] Building font-hermetic layer $IMAGE over $UPSTREAM ..."
-        docker build -q -f "$SKILL_DIR/docker/Dockerfile.c4" \
-            --build-arg "BASE_IMAGE=$UPSTREAM" \
-            -t "$IMAGE" "$SKILL_DIR"
-        return 0
-    fi
-
-    echo "[c4_runtime] Upstream $UPSTREAM unavailable; building locally from WAR ($LOCAL_WAR)..."
-    if [[ ! -f "$LOCAL_WAR" ]]; then
-        echo "ERROR: Local Structurizr WAR not found at $LOCAL_WAR" >&2
-        exit 1
-    fi
-    tmpctx="$(mktemp -d)"
-    trap 'rm -rf "$tmpctx"' RETURN
-    cp "$LOCAL_WAR" "$tmpctx/structurizr.war"
-    cp -r "$SKILL_DIR/resources/fonts" "$tmpctx/fonts"
-    cat << 'EOF' > "$tmpctx/structurizr.sh"
-#!/bin/bash
-if [ "$#" -eq 0 ]; then
-    java --enable-native-access=ALL-UNNAMED -jar /usr/local/structurizr.war help
-    exit 1
-fi
-java -Dserver.port=${PORT:-8080} -Dio.netty.noUnsafe=true --enable-native-access=ALL-UNNAMED -jar /usr/local/structurizr.war "$@"
-EOF
-    docker build -q -f "$SKILL_DIR/docker/Dockerfile.local-war" -t "$IMAGE" "$tmpctx"
+    echo "[c4_runtime] Pulling upstream Playwright image: $UPSTREAM"
+    docker pull "$UPSTREAM"
+    echo "[c4_runtime] Building font-hermetic layer $IMAGE over $UPSTREAM ..."
+    docker build -q -f "$SKILL_DIR/docker/Dockerfile.c4" \
+        --build-arg "BASE_IMAGE=$UPSTREAM" \
+        -t "$IMAGE" "$SKILL_DIR"
 }
 
 start_daemon() {
     if docker ps --format '{{.Names}}' | grep -qx "$CONTAINER"; then
-        # Verify mount matches WORKSPACE_ROOT
         cur_mount="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/workspace"}}{{.Source}}{{end}}{{end}}' "$CONTAINER" 2>/dev/null || true)"
         if [[ "$cur_mount" == "$WORKSPACE_ROOT" ]]; then
             return 0

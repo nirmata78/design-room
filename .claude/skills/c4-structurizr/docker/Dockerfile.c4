@@ -9,3 +9,4 @@ COPY resources/fonts/*.ttf /usr/local/share/fonts/google/
 RUN fc-cache -f && mkdir -p /workspace && chmod 777 /workspace
 
 WORKDIR /workspace
+
