@@ -1,0 +1,15 @@
+[project]
+name = "c4-structurizr"
+version = "0.1.0"
+description = "Containerized Structurizr DSL C4 renderer with 1080p viewport normalization and progressive video output."
+requires-python = ">=3.11"
+dependencies = [
+    "lxml>=5.0",
+    "pydantic>=2.0",
+    "playwright>=1.45",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]

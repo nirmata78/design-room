@@ -1,0 +1,16 @@
+# Local fallback Dockerfile when upstream structurizr/structurizr Playwright image
+# is unavailable or lacks native host architecture support.
+# Build context must contain structurizr.war, structurizr.sh, and resources/fonts/*.ttf.
+FROM mcr.microsoft.com/playwright/java:v1.64.0-noble
+
+ENV PORT=8080
+
+COPY structurizr.war /usr/local/structurizr.war
+COPY structurizr.sh /usr/local/structurizr.sh
+COPY fonts/*.ttf /usr/local/share/fonts/google/
+RUN chmod +x /usr/local/structurizr.sh && fc-cache -f && mkdir -p /workspace && chmod 777 /workspace
+
+EXPOSE ${PORT}
+WORKDIR /workspace
+
+ENTRYPOINT ["/usr/local/structurizr.sh"]

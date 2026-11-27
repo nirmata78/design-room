@@ -1,0 +1,51 @@
+{
+  "$defs": {
+    "ViewSpec": {
+      "properties": {
+        "slot": {
+          "default": "full",
+          "enum": [
+            "full",
+            "composite",
+            "split"
+          ],
+          "title": "Slot",
+          "type": "string"
+        },
+        "steps": {
+          "items": {},
+          "title": "Steps",
+          "type": "array"
+        },
+        "canon": {
+          "default": "",
+          "title": "Canon",
+          "type": "string"
+        },
+        "full": {
+          "default": true,
+          "title": "Full",
+          "type": "boolean"
+        },
+        "animation": {
+          "default": false,
+          "title": "Animation",
+          "type": "boolean"
+        }
+      },
+      "title": "ViewSpec",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "views": {
+      "additionalProperties": {
+        "$ref": "#/$defs/ViewSpec"
+      },
+      "title": "Views",
+      "type": "object"
+    }
+  },
+  "title": "WorkspaceSpec",
+  "type": "object"
+}
