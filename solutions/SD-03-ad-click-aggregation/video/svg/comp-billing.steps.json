@@ -1,0 +1,35 @@
+[
+  [
+    "e:close",
+    "e:read",
+    "e:lake",
+    "l:read-lake",
+    "l:close-read"
+  ],
+  [
+    "e:xdup",
+    "e:filt",
+    "e:fraud",
+    "l:read-xdup",
+    "l:xdup-filt",
+    "l:fraud-filt"
+  ],
+  [
+    "e:price",
+    "e:write",
+    "e:bill",
+    "l:filt-price",
+    "l:price-write",
+    "l:write-bill"
+  ],
+  [
+    "e:adj",
+    "e:invo",
+    "e:recon",
+    "e:live",
+    "l:write-adj",
+    "l:invo-adj",
+    "l:recon-write",
+    "l:recon-live"
+  ]
+]

@@ -137,7 +137,7 @@ model.
 
 ## The path of a swipe
 
-![The chain of a card payment, and who decides when we are late](diagrams/video-swipe-path.pdf){width=100%}
+![The chain of a card payment, and who decides when we are late](video/svg/swipe-path.svg){width=100%}
 
 A cardholder taps at a till. The **merchant's terminal** sends the purchase to the **acquirer**, which
 sends it into the **card network**. The network routes it by the card's number range to the
@@ -157,7 +157,7 @@ real-time decision path, and a batch clearing path that turns promises into post
 
 ## What one restaurant bill does to an account
 
-![One restaurant bill: a hold, an incremental, then clearing](diagrams/video-holds.pdf){width=100%}
+![One restaurant bill: a hold, an incremental, then clearing](video/svg/holds.svg){width=100%}
 
 | When | Message | Effect | Posted | Available |
 |---|---|---|---|---|
@@ -213,7 +213,7 @@ decision clock's path, and nothing the decision clock decided may be lost by the
 
 ## Where the deadline goes
 
-![Decision quality against time: the deadline is someone else's](diagrams/video-tension.pdf){width=100%}
+![Decision quality against time: the deadline is someone else's](video/svg/tension.svg){width=100%}
 
 Each signal costs time. Card status and the balance are a few milliseconds. In-process rules are ten.
 A fraud model is tens of milliseconds and occasionally far more. Rich aggregates computed on request
@@ -238,7 +238,7 @@ free; and the batch side is large but has hours, not milliseconds.
 
 ## The whole design on one page
 
-![The final design on the carried baseline](diagrams/video-base-final.pdf){width=100%}
+![The final design on the carried baseline](video/svg/base-final.svg){width=100%}
 
 Across the middle, the authorisation path: the **card network** (through the processor) calls our
 **auth gateway**, which maps the network's message format to ours; the **decision service** reads and
@@ -386,7 +386,7 @@ The ratio also tells you the fleet will idle most of the day, which is why the c
 (Stage 9) are fees and fraud, not servers.
 :::
 
-![The latency budget at the cut-off](diagrams/video-budget.pdf){width=100%}
+![The latency budget at the cut-off](video/svg/budget.svg){width=100%}
 
 **The budget, step by step.** Parse the network message and check its reference: 5 ms. Read the account,
 holds and card: 5 ms. Read and increment the burst counters: 3 ms. Rules, in process: 10 ms, in
@@ -432,7 +432,7 @@ false-positive signal there is (Challenge 6).
 
 ## The data model
 
-![Conceptual model: accounts, cards, holds, messages, decisions, clearing](diagrams/video-erd-chen.pdf){width=95%}
+![Conceptual model: accounts, cards, holds, messages, decisions, clearing](video/svg/erd-chen.svg){width=95%}
 
 An **account** has many **cards** (a joint account, a replacement card, a fleet of business cards). An
 account has many **holds**. A hold is created by a **message** and changed by later messages with the
@@ -441,7 +441,7 @@ a **decision**, a weak entity that only exists as the record of its message, car
 rule-set version and the model version. A hold is **settled** by clearing records: usually one, several
 for a split shipment, none for a hold that expires.
 
-![Physical tables in the authorisation store](diagrams/video-erd-physical.pdf){width=100%}
+![Physical tables in the authorisation store](video/svg/erd-physical.svg){width=100%}
 
 | Table | Key | Columns | Note |
 |---|---|---|---|
@@ -476,7 +476,7 @@ Draw one baseline and evolve it. Boxes never move; each version adds boxes and r
 
 ## Version 1: the simplest thing that works
 
-![V1: one decision service on the core ledger](diagrams/video-base-v1.pdf){width=100%}
+![V1: one decision service on the core ledger](video/svg/base-v1.svg){width=100%}
 
 A gateway and one decision service. To authorise, it reads the balance from the core ledger and inserts
 a hold row there, in one transaction. Rules are `if` statements in its code. A nightly clearing job reads
@@ -488,7 +488,7 @@ the network's file, posts the amounts and releases the holds.
 
 ## Version 2: split the decision from the ledger
 
-![V2: a dedicated authorisation store, rules as data, a model under a cut-off](diagrams/video-base-v2.pdf){width=100%}
+![V2: a dedicated authorisation store, rules as data, a model under a cut-off](video/svg/base-v2.svg){width=100%}
 
 The decision service becomes stateless, and the state it needs moves to an **authorisation store**:
 balances, holds and the message table, partitioned by account, with one atomic reserve. **Rules** move
@@ -505,7 +505,7 @@ events.
 
 ## Version 3: protect the deadline and close the loops
 
-![V3: features, consumers, and the loops closed](diagrams/video-base-v3.pdf){width=100%}
+![V3: features, consumers, and the loops closed](video/svg/base-v3.svg){width=100%}
 
 A **feature store** holds burst counters that the decision service reads and increments inline, and
 pattern features that a **stream aggregator** computes from the event log. The decision service carries
@@ -522,7 +522,7 @@ authorisation store against the ledger.
 
 ## The numbered flows, one per functional requirement
 
-![FR1, authorise: eight numbered steps](diagrams/video-flow-fr1.pdf){width=100%}
+![FR1, authorise: eight numbered steps](video/svg/flow-fr1.svg){width=100%}
 
 **FR1 · Authorise.** (1) The network sends the request through the processor. (2) The gateway maps it
 and passes it to a decision service. (3) The decision service increments this card's current-minute
@@ -532,9 +532,9 @@ reserves the hold in the account's partition: check available, insert the hold, 
 one conditional write. (6) The decision, with its inputs, features and versions, goes to the outbox in
 the same write and to the event log. (7, 8) The answer goes back through the gateway to the network.
 
-![The authorise sequence](diagrams/video-seq-authorise.pdf){width=100%}
+![The authorise sequence](video/svg/seq-authorise.svg){width=100%}
 
-![FR2, reverse and advise](diagrams/video-flow-fr2.pdf){width=100%}
+![FR2, reverse and advise](video/svg/flow-fr2.svg){width=100%}
 
 **FR2 · Reverse and advise.** (1) A reversal or an advice arrives from the network. (2) The gateway passes
 it on. (3) The decision service applies it by network reference in the authorisation store: a reversal
@@ -542,7 +542,7 @@ releases all or part of a hold (or is stored as a tombstone if its original has 
 is recorded as a hold even if it takes the account past zero. (4) The event goes to the log. (5) The
 acknowledgement goes back.
 
-![FR3, clear](diagrams/video-flow-fr3.pdf){width=100%}
+![FR3, clear](video/svg/flow-fr3.svg){width=100%}
 
 **FR3 · Clear.** Before step 1 the matcher loads the day's file and skips record IDs it has already seen.
 (1) In the authorisation store, in one write, it moves the amount from the hold to the posted balance:
@@ -560,9 +560,9 @@ spend money that is already gone. Moving the amount from hold to posted in one w
 authorisation store keeps available unchanged at every instant.
 :::
 
-![The clearing sequence](diagrams/video-seq-clearing.pdf){width=100%}
+![The clearing sequence](video/svg/seq-clearing.svg){width=100%}
 
-![FR4, change rules](diagrams/video-flow-fr4.pdf){width=100%}
+![FR4, change rules](video/svg/flow-fr4.svg){width=100%}
 
 **FR4 · Change rules.** (1) An analyst writes rule version 15 in the rule service, which backtests it on
 the decision archive. (2) The rule service pushes a new rule-set version to every decision service, in
@@ -572,13 +572,13 @@ enforcement; rollback is re-pointing to the previous version.
 
 ## The C4 views
 
-![C4 context](diagrams/video-c4-context.pdf){width=95%}
+![C4 context](video/svg/c4-context.svg){width=95%}
 
 **Context.** The cardholder pays a merchant, whose acquirer sends the purchase through the card network
 and the processor to us. We send the cardholder alerts. Fraud operations write rules and work cases. We
 send postings to the core banking ledger. Nothing else is on the authorisation path.
 
-![C4 containers](diagrams/video-c4-containers.pdf){width=100%}
+![C4 containers](video/svg/c4-containers.svg){width=100%}
 
 **Containers.** The gateway, the decision service, the authorisation store and the feature store, the
 model scorer and the rule service, the event log with its consumers, and the clearing matcher. The
@@ -783,7 +783,7 @@ The interviewer picks two to four of these. Each follows the same shape as the v
 answer most people give, a case with numbers that breaks it, where it breaks, the fix, why it works, the
 push on the fix, and the answer to give in the room. Each goes one level further here.
 
-![Eight attack points on the same baseline](diagrams/video-map.pdf){width=100%}
+![Eight attack points on the same baseline](video/svg/map.svg){width=100%}
 
 | # | Challenge | Kind | Mechanism |
 |---|---|---|---|
@@ -815,7 +815,7 @@ The same shape appears everywhere amounts differ: a hotel pre-authorises \$300 a
 fuel pump authorises \$1 and clears at \$64; an online order ships in two parts and clears twice; a
 purchase in another currency clears at a different rate.
 
-![Where it breaks: the decision service writing money](diagrams/video-ch1-attack.pdf){width=100%}
+![Where it breaks: the decision service writing money](video/svg/ch1-attack.svg){width=100%}
 
 **The fix: a hold, not a debit.** An approval inserts a hold of \$60 in the authorisation store. The
 incremental authorisation raises the same hold to \$72. Available is posted minus active holds:
@@ -824,7 +824,7 @@ the authorisation store lowers posted by \$72 and releases the hold, so availabl
 becomes \$428; the ledger posts \$72. Each hold gets a lifetime by merchant category: about seven days
 for most, about thirty for hotels and car hire, where the final amount can come weeks later.
 
-![The fix on the baseline](diagrams/video-ch1-fix.pdf){width=100%}
+![The fix on the baseline](video/svg/ch1-fix.svg){width=100%}
 
 **Why it works.** Safety S1 is checked against available, which includes every promise already made.
 Liveness L2 holds because every hold ends: by clearing, by reversal or by expiry.
@@ -877,7 +877,7 @@ Joint accounts, a cardholder with a phone wallet and a physical card, and an onl
 renews while the customer pays at a till all produce this race. It is rare per account and common across
 eight million.
 
-![Where it breaks: read, then write](diagrams/video-ch2-attack.pdf){width=100%}
+![Where it breaks: read, then write](video/svg/ch2-attack.svg){width=100%}
 
 **The fix: one conditional write per account.** The reserve is a single operation in the partition that
 owns the account: *if* holds total plus the amount is within posted, *and* the account's version is the
@@ -899,7 +899,7 @@ def reserve(store, acct_id, ref, amount, expires_at):
             return "approve"                               # else: someone else won; read again
 ```
 
-![The reserve race, resolved](diagrams/video-seq-ch2-reserve.pdf){width=100%}
+![The reserve race, resolved](video/svg/seq-ch2-reserve.svg){width=100%}
 
 **Why it works.** S1 is decided by the one partition that owns the account, so there is exactly one
 place where "is there enough?" can be answered. The conflict is cheap because per-account traffic is a
@@ -915,7 +915,7 @@ from the account: the account reserves budget to each card in blocks, refilled a
 authorisations touch only the card's slice. This is the escrow pattern, the same idea as counter ranges
 in other designs.
 
-![Sub-limits for a shared business account](diagrams/video-escrow.pdf){width=100%}
+![Sub-limits for a shared business account](video/svg/escrow.svg){width=100%}
 
 **The honest limit.** A card's slice can run dry while the account still has money. Refill early (at
 half-used), size slices by each card's recent spend, and when a slice is empty, fall back to the
@@ -952,7 +952,7 @@ nothing; a shared business account gets sub-limits per card."*
 Networks retry, processors resend after a failover, and the paths an authorisation and its reversal take
 are not guaranteed to deliver in order. These are normal conditions, not edge cases.
 
-![Where it breaks: every arrival treated as new](diagrams/video-ch3-attack.pdf){width=100%}
+![Where it breaks: every arrival treated as new](video/svg/ch3-attack.svg){width=100%}
 
 **The fix: idempotency on the network reference, written with the hold.** The message table is keyed by
 the network's reference. Before acting, the decision service looks the reference up: if it is there, it
@@ -961,7 +961,7 @@ the original arrives, it is answered as the network expects (the network already
 and no hold is placed. The message record is written **in the same transaction as the hold** (the
 reserve of Challenge 2), so no crash can leave a hold without its message record or the reverse.
 
-![Reversal before authorisation](diagrams/video-seq-reversal.pdf){width=100%}
+![Reversal before authorisation](video/svg/seq-reversal.svg){width=100%}
 
 **Why it works.** S2: the effect is keyed by what the network calls the message, not by when it arrives.
 Retries return the same answer; order stops mattering.
@@ -1000,7 +1000,7 @@ second (30 % of 1,500) with limits we set months ago and no fraud score at all. 
 decision is unscored, 1,500 × 60 = 90,000 a minute, and a fraud ring that probes with small purchases
 notices within minutes.
 
-![Where it breaks: the model scorer](diagrams/video-ch4-attack.pdf){width=100%}
+![Where it breaks: the model scorer](video/svg/ch4-attack.svg){width=100%}
 
 **The fix: a budget per step and a fail-policy table.** Rules always run, in process, in about 10 ms.
 The model gets a 60 ms cut-off; at 60 ms the decision proceeds without it. What "without it" means is a
@@ -1017,7 +1017,7 @@ table, agreed in advance:
 Every cell has an **exposure cap per hour**: the most we accept losing while degraded. The decision
 service counts degraded approvals and their amounts against the cap, live.
 
-![The cut-off, then the table](diagrams/video-seq-ch4-cutoff.pdf){width=100%}
+![The cut-off, then the table](video/svg/seq-ch4-cutoff.svg){width=100%}
 
 **Why it works.** L1: the answer leaves inside 300 ms whatever the model does, because nothing waits past
 its slice. The quality loss is bounded by the cap, priced by the estimate in Stage 2, and owned.
@@ -1061,14 +1061,14 @@ hourly exposure cap. We answer in time and we know what that costs."*
 A burst of fraud on one stolen card is seconds apart, because it is a script. A stream processor's
 counters are seconds behind, because that is what streams are.
 
-![Where it breaks: features from the stream](diagrams/video-ch5-attack.pdf){width=100%}
+![Where it breaks: features from the stream](video/svg/ch5-attack.svg){width=100%}
 
 **The fix: two-speed features.** Burst counters are **updated inline**: per card, one-minute buckets;
 increment the current bucket and read the previous nine in one pipelined round trip, about a
 millisecond. Pattern features that can be seconds late come from the stream: distinct merchants for this
 card today, a merchant's decline rate in the last hour, a device seen on other cards in thirty days.
 
-![Inline counters and stream aggregates](diagrams/video-features.pdf){width=100%}
+![Inline counters and stream aggregates](video/svg/features.svg){width=100%}
 
 ```python
 def swipes_last_10_min(store, card_token: str, now_s: int) -> int:
@@ -1118,12 +1118,12 @@ merchants, on cards from one breach. A hotfix takes fifty minutes through review
 alternative, an analyst pushing `amount > 300 && mcc == electronics → decline` live at 02:20, declines
 9 % of all electronics purchases, almost all of them good customers.
 
-![Where it breaks: the rule path](diagrams/video-ch6-attack.pdf){width=100%}
+![Where it breaks: the rule path](video/svg/ch6-attack.svg){width=100%}
 
 **The fix: rules as versioned data, staged.** A rule is an expression in a small sandboxed language (no
 loops, no I/O, a time limit), with an owner and an expiry. It goes through four stages:
 
-![A rule's lifecycle](diagrams/video-rule-life.pdf){width=100%}
+![A rule's lifecycle](video/svg/rule-life.svg){width=100%}
 
 1. **Backtest** on ninety days of the decision archive with known labels: how much of the ring's fraud
    it catches, how many good purchases it declines.
@@ -1150,7 +1150,7 @@ owner: fraud-ops/night
 Every decision records the rule-set version it ran. Rollback is re-pointing every decision service to
 the previous version: seconds, no deploy.
 
-![The rollout as a sequence](diagrams/video-seq-ch6-rollout.pdf){width=100%}
+![The rollout as a sequence](video/svg/seq-ch6-rollout.svg){width=100%}
 
 **Why it works.** L3: minutes from idea to enforcement, not a release cycle. S3: the version is on every
 decision, so any decision can be explained and any version undone. The staged rollout bounds the blast
@@ -1189,7 +1189,7 @@ advices arrive. Account A-19 had \$35 available; stand-in approved \$60 and \$80
 −\$105. A check that refuses any write taking available below zero rejects those advices. The holds are
 missing; Thursday's clearing posts anyway; the books disagree with the network's.
 
-![Where it breaks: the invariant on the advice path](diagrams/video-ch7-attack.pdf){width=100%}
+![Where it breaks: the invariant on the advice path](video/svg/ch7-attack.svg){width=100%}
 
 **The fix: the ledger absorbs decisions we did not make.** Advices are always acknowledged and recorded,
 idempotently by network reference, as holds, even when they take the account past zero. Over-limit is a
@@ -1198,7 +1198,7 @@ customer is told, and collections take over if it persists. Then, the next morni
 replayed through our rules offline, not to reverse them, but to see which we would have declined and to
 tune the stand-in limits with risk.
 
-![Advices after an outage](diagrams/video-seq-ch7-advices.pdf){width=100%}
+![Advices after an outage](video/svg/seq-ch7-advices.svg){width=100%}
 
 **Why it works.** S1 is about *our* approvals. The network's decisions are facts to record (S2), never
 requests to refuse. A design whose invariant is "never below zero" is false by construction the first
@@ -1214,7 +1214,7 @@ posting target slips, with a status note to finance and support, not silently. A
 clearing, the authorisation store is **reconciled** with the ledger: for every account, posted balance
 in the authorisation store must equal the ledger's; any difference is a break with an owner.
 
-![Recording stand-in on the baseline](diagrams/video-ch7-fix.pdf){width=100%}
+![Recording stand-in on the baseline](video/svg/ch7-fix.svg){width=100%}
 
 ::: why
 **Why stand-in limits are a risk decision too.** Higher limits mean fewer declined good customers during
@@ -1245,7 +1245,7 @@ idempotently, and hold expiry waits for the day's file."*
 Nothing failed. Every box was healthy. The product, deciding yes or no well, was broken for half an
 hour.
 
-![Where it breaks: monitoring that watches boxes](diagrams/video-ch8-attack.pdf){width=100%}
+![Where it breaks: monitoring that watches boxes](video/svg/ch8-attack.svg){width=100%}
 
 **The fix: SLIs on decisions, not machines.**
 
@@ -1280,7 +1280,7 @@ hour.
 | 4 Then the model and its features | a stale feature looks like risk |
 | 5 Tell support and the status page | complaints arrive before alerts otherwise |
 
-![Probes and decision SLIs on the baseline](diagrams/video-ch8-fix.pdf){width=100%}
+![Probes and decision SLIs on the baseline](video/svg/ch8-fix.svg){width=100%}
 
 **Why it works.** The SLI measures what the cardholder experiences. A pair turns two metrics into one
 cause. And the runbook starts with the most common cause, which is also the cheapest to undo.

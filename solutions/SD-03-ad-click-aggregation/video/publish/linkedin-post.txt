@@ -1,6 +1,6 @@
 "Use exactly-once" is the answer that fails the ad-click question. The grade is on what you do instead.
 
-I've published a 72-minute reference solution for counting ad impressions and clicks at the Staff bar: theory, a three-version design, and six challenges, on 482 numbered slides.
+I've published a 57-minute reference solution for counting ad impressions and clicks at the Staff bar, run like a real round: one C4 diagram that evolves through six interviewer challenges, on 0 numbered slides.
 
 The idea that unlocks it: one log, one aggregation code run twice. Fast and provisional for the dashboard, exact and pinned for the bill, and every number replaced by key rather than incremented, so a retry, a replay or a fraud correction can never double anything.
 

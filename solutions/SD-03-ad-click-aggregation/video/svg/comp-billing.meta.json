@@ -1,0 +1,51 @@
+{
+  "key": "comp-billing",
+  "slot": "stage",
+  "viewbox": [
+    0.0,
+    0.0,
+    1800.0,
+    860.0
+  ],
+  "scale_1080p": 1.0,
+  "min_font_svg_px": 18.0,
+  "min_rendered_1080p_px": 18.0,
+  "min_px": 18.0,
+  "legibility_ok": true,
+  "forbidden_fonts_found": [],
+  "node_keys": [
+    "e:fraud",
+    "e:invo",
+    "e:live",
+    "e:lake",
+    "e:close",
+    "e:read",
+    "e:xdup",
+    "e:filt",
+    "e:price",
+    "e:write",
+    "e:adj",
+    "e:recon",
+    "e:bill"
+  ],
+  "edge_keys": [
+    "l:read-lake",
+    "l:close-read",
+    "l:read-xdup",
+    "l:xdup-filt",
+    "l:fraud-filt",
+    "l:filt-price",
+    "l:price-write",
+    "l:write-bill",
+    "l:write-adj",
+    "l:invo-adj",
+    "l:recon-write",
+    "l:recon-live"
+  ],
+  "unknown_aliases": [],
+  "canon": "c4:comp-billing",
+  "full": true,
+  "source": "comp-billing",
+  "overflow": [],
+  "renderer": "native"
+}

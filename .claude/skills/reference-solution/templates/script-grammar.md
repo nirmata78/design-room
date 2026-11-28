@@ -1,126 +1,62 @@
-# Script grammar — reference-solution video
+# Script grammar — reference-solution video (six-chapter, C4-first format)
 
-Speakers: `C` candidate (drives), `I` interviewer, `V` key line (slower), `N` coach (grading notes only).
-Cues as in the kit: `[slide: v-NN]`, `[pause: S]`. Angle brackets are slots to fill.
+Speakers: `C` candidate (drives), `I` interviewer, `V` key line (slower), `N` coach (grading notes, challenge intros, bridges).
+Write written forms (`API`, `202`, `ClickHouse`); the pronunciation map respells them for the voice and the Markdown keeps them.
 
-**Reveal markers (2026-11-21).** In the chapter sources, `[+]` reveals the next unit of the slide (a table row, a trace event, a
-card, a strip, the next box or arrow of the figure in request-flow order), `[+N]` the next N, `[+*]` the rest. Write one to three
-sentences after each marker, about exactly what it revealed. Lines before the first marker are spoken over the empty frame (title
-and header only). `gen.py` writes the `[slide:]`/`[reveal:]` cues and refuses a slide whose markers do not cover its units.
+**Reveal markers.** `[+]` reveals the next unit of the slide (a table row, a trace event, a card, a strip, the next box, arrow, pill
+or badge of the figure), `[+N]` the next N, `[+*]` the rest. One to three sentences after each marker, about exactly what it
+revealed. Lines before the first marker are spoken over the empty frame. `gen.py` refuses a slide whose markers do not cover its
+units; `REVEAL_REPORT=1 python3 gen.py` lists them all.
 
 ```
-<!-- voices: N=af_heart@0.92 I=bf_emma@0.95 C=am_michael@0.9 V=af_bella@0.86 E=af_sarah@0.94 -->  <!-- house set approved 2026-11-12: V = key line, E = aside (traps, then-and-now); see slide-video-kit STANDARD §2 -->
-<!-- labels: N=COACH -->
+## 1 Prompt, questions and context                    chapter(1, …)
+qs  prompt            I: <the prompt, verbatim>.
+dia hook              C: <one hour / one request / one record, three numbers>. The whole design is about <…>.
+plain graded          N: Five axes, one at a time.  [+] N: Requirements. Weak: … Strong: …  (×5)  [+] C: <the rule I keep all round>.
+key thesis            V: <thesis>.
+plain scale           C: The scale first.  [+] C: <volume>.  [+] C: <total>.  [+] C: <peak and cause>.  [+] C: Every number starts from these.
+qs clar ×4–6          C: <question>?  [+] I: <short, decisive answer>.  C: <what it moves in the design>.
+plain FRs · NFRs      one requirement per [+]
+plain properties      V: ps("S1"): <…>.  (one per [+]; liveness by C)
+plain scope           [+] C: In scope …  [+] C: Out, on purpose …  [+] C: <the one out-of-scope item worth saying aloud>.
+stage c4-context      C: Before any boxes inside it, the system in its context.  [+] one actor or system per step, naming HTTPS vs event.
+key core              V: The core is <N> things: <…>.   N: <what was graded in this chapter>.
 
-## 0 Cold open
-[slide: title]        C: <Problem> looks simple. It is not testing <the obvious thing>. It tests <3–5 real things>.
-[slide: graded]       N: Here is what the interviewer grades. <one sentence on where the signal is>
-[slide: ribbon]       C: I'll go in this order: scope, numbers, the theory, a simple design, then I break it.
+## 2 Estimates                                         chapter(2, …)
+plain table ×2–3      C: <topic>.  [+] C: <arithmetic from the scale line>. That rules out <X> and forces <Y>.  (one row per [+])
+dia budget            C: <the budget, stage by stage, and what the spare is for>.
 
-## 1 Requirements
-[slide: scale]        C: The scale first. <volume> a month, <total> over <retention>, and a peak of <peak> when <cause>.
-                      C: Every number I use later starts from one of these three.        (GUIDELINES §3.1)
-[slide: q-clarify]    C: Before I draw anything: <clarifying question>?
-                      I: <short, decisive answer>.
-                      (repeat for each question that changes the design; 4–6)
-[slide: fr]           C: Four functional requirements.  [+]  C: One, <FR1>.  [+]  C: Two, <FR2>. …
-[slide: nfr]          C: And the numbers: <NFR with value>, because <reason>.
-[slide: scope]        [+] C: In scope: …  [+] C: Out of scope: …, and I'm saying so on purpose.
-[slide: c4-context]   C: Before any boxes inside it, the system in its context.  [+] C: <person>: <what they do>.  [+] … (one actor or system per step; end on "nothing external sits on the hot path")
-[slide: core]         V: The core is <N> things: <…>.            [pause: 0.8]
+## 3 API and data model                                chapter(3, …)
+plain code            C: <endpoint>, serving FR<n>. <the fields that matter: idempotency key, status codes>.
+plain table           one endpoint per [+], tagged by FR
+dia erd               one table per [+]; end on the rule the keys enforce
+dia state             one state or transition per [+]  (when the core entity has a lifecycle)
 
-## 2 Estimates
-[slide: est-N]        C: <what this table sizes>, from <the scale-line number>.  [+] C: <quantity> times <quantity> is <result>, <label>. What it tells me: <decision>.  [+] …
+## 4 The design, driven by challenges                  chapter(4, …)
+stage v1              C: Version one, in the order a request travels.  [+] one box per step.  End: why it is correct.
+stage flow-v1         C: The happy path, numbered, once.  [+] One: …  (one arrow per step)
+tech ×1–2             ST.say("<id>")   (cards for V1's containers)
 
-## 3 Theory
-[slide: th-is]        C: What this is: <definition>. What it is not: <neighbour>, because <difference>.
-[slide: th-props]     V: Safety: <must never happen>. Liveness: <must eventually happen>.   [pause: 0.8]
-[slide: th-tension]   C: The tension is <A against B>. <walk the picture>
-[slide: th-mech-N]    (mech_slide: name + diagram-type pill, picture beside the four blocks; property spoken with ps())  C: <Mechanism>. It protects <property>. It works like this: <steps>.
-                      C: It rules out <failure>. It costs <cost>.
-[slide: th-matrix]    C: <N> ways to do this. <Row 1> fails when <…>. <Row 2> fails when <…>.
-                      V: I pick <row>. I give up <cost>.          [pause: 0.8]
-[slide: th-map]       C: Where each mechanism will live.  [+] C: <mechanism n>: <container>, <one clause>.  [+] … (a table, not a drawing: the system is drawn once, in chapter 5; the labels return as badges on it)
-[slide: th-seq]       C: Mechanism <n> at work.  [+] C: <message 1, at protocol level: the conditional write, the log append, the quorum>.  [+] …
-[slide: th-opt-X]     (option_slide: one per option, 3–6) C: Option <X>, <name>.  [+] pros, one per step.  [+] cons.  [+] each pitfall as a red box, said as what breaks.  Pick: V: I pick it, and it gives up <cost>.
-[slide: obj-vN]       (objection: a sequence of the failing case; the next version's C4 delta answers it) I: <the objection>.  [+] C: <message 1 of the failing case> … C: That is why V<N+1> adds <box>.
-[slide: ch9-followups] (followups) N: Questions to be ready for next.  [+] C: <question>, answered at <chapter / challenge>.
-                      C: <what it needs and does not need: no clock, no lock, no timeout>.
-[slide: th-failures]  C: What will go wrong.  [+] C: <F1>.  [+] C: <F2> … I'll come back to each.
+challenge(n, T, "<title>", "<the interviewer's question>", ["N: <one-sentence intro>"])
+trace                 C: The trace.  [+] one event per step, concrete IDs and numbers.  Last line: why the naive answer fails.
+dia/stage break       [+] C: <view>. <component> is marked.  [+] C: The naive answer: …  [+] C: But …   (pill, then the two strips)
+mech_slide            C: The mechanism.  [+] C: It protects ps(…).  [+] how  [+] rules out  [+] costs
+stage/dia sequence    one message per [+]   (when the mechanism is a protocol)
+stage vN | dia fix    C: <delta>.  [+] new box or FIX pill per step.  [+] C: one level down …  [+] covers / does not  [+] C: Rejected: <tool>. <why>.
+plain pseudo          C: As pseudocode, key lines marked.  C: Line n: …  C: Why it works: …
+tech                  ST.say("<id>")   (the first time this container matters)
+push                  I: <what if the fix fails / 10× / replay / the checker is wrong>?
+cards | dia           the second fix or the honest limit, one card per [+]
+say_slide             V: If asked, I'd say: <2–4 sentences>.   N: That fix creates the next question: <…>.
 
-## 4 API and entities
-[slide: api-N]        C: <endpoint>. It serves <FR>. It writes <entity>. On the wire: <walk request and response>.
+## 5 When you don't need all this                     chapter(5, …)
+dia alt               [+] C: <what goes away>.  [+] C: <the one cluster / box that does it all>.  [+] how  [+] what it gives up
+key crossover         C: <the arithmetic from chapter 2>.   V: Below <N>, I'd ship this, and say when I'd switch.
 
-## 5 High-level design
-[slide: v1]           C: Version one, the simplest thing that works: <walk boxes and arrows>.          (the canonical C4 container view, upto=1: its only full drawing)
-                      C: The objection: <what breaks or is missing>.
-[slide: v2]           C: Version two answers that: <what is new, and only that>.                     (new=2: carried boxes at once, then the new ones)
-[slide: v3]           C: … This is the baseline. From here on it only changes by deltas.
-[slide: c4-containers] C: <what a container means here>. In the order a request travels.          (the same picture, walked: not a second drawing)
-                      [+] C: <container>: <what it is>, <what it owns>, <its number from the estimates>, <what it is not>.  (≥ 40 words each)
-                      C: <read the layout: what sits on the hot path, what sits beside it>.
-[slide: flow-FRn]     [+] C: <FR> end to end.  [+] C: One: <arrow 1>.  [+] C: Two: <arrow 2> …
-[slide: seq-FRn]      C: As a sequence.  [+] C: <message 1>.  [+] C: <message 2> …   (one per functional requirement)
-
-## 5.1 Components and technologies
-[slide: card]         C: Now one level down: every container with what it runs on, and what I rejected.
-[slide: c4-tech]      [+] … one step per container, naming the product on its type line.
-[slide: c4-comp-X]    C: Inside <service>, in the order a request meets them.  [+] C: <component>: <library or mechanism>, <timeout or bound>. …
-[slide: tech-X]       [+] C: <container>: <product, size, topology>. <the exact write or read, the configuration that matters>.
-                      [+] C: Why: <the property that decides>.
-                      [+] C: Rejected: <named alternative>: <the property or failure that rules it out>.  (≥ 2; say "an honest equal" when it is)
-[slide: stack]        C: The stack on one slide.  [+] C: <container>: <choice>, because <deciding reason>.  [+] …
-                      N: Naming a product is not the signal. Naming the property that rules out its rival is.
-[slide: drill-q]      N: Swap seats: which box would you drill, and what is your one question? Pause and pick one.   [pause: 3.0]
-[slide: drill]        N: Here is where interviewers usually go.  [+] I: <box>. <probe>?  [pause: 1.2]  N: <what a strong answer names>.  (4–5 rows, from DRILL())
-
-## 5.2 When you don't need all this (alternate path, 3–4 min)
-[slide: alt]          C: Before I break it: below <crossover number>, I would not build all this.      (ALTERNATE, a delta on the canonical view)
-                      [+] C: <the simpler box>: <how it works, one level down>.
-                      [+] C: What it gives up: <the bottleneck>, <the failover gap or the window>.
-                      [+] C: The line: at <number from the scale line> the full design pays for itself.
-                      V: Below <N>, I'd ship the simple one, and say when I'd switch.   [pause: 0.8]
-
-## 6 Bridge
-[slide: bridge]       V: It works. The question now is where it breaks first.   [pause: 1.0]
-[slide: map]          C: <N> places. <name each on the baseline>
-
-## 7 Challenge k  (repeat 6–8 times)
-[slide: ck-q]         I: <the challenge, as a question>?            [pause: 2.0]
-[slide: ck-naive]     C: The first answer is <naive>. It holds when <condition>.
-[slide: ck-trace]     C: The trace.  [+] C: At <t0>, <event>.  [+] C: At <t1>, <event>.  [+] C: <the bad line>.  [+] C: <the hedge>.
-[slide: ck-break]     C: Here is where that lands: <component>, inside <container>.        (C4 component view, attack=, the rest dimmed)
-[slide: ck-fix]       C: The fix is <mechanism>: <how, on the picture>.                   (same view, fix= or a NEW component; "V4" tag if the design changed)
-                      [+] C: One level down: <what is written or appended, the key and the condition>.
-                      [+] C: It covers <failure>. It does not cover <failure>; <what does>.
-                      [+] C: Rejected: <the tool an interviewer would name>. <the property or failure that rules it out>.   (rejl(*REJ(k)))
-[slide: ck-seq/code]  C: <walk the numbered messages, or the key lines of the pseudocode: pseudo(src, hl=(…)); a real language only when its idiom is the point>
-[slide: ck-why]       C: Why it works: it protects <property> because <reason>.
-[slide: ck-q2]        I: And if <the fix itself fails>?              [pause: 1.5]
-[slide: ck-fix2]      C: Then <second mechanism or honest limit>. That costs <cost>.
-[slide: ck-say]       V: If asked, I'd say: "<2–4 sentences>."       [pause: 1.0]
-                      C: That fix creates the next question.
-
-## 8 Build cost (AUX)
-[slide: cost]         N: This part is the manager layer. In an IC round it is optional.
-                      C: Version one is <scope>, <people> for <months>. I'd buy <X>, build <Y>. The top risk is <Z>.
-
-## 9 Recap
-[slide: final]        C: <one sentence per path, on the clean diagram>
-[slide: mistakes]     N: The mistakes that cost most in this round: <3–5>.
-[slide: close]        V: <thesis, restated>.                          [pause: 1.0]
+## 6 Recap                                             chapter(6, …)
+stage recap           C: The final design.  [+] one mechanism badge per step.
+plain stack           ST.summary_say()  + N: naming a product is not the signal …
+plain mistakes        N: one mistake and its instead per [+]
+followups             C: one follow-up and where to start per [+]
+key close             V: <the thesis again>.   C: Thanks for watching. The written design, generated from this same script, is linked below.
 ```
-
-Rules that the grammar does not show:
-
-- At least 40–70 spoken words on every diagram slide; walk each box and each numbered arrow, in reveal order.
-- Versions follow the challenges: say the version when it changes ("this is version four"), and never when it does not.
-- A data model is narrated entity by entity, each relationship as it is drawn ("a user authors posts: one to many").
-- The narration carries the detail; the slide carries a few words (GUIDELINES §7.6). When a strip runs past two lines, cut the
-  strip, not the sentence.
-- One to three sentences per reveal step; more than ~12 steps on one slide means two slides.
-- Name the concrete technology wherever a box is mentioned after 5.1 (Redis, not "the cache"; etcd, not "the allocator").
-- The interviewer never praises and never names a mechanism first.
-- The coach speaks only on the slides marked `N` above.
-- A hedge once per chapter: "these numbers are illustrative" or "this is an initial target".
-- Count the words per chapter against the outline before building.

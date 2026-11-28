@@ -156,7 +156,7 @@ transaction while they watch, then events.
 
 ## The same story as a state machine
 
-![The application as a state machine. Each arrow is one committed row. The only atomic step is OFFERED → BOOKED.](diagrams/video-states.pdf){width=95%}
+![The application as a state machine. Each arrow is one committed row. The only atomic step is OFFERED → BOOKED.](video/svg/states.svg){width=95%}
 
 Read the picture left to right. **STARTED** means the application exists and nothing has been asked.
 **CHECKING** means vendor calls are out. From there, three exits: **OFFERED** (approved, priced),
@@ -172,7 +172,7 @@ compensating action, because a transfer can be reversed.
 
 ## The central contrast
 
-![Time against evidence against money: what waiting buys, and what it costs.](diagrams/video-tension.pdf){width=95%}
+![Time against evidence against money: what waiting buys, and what it costs.](video/svg/tension.svg){width=95%}
 
 In most systems the hard trade is between consistency and availability. Here it is between **time,
 evidence and money**. Waiting longer for a vendor adds evidence and approvals, and loses the sale at
@@ -200,7 +200,7 @@ The deadline is a ceiling, not a wait: when every required answer has arrived, t
 
 ## The whole design on one page
 
-![The final design. The counter path across the middle; the vault above; what happens after booking, and what we keep, along the bottom.](diagrams/video-base-final.pdf){width=100%}
+![The final design. The counter path across the middle; the vault above; what happens after booking, and what we keep, along the bottom.](video/svg/base-final.svg){width=100%}
 
 ## Where the load and the money land
 
@@ -358,7 +358,7 @@ sixty thousand, so what we do then is a policy, not an exception handler."
 | A 20-minute bureau outage at peak | 8 × 1,200 $\approx$ **9,600** applications; approve all $\approx$ **$11.5M** unscored; decline all $\approx$ 9,600 × 60 % × 70 % $\approx$ **4,000** lost loans | derived | Neither extreme: a capped policy (6.2) |
 | Latency budget | 150 + 50 + 2,000 + 100 + 80 + 70 + 50 + 200 = **2,700 ms**, spare 300 | initial target | One deadline; nothing optional on the path |
 
-![The latency budget from submit to offers on screen, with the vendor deadline as the largest slice.](diagrams/video-budget.pdf){width=95%}
+![The latency budget from submit to offers on screen, with the vendor deadline as the largest slice.](video/svg/budget.svg){width=95%}
 
 ::: why
 **Why the deadline is two seconds and not three.** The customer's promise is three seconds at the 95th
@@ -444,13 +444,13 @@ If the decision interface hides which data was missing, nobody can prove the pol
 
 ## The data model
 
-![The conceptual model: one application, many vendor calls, one decision, many offers, at most one loan.](diagrams/video-erd-chen.pdf){width=92%}
+![The conceptual model: one application, many vendor calls, one decision, many offers, at most one loan.](video/svg/erd-chen.svg){width=92%}
 
 Read the conceptual model aloud in one breath: *an applicant, known by a token, submits applications;
 each application makes paid vendor calls; each is decided once; a decision holds offers; an application
 books at most one loan; a loan is paid out by funding transfers.*
 
-![The physical tables. The record body lives in object storage under `record_uri`.](diagrams/video-erd-physical.pdf){width=100%}
+![The physical tables. The record body lives in object storage under `record_uri`.](video/svg/erd-physical.svg){width=100%}
 
 ```sql
 CREATE TABLE application (
@@ -497,7 +497,7 @@ aloud before drawing the next version: it shows the interviewer that each box ex
 
 ## Version 1: the simplest thing that works
 
-![V1: one application service calls the vendors one after another and writes the loan.](diagrams/video-base-v1.pdf){width=100%}
+![V1: one application service calls the vendors one after another and writes the loan.](video/svg/base-v1.svg){width=100%}
 
 The point of sale calls an application service, which calls the identity vendor, then the bureau, runs a
 scoring function and writes the application and, on acceptance, the loan. It would work in a demo.
@@ -508,7 +508,7 @@ scoring function and writes the application and, on acceptance, the loan. It wou
 
 ## Version 2: one deadline, one state machine, one atomic step
 
-![V2: an orchestrator calls vendors in parallel under one deadline; the application is a state machine; booking writes an outbox row.](diagrams/video-base-v2.pdf){width=100%}
+![V2: an orchestrator calls vendors in parallel under one deadline; the application is a state machine; booking writes an outbox row.](video/svg/base-v2.svg){width=100%}
 
 Three changes, each answering one objection. A **decision orchestrator** sends all vendor calls at once
 and decides at a deadline, with a circuit breaker per vendor. The **application becomes a state machine**
@@ -523,7 +523,7 @@ The scoring function becomes a **versioned policy engine**: model, policy rules,
 
 ## Version 3: regulated, explainable, owned
 
-![V3: the vault, decision records, the policy table inside the policy engine, funding and servicing consuming LoanBooked.](diagrams/video-base-v3.pdf){width=100%}
+![V3: the vault, decision records, the policy table inside the policy engine, funding and servicing consuming LoanBooked.](video/svg/base-v3.svg){width=100%}
 
 The **identity vault** tokenises at apply and detokenises only inside the vendor adapters, which need
 the real values for the call. **Decision records** go to encrypted object storage, written once. The
@@ -537,7 +537,7 @@ the real values for the call. **Decision records** go to encrypted object storag
 
 **FR1 · Apply.**
 
-![FR1: apply. The identity is tokenised before anything else sees it.](diagrams/video-flow-fr1.pdf){width=100%}
+![FR1: apply. The identity is tokenised before anything else sees it.](video/svg/flow-fr1.svg){width=100%}
 
 1. The phone posts the application with an idempotency key.
 2. The API edge tokenises identity in the vault (or the phone posts identity to the vault directly and
@@ -549,7 +549,7 @@ the real values for the call. **Decision records** go to encrypted object storag
 
 **FR2 · Decide.**
 
-![FR2: decide. Everything at once, one deadline, a record written once.](diagrams/video-flow-fr2.pdf){width=100%}
+![FR2: decide. Everything at once, one deadline, a record written once.](video/svg/flow-fr2.svg){width=100%}
 
 1. The application service asks the orchestrator to decide, with a deadline.
 2. The vendor adapters detokenise the identity in the vault for the calls that need it.
@@ -562,7 +562,7 @@ the real values for the call. **Decision records** go to encrypted object storag
 
 **FR3 · Accept and book.**
 
-![FR3: accept and book. One transaction.](diagrams/video-flow-fr3.pdf){width=100%}
+![FR3: accept and book. One transaction.](video/svg/flow-fr3.svg){width=100%}
 
 1. The phone posts accept with the offer and the disclosure version, and an idempotency key.
 2. The API edge passes it to the application service.
@@ -573,7 +573,7 @@ the real values for the call. **Decision records** go to encrypted object storag
 
 **FR4 · Fund and hand off.**
 
-![FR4: fund and hand off. After the customer has left the counter.](diagrams/video-flow-fr4.pdf){width=100%}
+![FR4: fund and hand off. After the customer has left the counter.](video/svg/flow-fr4.svg){width=100%}
 
 1. The booking transaction has written the outbox row.
 2. The relay publishes LoanBooked to the event log.
@@ -582,9 +582,9 @@ the real values for the call. **Decision records** go to encrypted object storag
 
 ## The C4 views
 
-![Context: the customer and the merchant on the left; vendors, the partner bank and servicing on the right.](diagrams/video-c4-context.pdf){width=92%}
+![Context: the customer and the merchant on the left; vendors, the partner bank and servicing on the right.](video/svg/c4-context.svg){width=92%}
 
-![Containers. Every container exists for one reason.](diagrams/video-c4-containers.pdf){width=100%}
+![Containers. Every container exists for one reason.](video/svg/c4-containers.svg){width=100%}
 
 | Container | Why it is separate |
 |---|---|
@@ -600,9 +600,9 @@ the real values for the call. **Decision records** go to encrypted object storag
 
 ## The two core sequences
 
-![Apply and decide: submit, then everything at once, then one record.](diagrams/video-seq-decide.pdf){width=95%}
+![Apply and decide: submit, then everything at once, then one record.](video/svg/seq-decide.svg){width=95%}
 
-![Accept and book: one transaction, then at-least-once publishing.](diagrams/video-seq-book.pdf){width=95%}
+![Accept and book: one transaction, then at-least-once publishing.](video/svg/seq-book.svg){width=95%}
 
 The gather step, in code:
 
@@ -675,7 +675,7 @@ Every container with the technology it runs on, how it is built, the alternative
 
 ## The orchestrator, one level down
 
-![C4 level 3, the decision orchestrator: the gather owns one deadline; tier-0 checks run first; one adapter per vendor with a breaker and a token bucket; the policy client sends the features and the list of what is missing; one record per decision; late answers are kept.](diagrams/video-c4-comp-orch.pdf){width=100%}
+![C4 level 3, the decision orchestrator: the gather owns one deadline; tier-0 checks run first; one adapter per vendor with a breaker and a token bucket; the policy client sends the features and the list of what is missing; one record per decision; late answers are kept.](video/svg/c4-comp-orch.svg){width=100%}
 
 The orchestrator is the box the challenges open most (6.1, 6.2, 6.8), so it gets a component view. The **gather**
 holds one context deadline for the whole decision. **Tier-0 checks** run in process before anything is paid for.
@@ -819,7 +819,7 @@ Each fix in Stage 6 rejects one tool by name:
 
 ## When you don't need all this (the alternate path)
 
-![The alternate path changes one box: one bureau, and refer whatever is missing at the deadline.](diagrams/video-alt.pdf){width=90%}
+![The alternate path changes one box: one bureau, and refer whatever is missing at the deadline.](video/svg/alt.svg){width=90%}
 
 **The simpler design.** Keep the orchestrator, the deadline, the state machine and the atomic booking. Contract
 **one bureau**, and give the missing-data policy one rule: anything missing at the deadline is referred.
@@ -841,7 +841,7 @@ minimums, integration and its adapter's on-call. The two meet at A $\approx$ 330
 The bridge sentence, said aloud: **"It works. Where does it break first?"** Then show the challenge map
 and take the challenges in an order where each fix creates the next question.
 
-![The challenge map: eight attack points on the same baseline.](diagrams/video-map.pdf){width=100%}
+![The challenge map: eight attack points on the same baseline.](video/svg/map.svg){width=100%}
 
 | # | Challenge | Kind | Mechanism that answers it |
 |---|---|---|---|
@@ -863,7 +863,7 @@ counter see?"*
 take whichever answers first." Hedged requests are a good answer for an internal read-only service. They
 are the wrong answer here, and the interviewer asked the question to find out whether you know why.
 
-![The vendors break: waiting misses the promise; racing pays twice.](diagrams/video-ch1-attack.pdf){width=100%}
+![The vendors break: waiting misses the promise; racing pays twice.](video/svg/ch1-attack.svg){width=100%}
 
 **The case.**
 
@@ -883,7 +883,7 @@ bureaus doubles the bill for every slow call and can hurt the very customer you 
 
 **The fix: scatter-gather under one deadline, and a breaker per vendor.**
 
-![The orchestrator owns time: one deadline, a breaker per vendor.](diagrams/video-ch1-fix.pdf){width=100%}
+![The orchestrator owns time: one deadline, a breaker per vendor.](video/svg/ch1-fix.svg){width=100%}
 
 All required calls go out at once. The orchestrator decides at the deadline (2.0 s from the start of the
 calls) with what has arrived; if everything arrives earlier, it decides earlier. Each vendor adapter has a
@@ -892,7 +892,7 @@ opens and the adapter stops calling that vendor for everyone, so no customer wai
 known to be failing. The second bureau is called **only after an error or an open breaker**, never as a
 race against a slow but healthy first call.
 
-![The gather in time: the late answer is recorded and used to finish a refer.](diagrams/video-seq-ch1-gather.pdf){width=95%}
+![The gather in time: the late answer is recorded and used to finish a refer.](video/svg/seq-ch1-gather.svg){width=95%}
 
 **Why it works.** L1 (an answer within the deadline) is bounded by the deadline, not by the slowest
 vendor. S4 (at most one pull per bureau per application) holds because a second bureau is asked only
@@ -941,7 +941,7 @@ counter?"*
 **The naive answers.** "Approve with whatever data we have" or "decline until it's back." Both are
 engineering decisions about credit risk, made in a catch block.
 
-![The vendors and the policy break together: both extremes are expensive.](diagrams/video-ch2-attack.pdf){width=100%}
+![The vendors and the policy break together: both extremes are expensive.](video/svg/ch2-attack.svg){width=100%}
 
 **The case.** From 11:00 to 11:20 on Saturday, at about 8 applications a second: 8 × 1,200 s $\approx$ 9,600
 applications. Approve all of them without a credit file and we offer about 9,600 × $1,200 $\approx$ $11.5M of
@@ -951,9 +951,9 @@ applicant.
 
 **The fix: a missing-data policy table, signed by credit risk.**
 
-![The policy engine holds a signed table for missing data.](diagrams/video-ch2-fix.pdf){width=100%}
+![The policy engine holds a signed table for missing data.](video/svg/ch2-fix.svg){width=100%}
 
-![Four answers, in order, each with its own cap.](diagrams/video-policy.pdf){width=100%}
+![Four answers, in order, each with its own cap.](video/svg/policy.svg){width=100%}
 
 1. **The second bureau**, after the breaker on the first has opened. Not a race: the first is known to be
    failing.
@@ -968,7 +968,7 @@ Each row is a versioned setting in the policy, with a counter per row and a dash
 risk and approved by the partner bank as part of the credit policy. Engineering builds the mechanism;
 credit risk owns the numbers.
 
-![A referred application finished by text when a bureau answers.](diagrams/video-seq-ch2-refer.pdf){width=95%}
+![A referred application finished by text when a bureau answers.](video/svg/seq-ch2-refer.svg){width=95%}
 
 **Why it works.** S2 holds: nobody is declined for our outage. L1 holds: everybody gets an answer (an
 offer, a refer, a reasoned decline) within the deadline. And the exposure is bounded by arithmetic: the
@@ -1002,7 +1002,7 @@ merchant's tablet. How many loans?"*
 **The naive answers.** "Check whether a loan exists, and create one if it doesn't." Or: "an orchestrated
 saga with a compensating action for each step."
 
-![The application service and the database break: two workers, one application.](diagrams/video-ch3-attack.pdf){width=100%}
+![The application service and the database break: two workers, one application.](video/svg/ch3-attack.svg){width=100%}
 
 **The case.**
 
@@ -1020,7 +1020,7 @@ Check-then-insert does not save it either: both checks ran before either insert.
 
 **The fix: one local transaction.**
 
-![The database decides: a conditional update, a unique loan, the outbox row in the same commit.](diagrams/video-ch3-fix.pdf){width=100%}
+![The database decides: a conditional update, a unique loan, the outbox row in the same commit.](video/svg/ch3-fix.svg){width=100%}
 
 ```sql
 BEGIN;
@@ -1076,7 +1076,7 @@ What do you undo?"*
 **The naive answer.** "Roll back the saga: cancel the loan, reverse the credit check, delete the
 application."
 
-![Funding breaks after the customer has left.](diagrams/video-ch4-attack.pdf){width=100%}
+![Funding breaks after the customer has left.](video/svg/ch4-attack.svg){width=100%}
 
 **The case.** At 14:31 loan `ln_5531` is booked. At 18:00 the daily funding batch sends $1,164 (the
 $1,200 less a 3 % merchant fee) to the merchant. At 18:02 the bank returns *account closed*. At 18:03 a
@@ -1085,7 +1085,7 @@ safe" would pay the second merchant twice if its first attempt actually went thr
 
 **The fix: funding as its own state machine, with UNKNOWN as a state.**
 
-![Funding owns its states; reconciliation closes the gaps.](diagrams/video-ch4-fix.pdf){width=100%}
+![Funding owns its states; reconciliation closes the gaps.](video/svg/ch4-fix.svg){width=100%}
 
 | State | Meaning | Next |
 |---|---|---|
@@ -1101,7 +1101,7 @@ UNKNOWN is to ask, not to send. A *returned* transfer goes to merchant operation
 and a new attempt is sent with a new attempt number. The loan itself is cancelled only if the goods were
 not delivered, and that is a business decision with the merchant, not a rollback.
 
-![The unknown transfer, resolved by the next day's file rather than by a resend.](diagrams/video-seq-ch4-fund.pdf){width=95%}
+![The unknown transfer, resolved by the next day's file rather than by a resend.](video/svg/seq-ch4-fund.svg){width=95%}
 
 **Why it works.** L2 (every booked loan eventually funded, with one effect): the loan ID is the
 idempotency key end to end, and UNKNOWN keeps "maybe paid" from becoming "paid twice".
@@ -1126,7 +1126,7 @@ progress*, not a guess.
 
 **The naive answer.** "Re-run the model on the customer's data."
 
-![The policy engine only knows today.](diagrams/video-ch5-attack.pdf){width=100%}
+![The policy engine only knows today.](video/svg/ch5-attack.svg){width=100%}
 
 **The case.** In January 2026, application `ap_204` was declined by model v9 under policy v31, with
 reasons *high utilisation* and *short history*, and the customer was sent a notice saying so. In March
@@ -1135,9 +1135,9 @@ says one thing and a replay that says another, and neither tells the regulator w
 
 **The fix: an immutable decision record.**
 
-![The record is written once by the orchestrator.](diagrams/video-ch5-fix.pdf){width=100%}
+![The record is written once by the orchestrator.](video/svg/ch5-fix.svg){width=100%}
 
-![What a decision record holds.](diagrams/video-record.pdf){width=100%}
+![What a decision record holds.](video/svg/record.svg){width=100%}
 
 Every decision writes, once, a record of three parts. **Inputs, frozen**: the bureau report stored
 encrypted and referenced, the identity and fraud results, our internal history *as of that moment*, the
@@ -1147,7 +1147,7 @@ the ranked reasons, the degraded path taken, the timings and the deadline. Old m
 loadable in a registry. A replay job runs every night on a sample of records: it loads the versions,
 re-scores the frozen features and alarms on any difference.
 
-![The replay: load the record, load the old versions, re-score, compare.](diagrams/video-seq-ch5-replay.pdf){width=95%}
+![The replay: load the record, load the old versions, re-score, compare.](video/svg/seq-ch5-replay.svg){width=95%}
 
 **The rulebook, by name.** A record rather than a log line, because each rule reads a specific part of it.
 General, not legal advice: compliance owns the reading of each rule.
@@ -1193,7 +1193,7 @@ predicted loss. Roll it out."*
 
 **The naive answers.** "Shadow mode for a week; it looks good; switch it on." Or "a fifty-fifty A/B test."
 
-![The policy engine is where the risk of a new model lands.](diagrams/video-ch6-attack.pdf){width=100%}
+![The policy engine is where the risk of a new model lands.](video/svg/ch6-attack.svg){width=100%}
 
 **The case.** Six percent of two million is 120,000 more approvals a month; at 70 % take-up, about 84,000
 more loans, about $100M a month of new exposure. The first payments of those loans fall due in two to four
@@ -1202,9 +1202,9 @@ about whether the newly approved people repay. A fifty-fifty test puts $50M a mo
 
 **The fix: champion and challenger, in steps that each see what the one before cannot.**
 
-![A challenger beside the champion, deciding only a capped slice.](diagrams/video-ch6-fix.pdf){width=100%}
+![A challenger beside the champion, deciding only a capped slice.](video/svg/ch6-fix.svg){width=100%}
 
-![From backtest to a policy change.](diagrams/video-rollout.pdf){width=100%}
+![From backtest to a policy change.](video/svg/rollout.svg){width=100%}
 
 1. **Backtest** on labelled history: approval and loss on past loans the old model approved.
 2. **Shadow**: both models score every application; only the champion acts. Compare approval rates and
@@ -1238,7 +1238,7 @@ get?"*
 
 **The naive answers.** "A copy of the database; we encrypt it at rest." Or "we drop the name column."
 
-![Identity spread through rows, logs and exports.](diagrams/video-ch7-attack.pdf){width=100%}
+![Identity spread through rows, logs and exports.](video/svg/ch7-attack.svg){width=100%}
 
 **The case.** In V2 the application table holds a social security number, a date of birth and an address.
 A debug log line in the bureau adapter prints the full request. The support tool shows the full number to
@@ -1248,9 +1248,9 @@ protects a stolen disk; it does nothing for a query, a log line or an export.
 
 **The fix: an identity vault with tokens.**
 
-![Only the vault and the vendor adapters see real values.](diagrams/video-ch7-fix.pdf){width=100%}
+![Only the vault and the vendor adapters see real values.](video/svg/ch7-fix.svg){width=100%}
 
-![The boundary, drawn small on purpose.](diagrams/video-vault.pdf){width=95%}
+![The boundary, drawn small on purpose.](video/svg/vault.svg){width=95%}
 
 Identity is tokenised at apply. Only two things sit inside the boundary: the vault itself and the vendor
 adapters, which must send the real values to the bureau and the identity vendor. Every detokenise is
@@ -1282,7 +1282,7 @@ makes it reliable; resist every feature request that would grow it.
 
 **The naive answer.** "Error rate, latency and CPU."
 
-![The change that broke decisions raised no error.](diagrams/video-ch8-attack.pdf){width=100%}
+![The change that broke decisions raised no error.](video/svg/ch8-attack.svg){width=100%}
 
 **The case.** At 18:00 on Friday a pricing-table change maps one bureau field wrongly. No errors; latency
 is fine; CPU is flat. The approval rate across all merchants drops from 62 % to 41 %. At about two
@@ -1292,7 +1292,7 @@ each with a notice. It is found at 09:00 on Saturday when merchants start callin
 
 **The fix: SLIs on the promise and on the decision, read in pairs.**
 
-![What to watch: the decision, the fallbacks, the money.](diagrams/video-ch8-fix.pdf){width=100%}
+![What to watch: the decision, the fallbacks, the money.](video/svg/ch8-fix.svg){width=100%}
 
 | SLI | Why it pages |
 |---|---|
@@ -1425,7 +1425,7 @@ policy table, because they decide whether the counter promise can be kept.
 
 **Team seams.**
 
-![Six owners, three contracts.](diagrams/video-teams.pdf){width=95%}
+![Six owners, three contracts.](video/svg/teams.svg){width=95%}
 
 Applications and origination own the state machine and booking. The decisioning platform owns the
 orchestrator, the policy engine and model serving. Vendor integrations own the adapters, the contracts and

@@ -1,0 +1,13 @@
+[
+  [
+    "e:stream",
+    "p:new:stream",
+    "l:stream-log"
+  ],
+  [
+    "e:live",
+    "p:new:live",
+    "l:stream-live",
+    "l:api-live"
+  ]
+]

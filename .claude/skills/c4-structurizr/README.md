@@ -1,6 +1,6 @@
 # `c4-structurizr`
 
-Containerized, local-first C4 architecture diagramming skill for **Claude CLI**, **Antigravity (Gemini)**, and **Grok**. Converts **Structurizr DSL** workspaces into `1920×1080`-ready normalized SVGs, `@2x` PNGs, and **Mode A** progressive cross-dissolve MP4 videos (`visibility: hidden` + `0.35s` fade, optional `--ghost 0.0..1.0`).
+Containerized, local-first C4 architecture diagramming skill for **Claude CLI**, **Antigravity (Gemini)**, and **Grok**. Converts **Structurizr DSL** workspaces into `1920×1080`-ready SVGs drawn in the c4model.com style with Google colours (the native renderer, `scripts/c4draw.py`, laid out on a per-view grid), `@2x` PNGs, and **Mode A** progressive cross-dissolve MP4 videos (`visibility: hidden` + `0.35s` fade, optional `--ghost 0.0..1.0`).
 
 ## Multi-Agent Discovery
 - **Claude CLI:** `.claude/skills/c4-structurizr/SKILL.md`
@@ -14,7 +14,7 @@ Containerized, local-first C4 architecture diagramming skill for **Claude CLI**,
 .claude/skills/c4-structurizr/scripts/c4_runtime.sh ensure
 .claude/skills/c4-structurizr/scripts/c4_runtime.sh healthcheck
 
-# 2. Validate, export, normalize, and gate-check a workspace
+# 2. Validate, export (JSON), draw every view and gate-check a workspace
 pdf-kit/.venv/bin/python .claude/skills/c4-structurizr/scripts/render_c4.py \
   --dsl path/to/workspace.dsl \
   --spec path/to/views.json \

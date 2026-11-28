@@ -149,7 +149,7 @@ ask "what is that?", the answer is here.
 Before any architecture, here is the product from the fan's side. Every box in the architecture
 exists to make one of these steps work under load.
 
-![User journey, part 1: from opening the page to being admitted. The fan spends most of the on-sale here, and the waiting room serves this whole phase without touching the database.](diagrams/sd47-journey-1-queue.pdf){width=62%}
+![User journey, part 1: from opening the page to being admitted. The fan spends most of the on-sale here, and the waiting room serves this whole phase without touching the database.](diagrams/sd47-journey-1-queue.svg)
 
 **Step by step, with what the screen shows:**
 
@@ -170,7 +170,7 @@ exists to make one of these steps work under load.
 
 For the ~29,000 fans with low numbers, the story continues:
 
-![User journey, part 2: from admission to tickets. Only ~10,000 fans are in this phase at any moment, which is why the database survives.](diagrams/sd47-journey-2-buy.pdf){width=85%}
+![User journey, part 2: from admission to tickets. Only ~10,000 fans are in this phase at any moment, which is why the database survives.](diagrams/sd47-journey-2-buy.svg)
 
 5. **Admitted.** The browser swaps the queue token for an **admission token** valid for 10 minutes.
    It downloads the venue layout (immutable, from the CDN) and the **availability bitmap**, which shows
@@ -186,7 +186,7 @@ For the ~29,000 fans with low numbers, the story continues:
 
 ## The funnel: who gets what
 
-![Where a million fans end up. The design is mostly about the red box.](diagrams/sd47-funnel.pdf){width=72%}
+![Where a million fans end up. The design is mostly about the red box.](diagrams/sd47-funnel.svg)
 
 ::: why
 **Why only ~29,000 admitted, if 1,000,000 are waiting?** Admitting more than can possibly buy is
@@ -203,7 +203,7 @@ The single most useful picture for the round. **Three paths with three different
 the waiting path is huge and served from cache, the read path is large and may be a second stale,
 and the write path is small and must be correct.
 
-![Load map at the on-sale peak. Each arrow carries its request rate. The only component that must be strictly correct, PostgreSQL, sees the smallest number.](diagrams/sd47-load-map.pdf){width=68%}
+![Load map at the on-sale peak. Each arrow carries its request rate. The only component that must be strictly correct, PostgreSQL, sees the smallest number.](diagrams/sd47-load-map.svg)
 
 ::: load
 **Read the numbers top to bottom: 100,000 → 200 → 33 → 5,000 → 500 → 25.** Each layer exists to
@@ -706,14 +706,14 @@ store green, queue orange, cache yellow, external grey. Red is only failure; a g
 One API and one database. A seat table with a status column. The API reads the seat; if it is available it writes the
 fan's name. For a small venue with a quiet sale this is enough, and saying so is part of the answer.
 
-![V1: one API, one table, read then write.](diagrams/video-base-v1.pdf){width=80%}
+![V1: one API, one table, read then write.](video/svg/base-v1.svg){width=80%}
 
 **The objection.** Two fans can both read "available" and both write. There is no state for "someone is paying", so
 a lock would have to be held for the whole checkout. And a million requests land straight on the table.
 
 ## V2 · A third state, a conditional claim, and a separate order path
 
-![V2: the claim, the hold, and checkout behind it. New boxes outlined blue.](diagrams/video-base-v2.pdf){width=90%}
+![V2: the claim, the hold, and checkout behind it. New boxes outlined blue.](video/svg/base-v2.svg){width=90%}
 
 The seat gets a third state and an expiry; the claim becomes **one conditional update**. Checkout moves to its own
 **order service**, which freezes the seats, calls the **payment provider** and only then sells. The two paths are
@@ -724,7 +724,7 @@ read from the same database that the claims lock.
 
 ## V3 · An edge, a waiting room, a seat-map pipeline
 
-![V3: the shape that survives the sale. New boxes outlined blue.](diagrams/video-base-v3.pdf){width=100%}
+![V3: the shape that survives the sale. New boxes outlined blue.](video/svg/base-v3.svg){width=100%}
 
 Three additions, each with a job:
 
@@ -747,29 +747,29 @@ waiting room, which draws a random score and returns a signed queue token. (3) T
 computes their own position; when the pointer reaches them, `admit` exchanges the queue token for a ten-minute admission
 token.
 
-![FR1](diagrams/video-flow-fr1.pdf){width=85%}
+![FR1](video/svg/flow-fr1.svg){width=85%}
 
 **FR2 · Browse.** (1) Request. (2) The layout comes from the CDN, immutable; the availability comes from the seat-map
 cache by version, with a 304 when nothing changed. (3) Response.
 
-![FR2](diagrams/video-flow-fr2.pdf){width=85%}
+![FR2](video/svg/flow-fr2.svg){width=85%}
 
 **FR3 · Hold.** (1) Request with the admission token and an idempotency key. (2) The gateway checks the token. (3) The
 API sends one conditional claim, all or nothing. (4) The database answers won or lost. (5) The API answers `201` with an
 expiry, or `409` with a fresh bitmap. (6) The response.
 
-![FR3](diagrams/video-flow-fr3.pdf){width=85%}
+![FR3](video/svg/flow-fr3.svg){width=85%}
 
 **FR4 · Pay and ticket.** (1) `POST /orders` reaches the order service. (2) It **freezes** the seats before calling the
 provider. (3) It authorizes. (4) The provider answers approved, declined, or nothing. (5) A silent answer becomes
 *unknown*, and the reconciler asks again. The seats are sold only on an approved authorization.
 
-![FR4](diagrams/video-flow-fr4.pdf){width=90%}
+![FR4](video/svg/flow-fr4.svg){width=90%}
 
 **FR5 · Expiry and release.** (1) The sweeper releases expired holds in small batches. (2) The same transaction writes
 an outbox row. (3) The released seat is announced and can go to a fan on the waitlist.
 
-![FR5](diagrams/video-flow-fr5.pdf){width=90%}
+![FR5](video/svg/flow-fr5.svg){width=90%}
 
 ## The C4 views, and the sequences, follow in the pages below
 
@@ -788,9 +788,9 @@ Draw the context first (30 seconds), then the containers, then **walk one reques
 interview you draw L1 in seconds, spend your time on L2, and zoom to L3 only in a deep dive.
 :::
 
-![C4 Level 1: system context. Two external dependencies decide the shape of the design: the PSP (slow, sometimes silent) and the edge (where bots are stopped and polling is absorbed).](diagrams/sd47-c4-context.pdf){width=100%}
+![C4 Level 1: system context. Two external dependencies decide the shape of the design: the PSP (slow, sometimes silent) and the edge (where bots are stopped and polling is absorbed).](diagrams/sd47-c4-context.svg)
 
-![C4 Level 2: containers. Three separate paths: the queue path (Redis, cached at the CDN), the read path (snapshots built from the event stream) and the write path (PostgreSQL, one shard per hot event).](diagrams/sd47-c4-container.pdf){height=62%}
+![C4 Level 2: containers. Three separate paths: the queue path (Redis, cached at the CDN), the read path (snapshots built from the event stream) and the write path (PostgreSQL, one shard per hot event).](diagrams/sd47-c4-container.svg)
 
 **Every container, and why it's separate:**
 
@@ -1047,7 +1047,7 @@ payment that arrives late; a million at the door; bots; ten thousand shoppers re
 the plan; or a failure nobody can see. These are the eight attack points on the baseline, taken in an order where
 **each fix creates the next question.**
 
-![The challenge map: eight attack points on the same baseline.](diagrams/video-map.pdf){width=100%}
+![The challenge map: eight attack points on the same baseline.](video/svg/map.svg){width=100%}
 
 \newpage
 
@@ -1073,7 +1073,7 @@ SQL and the code.
 | **If the fix fails** | A bug elsewhere issues a second ticket, or the primary fails over mid-claim. |
 | **Second fix** | `UNIQUE (event_id, seat_id)` on the ticket rejects the second insert, independently of our code. On failover, a synchronous replica: an unacknowledged claim never became a hold. |
 
-![Attack and fix on the baseline.](diagrams/video-ch1-fix.pdf){width=85%}
+![Attack and fix on the baseline.](video/svg/ch1-fix.svg){width=85%}
 
 ::: {.key title="If asked, I would say"}
 One conditional update is the check and the change, all or nothing, with rows locked in a stable order. The loser
@@ -1091,7 +1091,7 @@ and another writer slips in between them.
 conditional `UPDATE` whose `WHERE` clause is the check. Whoever's update commits first wins; the
 other's condition is false and it changes zero rows.
 
-![Two fans, one seat. Fan A locks first and wins. Fan B fails immediately because of NOWAIT; without NOWAIT it would wait a few milliseconds and then match zero rows.](diagrams/sd47-seq-hold-race.pdf){width=78%}
+![Two fans, one seat. Fan A locks first and wins. Fan B fails immediately because of NOWAIT; without NOWAIT it would wait a few milliseconds and then match zero rows.](diagrams/sd47-seq-hold-race.svg)
 
 ```sql
 BEGIN;
@@ -1189,7 +1189,7 @@ carries C's `hold_id`. When A comes back and submits an order, the freeze step (
 expired"*. **The seat row is the truth; the hold row is bookkeeping.**
 :::
 
-![C4 Level 3: inside the inventory service. The claim engine and the outbox writer share one database transaction.](diagrams/sd47-c4-component.pdf){width=100%}
+![C4 Level 3: inside the inventory service. The claim engine and the outbox writer share one database transaction.](diagrams/sd47-c4-component.svg)
 
 > "The claim is one conditional UPDATE, all-or-nothing, with rows locked in sorted order and NOWAIT,
 > so a loser fails in milliseconds and gets a fresh map with the 409. Expired holds are claimable
@@ -1225,7 +1225,7 @@ a conditional update, so just write the conditional update.
 | **If the fix fails** | The sweeper releases a seat a buyer is paying for. |
 | **Second fix** | The predicate says `state = 'HELD'`: a seat in `PAYMENT_PENDING` is never touched. A sweeper that is down costs *staleness, not oversell*; alert on the age of the oldest expired hold above 30 seconds. |
 
-![The sweeper and the lazy path.](diagrams/video-ch2-fix.pdf){width=85%}
+![The sweeper and the lazy path.](video/svg/ch2-fix.svg){width=85%}
 
 ::: {.key title="If asked, I would say"}
 Two expiry paths, each covering the other's gap. The claim treats an expired hold as free, so correctness does not
@@ -1241,7 +1241,7 @@ first fan is paying.
 
 **The mechanism: two expiry paths, each covering the other's gap.**
 
-![Lazy expiry and the sweeper. Fan C claims an expired seat directly; the sweeper releases seats nobody tried and announces them so the map shows them free.](diagrams/sd47-seq-expiry.pdf){width=88%}
+![Lazy expiry and the sweeper. Fan C claims an expired seat directly; the sweeper releases seats nobody tried and announces them so the map shows them free.](diagrams/sd47-seq-expiry.svg)
 
 1. **Lazy expiry** is the `OR (state = 'HELD' AND hold_expires_at < now())` in the claim predicate
    (challenge 1). An expired hold is claimable the instant it expires, whether or not any job has run.
@@ -1289,7 +1289,7 @@ the map shows them as taken, so fans don't click them and the sell-through slows
 **age of the oldest expired hold**: anything above 30 seconds means the sweeper isn't keeping up.
 :::
 
-![Seat state machine. PAYMENT_PENDING is the state weak designs miss; the sweeper never touches it.](diagrams/sd47-seat-states.pdf){width=55%}
+![Seat state machine. PAYMENT_PENDING is the state weak designs miss; the sweeper never touches it.](diagrams/sd47-seat-states.svg)
 
 > "Two expiry paths. The claim predicate treats an expired hold as free, so correctness doesn't
 > depend on a job. A sweeper with SKIP LOCKED releases expired holds in small batches and publishes
@@ -1315,7 +1315,7 @@ the map shows them as taken, so fans don't click them and the sell-through slows
 | **If the fix fails** | The provider stays silent for an hour. |
 | **Second fix** | A reconciler with backoff and a freeze deadline; cancel with the provider, then release. The trade-off is explicit and goes to the product owner: *slower sell-through at the very end of the sale.* |
 
-![Freeze, authorize, and a reconciler.](diagrams/video-ch3-fix.pdf){width=95%}
+![Freeze, authorize, and a reconciler.](video/svg/ch3-fix.svg){width=95%}
 
 ::: {.key title="If asked, I would say"}
 I would rather hold a seat ten extra minutes than sell it twice or charge someone for nothing. Seats are frozen before I
@@ -1360,9 +1360,9 @@ with backoff, and accept the webhook too. Seats stay `PAYMENT_PENDING` until the
 refund automatically, apologise, and give the fan priority on the waitlist. It's rare, it's
 measured, and it has an owner.
 
-![Order state machine. UNKNOWN is a real state with its own exits, not an error. VOIDED -> REFUNDED is the residual case.](diagrams/sd47-order-states.pdf){width=55%}
+![Order state machine. UNKNOWN is a real state with its own exits, not an error. VOIDED -> REFUNDED is the residual case.](diagrams/sd47-order-states.svg)
 
-![Checkout when the PSP goes silent: the authorization times out, the order becomes UNKNOWN, status polling and the webhook race, and the first definite answer wins.](diagrams/sd47-seq-checkout.pdf){width=78%}
+![Checkout when the PSP goes silent: the authorization times out, the order becomes UNKNOWN, status polling and the webhook race, and the first definite answer wins.](diagrams/sd47-seq-checkout.svg)
 
 The order service, step by step:
 
@@ -1513,7 +1513,7 @@ exact race this deep dive is about).
 | **If the fix fails** | The controller dies, or the CDN cannot reach the origin. |
 | **Second fix** | One leader per event by lease; the pointer simply pauses. `stale-if-error` at the CDN. Jitter on every synchronised action. Double the fans changes the lobby size, not the database load. |
 
-![The line in front of the shop.](diagrams/video-ch4-fix.pdf){width=85%}
+![The line in front of the shop.](video/svg/ch4-fix.svg){width=85%}
 
 ::: {.key title="If asked, I would say"}
 I convert a stampede into a stream. A million people wait at the edge for almost nothing each; a controller admits them at
@@ -1538,7 +1538,7 @@ sees what I chose to admit.
 | **If the fix fails** | An account farm passes verification. |
 | **Second fix** | Limits per payment card and per device; cancel flagged orders after the sale and release them to the waitlist. The honest limit: no scheme is bot-proof, the aim is to make bots expensive. |
 
-![A fair line.](diagrams/video-ch5-fix.pdf){width=85%}
+![A fair line.](video/svg/ch5-fix.svg){width=85%}
 
 ::: {.key title="If asked, I would say"}
 Fairness is a product decision, so I would take it to the promoter: a lottery for everyone in the lobby at T0, then
@@ -1723,7 +1723,7 @@ doesn't depend on it: the CDN handles 100,000 req/s anyway.
 
 #### The admission controller: turning the dial
 
-![The admission control loop, once a second per event. It's the same idea as TCP congestion control: increase gently while healthy, cut sharply on trouble (AIMD).](diagrams/sd47-admission-loop.pdf){width=55%}
+![The admission control loop, once a second per event. It's the same idea as TCP congestion control: increase gently while healthy, cut sharply on trouble (AIMD).](diagrams/sd47-admission-loop.svg)
 
 ```java
 @Scheduled(fixedRate = 1000)                  // one active instance per event (leader-elected)
@@ -1853,7 +1853,7 @@ is the truth. Both flags travel in the same cached JSON, so they reach everyone 
 | **If the fix fails** | The stream stalls. |
 | **Second fix** | Staleness grows, never incorrectness. A click gets a `409` with the current bitmap. The map is rebuilt from a scan. The log offset as the version never goes backwards. |
 
-![The seat-map pipeline.](diagrams/video-ch6-fix.pdf){width=85%}
+![The seat-map pipeline.](video/svg/ch6-fix.svg){width=85%}
 
 ::: {.key title="If asked, I would say"}
 The map can be a second or two stale because the write path decides. The layout is immutable on the CDN and the
@@ -1875,7 +1875,7 @@ connections, which is exactly the "mixed paths" failure from Chapter 5.
   memory from the Kafka stream, and **at most once a second** publishes a new version to Redis.
   Clients send the version they have and get **304 Not Modified** when nothing changed.
 
-![From a committed hold to a fan's map: outbox row, log-based relay, Kafka, the snapshot builder, a versioned bitmap in Redis, and the 304 path.](diagrams/sd47-seq-seatmap.pdf){width=96%}
+![From a committed hold to a fan's map: outbox row, log-based relay, Kafka, the snapshot builder, a versioned bitmap in Redis, and the 304 path.](diagrams/sd47-seq-seatmap.svg)
 
 ```java
 // The snapshot builder: a Kafka consumer group, partitioned by event_id
@@ -1979,7 +1979,7 @@ phase 2, but polling a 6 KB bitmap is good enough and has fewer moving parts.
 | **If the fix fails** | Two mega events share a Redis node or a payment budget. |
 | **Second fix** | Pin hot slots and move to a dedicated cell the day before (on-sales are scheduled); stagger on-sales; split the budget. |
 
-![The waitlist is a new consumer.](diagrams/video-ch7-fix.pdf){width=85%}
+![The waitlist is a new consumer.](video/svg/ch7-fix.svg){width=85%}
 
 ::: {.key title="If asked, I would say"}
 Say what changes, what does not, and what it costs. Releasing seats is an insert and a new layout version; the claim
@@ -1998,7 +1998,7 @@ are **independent by construction**. Running many at once isn't a coordination p
 **isolation** problem: one huge on-sale mustn't hurt the others, and the few resources they *do*
 share must be divided fairly.
 
-![Many events at once. Stateless fleets and the CDN are shared. Each event's queue state is one Redis slot. Inventory is placed per event: thousands of small events packed into a shared cell, a mega on-sale in its own cell.](diagrams/sd47-multi-event.pdf){width=86%}
+![Many events at once. Stateless fleets and the CDN are shared. Each event's queue state is one Redis slot. Inventory is placed per event: thousands of small events packed into a shared cell, a mega on-sale in its own cell.](diagrams/sd47-multi-event.svg)
 
 **Layer by layer:**
 
@@ -2083,7 +2083,7 @@ changes, what doesn't, what it costs. Don't silently redraw.
 
 ### Worked delta 1: the waitlist
 
-![The waitlist as a new consumer: a released seat becomes a targeted hold for the next waitlisted fan, who gets a deep link with a one-off admission token.](diagrams/sd47-seq-waitlist.pdf){width=86%}
+![The waitlist as a new consumer: a released seat becomes a targeted hold for the next waitlisted fan, who gets a deep link with a one-off admission token.](diagrams/sd47-seq-waitlist.svg)
 
 ```sql
 ALTER TABLE event_seat ADD COLUMN hold_for_user bigint;   -- null for ordinary holds
@@ -2136,7 +2136,7 @@ and fetch `/layout?v=4` from the CDN (a new URL, so no purge); the controller cl
 | **If the fix fails** | The metrics say all is fine and fans are angry. |
 | **Second fix** | The synthetic fan, and a support-contact signal as a metric of last resort. |
 
-![Measure the promise.](diagrams/video-ch8-fix.pdf){width=85%}
+![Measure the promise.](video/svg/ch8-fix.svg){width=85%}
 
 ::: {.key title="If asked, I would say"}
 The SLI is a fan completing a purchase, probed continuously. I watch seats frozen by unknown payments and the age of the
@@ -2303,7 +2303,7 @@ the invariant.
 
 # Chapter 9 · Recap
 
-![The final baseline.](diagrams/video-base-final.pdf){width=100%}
+![The final baseline.](video/svg/base-final.svg){width=100%}
 
 | Path | In one sentence |
 |---|---|

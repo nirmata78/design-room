@@ -150,13 +150,13 @@ Ana's post took a few seconds to reach Ben, and about 140 ms to show once he ope
 
 ## Why a few accounts decide the design
 
-![Followers per account, log scale, illustrative. The median account has about 200; the largest over 100 million. One post's push cost is its author's follower count.](diagrams/video-tail.pdf){width=92%}
+![Followers per account, log scale, illustrative. The median account has about 200; the largest over 100 million. One post's push cost is its author's follower count.](video/svg/tail.svg){width=92%}
 
 The cost of pushing one post is its author's follower count. For the median author that is about 200
 inserts, nothing. For the account at the bottom of the chart it is 110 million inserts, for one post.
 Every design decision in this document follows from that chart.
 
-![The central tension. Push pays at write time in proportion to the author's followers (red); pull pays a small read on every follower's open (blue). The hybrid follows the lower curve.](diagrams/video-tension.pdf){width=92%}
+![The central tension. Push pays at write time in proportion to the author's followers (red); pull pays a small read on every follower's open (blue). The hybrid follows the lower curve.](video/svg/tension.svg){width=92%}
 
 ## One post, second by second
 
@@ -190,7 +190,7 @@ becoming about 60,000 timeline inserts a second after skipping inactive follower
 memory (12 TB with three replicas). Ranking about 90,000 calls a second, each with an 80 ms deadline.
 :::
 
-![The read budget as one bar: lookups and filtering 20 ms, ranking deadline 80, hydration 20, network 20; 140 used, 60 spare.](diagrams/video-budget.pdf){width=95%}
+![The read budget as one bar: lookups and filtering 20 ms, ranking deadline 80, hydration 20, network 20; 140 used, 60 spare.](video/svg/budget.svg){width=95%}
 
 \newpage
 
@@ -366,9 +366,9 @@ score and ID, and the next page is everything strictly after it, whatever arrive
 
 ## The data model
 
-![Conceptual model. Users author posts, follow users and block users; the timeline entry is a weak entity, derived and rebuildable.](diagrams/video-erd-chen.pdf){width=88%}
+![Conceptual model. Users author posts, follow users and block users; the timeline entry is a weak entity, derived and rebuildable.](video/svg/erd-chen.svg){width=88%}
 
-![Physical model. Three stores of truth (post, author index, follows) and three in-memory derived structures (timelines, celebrity lists, block sets).](diagrams/video-erd-physical.pdf){width=95%}
+![Physical model. Three stores of truth (post, author index, follows) and three in-memory derived structures (timelines, celebrity lists, block sets).](video/svg/erd-physical.svg){width=95%}
 
 | Store | Key | Holds | Truth or derived | Lose it? |
 |---|---|---|---|---|
@@ -397,7 +397,7 @@ to the one before demands.
 
 ## Version 1: the simplest thing that works
 
-![V1. The post service writes posts and the author index; the feed service, on every open, reads followees and blocks from the graph, merges the recent posts of 200 authors, ranks and returns.](diagrams/video-base-v1.pdf){width=95%}
+![V1. The post service writes posts and the author index; the feed service, on every open, reads followees and blocks from the graph, merges the recent posts of 200 authors, ranks and returns.](video/svg/base-v1.svg){width=95%}
 
 Pull on every open, with a per-reader result cache for a minute. At one percent of this scale it is the
 right design: no fan-out, no timelines, nothing to rebuild.
@@ -407,7 +407,7 @@ a second at peak. And a cached result is up to a minute old, so a close friend's
 
 ## Version 2: push
 
-![V2. Outbox, event log and fan-out workers insert post IDs into each active follower's timeline; the read is one timeline read, ranking and a multi-get from the post cache.](diagrams/video-base-v2.pdf){width=95%}
+![V2. Outbox, event log and fan-out workers insert post IDs into each active follower's timeline; the read is one timeline read, ranking and a multi-get from the post cache.](video/svg/base-v2.svg){width=95%}
 
 The post and an outbox row commit together; a relay publishes to a log keyed by author; fan-out workers page
 through followers and insert IDs into bounded timelines; the feed reads one timeline, ranks and hydrates.
@@ -417,7 +417,7 @@ open the app this month; a deleted post sits in millions of timelines.
 
 ## Version 3: the hybrid, correct on the read path
 
-![V3. A tier per author: push below the line, one write to a celebrity list above it; readers merge the few celebrities they follow; the feed filters every page and ranks under a deadline.](diagrams/video-base-v3.pdf){width=95%}
+![V3. A tier per author: push below the line, one write to a celebrity list above it; readers merge the few celebrities they follow; the feed filters every page and ranks under a deadline.](video/svg/base-v3.svg){width=95%}
 
 Four changes. (1) A tier per author: above the threshold, one write to the author's recent list and no fan-out.
 (2) Fan-out to active followers only. (3) A visibility filter on every page. (4) Ranking with a deadline and a
@@ -425,15 +425,15 @@ fallback. The rebuild path (Challenge 5) and probes (Challenge 8) are added in t
 
 ## The numbered flows, one per functional requirement
 
-![FR1, an ordinary author: (1) post, (2) one transaction, (3) outbox to the log, (4) a worker consumes, (5) followers paged from the graph, (6) IDs inserted into active followers' timelines.](diagrams/video-flow-fr1.pdf){width=95%}
+![FR1, an ordinary author: (1) post, (2) one transaction, (3) outbox to the log, (4) a worker consumes, (5) followers paged from the graph, (6) IDs inserted into active followers' timelines.](video/svg/flow-fr1.svg){width=95%}
 
-![FR1, a celebrity: the same event, then one write to the author's recent list. No fan-out.](diagrams/video-flow-fr1c.pdf){width=95%}
+![FR1, a celebrity: the same event, then one write to the author's recent list. No fan-out.](video/svg/flow-fr1c.svg){width=95%}
 
-![FR2, read: (1) get feed, (2) timeline, (3) celebrity lists, (4) blocks, (5) rank with a deadline, (6) hydrate, (7) fifty items and a cursor.](diagrams/video-flow-fr2.pdf){width=95%}
+![FR2, read: (1) get feed, (2) timeline, (3) celebrity lists, (4) blocks, (5) rank with a deadline, (6) hydrate, (7) fifty items and a cursor.](video/svg/flow-fr2.svg){width=95%}
 
-![FR3, follow: one edge; nothing is backfilled.](diagrams/video-flow-fr3.pdf){width=95%}
+![FR3, follow: one edge; nothing is backfilled.](video/svg/flow-fr3.svg){width=95%}
 
-![FR4, remove: one write to the post, an invalidation, and the filter on the next page.](diagrams/video-flow-fr4.pdf){width=95%}
+![FR4, remove: one write to the post, an invalidation, and the filter on the next page.](video/svg/flow-fr4.svg){width=95%}
 
 **Follow, in words.** Following writes one edge. If the followee is a celebrity, the next read's merge already
 includes them. If they are an ordinary author, their next post arrives by fan-out. To make a follow feel
@@ -443,18 +443,18 @@ out.
 
 ## The C4 views and the sequences
 
-![C4 context. Authors and readers; ranking, the social graph and the media CDN belong to other teams.](diagrams/video-c4-context.pdf){width=92%}
+![C4 context. Authors and readers; ranking, the social graph and the media CDN belong to other teams.](video/svg/c4-context.svg){width=92%}
 
-![C4 containers. The write path across the top, three in-memory stores in the middle, the stateless feed service below.](diagrams/video-c4-containers.pdf){width=95%}
+![C4 containers. The write path across the top, three in-memory stores in the middle, the stateless feed service below.](video/svg/c4-containers.svg){width=95%}
 
 **Why each container is separate.** The *post service* owns the only write of truth and must stay simple. The
 *event log* decouples fan-out from posting and lets other consumers (search, notifications) read the same
 events. *Fan-out workers* scale with followers, not with requests. The three *caches* have different keys,
 lifetimes and owners. The *feed service* is stateless, so it scales with opens.
 
-![Sequence: publish. One transaction, then asynchronous fan-out; the log offset is committed last.](diagrams/video-seq-publish.pdf){width=95%}
+![Sequence: publish. One transaction, then asynchronous fan-out; the log offset is committed last.](video/svg/seq-publish.svg){width=95%}
 
-![Sequence: read. Timeline, celebrity lists, merge and filter, rank with a deadline, hydrate.](diagrams/video-seq-read.pdf){width=95%}
+![Sequence: read. Timeline, celebrity lists, merge and filter, rank with a deadline, hydrate.](video/svg/seq-read.svg){width=95%}
 
 The fan-out worker, which is the mechanism, so it is worth writing:
 
@@ -709,9 +709,9 @@ recent lists of the celebrities the reader follows (a handful) and merges them w
 de-duplicating by post ID. The lists are hot keys, so they are replicated to many cache nodes or cached in
 each feed-service process for a few seconds.
 
-![Challenge 1 fix: one write to the celebrity list; readers merge.](diagrams/video-ch1-fix.pdf){width=95%}
+![Challenge 1 fix: one write to the celebrity list; readers merge.](video/svg/ch1-fix.svg){width=95%}
 
-![Sequence: one write on publish, a small merge on read.](diagrams/video-seq-celebrity.pdf){width=95%}
+![Sequence: one write on publish, a small merge on read.](video/svg/seq-celebrity.svg){width=95%}
 
 **Why it works.** Push costs a write multiplied by followers; pull costs a small read multiplied by opens.
 For the tail, the read is far cheaper, and it is paid by the reader inside the budget rather than by every
@@ -756,7 +756,7 @@ stay and age out; readers' merge shows new posts from the first minute. Crossing
 again; the merge still shows the recent ones until they age out of the list. **No backfill in either
 direction**, because the read merge covers the gap.
 
-![Sequence: crossing the line needs no backfill.](diagrams/video-seq-tier.pdf){width=95%}
+![Sequence: crossing the line needs no backfill.](video/svg/seq-tier.svg){width=95%}
 
 **The push: the power reader.** Treat the tail of readers like the tail of authors. For readers who pull more
 than about 50 authors, a background job merges their celebrity lists every few minutes into their timeline,
@@ -791,9 +791,9 @@ emits an invalidation for the post cache. Every page is hydrated through the pos
 deleted or out of audience is dropped. The merge drops authors in the reader's block, mute and unfollow set
 (small, cached per reader). A background job removes stale IDs from timelines later.
 
-![Challenge 3 fix: hydrate from the post itself and filter by the reader's sets.](diagrams/video-ch3-fix.pdf){width=95%}
+![Challenge 3 fix: hydrate from the post itself and filter by the reader's sets.](video/svg/ch3-fix.svg){width=95%}
 
-![Sequence: one write, filtered on every page.](diagrams/video-seq-delete.pdf){width=95%}
+![Sequence: one write, filtered on every page.](video/svg/seq-delete.svg){width=95%}
 
 **Why it works.** S1 is decided at one place, the post's own row, read on every page. The bound is the cache
 invalidation time.
@@ -840,7 +840,7 @@ def after(cursor, ranked, scores):
     return [i for i in ranked if (scores[i], i) < (c["s"], c["p"])]
 ```
 
-![Sequence: re-delivery is a no-op; the next page starts after the last item.](diagrams/video-seq-dedupe.pdf){width=95%}
+![Sequence: re-delivery is a no-op; the next page starts after the last item.](video/svg/seq-dedupe.svg){width=95%}
 
 **The push: ranking reorders between pages.** Scores in a cursor mean nothing if the next request re-ranks. Keep
 the first page's ranked candidate list (a few hundred IDs) for the session with a short lifetime; later pages
@@ -873,11 +873,11 @@ rebuild through the pull path (the code of V1), written back to the cache. One r
 front of the author indexes). Over the limit, a degraded feed immediately: the reader's celebrities plus the
 recent posts of their top 20 followees by interaction, marked for a full rebuild later.
 
-![Challenge 5 fix: the rebuild path with coalescing and a limit.](diagrams/video-ch5-fix.pdf){width=95%}
+![Challenge 5 fix: the rebuild path with coalescing and a limit.](video/svg/ch5-fix.svg){width=95%}
 
-![Sequence: a token for each rebuild; a degraded feed without one.](diagrams/video-seq-rebuild.pdf){width=95%}
+![Sequence: a token for each rebuild; a degraded feed without one.](video/svg/seq-rebuild.svg){width=95%}
 
-![The limit decides the blast radius: unlimited, 1,700 rebuilds a second and an author-index overload; limited to 500, a healthy store and a longer recovery.](diagrams/video-rebuild-wave.pdf){width=92%}
+![The limit decides the blast radius: unlimited, 1,700 rebuilds a second and an author-index overload; limited to 500, a healthy store and a longer recovery.](video/svg/rebuild-wave.svg){width=92%}
 
 ::: load
 **With a limit of 500 rebuilds a second** (illustrative): 100,000 author-index reads a second from rebuilds,
@@ -915,7 +915,7 @@ drops; nothing in the feed service changed.
 plus close ties, or reuse the session's last ranking. Late scores are dropped and counted; the response carries
 `fallback=true`.
 
-![Sequence: eighty milliseconds, then the fallback.](diagrams/video-seq-rank.pdf){width=95%}
+![Sequence: eighty milliseconds, then the fallback.](video/svg/seq-rank.svg){width=95%}
 
 **The 120 ms request: find the budget, don't move the user's deadline.**
 
@@ -949,9 +949,9 @@ and nothing for inactive users. Stretching it doubles the memory bill for everyo
 in time order, paginated by (time, post ID), filtered by the same visibility rules, cached per user for ten
 minutes. The ranked feed is untouched.
 
-![Challenge 7 fix: catch-up reads the author indexes through the rebuild path.](diagrams/video-ch7-fix.pdf){width=95%}
+![Challenge 7 fix: catch-up reads the author indexes through the rebuild path.](video/svg/ch7-fix.svg){width=95%}
 
-![Sequence: cached result, or the rebuild path.](diagrams/video-seq-catchup.pdf){width=95%}
+![Sequence: cached result, or the rebuild path.](video/svg/seq-catchup.svg){width=95%}
 
 ::: load
 **Catch-up cost** (illustrative): if 2 % of opens use it, 1,800 a second at peak, each about 200 author-index
@@ -981,7 +981,7 @@ Engagement drifts down 2 % over a week, and a product manager asks why.
 synthetic followers open the feed every 5 s and time the post's arrival. That is the **freshness SLI per tier**
 (p95 under 5 s). In this case, the mid-tier probe stops arriving within minutes.
 
-![Sequence: post, deliver, look, time it.](diagrams/video-seq-probe.pdf){width=95%}
+![Sequence: post, deliver, look, time it.](video/svg/seq-probe.svg){width=95%}
 
 **Symptom pairs: two metrics, one conclusion.**
 

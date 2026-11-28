@@ -104,7 +104,7 @@ with itself. Everything after it defends one of those three clauses.
 
 ## The whole design on one page
 
-![Version 4, with the mechanisms on it.](diagrams/video-recap.pdf){width=100%}
+![Version 4, with the mechanisms on it.](video/svg/recap.svg){width=100%}
 
 ## Where the load lands
 
@@ -146,7 +146,7 @@ day, a 50,000-scenario gate due within four hours.
 scenario run in 15 minutes; zero unexplained passes. **Out:** fleet ingestion, simulator physics, training, the release
 pipeline itself.
 
-![C4 level 1.](diagrams/video-c4-context.pdf){width=90%}
+![C4 level 1.](video/svg/c4-context.svg){width=90%}
 
 # Stage 2: Back-of-the-envelope
 
@@ -174,7 +174,7 @@ by byte range, near the data. *Say:* "Nothing is copied; chunks are read where t
 | Metrics | 6 M × 1,000 ≈ 6 B rows a month | columnar store |
 | One engineer | 5,000 log-min ÷ 15 min ≈ 330 cores, or 330 GPUs on a miss | quotas |
 
-![The gate budget.](diagrams/video-budget.pdf){width=95%}
+![The gate budget.](video/svg/budget.svg){width=95%}
 
 # Stage 3: API and data
 
@@ -198,39 +198,39 @@ re-executes and compares output hashes. `POST /v1/gates` (FR4) answers pass or b
 and its cache key would be a lie.
 :::
 
-![Conceptual model.](diagrams/video-erd-chen.pdf){width=95%}
+![Conceptual model.](video/svg/erd-chen.svg){width=95%}
 
-![Physical model.](diagrams/video-erd-physical.pdf){width=95%}
+![Physical model.](video/svg/erd-physical.svg){width=95%}
 
 # Stage 4: High-level design
 
-![V1: pinned runs on a batch pool. Reproducible; every build recomputes everything.](diagrams/video-base-v1.pdf){width=100%}
+![V1: pinned runs on a batch pool. Reproducible; every build recomputes everything.](video/svg/base-v1.svg){width=100%}
 
-![V2: a DAG planner and an artifact cache. Reuse by content.](diagrams/video-base-v2.pdf){width=100%}
+![V2: a DAG planner and an artifact cache. Reuse by content.](video/svg/base-v2.svg){width=100%}
 
-![V3: the gate service and the release pipeline. Paired verdicts.](diagrams/video-base-v3.pdf){width=100%}
+![V3: the gate service and the release pipeline. Paired verdicts.](video/svg/base-v3.svg){width=100%}
 
-![FR2: a run, numbered.](diagrams/video-flow-run.pdf){width=100%}
+![FR2: a run, numbered.](video/svg/flow-run.svg){width=100%}
 
-![FR4: a gate, numbered.](diagrams/video-flow-gate.pdf){width=100%}
+![FR4: a gate, numbered.](video/svg/flow-gate.svg){width=100%}
 
-![FR1, find.](diagrams/video-seq-find.pdf){width=80%}
+![FR1, find.](video/svg/seq-find.svg){width=80%}
 
-![FR2, run.](diagrams/video-seq-run.pdf){width=85%}
+![FR2, run.](video/svg/seq-run.svg){width=85%}
 
-![FR3, reproduce.](diagrams/video-seq-repro.pdf){width=80%}
+![FR3, reproduce.](video/svg/seq-repro.svg){width=80%}
 
-![FR4, gate.](diagrams/video-seq-gate.pdf){width=85%}
+![FR4, gate.](video/svg/seq-gate.svg){width=85%}
 
 # Stage 5: Components and technologies
 
-![The sim worker.](diagrams/video-c4-comp-worker.pdf){width=100%}
+![The sim worker.](video/svg/c4-comp-worker.svg){width=100%}
 
-![The DAG planner.](diagrams/video-c4-comp-planner.pdf){width=100%}
+![The DAG planner.](video/svg/c4-comp-planner.svg){width=100%}
 
-![The gate service.](diagrams/video-c4-comp-gate.pdf){width=100%}
+![The gate service.](video/svg/c4-comp-gate.svg){width=100%}
 
-![The container view with technologies.](diagrams/video-c4-containers-tech.pdf){width=100%}
+![The container view with technologies.](video/svg/c4-containers-tech.svg){width=100%}
 
 <!-- stack:sections -->
 
@@ -318,7 +318,7 @@ Each fix in Stage 6 rejects one tool by name:
 
 ## When you don't need all this (the alternate path)
 
-![ALTERNATE: no planner, no cache; a nightly recompute.](diagrams/video-alt.pdf){width=100%}
+![ALTERNATE: no planner, no cache; a nightly recompute.](video/svg/alt.svg){width=100%}
 
 A nightly job runs every scenario on the release branch in the same deterministic harness and compares with the previous
 night by fixed rules. It gives up per-change answers (engineers wait a night), reuse, and a cost that does not grow with
@@ -342,7 +342,7 @@ were delivered in thread order, and a GPU reduction used atomic adds.
 | Unpinned inputs | "latest" model, a moving map | digests and hashes only |
 | Hidden reads | an environment variable, a file | a hermetic sandbox |
 
-![Finding non-determinism: run twice, compare message hashes to the first difference.](diagrams/video-seq-ch1-double.pdf){width=80%}
+![Finding non-determinism: run twice, compare message hashes to the first difference.](video/svg/seq-ch1-double.svg){width=80%}
 
 ::: warn
 **"Set the random seed."** It removes one of six sources. Threads, GPU atomics, the wall clock, unpinned inputs and hidden
@@ -372,7 +372,7 @@ for s in topo_order(stages):
     index.put(key(s), blob, producer=run)  # 2: row
 ```
 
-![Mechanism M3 at protocol level: two keys, one hit, one miss.](diagrams/video-seq-th-keys.pdf){width=80%}
+![Mechanism M3 at protocol level: two keys, one hit, one miss.](video/svg/seq-th-keys.svg){width=80%}
 
 ::: why
 **Why a chain.** Including the input keys in a stage's key means a change upstream changes every key downstream of it, and
@@ -394,7 +394,7 @@ hours for a perception change landed on cut day itself.
 
 ## 6.4 The log does not react
 
-![Open-loop replay after divergence.](diagrams/video-divergence.pdf){width=95%}
+![Open-loop replay after divergence.](video/svg/divergence.svg){width=95%}
 
 **The mechanism.** The harness measures divergence (position and heading against the log) every step; metrics are scored up to
 the first divergence above 1 m and the scenario reports where it was. Interactive sets run closed loop: other road users are
@@ -429,7 +429,7 @@ reviewed: either the policy changes or the override was wrong.
 **The case.** A stage starts reading an undeclared config file; its key misses it; planning keeps hitting stale outputs; the gate
 compares old planning with old planning and passes; the field regresses.
 
-![V4: a gate auditor.](diagrams/video-base-v4.pdf){width=100%}
+![V4: a gate auditor.](video/svg/base-v4.svg){width=100%}
 
 | Check | What it catches |
 |---|---|

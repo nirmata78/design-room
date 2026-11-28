@@ -174,7 +174,7 @@ The node never waits for the network to answer a request. It asks for updates on
 when it cannot get them it keeps doing the last correct thing it knew.
 :::
 
-![The life of one list version. A version is built, staged, rolled out, and either becomes current or is halted. A rollback is never an undo: it publishes the old content as a new, higher version.](diagrams/sd94-version-states.pdf){width=78%}
+![The life of one list version. A version is built, staged, rolled out, and either becomes current or is halted. A rollback is never an undo: it publishes the old content as a new, higher version.](diagrams/sd94-version-states.svg)
 
 ## The same story as a version's states
 
@@ -191,14 +191,14 @@ The figure above is the life of one version. Three details to keep in mind:
 
 The hook of the whole question is a typo. An operator means a small range and types a wide one.
 
-![The same pipe delivers a ban and a mistake in the same 18 seconds. Top: no gates, every node serves the mistake and 8 percent of requests are denied until someone acts. Bottom: a canary sees it first, the gate trips, and a rollback lands as a new version.](diagrams/video-badpush.pdf){width=94%}
+![The same pipe delivers a ban and a mistake in the same 18 seconds. Top: no gates, every node serves the mistake and 8 percent of requests are denied until someone acts. Bottom: a canary sees it first, the gate trips, and a rollback lands as a new version.](video/svg/badpush.svg){width=94%}
 
 Nothing failed. The compiler did what it was told, the relays carried it, the nodes applied it. The
 pipeline that is built to land an urgent ban fast lands a mistake just as fast. This is why a
 denylist gets the same discipline as a binary: validation, an allowlist that always wins, a staged
 rollout gated on a number, a kill flag, and a rollback that is a new version.
 
-![Freshness against blast radius. The same slider carries an urgent ban, a routine push, and an ungated push. The owner picks the position, per push.](diagrams/video-tension.pdf){width=92%}
+![Freshness against blast radius. The same slider carries an urgent ban, a routine push, and an ungated push. The owner picks the position, per push.](video/svg/tension.svg){width=92%}
 
 ## One ban, second by second
 
@@ -221,11 +221,11 @@ A single address ban, published at time zero, with push and a ten-second poll. A
 About nine seconds with push. With no push, the node waits for its next poll, up to ten seconds more:
 **eighteen seconds worst case against a thirty-second target**.
 
-![The propagation budget as one bar: compile 3, origin to regional 2, regional to zone 2, poll wait up to 10, verify and apply 1. Eighteen used, twelve spare.](diagrams/video-budget.pdf){width=95%}
+![The propagation budget as one bar: compile 3, origin to regional 2, regional to zone 2, poll wait up to 10, verify and apply 1. Eighteen used, twelve spare.](video/svg/budget.svg){width=95%}
 
 ## Where the load lands
 
-![Load map. The request path (right) never touches the network. The distribution path (left to middle) carries about 1.5 KB a second of deltas and 10,000 manifest polls a second across the fleet. Every figure is derived in Stage 2.](diagrams/sd94-load-map.pdf){width=90%}
+![Load map. The request path (right) never touches the network. The distribution path (left to middle) carries about 1.5 KB a second of deltas and 10,000 manifest polls a second across the fleet. Every figure is derived in Stage 2.](diagrams/sd94-load-map.svg)
 
 ::: load
 **The request path.** A million requests a second across a hundred thousand nodes: ten a second per
@@ -421,7 +421,7 @@ anywhere between 100 ns and 5 microseconds.
 
 Every call carries a tag: which requirement it serves, and which entity it reads or writes.
 
-![Conceptual model in Chen notation. A key has at most one live state per list, and the version of its last change decides it. That is what makes merging safe.](diagrams/video-erd-chen.pdf){width=96%}
+![Conceptual model in Chen notation. A key has at most one live state per list, and the version of its last change decides it. That is what makes merging safe.](video/svg/erd-chen.svg){width=96%}
 
 **PublishChange** (FR1, writes ChangeSet and Rule)
 
@@ -491,7 +491,7 @@ already-updated nodes quickly, publish the rollback and let the normal path carr
 
 ## The data model
 
-![Physical model. A removed key stays as a tombstone for the delta window. The version number is assigned in the same transaction as the rules. On the node, two copies exist during a swap.](diagrams/video-erd-physical.pdf){width=96%}
+![Physical model. A removed key stays as a tombstone for the delta window. The version number is assigned in the same transaction as the rules. On the node, two copies exist during a swap.](video/svg/erd-physical.svg){width=96%}
 
 ```sql
 CREATE TABLE rule (
@@ -556,7 +556,7 @@ before.
 
 ## Version 1: the simplest thing that works
 
-![V1. A policy tool writes one list file to object storage. Each node downloads it every minute, builds a set, swaps it in and checks locally.](diagrams/video-base-v1.pdf){width=92%}
+![V1. A policy tool writes one list file to object storage. Each node downloads it every minute, builds a set, swaps it in and checks locally.](video/svg/base-v1.svg){width=92%}
 
 For a short list that rarely changes this might be enough. **The objection:** every minute a hundred
 thousand nodes pull 40 MB each (4 TB from one place); a node can read a file while it is still being
@@ -565,7 +565,7 @@ written and load half a list without knowing; a bad file reaches every node; and
 
 ## Version 2: versions, a rule store, and a relay tree
 
-![V2. A rule store assigns versions. A compiler writes immutable snapshots and deltas with chained checksums to the origin. A relay tree carries them. Nodes poll the manifest every ten seconds; a push says a version exists; the delta comes back.](diagrams/video-base-v2.pdf){width=92%}
+![V2. A rule store assigns versions. A compiler writes immutable snapshots and deltas with chained checksums to the origin. A relay tree carries them. Nodes poll the manifest every ten seconds; a push says a version exists; the delta comes back.](video/svg/base-v2.svg){width=92%}
 
 Now a node can say what it holds, verify what it gets, catch up by deltas, and never download the list
 on a routine poll. **The objection:** one bad version reaches every node in eighteen seconds, nothing
@@ -578,7 +578,7 @@ Push shortens the wait; poll guarantees arrival; the node's logic is the same fo
 
 ## Version 3: safe enforcement
 
-![V3. A controller reads every node's applied version and age and gates each stage of a rollout. On the node: an atomic swap, last known good on disk, and a staleness bound with an action.](diagrams/video-base-v3.pdf){width=92%}
+![V3. A controller reads every node's applied version and age and gates each stage of a rollout. On the node: an atomic swap, last known good on disk, and a staleness bound with an action.](video/svg/base-v3.svg){width=92%}
 
 The controller (dashed purple arrow back from the nodes) reads applied versions and ages, and gates a
 rollout through the origin. Ingest now validates against an allowlist and size limits. **What V3 leaves
@@ -593,38 +593,38 @@ one change may cover, and the allowlist. (4) Above a threshold, a second person 
 transaction writes the rules and takes the next version. (6) An audit event is written. The compiler picks
 it up from there.
 
-![FR1, publish. Normalise, validate, approve, then one transaction assigns the next version.](diagrams/video-flow-fr1.pdf){width=90%}
+![FR1, publish. Normalise, validate, approve, then one transaction assigns the next version.](video/svg/flow-fr1.svg){width=90%}
 
 **FR2 Distribute.** (1) The origin fans artifacts out through the relay tree. (2) A push says a new
 version exists. (3) The node polls the manifest with its version. (4) The delta comes back. The node
 verifies, builds beside, swaps, writes to disk and reports. A node that never hears the push takes the
 same steps at its next poll, and so does a node that was offline.
 
-![FR2, distribute. A poll asks the manifest only. Deltas when behind inside the window; a snapshot only to bootstrap.](diagrams/video-flow-fr2.pdf){width=90%}
+![FR2, distribute. A poll asks the manifest only. Deltas when behind inside the window; a snapshot only to bootstrap.](video/svg/flow-fr2.svg){width=90%}
 
 **FR3 Enforce.** (1) A request arrives with a source address. (2) The agent normalises it and checks the
 allowlist, then the exact key, then the longest-prefix range. No network call. (3) The verdict returns with
 the rule and the version; a sample goes to the log off the hot path.
 
-![FR3, enforce. Allowlist first, then exact, then longest prefix. The verdict carries the rule version.](diagrams/video-flow-fr3.pdf){width=90%}
+![FR3, enforce. Allowlist first, then exact, then longest prefix. The verdict carries the rule version.](video/svg/flow-fr3.svg){width=90%}
 
 **FR4 Inspect and explain.** (1) Every poll carries the version applied and its age. (2) The controller
 computes version skew and the list of late nodes. (3) Metrics turn it into the propagation SLI per
 region. For audit, `Explain` joins a sampled decision to the rule history by version.
 
-![FR4, inspect and explain. Each node reports version and age; decisions are sampled with their version.](diagrams/video-flow-fr4.pdf){width=90%}
+![FR4, inspect and explain. Each node reports version and age; decisions are sampled with their version.](video/svg/flow-fr4.svg){width=90%}
 
 **FR5 Roll back and stop.** (1) An operator or a gate halts the stage, so regions not yet reached never
 receive the bad version. (2) The controller tells the origin. A rollback publishes the old content as a
 new, higher version. The kill flag is the lighter lever, a field in the manifest read on the next poll.
 
-![FR5, roll back and stop. Halt the stage, flip the kill flag, or publish the old content as a higher version.](diagrams/video-flow-fr5.pdf){width=90%}
+![FR5, roll back and stop. Halt the stage, flip the kill flag, or publish the old content as a higher version.](video/svg/flow-fr5.svg){width=90%}
 
 ## The C4 views and the sequences
 
-![C4 level 1. Policy owns the content; platform owns the pipe; the propagation target is the contract between them.](diagrams/video-c4-context.pdf){width=92%}
+![C4 level 1. Policy owns the content; platform owns the pipe; the propagation target is the contract between them.](video/svg/c4-context.svg){width=92%}
 
-![C4 level 2. Inside each serving process, an enforcement agent holds the structure, applies updates and answers Check in process.](diagrams/video-c4-containers.pdf){width=96%}
+![C4 level 2. Inside each serving process, an enforcement agent holds the structure, applies updates and answers Check in process.](video/svg/c4-containers.svg){width=96%}
 
 **Why each container is separate.** The *policy tool* changes at human speed and needs approval. *Ingest
 and the rule store* are the one place that must be strictly correct (one order). The *compiler and origin*
@@ -632,13 +632,13 @@ turn rows into immutable files. The *relay tree* exists to bound the origin's lo
 *control plane* owns rollout and fleet state; it must not be on the request path. The *agent* is a library,
 not a service, so the check has no network between it and the request.
 
-![Publish as a sequence.](diagrams/video-seq-publish.pdf){width=92%}
+![Publish as a sequence.](video/svg/seq-publish.svg){width=92%}
 
-![Distribute and apply as a sequence.](diagrams/video-seq-distribute.pdf){width=92%}
+![Distribute and apply as a sequence.](video/svg/seq-distribute.svg){width=92%}
 
-![Enforce as a sequence.](diagrams/video-seq-enforce.pdf){width=92%}
+![Enforce as a sequence.](video/svg/seq-enforce.svg){width=92%}
 
-![Rollback as a sequence.](diagrams/video-seq-rollback.pdf){width=92%}
+![Rollback as a sequence.](video/svg/seq-rollback.svg){width=92%}
 
 **What correct serving code looks like.**
 
@@ -875,13 +875,13 @@ nodes run version N?"
 04:01  a power cut mid-download leaves a truncated file the node would load
 ```
 
-![The attack and the fix. Nothing says what the node should fetch or whether it is whole; the manifest answers the first, the chained checksum and digest the second.](diagrams/video-ch1-fix.pdf){width=90%}
+![The attack and the fix. Nothing says what the node should fetch or whether it is whole; the manifest answers the first, the chained checksum and digest the second.](video/svg/ch1-fix.svg){width=90%}
 
 **The mechanism.** The node sends `have = V`. The manifest says: inside the window, take the delta; outside
 it, take the snapshot. Every artifact is verified (chain, then state digest) **before anything is applied**,
 and the apply is the atomic swap.
 
-![Reconnect, manifest, delta, verify, swap, with a failed checksum falling back to a snapshot.](diagrams/video-seq-ch1-catchup.pdf){width=92%}
+![Reconnect, manifest, delta, verify, swap, with a failed checksum falling back to a snapshot.](video/svg/seq-ch1-catchup.svg){width=92%}
 
 ```
 m = manifest(have = v)
@@ -945,7 +945,7 @@ only if its version is higher than the key's last. Replays and reordering become
 longest prefix; allow beats deny at equal specificity; an allowlist range matches first and always wins;
 and two sources disagree by written precedence** (an unexpired manual entry beats a feed).
 
-![Late and duplicate changes are ignored. Version 100 arrives after 101 and is not higher; the duplicate 101 is a no-op.](diagrams/video-seq-ch2-merge.pdf){width=82%}
+![Late and duplicate changes are ignored. Version 100 arrives after 101 and is not higher; the duplicate 101 is a no-op.](video/svg/seq-ch2-merge.svg){width=82%}
 
 | Situation | Rule | Why |
 |---|---|---|
@@ -1018,7 +1018,7 @@ the on-call is paged, and the fix is a new version that takes another 18 seconds
 | Apply failures | about 0 | any checksum failure on a stage | halt that version |
 | Urgent ban | none | fast path: one region, 60 s bake | logged as an exception, reviewed after |
 
-![Staged rollout: the same mistake with a canary. Only 5,000 nodes see it; the gate trips within one metrics window.](diagrams/video-ch3-fix.pdf){width=90%}
+![Staged rollout: the same mistake with a canary. Only 5,000 nodes see it; the gate trips within one metrics window.](video/svg/ch3-fix.svg){width=90%}
 
 **The second-level push.** "The rule is legitimate-looking and wrong: a real customer's range. Block rate
 does not move. Or the kill switch rides the same pipe that is broken." *Nodes protect themselves:* if a
@@ -1071,9 +1071,9 @@ are missing. Then a **bound and an action**, signed by the owner, per list:
 | Legal list with a hard deadline | per the legal term | drain the node; escalate to legal | legal |
 | A node with no list on disk | none | stay out of rotation until it bootstraps | platform |
 
-![Stale is not open. A node keeps enforcing its last list through every stage; only the newest bans are missing.](diagrams/video-stale.pdf){width=92%}
+![Stale is not open. A node keeps enforcing its last list through every stage; only the newest bans are missing.](video/svg/stale.svg){width=92%}
 
-![Past the bound, drained, recovered. The node keeps enforcing its last list while it is out of rotation.](diagrams/video-seq-ch4-drain.pdf){width=82%}
+![Past the bound, drained, recovered. The node keeps enforcing its last list while it is out of rotation.](video/svg/seq-ch4-drain.svg){width=82%}
 
 **The second-level push.** "Every node passes the bound at once because the control plane is down. You just
 drained the fleet." A **drain budget**: automatic draining never removes more than a fixed share of the
@@ -1114,7 +1114,7 @@ lookup adds a dependency; a filter alone blocks real users.
 1 M a second is a hard dependency and 1 ms on every call. A filter used alone, at 1 percent false
 positives, blocks **10,000 real users a second**.
 
-![A filter in front: not listed is certain; maybe needs a check.](diagrams/video-bloom.pdf){width=92%}
+![A filter in front: not listed is certain; maybe needs a check.](video/svg/bloom.svg){width=92%}
 
 **The mechanism.** A local filter (125 MB) answers "not listed" for about 99 percent of traffic with no
 network call. A *maybe* goes to a **sharded exact lookup tier**, whose answer is cached on the node with a
@@ -1122,7 +1122,7 @@ lifetime bounded by the staleness bound. Keep the hottest, most-matched ranges e
 enforcement point depends on where the key first becomes known: an address at the edge, a user id after
 authentication, an email after login.
 
-![Maybe, lookup, cache.](diagrams/video-seq-ch5-lookup.pdf){width=82%}
+![Maybe, lookup, cache.](video/svg/seq-ch5-lookup.svg){width=82%}
 
 **The second-level push.** "During an attack nearly every request is a true hit, so every request goes to
 the lookup tier." Cache positive verdicts (repeated hits from one source cost one lookup); **coalesce**
@@ -1164,7 +1164,7 @@ At 100 a second a day buys 8.6 M lookups against about 50 M distinct addresses: 
 `192.0.2.7` is cached as allowed for 24 hours; an hour later the authority bans `192.0.0.0/16`, and the
 address is served from cache for 23 more hours.
 
-![A slow lookup API cannot sit on the request path and cannot cover everything.](diagrams/video-authority.pdf){width=92%}
+![A slow lookup API cannot sit on the request path and cannot cover everything.](video/svg/authority.svg){width=92%}
 
 **The mechanism.** (1) If any bulk list or feed exists, **mirror it** and use the same pipeline; the API only
 verifies. (2) With only a lookup: a **range-keyed verdict cache**, so a wider ban supersedes address
@@ -1173,7 +1173,7 @@ lookups; a token bucket of 100 a second spent on the highest-volume addresses fi
 for a first-seen address** (serve and verify, or hold briefly), chosen by the owner. (3) A circuit breaker
 with an explicit, fleet-wide rule for an outage.
 
-![One lookup, one range rule.](diagrams/video-seq-ch6-authority.pdf){width=82%}
+![One lookup, one range rule.](video/svg/seq-ch6-authority.svg){width=82%}
 
 **The second-level push.** "The API is down for two days and your cache lifetime is one day." A **grace
 period**: serve expired verdicts for a stated number of days, flag every decision made on expired data in
@@ -1233,7 +1233,7 @@ that is too small.
 the real path in each region; a region that still allows it after 30 seconds pages, with the node's applied
 version attached.
 
-![The probe, end to end.](diagrams/video-seq-ch7-probe.pdf){width=82%}
+![The probe, end to end.](video/svg/seq-ch7-probe.svg){width=82%}
 
 **The second-level push.** "The probe passes and a real ban is still missing. Or the block rate is flat
 because traffic bypasses the enforcement point." Skew is measured **per node, from reports**, not only from

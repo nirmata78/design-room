@@ -144,11 +144,11 @@ region, the edge in dozens of cities, and the browsers of everyone who received 
 takedown is only as fast as the slowest copy. This is why every cache lifetime in this design is chosen
 with the five-minute takedown target in view, and why `301` is not the default.
 
-![Speed against control: every layer closer to the user answers faster and is harder to count or to take back.](diagrams/video-tension.pdf){width=95%}
+![Speed against control: every layer closer to the user answers faster and is harder to count or to take back.](video/svg/tension.svg){width=95%}
 
 ## The whole design on one page
 
-![The final design. Create on top, the redirect across the middle, side paths along the bottom, probes on the left, a replica per region on the right.](diagrams/video-base-final.pdf){width=100%}
+![The final design. Create on top, the redirect across the middle, side paths along the bottom, probes on the left, a replica per region on the right.](video/svg/base-final.svg){width=100%}
 
 ## Where the load lands
 
@@ -240,7 +240,7 @@ At the server, with a miss: cache 1 ms + store 5 ms + parse, respond and emit 1.
 20 ms. *Decision:* there is room for one miss and nothing synchronous after it: no counter write, no
 classifier call, no cross-region read in the normal path.
 
-![The redirect's latency budget at the server (initial target).](diagrams/video-budget.pdf){width=85%}
+![The redirect's latency budget at the server (initial target).](video/svg/budget.svg){width=85%}
 :::
 
 ## The full table
@@ -321,7 +321,7 @@ is a client bug: answer `422`, never silently return the old code.
 
 ## The data model
 
-![Conceptual model: owners create links; clicks are weak entities of a link and roll up into daily counts.](diagrams/video-erd-chen.pdf){width=88%}
+![Conceptual model: owners create links; clicks are weak entities of a link and roll up into daily counts.](video/svg/erd-chen.svg){width=88%}
 
 | Table | Key | Columns | Note |
 |---|---|---|---|
@@ -354,7 +354,7 @@ interviewer sees the same boxes grow.
 One service, one relational table `code -> url`. Create draws a random seven-character code and inserts
 it, retrying on a conflict. Redirect reads the table and answers `302`.
 
-![V1: one service, one table.](diagrams/video-base-v1.pdf){width=95%}
+![V1: one service, one table.](video/svg/base-v1.svg){width=95%}
 
 **The objection.** 4,000 reads a second on one table and a 40,000 peak on one row; analytics would be an
 update per click; creating and redirecting share one process and one failure mode.
@@ -366,7 +366,7 @@ can wait a few seconds), so they become two services. Redirect servers are state
 shared cache in front of a sharded link store, cache-aside. The create service leases ID ranges from an
 allocator and inserts under a unique constraint.
 
-![V2: split paths; a shared cache; counter ranges.](diagrams/video-base-v2.pdf){width=95%}
+![V2: split paths; a shared cache; counter ranges.](video/svg/base-v2.svg){width=95%}
 
 **The objection.** One viral code is one hot cache key. Clicks have nowhere to go. A takedown sits behind
 every cache.
@@ -378,25 +378,25 @@ flight. Clicks go *after* the answer into a click log, an aggregator and a stats
 writes the status and publishes on an invalidation channel that reaches the edge, every redirect server and
 the shared cache. Create calls a safety check on the URL first.
 
-![V3: protect the redirect; make every copy withdrawable.](diagrams/video-base-v3.pdf){width=100%}
+![V3: protect the redirect; make every copy withdrawable.](video/svg/base-v3.svg){width=100%}
 
 ## The numbered flows, one per functional requirement
 
-![FR1 create: (1) post with an idempotency key, (2) safety check, (3) next ID from the leased range, (4) insert under the unique constraint.](diagrams/video-flow-fr1.pdf){width=95%}
+![FR1 create: (1) post with an idempotency key, (2) safety check, (3) next ID from the leased range, (4) insert under the unique constraint.](video/svg/flow-fr1.svg){width=95%}
 
-![Create as a sequence.](diagrams/video-seq-create.pdf){width=88%}
+![Create as a sequence.](video/svg/seq-create.svg){width=88%}
 
-![FR2 redirect: (1) edge, (2) redirect server and its memory, (3) shared cache, (4) store on a miss, (5–6) fill and return, (7–8) the 302 back through the edge.](diagrams/video-flow-fr2.pdf){width=95%}
+![FR2 redirect: (1) edge, (2) redirect server and its memory, (3) shared cache, (4) store on a miss, (5–6) fill and return, (7–8) the 302 back through the edge.](video/svg/flow-fr2.svg){width=95%}
 
-![The redirect as a sequence: the click is recorded after the answer.](diagrams/video-seq-redirect.pdf){width=92%}
+![The redirect as a sequence: the click is recorded after the answer.](video/svg/seq-redirect.svg){width=92%}
 
-![FR3 count: after the answer, a local buffer, a log by code, an aggregator, a stats store.](diagrams/video-flow-fr3.pdf){width=95%}
+![FR3 count: after the answer, a local buffer, a log by code, an aggregator, a stats store.](video/svg/flow-fr3.svg){width=95%}
 
-![Counting as a sequence: pre-aggregated per second at the server, Kafka keyed by code, one-minute windows in Flink, counts in ClickHouse with an as-of time.](diagrams/video-seq-count.pdf){width=95%}
+![Counting as a sequence: pre-aggregated per second at the server, Kafka keyed by code, one-minute windows in Flink, counts in ClickHouse with an as-of time.](video/svg/seq-count.svg){width=95%}
 
-![FR4 withdraw: status, publish, the shared cache deleted, every server drops it, the edge purged.](diagrams/video-flow-fr4.pdf){width=95%}
+![FR4 withdraw: status, publish, the shared cache deleted, every server drops it, the edge purged.](video/svg/flow-fr4.svg){width=95%}
 
-![Takedown as a sequence: status first, a direct delete of the shared-cache key, then the invalidation; lifetimes are the backstop.](diagrams/video-seq-takedown.pdf){width=92%}
+![Takedown as a sequence: status first, a direct delete of the shared-cache key, then the invalidation; lifetimes are the backstop.](video/svg/seq-takedown.svg){width=92%}
 
 **Code for the redirect path**, the part interviewers ask to see:
 
@@ -412,9 +412,9 @@ def redirect(code):
     clicks.append(code, now(), country(), event_id())   # then, never before
 ```
 
-![The C4 context view.](diagrams/video-c4-context.pdf){width=85%}
+![The C4 context view.](video/svg/c4-context.svg){width=85%}
 
-![The C4 container view: the redirect path is four boxes in a row; everything else is above or below it.](diagrams/video-c4-containers.pdf){width=95%}
+![The C4 container view: the redirect path is four boxes in a row; everything else is above or below it.](video/svg/c4-containers.svg){width=95%}
 
 # Stage 5: Components and technologies
 
@@ -425,11 +425,11 @@ that rules it out. It goes past what a 45-minute round has time to say; it is he
 they pick, you can go one level down. Background for each mechanism is in the building-blocks course
 (`theory/video/src/`), cited per section.
 
-![The container view with technologies.](diagrams/video-c4-containers-tech.pdf){width=95%}
+![The container view with technologies.](video/svg/c4-containers-tech.svg){width=95%}
 
-![C4 level 3: inside the redirect service. Every miss path has its own timeout: Redis 2 ms, PostgreSQL 20 ms.](diagrams/video-c4-comp-redirect.pdf){width=95%}
+![C4 level 3: inside the redirect service. Every miss path has its own timeout: Redis 2 ms, PostgreSQL 20 ms.](video/svg/c4-comp-redirect.svg){width=95%}
 
-![C4 level 3: inside the create service. Nothing here is on the redirect path.](diagrams/video-c4-comp-create.pdf){width=95%}
+![C4 level 3: inside the create service. Nothing here is on the redirect path.](video/svg/c4-comp-create.svg){width=95%}
 
 <!-- stack:sections -->
 
@@ -466,7 +466,7 @@ they pick, you can go one level down. Background for each mechanism is in the bu
 
 *Drill.* "The etcd leader dies mid-lease. Can two servers end up holding the same thousand IDs?" No. The transaction commits only on a majority; a new leader has every committed entry, and an uncommitted one is retried against the new revision. The worst case is a wasted block, a gap.
 
-![Mechanism M1 at protocol level: two servers race; the revision decides; the log commits on a majority.](diagrams/video-seq-th-lease.pdf){width=95%}
+![Mechanism M1 at protocol level: two servers race; the revision decides; the log commits on a majority.](video/svg/seq-th-lease.svg){width=95%}
 
 ## Shared cache: Redis Cluster
 
@@ -498,7 +498,7 @@ they pick, you can go one level down. Background for each mechanism is in the bu
 
 *Course:* building-blocks course, part 9 §9.7 (stampede control) and part 6 §6.5 (hot keys).
 
-![Mechanisms M4 and M6 at work: three concurrent misses become one lookup; an invalidation, or the lifetime, ends the copy.](diagrams/video-seq-th-cache.pdf){width=95%}
+![Mechanisms M4 and M6 at work: three concurrent misses become one lookup; an invalidation, or the lifetime, ends the copy.](video/svg/seq-th-cache.svg){width=95%}
 
 ## Click log: Kafka
 
@@ -598,7 +598,7 @@ The interviewer picks; you should be able to run any of the eight. Each is writt
 the question, the risk, the naive answer, a failure case with numbers, the mechanism, why it works, the
 second-level push, what the first draft glosses over, weak answers, and the words to say.
 
-![The challenge map: eight attack points on the same baseline.](diagrams/video-map.pdf){width=95%}
+![The challenge map: eight attack points on the same baseline.](video/svg/map.svg){width=95%}
 
 ## 6.1 Two servers, one code (correctness)
 
@@ -624,9 +624,9 @@ the allocator in one compare-and-set and hands them out from memory. Every inser
 `UNIQUE(code)`, so the store, not the application, arbitrates aliases: one `201`, one `409`. Aliases live
 in their own namespace (eight characters or more).
 
-![The fix on the baseline: disjoint ranges and the constraint as the authority.](diagrams/video-ch1-fix.pdf){width=95%}
+![The fix on the baseline: disjoint ranges and the constraint as the authority.](video/svg/ch1-fix.svg){width=95%}
 
-![Ranges: coordination once per thousand links.](diagrams/video-ranges.pdf){width=90%}
+![Ranges: coordination once per thousand links.](video/svg/ranges.svg){width=90%}
 
 ```python
 def lease(store, size=1000):
@@ -684,7 +684,7 @@ network over 42 bits with a secret key, plus *cycle walking* (re-apply until the
 It is a bijection, so distinct IDs give distinct codes; neighbouring IDs give unrelated codes. Add a rate
 limit on `404`s per client so guessing is slow.
 
-![A keyed permutation: unique in, unique out, neighbours unrelated.](diagrams/video-feistel.pdf){width=90%}
+![A keyed permutation: unique in, unique out, neighbours unrelated.](video/svg/feistel.svg){width=90%}
 
 ```python
 N = 62 ** 7
@@ -743,7 +743,7 @@ on a restart, one row of the store (L2).
 **Single flight:** concurrent misses for one code wait on one lookup. **Negative caching** for unknown
 codes, so scanners' `404`s don't reach the store.
 
-![A thousand requests, one lookup.](diagrams/video-seq-ch3-flight.pdf){width=88%}
+![A thousand requests, one lookup.](video/svg/seq-ch3-flight.svg){width=88%}
 
 ```python
 inflight = {}                                   # code -> future
@@ -848,9 +848,9 @@ every redirect server drops the code, the edge is purged. The next request reads
 `410` with a warning page. The safety check on create and a rescan when the classifier's list updates
 prevent most takedowns from being needed.
 
-![The worst case if the invalidation event is lost: about two minutes against five.](diagrams/video-takedown-budget.pdf){width=85%}
+![The worst case if the invalidation event is lost: about two minutes against five.](video/svg/takedown-budget.svg){width=85%}
 
-![The takedown as a sequence.](diagrams/video-seq-takedown.pdf){width=90%}
+![The takedown as a sequence.](video/svg/seq-takedown.svg){width=90%}
 
 **Why it works.** S2 holds by arithmetic: the worst case is the sum of lifetimes along the path, and each
 was chosen to fit.
@@ -889,7 +889,7 @@ on the critical path.
 1,000 events to a log partitioned by code; an aggregator counts per code per minute, then per day per
 country. Buffer full: drop, and count the drops.
 
-![The click path on the baseline.](diagrams/video-ch6-fix.pdf){width=95%}
+![The click path on the baseline.](video/svg/ch6-fix.svg){width=95%}
 
 | Today (not billed) | If clicks are billed |
 |---|---|
@@ -898,7 +898,7 @@ country. Buffer full: drop, and count the drops.
 | Bots counted | Bots filtered before billing |
 | Minutes late | Same lag; exact once settled; stated in the billing terms |
 
-![Billed clicks: event IDs, a durable buffer, de-duplication.](diagrams/video-seq-ch6-billed.pdf){width=88%}
+![Billed clicks: event IDs, a durable buffer, de-duplication.](video/svg/seq-ch6-billed.svg){width=88%}
 
 ::: why
 **Precision about "exactly once".** Delivery is at least once; the *effect* is once per event ID because
@@ -926,13 +926,13 @@ to a store now read-only. Creates fail: the primary and the allocator's leader a
 caches; a redirect never crosses regions. **Creates are regional:** each region leases from its own slice
 of the ID space, so it can create alone; the store replicates asynchronously.
 
-![Each region answers its own redirects and creates in its own slice of the ID space.](diagrams/video-regions.pdf){width=92%}
+![Each region answers its own redirects and creates in its own slice of the ID space.](video/svg/regions.svg){width=92%}
 
 **The second-level push.** "A link created in Asia is clicked in Europe 200 ms later." The code's ID slice
 says which region created it (decode the permutation, read the top bits); on a local miss, one
 cross-region lookup, then cache it. One round trip slower, no error.
 
-![One cross-region lookup, not an error.](diagrams/video-seq-ch7-region.pdf){width=85%}
+![One cross-region lookup, not an error.](video/svg/seq-ch7-region.svg){width=85%}
 
 ::: why
 **What the first draft glosses over: negative caching meets replication lag.** Challenge 3 caches `404`s

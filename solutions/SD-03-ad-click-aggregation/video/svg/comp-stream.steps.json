@@ -1,0 +1,29 @@
+[
+  [
+    "e:log",
+    "e:src",
+    "l:src-log"
+  ],
+  [
+    "e:time",
+    "l:src-time"
+  ],
+  [
+    "e:dedup",
+    "e:ckpt",
+    "l:time-dedup",
+    "l:dedup-ckpt"
+  ],
+  [
+    "e:comb",
+    "e:win",
+    "l:dedup-comb",
+    "l:comb-win"
+  ],
+  [
+    "e:sink",
+    "e:live",
+    "l:win-sink",
+    "l:sink-live"
+  ]
+]

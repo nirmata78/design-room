@@ -153,7 +153,7 @@ Follow one payment, `p-7731`, for 1,050 minor units, from tap to settlement.
 
 ## The same story as a payment's states
 
-![The payment state machine. UNKNOWN is a real state with exactly two exits: the inquiry says approved, or the processor reports the reference as not found after its safe window. Any transition not drawn is rejected by the code.](diagrams/video-states.pdf){width=96%}
+![The payment state machine. UNKNOWN is a real state with exactly two exits: the inquiry says approved, or the processor reports the reference as not found after its safe window. Any transition not drawn is rejected by the code.](video/svg/states.svg){width=96%}
 
 Read the diagram as a contract: the only legal moves are the arrows. `CAPTURED -> AUTHORIZED`, or a capture
 on a `DECLINED` payment, cannot happen, because the update that would perform it carries the expected old
@@ -161,7 +161,7 @@ state in its `WHERE` clause and finds no row.
 
 ## Why the truth arrives over months
 
-![The truth timeline. The client wants an answer in two seconds; the processor's answer comes in about a second or not at all; an inquiry can settle an unknown in minutes; the settlement file arrives next day; a dispute can arrive months later.](diagrams/video-truth.pdf){width=94%}
+![The truth timeline. The client wants an answer in two seconds; the processor's answer comes in about a second or not at all; an inquiry can settle an unknown in minutes; the settlement file arrives next day; a dispute can arrive months later.](video/svg/truth.svg){width=94%}
 
 Every mechanism in this design lives at one point on that line:
 
@@ -177,7 +177,7 @@ design with reconciliation and no UNKNOWN state double-charges at "two seconds".
 
 ## One capture as entries
 
-![A capture of 1,050 with a fee of 30. Processor receivable is debited 1,050; merchant payable is credited 1,020; fee revenue is credited 30. Debits equal credits.](diagrams/video-entries.pdf){width=90%}
+![A capture of 1,050 with a fee of 30. Processor receivable is debited 1,050; merchant payable is credited 1,020; fee revenue is credited 30. Debits equal credits.](video/svg/entries.svg){width=90%}
 
 ## Where the load lands
 
@@ -188,7 +188,7 @@ second across the ledger partitions; 10 UNKNOWN outcomes a second for the inquir
 reconciliation; the processor taking up to 1.5 seconds of the 2-second budget at its 99th percentile.
 :::
 
-![The latency budget: our own work about 90 ms, the processor up to 1,500 ms at p99, 410 ms spare out of 2,000.](diagrams/video-budget.pdf){width=92%}
+![The latency budget: our own work about 90 ms, the processor up to 1,500 ms at p99, 410 ms spare out of 2,000.](video/svg/budget.svg){width=92%}
 
 \newpage
 
@@ -371,9 +371,9 @@ database and is the backstop when webhooks are lost.
 
 ## The data model
 
-![Conceptual model in Chen notation. A payment has attempts and posts journal transactions; a transaction contains at least two entries, each on one account; a balance is derived; a break may explain one transaction.](diagrams/video-erd-chen.pdf){width=96%}
+![Conceptual model in Chen notation. A payment has attempts and posts journal transactions; a transaction contains at least two entries, each on one account; a balance is derived; a break may explain one transaction.](video/svg/erd-chen.svg){width=96%}
 
-![Physical model. Journal entries are hashed by merchant into 64 partitions and only inserted. The payment row is the only mutable row, changed by conditional updates. Idempotency keys keep a request hash and the stored response. The outbox commits with the state.](diagrams/video-erd-physical.pdf){width=96%}
+![Physical model. Journal entries are hashed by merchant into 64 partitions and only inserted. The payment row is the only mutable row, changed by conditional updates. Idempotency keys keep a request hash and the stored response. The outbox commits with the state.](video/svg/erd-physical.svg){width=96%}
 
 | Table | Key | Mutability | Lose it? |
 |---|---|---|---|
@@ -408,7 +408,7 @@ Three versions on one baseline. Each is introduced by the objection to the one b
 
 ## Version 1: the simplest thing that works
 
-![V1. The merchant calls the API; the payment service charges the card synchronously; one transaction updates the payment's status and the merchant's balance column.](diagrams/video-base-v1.pdf){width=92%}
+![V1. The merchant calls the API; the payment service charges the card synchronously; one transaction updates the payment's status and the merchant's balance column.](video/svg/base-v1.svg){width=92%}
 
 **The objection:** a timeout leaves no answer, and the naive code marks it failed; the processor approves half a
 second later; the checkout retries as a new payment, which is approved: two holds on one card. And next month an
@@ -416,7 +416,7 @@ auditor asks why a balance is what it is, and the answer is a number updated in 
 
 ## Version 2: one effect per intent, and books that prove themselves
 
-![V2. The key is inserted first; the attempt is committed before the call; an adapter calls with our reference; the database holds a journal of immutable, balanced entries.](diagrams/video-base-v2.pdf){width=92%}
+![V2. The key is inserted first; the attempt is committed before the call; an adapter calls with our reference; the database holds a journal of immutable, balanced entries.](video/svg/base-v2.svg){width=92%}
 
 The heart of V2 is one transaction:
 
@@ -438,7 +438,7 @@ noticing.
 
 ## Version 3: close every loop
 
-![V3. An outbox relay feeds the event log and the webhook sender; an inquiry job resolves UNKNOWN payments by reference; reconciliation compares the processor's settlement file with expectations from the ledger and hands breaks to finance operations.](diagrams/video-base-v3.pdf){width=92%}
+![V3. An outbox relay feeds the event log and the webhook sender; an inquiry job resolves UNKNOWN payments by reference; reconciliation compares the processor's settlement file with expectations from the ledger and hands breaks to finance operations.](video/svg/base-v3.svg){width=92%}
 
 ```python
 def pay(req, key):
@@ -460,23 +460,23 @@ name; the sweeper catches it. After the final commit: done, and the response is 
 
 ## The numbered flows, one per functional requirement
 
-![FR1, pay. 1 pay · 2 create · 3 one transaction: key and AUTH_PENDING with attempt · 4 authorise · 5 by reference · 6 approved · 7 status · 8 the answer.](diagrams/video-flow-pay.pdf){width=90%}
+![FR1, pay. 1 pay · 2 create · 3 one transaction: key and AUTH_PENDING with attempt · 4 authorise · 5 by reference · 6 approved · 7 status · 8 the answer.](video/svg/flow-pay.svg){width=90%}
 
-![FR2, a refund. The conditional update, the processor refund with a reference made of the payment and the refund key, and a new journal transaction dated now.](diagrams/video-seq-refund.pdf){width=90%}
+![FR2, a refund. The conditional update, the processor refund with a reference made of the payment and the refund key, and a new journal transaction dated now.](video/svg/seq-refund.svg){width=90%}
 
-![FR3, notify. The outbox row commits with the state; the relay publishes; the webhook sender signs and retries; the merchant de-duplicates by event ID.](diagrams/video-seq-outbox.pdf){width=90%}
+![FR3, notify. The outbox row commits with the state; the relay publishes; the webhook sender signs and retries; the merchant de-duplicates by event ID.](video/svg/seq-outbox.svg){width=90%}
 
-![FR4, reconcile. The raw file is stored; expectations come from the ledger; matches settle payments; every unmatched line becomes a break owned by finance operations.](diagrams/video-flow-recon.pdf){width=90%}
+![FR4, reconcile. The raw file is stored; expectations come from the ledger; matches settle payments; every unmatched line becomes a break owned by finance operations.](video/svg/flow-recon.svg){width=90%}
 
-![FR5, explain. A balance comes from the projection with the entry it is current to; audit sums the entries for the period.](diagrams/video-seq-explain.pdf){width=90%}
+![FR5, explain. A balance comes from the projection with the entry it is current to; audit sums the entries for the period.](video/svg/seq-explain.svg){width=90%}
 
 ## The C4 views and the sequences
 
-![C4 level 1. A customer pays at a merchant; the merchant's system calls us; we call the processor and receive its settlement files; finance operations owns breaks. Two neighbours keep their own books of the same money.](diagrams/video-c4-context.pdf){width=92%}
+![C4 level 1. A customer pays at a merchant; the merchant's system calls us; we call the processor and receive its settlement files; finance operations owns breaks. Two neighbours keep their own books of the same money.](video/svg/c4-context.svg){width=92%}
 
-![C4 level 2. The API owns keys and the deadline; the payment service the state machine and postings; one relational database per partition holds payments, journal and outbox; the adapter owns references and error codes; relay, webhook sender, inquiry job and reconciliation complete the loops.](diagrams/video-base-v3.pdf){width=96%}
+![C4 level 2. The API owns keys and the deadline; the payment service the state machine and postings; one relational database per partition holds payments, journal and outbox; the adapter owns references and error codes; relay, webhook sender, inquiry job and reconciliation complete the loops.](video/svg/base-v3.svg){width=96%}
 
-![One payment as a sequence.](diagrams/video-seq-pay.pdf){width=92%}
+![One payment as a sequence.](video/svg/seq-pay.svg){width=92%}
 
 ::: why
 **Why one relational database per partition, not a log as the source of truth?** The posting must be atomic
@@ -646,13 +646,13 @@ partition, which 6.4 handles. **Shared accounts** (fee revenue, the processor re
 each partition has its own, and the company-wide figure is the sum of the mirrors. 64 logical partitions map to about ten
 primaries, so a rebalance moves a partition, not rows.
 
-![The same container view, with the type lines naming the technologies.](diagrams/video-c4-containers-tech.pdf){width=100%}
+![The same container view, with the type lines naming the technologies.](video/svg/c4-containers-tech.svg){width=100%}
 
-![Inside the payment service: where challenges 1 and 2 happen.](diagrams/video-c4-comp-service.pdf){width=100%}
+![Inside the payment service: where challenges 1 and 2 happen.](video/svg/c4-comp-service.svg){width=100%}
 
-![Inside one partition of the ledger database: where challenges 3 and 4 happen.](diagrams/video-c4-comp-db.pdf){width=100%}
+![Inside one partition of the ledger database: where challenges 3 and 4 happen.](video/svg/c4-comp-db.svg){width=100%}
 
-![Inside reconciliation: where challenge 5 happens.](diagrams/video-c4-comp-rec.pdf){width=100%}
+![Inside reconciliation: where challenge 5 happens.](video/svg/c4-comp-rec.svg){width=100%}
 
 ## Gateway or processor: why most companies use a gateway
 
@@ -718,7 +718,7 @@ payment is the processor, so the design that wins is the one that is **correct u
 
 ## 5.2 When you don't need all this (alternate path)
 
-![ALTERNATE: a gateway, one primary, a polled outbox.](diagrams/video-alt.pdf){width=100%}
+![ALTERNATE: a gateway, one primary, a polled outbox.](video/svg/alt.svg){width=100%}
 
 One adapter (the gateway); one PostgreSQL primary with a synchronous standby; the outbox polled every 200 ms; no Kafka, no
 Debezium, no partitions. **It gives up** one writer (about 1,200 commits a second), a replayable log, the gateway's fee premium
@@ -742,7 +742,7 @@ They are ordered so that each fix creates the next question.
 | 5 999,998 against 1,000,000 | 6.6, with 6.7 as its second push | 6.7 the bad release |
 | 6 How would you know before finance does? | 6.8 | |
 
-![The challenge map: the carried baseline with every attack point outlined.](diagrams/video-map.pdf){width=92%}
+![The challenge map: the carried baseline with every attack point outlined.](video/svg/map.svg){width=92%}
 
 ## 6.1 The bank timed out (the crux, part one)
 
@@ -776,9 +776,9 @@ request arrived and only the answer was lost, unless the processor de-duplicates
 6. **Ten days later**, the settlement file is the final arbiter: an approval the inquiry never confirmed appears there,
    becomes a break, and is fixed by an adjusting transaction and a message to the merchant.
 
-![The attack and the fix on the baseline. The inquiry job resolves UNKNOWN payments by our reference.](diagrams/video-ch1-fix.pdf){width=90%}
+![The attack and the fix on the baseline. The inquiry job resolves UNKNOWN payments by our reference.](video/svg/ch1-fix.svg){width=90%}
 
-![The next ten minutes as a sequence.](diagrams/video-seq-timeout.pdf){width=92%}
+![The next ten minutes as a sequence.](video/svg/seq-timeout.svg){width=92%}
 
 **Why it works.** S1 holds because no path creates a second movement for one intent: every retry carries the same
 key, and every processor call for one unknown attempt carries the same reference. L1 holds because every UNKNOWN has a
@@ -834,7 +834,7 @@ def insert_or_get(client, key, req_hash, create):
     return Stored(row.response)
 ```
 
-![One wins; the others read.](diagrams/video-seq-idem.pdf){width=90%}
+![One wins; the others read.](video/svg/seq-idem.svg){width=90%}
 
 **Why it works.** S1 is decided by the database's unique constraint: the one place every request must pass. The
 result is returned, not re-executed. A changed request under an old key is a client bug, so it is reported, not hidden.
@@ -868,7 +868,7 @@ shipped for an unpaid order).
 **The mechanism: the transactional outbox.** The event is a row in the same transaction as the state and the entries. A
 relay reads committed rows in order and publishes them, at least once; consumers and merchants de-duplicate by event ID.
 
-![Nothing is lost at the crash.](diagrams/video-seq-outbox.pdf){width=92%}
+![Nothing is lost at the crash.](video/svg/seq-outbox.svg){width=92%}
 
 **The second-level push:** *"The relay is twenty minutes behind. Or a merchant's endpoint is down for a day."* Outbox age
 is a metric with an alert. The relay publishes keyed by merchant, so one slow partition does not hold the others. Webhooks
@@ -892,7 +892,7 @@ order, so consumers should key their state by payment and ignore an event that w
 lock: about 670 a second at 1.5 ms each, against 5,000 arriving. The queue grows by 4,330 a second; within a second the
 merchant's payments pass 2 s and start timing out, becoming UNKNOWNs: this challenge feeds 6.1.
 
-![One balance row against one merchant's payment rate. Illustrative lock time; the ratio is the point.](diagrams/video-hot.pdf){width=90%}
+![One balance row against one merchant's payment rate. Illustrative lock time; the ratio is the point.](video/svg/hot.svg){width=90%}
 
 **The mechanism: append; derive; serialise only what must be serial.** Payments insert only their own entries: no shared
 row. A projection updates balances a few seconds behind, which is fine for dashboards. Where a check needs a current
@@ -949,7 +949,7 @@ chargeback."*
 update on the payment row, so exactly one of two racing refunds changes a row. A chargeback posts entries **dated now**, to
 a disputes account, referencing the payment; the closed month is never touched.
 
-![One refund wins; the month stays closed.](diagrams/video-seq-refund.pdf){width=90%}
+![One refund wins; the month stays closed.](video/svg/seq-refund.svg){width=90%}
 
 **The second-level push:** *"The merchant wins the dispute. Or the refund is in another currency."* A won dispute is one
 more transaction from the disputes account back to the merchant. Amounts stay in the original currency; a conversion is its
@@ -989,7 +989,7 @@ Matched lines move payments to `SETTLED` with settlement entries. Every unmatche
 their side, missing on ours, amount, timing), an owner and an age. Timing breaks close themselves when the next file matches;
 real breaks get an adjusting transaction with a reason.
 
-![From the file to an owned break.](diagrams/video-seq-recon.pdf){width=92%}
+![From the file to an owned break.](video/svg/seq-recon.svg){width=92%}
 
 **The second-level push:** *"Forty thousand breaks this morning, not forty."* That is an incident, not a backlog. Classify by
 type and processor first: one cause usually explains thousands of lines. Hold payouts if the break amount crosses a threshold.
@@ -1029,7 +1029,7 @@ about money already paid out.
    each. A business decision with communication, not a database operation.
 5. **Learn:** why did idempotency not catch it?
 
-![The correction, step by step.](diagrams/video-seq-correct.pdf){width=90%}
+![The correction, step by step.](video/svg/seq-correct.svg){width=90%}
 
 **Why idempotency did not catch it:** it guards *requests*, not code paths. There was one request with one key; the bug posted
 twice inside it, with a new transaction ID each time. The invariant that stops the class is a unique constraint on
@@ -1069,7 +1069,7 @@ are down.
 | breaks up today | UNKNOWN up yesterday | the inquiry is not resolving |
 | debits − credits non-zero | anything | stop and page: a posting bug |
 
-![The probe, end to end.](diagrams/video-seq-probe.pdf){width=88%}
+![The probe, end to end.](video/svg/seq-probe.svg){width=88%}
 
 **The second-level push:** *"The approval rate drops slowly: half a point a week."* Compare weekly, per segment, against a
 seasonal baseline; give approval rate an owner in payments operations who reviews it with the processor every week.

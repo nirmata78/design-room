@@ -55,9 +55,9 @@ Sequence numbers decide what is newer; lanes decide what goes first.**
 
 # Part I: The system in pictures
 
-![Two products from one stream.](diagrams/video-tension.pdf){width=95%}
+![Two products from one stream.](video/svg/tension.svg){width=95%}
 
-![The seams: which earlier question each part comes from.](diagrams/video-seams.pdf){width=100%}
+![The seams: which earlier question each part comes from.](video/svg/seams.svg){width=100%}
 
 ## Vocabulary
 
@@ -80,7 +80,7 @@ Sequence numbers decide what is newer; lanes decide what goes first.**
 5. Every five minutes, the lake sink writes it to Iceberg, in its event day and vehicle bucket, sorted.
 6. Two years later, an auditor reads that vehicle's hour from one bucket at a pinned snapshot in about ten seconds.
 
-![Version 4, with the mechanisms on it.](diagrams/video-recap.pdf){width=100%}
+![Version 4, with the mechanisms on it.](video/svg/recap.svg){width=100%}
 
 ::: load
 **Ingest:** 1 M positions/s at rush hour, 300 MB/s (900 MB/s replicated), 512 partitions. **Live store:** 400 MB. **Map:** 5,000
@@ -102,7 +102,7 @@ viewers, ~100 counts each per second zoomed out, ~400 deltas zoomed in. **Lake:*
 
 FR1 Report · FR2 Watch · FR3 Replay · FR4 Alert. The map may drop a point; the history may not.
 
-![C4 level 1.](diagrams/video-c4-context.pdf){width=90%}
+![C4 level 1.](video/svg/c4-context.svg){width=90%}
 
 # Stage 2: Back-of-the-envelope
 
@@ -119,7 +119,7 @@ FR1 Report · FR2 Watch · FR3 Replay · FR4 Alert. The map may drop a point; th
 questions it will be asked."
 :::
 
-![The freshness budget.](diagrams/video-budget.pdf){width=95%}
+![The freshness budget.](video/svg/budget.svg){width=95%}
 
 # Stage 3: API and data
 
@@ -135,17 +135,17 @@ PUBLISH v/v-311/pos
 `WS /v1/map` (viewport, zoom → snapshot, then deltas or counts) · `GET /v1/vehicles/{id}/track?from&to` (every fix by seq, at a pinned
 snapshot) · a separate safety topic to dispatch.
 
-![Conceptual model.](diagrams/video-erd-chen.pdf){width=95%}
+![Conceptual model.](video/svg/erd-chen.svg){width=95%}
 
-![Physical model.](diagrams/video-erd-physical.pdf){width=95%}
+![Physical model.](video/svg/erd-physical.svg){width=95%}
 
 # Stage 4: High-level design
 
-![V1: a log and a lake.](diagrams/video-base-v1.pdf){width=100%}
+![V1: a log and a lake.](video/svg/base-v1.svg){width=100%}
 
-![V2: the live view (SD-03's hot path).](diagrams/video-base-v2.pdf){width=100%}
+![V2: the live view (SD-03's hot path).](video/svg/base-v2.svg){width=100%}
 
-![V3: a safety lane and a replay API.](diagrams/video-base-v3.pdf){width=100%}
+![V3: a safety lane and a replay API.](video/svg/base-v3.svg){width=100%}
 
 | Where a position waits | Bound | When it fills |
 |---|---|---|
@@ -155,17 +155,17 @@ snapshot) · a separate safety topic to dispatch.
 | The updater | checkpointed state | resume from offsets |
 | The map push | 1 s tick | drop deltas, resend snapshot |
 
-![The live path, numbered.](diagrams/video-flow-live.pdf){width=100%}
+![The live path, numbered.](video/svg/flow-live.svg){width=100%}
 
-![The history path, numbered.](diagrams/video-flow-history.pdf){width=100%}
+![The history path, numbered.](video/svg/flow-history.svg){width=100%}
 
 # Stage 5: Components and technologies
 
-![The vehicle uplink.](diagrams/video-c4-comp-uplink.pdf){width=100%}
+![The vehicle uplink.](video/svg/c4-comp-uplink.svg){width=100%}
 
-![The state updater.](diagrams/video-c4-comp-updater.pdf){width=100%}
+![The state updater.](video/svg/c4-comp-updater.svg){width=100%}
 
-![The map API.](diagrams/video-c4-comp-map.pdf){width=100%}
+![The map API.](video/svg/c4-comp-map.svg){width=100%}
 
 <!-- stack:sections -->
 
@@ -256,7 +256,7 @@ table partitioned by day, and a PostGIS map. Keep the sequence numbers and the l
 
 ## 6.1 Out of the tunnel (the crux)
 
-![Latest first; backfill to history.](diagrams/video-seq-ch1-tunnel.pdf){width=85%}
+![Latest first; backfill to history.](video/svg/seq-ch1-tunnel.svg){width=85%}
 
 Keyed state holds the last sequence per vehicle; anything at or below it goes to history only; the live store also compares on
 write. Timestamps cannot order: arrival time reverses backlogs, the vehicle's clock jumps, and two fixes can share a millisecond.
@@ -316,7 +316,7 @@ return sort_by(rows, (epoch, seq))
 
 ## 6.6 Forty seconds stale (observability)
 
-![V4: a freshness probe.](diagrams/video-base-v4.pdf){width=100%}
+![V4: a freshness probe.](video/svg/base-v4.svg){width=100%}
 
 A canary vehicle per city publishes through the real gateway, drives a route across cells, is watched by a probe viewer on every map
 pod, raises a safety event every ten minutes, and has its history replayed hourly. With age-on-screen reported by browsers and

@@ -13,15 +13,24 @@ marker are spoken over the slide with nothing revealed. A slide that has units m
 made with steps=False (then it is shown whole: thesis cards, "if asked" slides).
 
 REVEAL_REPORT=1 python3 gen.py  does not stop at the first slide whose markers do not match its units: it lists every one, with
-the source file and line, the unit count and the reveal count, and writes nothing. Used to retrofit older solutions (RETROFIT.md).
+the source file and line, the unit count and the reveal count, and writes nothing.
+
+One source, three outputs (2026-11-28, issue #5): write() emits the deck (video-slides.html) and the narration script
+(<stem>.script.md) — both build intermediates — and write_reference_markdown() emits SD-NN_<Title>_Reference_Design.md, the
+tracked GitHub-Pages document, from the same slides and lines. Nothing in the Markdown is written by hand.
+
+This module lives in the kit (.claude/skills/reference-solution/kit/dsl.py); a solution's video/src/gen.py imports it from
+there and never keeps a copy. The six-chapter structure (GUIDELINES §3): 1 prompt + context · 2 estimates · 3 API + data ·
+4 C4 evolution through interviewer challenges · 5 the alternate path · 6 recap.
 """
 import html as _h, json, os, pathlib, re, sys
 
 SL = []          # list of dict(kind, html, say, name, chapter, steps)
-STAGES = ["Requirements", "Estimates", "Theory", "API + data", "Design", "Challenges", "Cost · AUX", "Recap"]
+STAGES = ["Prompt + context", "Estimates", "API + data", "Design + challenges", "Alternate", "Recap"]
 META = dict(title="SD-NN: slides", heading="# SD-NN: reference solution", stem="reference", svg=None,
             voices="N=af_heart@0.92 I=bf_emma@0.95 C=am_michael@0.9 V=am_michael@0.84", names="C=Candidate V=Candidate N=Coach I=Interviewer",
-            say="", automark=False, chapters=9)   # chapters: the last chapter number ("Chapter n of N"); 8 in the compact cut
+            say="", automark=False, chapters=6,   # chapters: the last chapter number ("Chapter n of N")
+            md=None)                     # write_reference_markdown() settings: dict(path, title, description, question_id, level, tags)
 _cur = {"n": None}
 
 def e(s): return _h.escape(s, quote=False)
@@ -42,7 +51,7 @@ def chapter(n, title, stage, sub, say, aux=False):
     ribbon = "".join(f'<span class="{"done" if i < stage else ("on" if i == stage else "")}">{s}</span>' for i, s in enumerate(STAGES))
     body = (f'<div class="lbl">Chapter {n} of {META.get("chapters", 9)}</div><div class="s">{title}</div><div class="sub">{sub}</div>'
             f'<div class="ribbon">{ribbon}</div>')
-    S(body, say if isinstance(say, list) else [say], cls="th" + (" aux" if aux else ""), name="card " + title, steps=False)
+    S(body, say if isinstance(say, list) else [say], cls="th chap" + (" aux" if aux else ""), name="card " + title, steps=False)
 
 def subchapter(label, title, intro=None, sub=""):
     """A sub-section (5.1, 7.1 ...) with its own title card and a spoken one-sentence introduction."""
@@ -108,7 +117,7 @@ def tech(kicker, title, pick, how, rejected, cite=None, cls=""):
     return plain(kicker, title, inner)
 
 
-# ══ 2026-11-25 additions: descriptive property ids, mechanism and option infographics, PlantUML, objections, follow-ups ══
+# ══ 2026-11-25 additions: descriptive property ids, mechanism and option infographics, objections, follow-ups ══
 # Properties carry a slug, never a bare code: [S1-no-twice-coll], not S1. Declare them once; use pid() on slides and ps() in speech.
 PROPS = {}      # "S1" -> "no-twice-coll"
 def props(**kw):
@@ -136,12 +145,12 @@ def lint_props():
                 bad.append((s["src"], "speech", ln[:60]))
     if bad: raise SystemExit("bare property codes (use pid('S1') on slides and ps('S1') in speech):\n" + "\n".join(map(str, bad[:12])))
 
-_KIND = {"c4": "C4", "seq": "SEQUENCE", "erd": "ERD", "state": "STATE MACHINE", "none": ""}
+_KIND = {"c4": "C4", "seq": "SEQUENCE", "erd": "ERD", "state": "STATE MACHINE", "fig": "FIGURE", "none": ""}
 def dtag(kind):
     """The diagram-type pill: which picture type fits this mechanism or option (C4 · SEQUENCE · ERD · STATE MACHINE)."""
     return f'<span class="dtag {kind}">{_KIND[kind]}</span>' if kind != "none" else ""
 
-def mech_slide(n, total, name, protects, how, rules, costs, say, diagram=None, live=True, short=None, part="4 of 5"):
+def mech_slide(n, total, name, protects, how, rules, costs, say, diagram=None, live=True, short=None, part=None):
     """A theory mechanism as a composite infographic: the shorthand name with its diagram type, the four fixed blocks on the left
     (property protected · how it works · failure ruled out · cost) and the picture on the right.
     diagram = ("c4"|"seq"|"erd"|"state", svg_name, "Figure caption") or None (text-only, then the four blocks span the slide).
@@ -151,11 +160,11 @@ def mech_slide(n, total, name, protects, how, rules, costs, say, diagram=None, l
               f'<div class="prop"><div class="lbl">How it works</div><p>{how}</p></div>'
               f'<div class="prop safe"><div class="lbl">Rules out</div><p>{rules}</p></div>'
               f'<div class="prop cost"><div class="lbl">Costs</div><p>{costs}</p></div>')
-    head = f'<div class="k">Theory · {part} · mechanism {n} of {total}</div><h1>{short or name} {dtag(kind)}</h1>'
+    head = f'<div class="k">{part or "Mechanism"} · {n} of {total}</div><h1>{short or name} {dtag(kind)}</h1>'
     inner = f'<div class="info"><div class="infol">{blocks}</div><div class="infor">{fig(svg, cap)}</div></div>' if svg else blocks
     S(head + inner, say, cls="theory" + (" infocomp" if svg else ""), name=f"mech {n} {name}")
 
-def option_slide(letter, name, verdict, pros, cons, pits, svg, say, pick=False, kind="c4", cap=None, part="5 of 5"):
+def option_slide(letter, name, verdict, pros, cons, pits, svg, say, pick=False, kind="c4", cap=None, part="Options"):
     """One option of the options matrix as its own infographic: pros, cons, the architecture drawn (C4 by default) and red pitfall boxes.
     pros, cons: lists of short strings (one reveal unit each). pits: pitfalls and edge cases, each a red box.
     The compact matrix table still follows these slides as the summary; it is not the place to explain an option."""
@@ -164,7 +173,7 @@ def option_slide(letter, name, verdict, pros, cons, pits, svg, say, pick=False, 
              f'<div class="pc"><div class="col"><b class="t">Pros</b>{li("pro", pros)}</div><div class="col"><b class="t">Cons</b>{li("con", cons)}</div></div>'
              f'<div class="pits"><b class="t">Pitfalls and edge cases</b>{li("pit", pits)}</div></div>'
              f'<div class="optr">{fig(svg, cap)}</div></div>')
-    S(f'<div class="k">Theory · {part} · option {letter}</div><h1>{letter} · {name} {dtag(kind)}</h1>' + inner, say,
+    S(f'<div class="k">{part} · option {letter}</div><h1>{letter} · {name} {dtag(kind)}</h1>' + inner, say,
       cls="theory infocomp" + (" pickopt" if pick else ""), name=f"option {letter} {name}")
 
 def objection(v, objection_text, svg, say, kind="seq", cap=None, extra=""):
@@ -280,6 +289,8 @@ def hide_css(pid, units, vis, fresh):
                 k = f'#{pid} figure[data-f="{u[1]}"] [data-k="{key}"]'
                 if i >= vis: sel.append(k)
     css = (",".join(sel) + "{visibility:hidden}") if sel else ""
+    rows = [k.replace(' [', ' tr[') for k in sel if ' [data-u=' in k]
+    css += (",".join(rows) + "{display:none}") if rows else ""     # a row not yet revealed takes no space: no empty ruled rows
     css += "".join(f"{k.replace(' [', ' tr[')} > td{{background:var(--now)}}" for k in now)   # only rows match: a soft tint on the row just added
     return f"<style>{css}</style>" if css else ""
 
@@ -388,8 +399,7 @@ def write(outdir):
     if os.environ.get("REVEAL_REPORT"):
         report(svgdir)
     lint_props()
-    only = os.environ.get("ONLY_CHAPTER")          # ONLY_CHAPTER=3 → the theory pass: video-theory.html + theory.script.md (SKILL §4: theory is rendered first)
-    sl = [s for s in SL if not only or (s["chapter"] and str(s["chapter"][0]).split(".")[0] == only)]
+    sl = list(SL)
     plan = []
     for s in sl:
         h, units = tag_units(s["html"], svgdir)
@@ -411,7 +421,7 @@ def write(outdir):
             '<link rel="stylesheet" href="style.css">\n<link rel="stylesheet" href="deck.css">\n<link rel="stylesheet" href="video.css">\n<link rel="stylesheet" href="google-theme.css">\n'
             '<style>:root{--qid:"' + (re.search(r"SD-\d+", str(out.resolve())) or re.search(r"(.*)", "SD")).group(0) + '"}</style>\n</head><body>\n')
     parts, script = [head], [META["heading"] + "\n"]
-    script.append("<!-- Video script for slide-video-kit/scripts/build_video.py. [slide: v-NNN] = frames/v-NNN.png; [reveal: v-NNN] = the next\n"
+    script.append("<!-- Video script for the reference-solution kit's build_video.py. [slide: v-NNN] = frames/v-NNN.png; [reveal: v-NNN] = the next\n"
                   "     reveal step of the same slide. Generated from src/*.py: edit the sources, not this file. -->")
     script.append(f"<!-- voices: {META['voices']} -->")
     script.append(f"<!-- names: {META['names']} -->")
@@ -431,7 +441,7 @@ def write(outdir):
             page += 1; pid = f"p{page}"
             cls = ("slide " + s["cls"]).strip()
             parts.append(f"<!-- {nm(page)} · slide {n}{f' step {j+1}/{len(pg)}' if len(pg) > 1 else ''} · {e(s['name'] or re.sub('<[^>]+>', ' ', s['html'])[:40])} -->\n"
-                         f'<div class="{cls}" id="{pid}" data-n="{n}">{hide_css(pid, units, vis, fresh if j else vis)}\n{h}\n</div>\n')
+                         f'<div class="{cls}" id="{pid}" data-n="{n}" data-frame="{nm(page)}">{hide_css(pid, units, vis, fresh if j else vis)}\n{h}\n</div>\n')
             fresh = vis
             body = strip_edge_pauses(list(lines), j == 0, j == len(pg) - 1)
             if j == 0:
@@ -442,8 +452,8 @@ def write(outdir):
         script += tail; script.append("")
         prev = k
     parts.append("</body></html>\n")
-    (out / ("video-theory.html" if only else "video-slides.html")).write_text("".join(parts), encoding="utf-8")
-    (out / (f"{META['stem']}-theory.script.md" if only else f"{META['stem']}.script.md")).write_text("\n".join(script), encoding="utf-8")
+    (out / "video-slides.html").write_text("".join(parts), encoding="utf-8")
+    (out / f"{META['stem']}.script.md").write_text("\n".join(script), encoding="utf-8")
     if AUTOMARKED: print(f"automarked {len(AUTOMARKED)} legacy slides (hand-place markers to refine): {AUTOMARKED[:6]} …")
     return len(SL), total
 
@@ -478,7 +488,7 @@ def _node(script, cachefile, key, payload):
 def tex(src):
     """A display formula as MathML."""
     m = _node("tex.js", "tex.json", f"1|{src}", [src, True]).replace(' display="block"', "")
-    return f'<div class="fxone">{m}</div>'
+    return f'<div class="fxone" data-tex="{_h.escape(src)}">{m}</div>'
 
 # Code on a 1080p slide (2026-11-22): pseudocode by default; a real language only when its idiom is the lesson (the exact
 # client call, the conditional write). Short lines, few of them, and the lines the narration is about marked as key lines.
@@ -538,45 +548,288 @@ def pseudo(src, hl=()):
     """Pseudocode (the default for code on a slide)."""
     return code(src, "pseudo", hl)
 
-# ══ one source for the video and the GitHub Markdown design (2026-11-25): the theory chapter is written once, as slides ══
-def _md_inline(h):
-    h = re.sub(r"<br\s*/?>", " ", h); h = re.sub(r"</?(b|strong)[^>]*>", "**", h); h = re.sub(r"</?em>", "*", h)
-    h = re.sub(r'<b class="pid[^>]*>(.*?)</b>', r"`\1`", h)
-    h = re.sub(r"<[^>]+>", "", h)
-    return _h.unescape(h).replace("**  **", " ").strip()
 
-def slide_markdown(s, figdir="diagrams/video-", ext=".svg"):
-    """One theory slide as GitHub Markdown: heading, blocks as bullets, tables as tables, the figure as an image."""
-    h, out = s["html"], []
-    t = re.search(r"<h1[^>]*>(.*?)</h1>", h, re.S)
-    k = re.search(r'<div class="(?:k|lbl)[^"]*">(.*?)</div>', h, re.S)
-    if t: out.append("### " + re.sub(r"\s+", " ", _md_inline(re.sub(r'<span class="dtag[^>]*>(.*?)</span>', r" · \1", t.group(1)))))
-    if k: out.append("*" + _md_inline(k.group(1)) + "*")
-    s_ = re.search(r'<div class="s">(.*?)</div>', h, re.S)
-    if s_: out.append("> " + _md_inline(s_.group(1)))
-    for m in re.finditer(r'<div class="prop[^"]*"><div class="lbl">(.*?)</div><p>(.*?)</p></div>', h, re.S):
-        out.append(f"- **{_md_inline(m.group(1))}.** {_md_inline(m.group(2))}")
-    for m in re.finditer(r'<div class="verdict[^"]*">(.*?)</div>', h, re.S): out.append(f"**{_md_inline(m.group(1))}**")
-    for cls, lab in (("pro", "✅ Pro"), ("con", "➖ Con"), ("pit", "🔴 Pitfall")):
-        for m in re.finditer(rf'<div class="{cls}">(.*?)</div>', h, re.S): out.append(f"- {lab}: {_md_inline(m.group(1))}")
-    for m in re.finditer(r'<div class="cd[^"]*"><h3>(.*?)</h3><p>(.*?)</p></div>', h, re.S):
-        out.append(f"- **{_md_inline(m.group(1))}.** {_md_inline(m.group(2))}")
-    for tb in re.finditer(r"<table[^>]*>(.*?)</table>", h, re.S):
-        rows = [[_md_inline(c) for c in re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", r, re.S)] for r in re.findall(r"<tr[^>]*>(.*?)</tr>", tb.group(1), re.S)]
-        if rows:
-            out += ["", "| " + " | ".join(rows[0]) + " |", "|" + "---|" * len(rows[0])] + ["| " + " | ".join(r) + " |" for r in rows[1:]]
-    for m in re.finditer(r'<figure[^>]*data-f="([\w.-]+)"[^>]*>.*?(?:<figcaption>(.*?)</figcaption>)?</figure>', h, re.S):
-        out += ["", f"![{_md_inline(m.group(2) or m.group(1))}]({figdir}{m.group(1)}{ext})"]
-    return "\n".join(x for x in out) + "\n"
 
-def sync_theory_md(md_path, chapter="3"):
-    """Replace the region between <!-- theory:begin --> and <!-- theory:end --> in the Markdown design with the theory chapter
-    generated from the slides (mechanisms with their diagram type, each option with pros, cons and pitfalls, the matrix)."""
-    p = pathlib.Path(md_path)
-    if not p.exists(): return False
-    md = p.read_text(encoding="utf-8")
-    if "<!-- theory:begin -->" not in md: return False
-    parts = [slide_markdown(s) for s in SL if s["chapter"] and str(s["chapter"][0]).split(".")[0] == chapter and not s["name"].startswith("card ")]
-    body = "<!-- theory:begin -->\n<!-- generated from video/src/ch3.py by dsl.sync_theory_md: edit the slides, not this region -->\n\n" + "\n".join(parts) + "\n<!-- theory:end -->"
-    md = re.sub(r"<!-- theory:begin -->.*?<!-- theory:end -->", lambda m: body, md, flags=re.S)
-    p.write_text(md, encoding="utf-8"); return True
+# ══ 2026-11-28 (issue #5): C4-first, challenge-driven helpers ══════════════════════════════════════════════════════════════
+HEADER_PT = 880      # usable width of a stage header, in points (13.333 in − padding)
+
+def _header_pt(kicker, title):
+    """Approximate width of a stage header: kicker in 11 pt tracked caps, title in 22 pt Plus Jakarta Sans."""
+    t = re.sub(r"<[^>]+>", "", title)
+    return len(kicker) * 11 * 0.78 + 12 + len(t) * 22 * 0.52
+
+
+def stage(kicker, title, svg, say, cap=None, vtag=None, extra="", name="", steps=True, q=False, red=False):
+    """A diagram-only slide for a C4 view or a delta of it (c4-structurizr slot "stage"): one-line header, the figure fills
+    the frame. The caption is not drawn on the frame; it becomes the figure's alt text in the Markdown.
+    The header must fit on one line (a wrapped header pushes the figure down and reads as a mistake): shorten the title."""
+    if _header_pt(kicker, title) > HEADER_PT:
+        raise SystemExit(f"{_where()}: stage header too long for one line ({_header_pt(kicker, title):.0f} > {HEADER_PT} pt): "
+                         f"{kicker!r} + {title!r}. Shorten the title (move detail into the narration).")
+    v = f'<span class="vtag">{vtag}</span>' if vtag else ""
+    h1 = f'<h1 class="q">' if q else "<h1>"
+    k = f'<span class="k{" r" if red else ""}">{kicker}</span>'
+    S(f'{h1}{k}{v}{title}</h1>' + fig(svg, cap) + extra, say, cls="dia stage", name=name or title, steps=steps)
+
+
+def zoom(kicker, title, svg, cards, say, cap=None, q=False, red=False, title2=None):
+    """A C4 zoom in two slides (2026-11-28): the full component (or container) view with the boxes in play marked and the rest
+    dimmed, full frame — then the explanation as cards at full size. Replaces a small diagram over a strip of cards, which put
+    1080p labels under 14 px. The narration is split where the figure's reveal steps run out: the lines up to the last figure
+    step stay with the picture, the rest (one [+] per card) go with the cards. Same title on both, so it reads as one beat."""
+    n_fig = len(json.loads((pathlib.Path(META["svg"]) / f"{svg}.steps.json").read_text()))
+    fig_say, card_say, cnt = [], [], 0
+    for ln in say:
+        m = MARK.match(ln)
+        if m and not card_say and cnt >= n_fig:
+            card_say.append(ln)
+            continue
+        if m and not card_say:
+            cnt += n_fig if m.group(1) == "*" else int(m.group(1) or 1)
+        (card_say if card_say else fig_say).append(ln)
+    if not card_say:
+        raise SystemExit(f"{_where()}: zoom {svg!r}: the narration reveals only the figure's {n_fig} steps; add one [+] per card after them")
+    stage(kicker, title, svg, fig_say, cap=cap, q=q, red=red, name=f"zoom {svg}")
+    S(plain(kicker, title2 or title, cards, q=q, red=red), card_say, cls="zoomcards", name=f"zoom cards {svg}")
+
+
+def challenge(n, total, title, question, intro=None):
+    """Open challenge 4.n: a sub-chapter card (spoken by the coach) and the interviewer's question, verbatim."""
+    subchapter(f"4.{n}", f"Challenge {n}: {title}", intro or [f"N: Challenge {n} of {total}."])
+    qs(f"Interviewer · challenge {n} of {total}", f"“{question}”", [f"I: {question}", "[pause: 2.0]"])
+
+
+def push(question):
+    """The interviewer goes one level deeper on the fix just given ("what if the fix fails?")."""
+    qs("Interviewer · one level deeper", f"“{question}”", [f"I: {question}", "[pause: 1.5]"])
+
+
+# ══ single-source Markdown (issue #5, Workstream 3) ═══════════════════════════════════════════════════════════════════════
+# The reference design is the slides and the narration, rendered for reading: every slide becomes a section with its
+# visual (tables, code, formulas, figures) and the spoken lines beneath it — the candidate's lines as prose, the interviewer
+# as quotes, "If asked, I'd say" as a TIP and the coach as IMPORTANT. Edit video/src/*.py, never the .md.
+from html.parser import HTMLParser as _HP
+
+class _Node:
+    __slots__ = ("tag", "attrs", "kids")
+    def __init__(self, tag, attrs): self.tag, self.attrs, self.kids = tag, dict(attrs), []
+    @property
+    def cls(self): return set((self.attrs.get("class") or "").split())
+
+class _Tree(_HP):
+    VOID = {"br", "img", "hr", "meta", "link", "input"}
+    def __init__(self):
+        super().__init__(convert_charrefs=True); self.root = _Node("root", {}); self.stack = [self.root]
+    def handle_starttag(self, tag, attrs):
+        n = _Node(tag, attrs); self.stack[-1].kids.append(n)
+        if tag not in self.VOID: self.stack.append(n)
+    def handle_endtag(self, tag):
+        for i in range(len(self.stack) - 1, 0, -1):
+            if self.stack[i].tag == tag: del self.stack[i:]; return
+    def handle_data(self, d): self.stack[-1].kids.append(d)
+    def handle_comment(self, d):
+        if d.startswith("SVG:"): self.stack[-1].kids.append(_Node("svgref", [("name", d[4:])]))
+
+def _tree(h):
+    t = _Tree(); t.feed(h); t.close(); return t.root
+
+def _text(n):
+    """Inline Markdown of a node: bold, italics, code, property tags; whitespace collapsed."""
+    if isinstance(n, str): return n.replace("|", "\\|")
+    if n.tag in ("style", "svg", "svgref", "math"): return ""
+    if n.tag == "br": return " "
+    inner = "".join(_text(k) for k in n.kids)
+    if n.tag in ("b", "strong") and "pid" in n.cls: return f"`{inner.strip()}`"
+    if n.tag in ("b", "strong") and "t" not in n.cls: return f"**{inner.strip()}**" if inner.strip() else ""
+    if n.tag in ("em", "i") and inner.strip() and inner.strip() != "·": return f"*{inner.strip()}*"
+    if n.tag == "code": return f"`{inner}`"
+    if n.tag == "span" and "dtag" in n.cls: return f" · {inner}"
+    return inner
+
+def _clean(s): return re.sub(r"\s+", " ", s).strip()
+
+def _find(n, pred):
+    out = []
+    def walk(x):
+        if isinstance(x, str): return
+        if pred(x): out.append(x); return
+        for k in x.kids: walk(k)
+    walk(n); return out
+
+def _first(n, pred):
+    r = _find(n, pred); return r[0] if r else None
+
+def _plain(n):
+    if isinstance(n, str): return n
+    return "".join(_plain(k) for k in n.kids)
+
+def _table_md(t):
+    rows = []
+    for tr in _find(t, lambda x: x.tag == "tr"):
+        rows.append([_clean(_text(c)) for c in tr.kids if not isinstance(c, str) and c.tag in ("td", "th")])
+    if not rows: return []
+    if "tl" in t.cls:                                   # a trace: time | event
+        return ["| When | What happens |", "|---|---|"] + [f"| {' | '.join(r)} |" for r in rows]
+    w = max(len(r) for r in rows)
+    rows = [r + [""] * (w - len(r)) for r in rows]
+    return [f"| {' | '.join(rows[0])} |", "|" + "---|" * w] + [f"| {' | '.join(r)} |" for r in rows[1:]]
+
+_LANG_MD = {"pseudocode": "text", "pseudo": "text"}
+_BLOCK = {"fixb": "The fix", "case": "", "whyb": "", "hedge": "", "techhow": "How it is built", "grade": ""}
+
+def _body_md(n, figdir):
+    """Block-level Markdown for one slide's HTML (headings handled by the caller)."""
+    out = []
+    def walk(x):
+        if isinstance(x, str):
+            s = _clean(x)
+            if s: out.append(s)
+            return
+        c = x.cls
+        if x.tag in ("h1", "style") or c & {"k", "who", "pz", "lbl", "ribbon", "sub"}: return
+        if x.tag == "table": out.extend([""] + _table_md(x) + [""]); return
+        if x.tag == "pre":
+            lang = _LANG_MD.get(x.attrs.get("data-lang", ""), x.attrs.get("data-lang", ""))
+            lines = [_plain(k) for k in x.kids if not isinstance(k, str) and "ln" in k.cls] or _plain(x).split("\n")
+            out.extend(["", f"```{lang}"] + [l.rstrip() for l in lines] + ["```", ""]); return
+        if "fxone" in c:
+            out.extend(["", "$$", _h.unescape(x.attrs.get("data-tex", "")), "$$", ""]); return
+        if x.tag == "figure":
+            ref = _first(x, lambda y: y.tag == "svgref"); cap = _first(x, lambda y: y.tag == "figcaption")
+            name = ref.attrs["name"] if ref else x.attrs.get("data-f", "")
+            alt = _clean(_text(cap)) if cap else name
+            out.extend(["", f"![{alt}]({figdir}{name}.svg)", ""]); return
+        if "cd" in c:
+            h3 = _first(x, lambda y: y.tag == "h3"); p_ = _first(x, lambda y: y.tag == "p")
+            out.append(f"- **{_clean(_text(h3)) if h3 else ''}.** {_clean(_text(p_)) if p_ else ''}"); return
+        if "tile" in c:
+            b = _first(x, lambda y: y.tag == "b"); sp = _first(x, lambda y: y.tag == "span")
+            out.append(f"- **{_clean(_text(b)) if b else ''}** — {_clean(_text(sp)) if sp else ''}"); return
+        if "prop" in c:
+            l = _first(x, lambda y: "lbl" in y.cls); p_ = _first(x, lambda y: y.tag == "p")
+            out.append(f"- **{_clean(_plain(l)) if l else ''}.** {_clean(_text(p_)) if p_ else ''}"); return
+        if c & {"pro", "con", "pit"}:
+            lab = {"pro": "Pro", "con": "Con", "pit": "Pitfall"}[next(iter(c & {"pro", "con", "pit"}))]
+            out.append(f"- *{lab}:* {_clean(_text(x))}"); return
+        if "rejb" in c:
+            out.append(f"- **Rejected:** {_clean(_text(x)).replace('Rejected', '', 1).strip()}"); return
+        if "grade" in c:
+            t = _first(x, lambda y: "t" in y.cls); body = _clean("".join(_text(k) for k in x.kids if k is not t))
+            out.extend(["", "> [!IMPORTANT]", f"> **{_clean(_plain(t)) if t else 'Graded here'}.** {body.strip()}", ""]); return
+        if c & set(_BLOCK):
+            t = _first(x, lambda y: y.tag == "b" and "t" in y.cls)
+            title = _clean(_plain(t)) if t else _BLOCK[next(iter(c & set(_BLOCK)))]
+            body = _clean("".join(_text(k) for k in x.kids if k is not t))
+            out.append(f"- **{title}.** {body}" if title else f"- {body}"); return
+        if "verdict" in c: out.append(f"**{_clean(_text(x))}**"); return
+        if "chips" in c: out.append("*" + _clean(_plain(x)).replace("·", " · ") + "*"); return
+        if "line" in c and not _find(x, lambda y: y.tag in ("pre", "table")): out.extend(["", _clean(_text(x)), ""]); return
+        if "qq" in c: out.append(f"> {_clean(_text(x))}"); return
+        if "ans" in c: out.append(f"> *{_clean(_text(x))}*"); return
+        if "s" in c and x.tag == "div": out.append(f"> {_clean(_text(x))}"); return
+        for k in x.kids: walk(k)
+    walk(n)
+    md, prev = [], None
+    for ln in out:
+        if ln == "" and prev == "": continue
+        md.append(ln); prev = ln
+    return "\n".join(md).strip()
+
+# Spoken forms back to written ones: the inverse of META["say"] (and the course map), plus spelled-out abbreviations.
+_SPOKEN_NUM = {"two-oh-two": "202", "four-oh-nine": "409", "four-twenty-nine": "429", "five-oh-three": "503", "four-oh-four": "404"}
+def say_to_prose(s):
+    """TTS respellings → the written form a reader expects: A-P-I → API, two-oh-two → 202, Kahf-kah → Kafka."""
+    for k, slug in PROPS.items():                       # ps("S1") → `[S1-count-once]`
+        s = s.replace(ps(k), f"`[{k}-{slug}]`")
+    pairs = []
+    for item in (META.get("say") or "").split():
+        if "=" in item:
+            w, sp = item.split("=", 1)
+            if "-" in sp: pairs.append((sp, w))          # only TTS respellings (A-P-I, Kahf-kah); plain words stay words
+    for sp, w in sorted(pairs, key=lambda p: -len(p[0])):
+        s = re.sub(rf"(?<![\w-]){re.escape(sp)}(?![\w-])", w, s)
+    for sp, w in _SPOKEN_NUM.items(): s = re.sub(rf"\b{sp}\b", w, s, flags=re.I)
+    s = re.sub(r"\b((?:[A-Z]-){1,5}[A-Z])(s?)\b", lambda m: m.group(1).replace("-", "") + m.group(2), s)
+    return s
+
+_WHO = {"I": "Interviewer", "Q": "Interviewer", "C": None, "V": "If asked, I'd say", "N": "Coach", "E": "Aside"}
+def _transcript_md(lines):
+    """Spoken lines as reading text: consecutive lines of one speaker merge; the candidate is prose, the others callouts."""
+    groups = []
+    for ln in lines:
+        m = re.match(r"^([A-Z]): (.*)$", ln, re.S)
+        if not m: continue
+        who, txt = m.group(1), say_to_prose(m.group(2).strip())
+        if who == "V": txt = re.sub(r"^If asked, I'd say:\s*", "", txt)
+        txt = txt[:1].upper() + txt[1:]
+        if groups and groups[-1][0] == who: groups[-1][1].append(txt)
+        else: groups.append((who, [txt]))
+    out = []
+    for who, txts in groups:
+        body = " ".join(txts)
+        if who == "C": out.extend(["", body, ""])
+        elif who in ("I", "Q"): out.extend(["", f"> **Interviewer:** {body}", ""])
+        elif who == "V": out.extend(["", "> [!TIP]", f"> **If asked, I'd say:** {body}", ""])
+        elif who == "N": out.extend(["", "> [!IMPORTANT]", f"> **Coach:** {body}", ""])
+        else: out.extend(["", f"*{body}*", ""])
+    return "\n".join(out).strip()
+
+def _slug(s):
+    """GitHub's anchor rule: lower-case, drop punctuation except hyphens, spaces become hyphens."""
+    s = re.sub(r"<[^>]+>", "", s).lower()
+    return re.sub(r"[^\w\- ]", "", s).replace(" ", "-")
+
+def write_reference_markdown(path, figdir="video/svg/", lab=None):
+    """Write the whole reference design from SL. path: the .md file (beside stack.json). figdir: relative to it.
+    META["md"] supplies the front matter: title, description, question_id, level, tags (list)."""
+    m = META.get("md") or {}
+    p = pathlib.Path(path)
+    fm = ["---", "layout: reference-solution", f'title: "{m.get("title", META["title"])}"',
+          f'description: "{m.get("description", "")}"', f'question_id: {m.get("question_id", "SD-NN")}',
+          f'level: "{m.get("level", "Staff L6/L7")}"', "tags: [" + ", ".join(m.get("tags", [])) + "]", "---", ""]
+    body = [f"# {m.get('title', META['title'])}", "",
+            "<!-- Generated by video/src/gen.py (kit dsl.write_reference_markdown) from the same slides and narration as the "
+            "video. Edit video/src/*.py, then re-run gen.py; never edit this file. -->", ""]
+    if m.get("lede"): body += [f"> {m['lede']}", ""]
+    chapters = [(s["chapter"], s) for s in SL if s["name"].startswith("card ") and s["chapter"]]
+    toc = [f"- [{c[0]} · {c[1]}](#{_slug(f'{c[0]} · {c[1]}')})" for c, _ in chapters if "." not in str(c[0])]
+    body += ["**Contents**", ""] + toc + ["- [Implementation Lab & Reproducible Workspace](#implementation-lab--reproducible-workspace)", ""]
+    for s in SL:
+        h = s["html"]
+        if s["name"].startswith("card "):
+            c, t = s["chapter"]
+            body += ["", f"{'###' if '.' in str(c) else '##'} {c} · {t}", ""]
+            sub = re.search(r'<div class="sub">(.*?)</div>', h, re.S)
+            if sub and "." not in str(c): body += [f"*{_clean(_text(_tree(sub.group(1))))}*", ""]
+            tr = _transcript_md(s["say"])
+            if tr: body += [tr, ""]
+            continue
+        root = _tree(h)
+        cls = set(s["cls"].split())
+        h1 = _first(root, lambda x: x.tag == "h1")
+        kick = _first(root, lambda x: "k" in x.cls)
+        title = _clean(_text(h1).replace(_text(kick) if kick and h1 and kick in h1.kids else "", "", 1)) if h1 else ""
+        if cls & {"qs", "say"} or ("th" in cls and not h1):
+            body += [_transcript_md(s["say"]), ""]          # the question or the key line is the spoken line itself
+            continue
+        if title: body += [f"#### {title}", ""]
+        if kick: body += [f"<sub>{_clean(_plain(kick))}</sub>", ""]
+        md = _body_md(root, figdir)
+        if md: body += [md, ""]
+        tr = _transcript_md(s["say"])
+        if tr: body += [tr, ""]
+    lab = lab or {}
+    body += ["", "## Implementation Lab & Reproducible Workspace", "",
+             "Everything in this design is reproducible from files in this folder:", "",
+             "| File | What it is |", "|---|---|",
+             "| [`workspace.dsl`](workspace.dsl) | the one Structurizr workspace behind every C4 picture (context, containers, components) |",
+             "| [`views.json`](views.json) | every version (V1 … Vn), flow, challenge break/fix zoom and the recap, derived from that workspace |",
+             "| [`stack.json`](stack.json) | each container's technology, how it is built, the rivals rejected and why |",
+             "| [`video/src/`](video/src/) | the slides and narration this document and the video are both generated from |", ""]
+    if lab.get("note"): body += [lab["note"], ""]
+    body += ["Rebuild: `python3 .claude/skills/reference-solution/scripts/ref_solution.py all " + m.get("question_id", "SD-NN") + "` "
+             "(stages: diagrams · deck · markdown · video · publish · clean).", ""]
+    text = "\n".join(fm + body)
+    text = re.sub(r"\n{3,}", "\n\n", text).rstrip() + "\n"
+    p.write_text(text, encoding="utf-8")
+    return p

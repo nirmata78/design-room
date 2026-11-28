@@ -1,1 +1,21 @@
-[["n:cli"], ["n:sys", "e:0"], ["n:adv", "e:1"], ["n:fr", "e:2"], ["n:inv", "e:3"]]
+[
+  [
+    "e:cli"
+  ],
+  [
+    "e:ac",
+    "l:cli-ac"
+  ],
+  [
+    "e:adv",
+    "l:adv-ac"
+  ],
+  [
+    "e:fraud",
+    "l:fraud-ac"
+  ],
+  [
+    "e:invo",
+    "l:invo-ac"
+  ]
+]

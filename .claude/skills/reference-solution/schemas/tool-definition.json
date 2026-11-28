@@ -1,0 +1,107 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "ref_solution_init_or_validate_outline",
+      "description": "Create video/OUTLINE.md from the template if missing, else check it states the scale line and the challenge list. Runs: python3 .claude/skills/reference-solution/scripts/ref_solution.py outline <solution>. Returns one JSON object: status (ok | outline_created | solution_not_found | diagram_gate_failed | dsl_error | missing_reveal_markers | layout_gate_failed | markdown_lint_failed | render_failed | publish_failed | missing_dependency) and, when not ok, an actionable remedy.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "solution": {
+            "type": "string",
+            "description": "Bank ID (\"SD-03\") or path to solutions/SD-NN-<slug>/."
+          }
+        },
+        "required": [
+          "solution"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "ref_solution_render_diagrams",
+      "description": "Render video/svg/: every C4 view (context, containers, components, version deltas V1..Vn, flows, challenge break/fix zooms, recap badges) from workspace.dsl + views.json through c4-structurizr, plus sequences, ERDs, state machines and figures from video/diagrams.py. Fails on the 1080p legibility gate or an unknown alias. Runs: python3 .claude/skills/reference-solution/scripts/ref_solution.py diagrams <solution>. Returns one JSON object: status (ok | outline_created | solution_not_found | diagram_gate_failed | dsl_error | missing_reveal_markers | layout_gate_failed | markdown_lint_failed | render_failed | publish_failed | missing_dependency) and, when not ok, an actionable remedy.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "solution": {
+            "type": "string",
+            "description": "Bank ID (\"SD-03\") or path to solutions/SD-NN-<slug>/."
+          }
+        },
+        "required": [
+          "solution"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "ref_solution_build_deck_and_markdown",
+      "description": "Generate the slides and narration from video/src/*.py, run the 1080p layout gate, then generate SD-NN_<Title>_Reference_Design.md from the same source and lint it for GitHub. Runs: python3 .claude/skills/reference-solution/scripts/ref_solution.py deck, then markdown <solution>. Returns one JSON object: status (ok | outline_created | solution_not_found | diagram_gate_failed | dsl_error | missing_reveal_markers | layout_gate_failed | markdown_lint_failed | render_failed | publish_failed | missing_dependency) and, when not ok, an actionable remedy.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "solution": {
+            "type": "string",
+            "description": "Bank ID (\"SD-03\") or path to solutions/SD-NN-<slug>/."
+          },
+          "markdown_only": {
+            "type": "boolean",
+            "default": false,
+            "description": "Skip the layout gate; only regenerate and lint the Markdown."
+          }
+        },
+        "required": [
+          "solution"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "ref_solution_render_video",
+      "description": "Render 1920x1080 frames by Playwright element screenshots and the narrated MP4 with sidecar .srt/.vtt captions (Kokoro TTS), then delete every intermediate (frames, slides HTML, scripts, layout reports). Runs: python3 .claude/skills/reference-solution/scripts/ref_solution.py video <solution>. Returns one JSON object: status (ok | outline_created | solution_not_found | diagram_gate_failed | dsl_error | missing_reveal_markers | layout_gate_failed | markdown_lint_failed | render_failed | publish_failed | missing_dependency) and, when not ok, an actionable remedy.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "solution": {
+            "type": "string",
+            "description": "Bank ID (\"SD-03\") or path to solutions/SD-NN-<slug>/."
+          },
+          "keep_intermediates": {
+            "type": "boolean",
+            "default": false,
+            "description": "Keep frames and slides HTML for debugging."
+          }
+        },
+        "required": [
+          "solution"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "ref_solution_publish_kit",
+      "description": "Generate video/publish/* (YouTube description with chapters, thumbnail, LinkedIn post) from video/publish/meta.json, then update solutions/VIDEOS.md and Question-Bank.md by hand as SKILL.md says. Runs: python3 .claude/skills/reference-solution/scripts/ref_solution.py publish <solution>. Returns one JSON object: status (ok | outline_created | solution_not_found | diagram_gate_failed | dsl_error | missing_reveal_markers | layout_gate_failed | markdown_lint_failed | render_failed | publish_failed | missing_dependency) and, when not ok, an actionable remedy.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "solution": {
+            "type": "string",
+            "description": "Bank ID (\"SD-03\") or path to solutions/SD-NN-<slug>/."
+          }
+        },
+        "required": [
+          "solution"
+        ]
+      }
+    }
+  }
+]

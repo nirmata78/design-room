@@ -80,11 +80,11 @@ live on the device.
    rejected v18.
 6. Offline devices do the same, whenever they return, with the latest version only.
 
-![Reach every device, or never break one.](diagrams/video-tension.pdf){width=95%}
+![Reach every device, or never break one.](video/svg/tension.svg){width=95%}
 
 ## The whole design on one page
 
-![Version 4, with the mechanisms on it.](diagrams/video-recap.pdf){width=100%}
+![Version 4, with the mechanisms on it.](video/svg/recap.svg){width=100%}
 
 # Part II: The round, stage by stage
 
@@ -101,7 +101,7 @@ live on the device.
 FR1 Know · FR2 Configure · FR3 Release · FR4 Stop. NFRs: ≤ 100 devices harmed per release; 95 % of online devices on a config within
 24 h; a release in ~2 weeks; 99.9 % for the control plane, and devices keep running their last good state without it.
 
-![C4 level 1.](diagrams/video-c4-context.pdf){width=90%}
+![C4 level 1.](video/svg/c4-context.svg){width=90%}
 
 # Stage 2: Back-of-the-envelope
 
@@ -123,7 +123,7 @@ devices."
 Images: 50 MB × 1 M = 50 TB a release (deltas ≈ 8 TB): a CDN. Certificates: ≈ 1,400 renewals a day. Version tail: up to 84 versions
 over seven years.
 
-![The release budget.](diagrams/video-budget.pdf){width=95%}
+![The release budget.](video/svg/budget.svg){width=95%}
 
 # Stage 3: API and data
 
@@ -140,25 +140,25 @@ GET devices/d-7781/desired   (MQTT, retained)
 The reported document carries the applied version, firmware and slot, what was rejected and why, what the device is blocked on, and
 a `(seq, epoch)` pair. Operators write desired state with `If-Match`; releases are created with a wave plan and halted without a call.
 
-![Conceptual model.](diagrams/video-erd-chen.pdf){width=95%}
+![Conceptual model.](video/svg/erd-chen.svg){width=95%}
 
-![Physical model.](diagrams/video-erd-physical.pdf){width=95%}
+![Physical model.](video/svg/erd-physical.svg){width=95%}
 
 # Stage 4: High-level design
 
-![V1: a shadow behind a broker.](diagrams/video-base-v1.pdf){width=100%}
+![V1: a shadow behind a broker.](video/svg/base-v1.svg){width=100%}
 
-![V2: a reconciler and telemetry.](diagrams/video-base-v2.pdf){width=100%}
+![V2: a reconciler and telemetry.](video/svg/base-v2.svg){width=100%}
 
-![V3: a rollout controller and an image CDN.](diagrams/video-base-v3.pdf){width=100%}
+![V3: a rollout controller and an image CDN.](video/svg/base-v3.svg){width=100%}
 
-![FR2: a config change, numbered.](diagrams/video-flow-config.pdf){width=100%}
+![FR2: a config change, numbered.](video/svg/flow-config.svg){width=100%}
 
-![FR3: a release, numbered.](diagrams/video-flow-release.pdf){width=100%}
+![FR3: a release, numbered.](video/svg/flow-release.svg){width=100%}
 
-![FR3: one wave, soaked and compared.](diagrams/video-seq-release.pdf){width=85%}
+![FR3: one wave, soaked and compared.](video/svg/seq-release.svg){width=85%}
 
-![FR4: a halt without anyone in the loop.](diagrams/video-seq-halt.pdf){width=80%}
+![FR4: a halt without anyone in the loop.](video/svg/seq-halt.svg){width=80%}
 
 | Outcome | Cost | Who decides |
 |---|---|---|
@@ -168,11 +168,11 @@ a `(seq, epoch)` pair. Operators write desired state with `If-Match`; releases a
 
 # Stage 5: Components and technologies
 
-![The device agent.](diagrams/video-c4-comp-agent.pdf){width=100%}
+![The device agent.](video/svg/c4-comp-agent.svg){width=100%}
 
-![The rollout controller.](diagrams/video-c4-comp-rollout.pdf){width=100%}
+![The rollout controller.](video/svg/c4-comp-rollout.svg){width=100%}
 
-![The device gateway.](diagrams/video-c4-comp-gateway.pdf){width=100%}
+![The device gateway.](video/svg/c4-comp-gateway.svg){width=100%}
 
 <!-- stack:sections -->
 
@@ -256,7 +256,7 @@ Each fix in Stage 6 rejects one tool by name:
 
 ## When you don't need all this
 
-![ALTERNATE: a managed device service and manual waves.](diagrams/video-alt.pdf){width=100%}
+![ALTERNATE: a managed device service and manual waves.](video/svg/alt.svg){width=100%}
 
 Below about 10,000 devices: a managed device service holds the shadows, devices poll hourly, and a release is three manual steps.
 Keep the A/B slots and the watchdog no matter what: they are the only protection a device in a crash loop has.
@@ -265,7 +265,7 @@ Keep the A/B slots and the watchdog no matter what: they are the only protection
 
 ## 6.1 A config that crashes the device (the crux)
 
-![The bad config, three tries, and the last known good.](diagrams/video-seq-ch1-brick.pdf){width=80%}
+![The bad config, three tries, and the last known good.](video/svg/seq-ch1-brick.svg){width=80%}
 
 New configs, like images, are **pending until confirmed**. The agent confirms only after four checks within 120 s: the process is
 up, the network has an address, the gateway accepted the certificate, and desired state was fetched and reported back. Three failed
@@ -279,7 +279,7 @@ the devices that need it.
 
 ## 6.2 The rare revision
 
-![Waves by cohort, each soaked and compared.](diagrams/video-waves.pdf){width=95%}
+![Waves by cohort, each soaked and compared.](video/svg/waves.svg){width=95%}
 
 Wave 1 contains at least 50 online devices of every (hardware revision × region × carrier) cell; each cell is compared with its own
 control for 24 h; the halt is automatic when an interval for crashes, reconnects, watchdog reverts or battery excludes zero. A
@@ -348,7 +348,7 @@ wave, never by device: per-device records go to the lake.
 
 ## 6.6 Connected is not converged (observability)
 
-![V4: a fleet census.](diagrams/video-base-v4.pdf){width=100%}
+![V4: a fleet census.](video/svg/base-v4.svg){width=100%}
 
 | SLI | Target |
 |---|---|

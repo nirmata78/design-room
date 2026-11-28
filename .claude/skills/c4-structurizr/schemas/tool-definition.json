@@ -3,7 +3,7 @@
     "type": "function",
     "function": {
       "name": "render_c4_workspace",
-      "description": "Validate a Structurizr DSL workspace inside the containerized Playwright runtime, batch-export all C4 views to normalized 1080p-ready SVGs with Mode A progressive .steps.json sidecars, and run the DESIGN-TOKENS.md font and legibility gates.",
+      "description": "Validate a Structurizr DSL workspace in the warm Docker runtime, export it as JSON and draw every view natively (c4model.com shapes, Google palette, laid out on each view's grid, sized to its 1080p slot), with .steps.json reveal plans and .meta.json gate results (18 px minimum, text must fit its box).",
       "parameters": {
         "type": "object",
         "properties": {
@@ -17,7 +17,7 @@
           },
           "spec": {
             "type": "string",
-            "description": "Optional path to views.json specifying per-view slot (full|composite|split) and ordered progressive reveal steps."
+            "description": "views.json: per exported view a 'grid' (rows of DSL identifiers, '.' = empty), 'box' [w, h], 'slot' (stage|full|composite|split), reveal 'steps'; derived views name their source with 'from' and add overlays: hide, new, breaks, fix, focus, alternate, badges, keep (+ crop), flow, min_px, video:false, legend. See SKILL.md."
           },
           "png": {
             "type": "boolean",
@@ -25,7 +25,10 @@
             "description": "Also render @2x PNG previews via Playwright Chromium."
           }
         },
-        "required": ["dsl", "out"]
+        "required": [
+          "dsl",
+          "out"
+        ]
       }
     }
   },
@@ -72,7 +75,11 @@
             "description": "Optional opacity for unrevealed elements (default 0.0 = visibility: hidden; e.g. 0.10 for faint silhouettes)."
           }
         },
-        "required": ["svg", "out", "title"]
+        "required": [
+          "svg",
+          "out",
+          "title"
+        ]
       }
     }
   }

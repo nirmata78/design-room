@@ -1,0 +1,348 @@
+{
+  "_doc": "Every C4 picture of SD-03, drawn by c4-structurizr's native renderer from workspace.dsl. Each exported view has a 'grid' (rows of DSL identifiers, '.' = empty cell); derived views name their source with 'from' and keep its grid and canvas, so no box moves from V1 to the recap. Zooms dim the rest of the full component view instead of cropping it, so the viewer always sees where in the pipeline a challenge is.",
+  "views": {
+    "c4-context": {
+      "slot": "stage",
+      "box": [
+        380,
+        170
+      ],
+      "grid": [
+        " .    adv    .   ",
+        "cli   ac   fraud ",
+        " .    invo   .   "
+      ],
+      "steps": [
+        "cli",
+        "ac",
+        "adv",
+        "fraud",
+        "invo"
+      ]
+    },
+    "containers": {
+      "slot": "stage",
+      "box": [
+        236,
+        176
+      ],
+      "grid": [
+        "cli    .       fraud   .      adv",
+        "col    lake    batch   bill   api",
+        "log    stream  .       live   . "
+      ]
+    },
+    "alt": {
+      "slot": "stage",
+      "box": [
+        360,
+        170
+      ],
+      "grid": [
+        "adv  api   .  ",
+        "cli  col  live"
+      ],
+      "alternate": [
+        "live"
+      ]
+    },
+    "comp-stream": {
+      "slot": "stage",
+      "box": [
+        290,
+        156
+      ],
+      "grid": [
+        "log   src    time   .   ",
+        " .     .     dedup  ckpt",
+        "live  sink   win    comb"
+      ],
+      "steps": [
+        [
+          "log",
+          "src"
+        ],
+        [
+          "time"
+        ],
+        [
+          "dedup",
+          "ckpt"
+        ],
+        [
+          "comb",
+          "win"
+        ],
+        [
+          "sink",
+          "live"
+        ]
+      ]
+    },
+    "comp-billing": {
+      "slot": "stage",
+      "box": [
+        250,
+        136
+      ],
+      "grid": [
+        " .     .      .      fraud   . ",
+        "lake  read   xdup   filt   price",
+        " .    close  recon  write   adj ",
+        " .     .     live   bill   invo "
+      ],
+      "steps": [
+        [
+          "close",
+          "read",
+          "lake"
+        ],
+        [
+          "xdup",
+          "filt",
+          "fraud"
+        ],
+        [
+          "price",
+          "write",
+          "bill"
+        ],
+        [
+          "adj",
+          "invo",
+          "recon",
+          "live"
+        ]
+      ]
+    },
+    "v1": {
+      "from": "containers",
+      "slot": "stage",
+      "hide": [
+        "stream",
+        "live",
+        "fraud"
+      ],
+      "steps": [
+        "cli",
+        "col",
+        "log",
+        "lake",
+        "batch",
+        "bill",
+        "api",
+        "adv"
+      ]
+    },
+    "flow-v1": {
+      "from": "containers",
+      "slot": "stage",
+      "hide": [
+        "stream",
+        "live",
+        "fraud"
+      ],
+      "flow": [
+        "cli->col",
+        "col->log",
+        "lake->log",
+        "batch->lake",
+        "batch->bill",
+        "adv->api",
+        "api->bill"
+      ]
+    },
+    "v1-break": {
+      "from": "containers",
+      "slot": "stage",
+      "hide": [
+        "stream",
+        "live",
+        "fraud"
+      ],
+      "breaks": [
+        "batch"
+      ]
+    },
+    "v2": {
+      "from": "containers",
+      "slot": "stage",
+      "hide": [
+        "fraud"
+      ],
+      "new": [
+        "stream",
+        "live"
+      ]
+    },
+    "flow-live": {
+      "from": "containers",
+      "slot": "stage",
+      "hide": [
+        "fraud"
+      ],
+      "flow": [
+        "cli->col",
+        "col->log",
+        "stream->log",
+        "stream->live",
+        "adv->api",
+        "api->live"
+      ]
+    },
+    "v3": {
+      "from": "containers",
+      "slot": "stage",
+      "new": [
+        "fraud"
+      ]
+    },
+    "recap": {
+      "from": "containers",
+      "slot": "stage",
+      "badges": {
+        "stream": "M2 M3 M4",
+        "live": "replace by version",
+        "batch": "M1 M2 M3",
+        "bill": "versions",
+        "api": "provisional | final"
+      }
+    },
+    "dd-break": {
+      "from": "comp-stream",
+      "slot": "stage",
+      "keep": [
+        "src",
+        "time",
+        "dedup"
+      ],
+      "breaks": [
+        "dedup"
+      ]
+    },
+    "dd-fix": {
+      "from": "comp-stream",
+      "slot": "stage",
+      "keep": [
+        "time",
+        "dedup",
+        "ckpt"
+      ],
+      "fix": [
+        "dedup",
+        "ckpt"
+      ]
+    },
+    "replay-fix": {
+      "from": "comp-stream",
+      "slot": "stage",
+      "keep": [
+        "win",
+        "sink",
+        "live"
+      ],
+      "fix": [
+        "sink",
+        "live"
+      ]
+    },
+    "late-break": {
+      "from": "comp-stream",
+      "slot": "stage",
+      "keep": [
+        "src",
+        "time",
+        "dedup"
+      ],
+      "breaks": [
+        "time"
+      ]
+    },
+    "late-fix": {
+      "from": "comp-stream",
+      "slot": "stage",
+      "keep": [
+        "time",
+        "dedup",
+        "comb",
+        "win"
+      ],
+      "fix": [
+        "time",
+        "win"
+      ]
+    },
+    "close-fix": {
+      "from": "comp-billing",
+      "slot": "stage",
+      "keep": [
+        "close",
+        "read",
+        "xdup"
+      ],
+      "fix": [
+        "close"
+      ]
+    },
+    "hot-break": {
+      "from": "comp-stream",
+      "slot": "stage",
+      "keep": [
+        "comb",
+        "win",
+        "sink"
+      ],
+      "breaks": [
+        "win"
+      ]
+    },
+    "hot-fix": {
+      "from": "comp-stream",
+      "slot": "stage",
+      "keep": [
+        "dedup",
+        "comb",
+        "win"
+      ],
+      "fix": [
+        "comb",
+        "win"
+      ]
+    },
+    "fraud-break": {
+      "from": "comp-billing",
+      "slot": "stage",
+      "keep": [
+        "filt",
+        "price",
+        "write"
+      ],
+      "breaks": [
+        "write"
+      ]
+    },
+    "fraud-fix": {
+      "from": "comp-billing",
+      "slot": "stage",
+      "keep": [
+        "price",
+        "write",
+        "adj"
+      ],
+      "fix": [
+        "adj"
+      ]
+    },
+    "recon-fix": {
+      "from": "comp-billing",
+      "slot": "stage",
+      "keep": [
+        "write",
+        "recon"
+      ],
+      "fix": [
+        "recon"
+      ]
+    }
+  }
+}

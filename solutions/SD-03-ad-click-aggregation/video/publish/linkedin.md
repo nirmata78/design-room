@@ -2,12 +2,12 @@
 
 Post from a computer, after the YouTube video is public. The link is still pending: rerun with --youtube-url.
 
-**Post** (1189/3000; hook 103 characters, before the "see more" fold): `pbcopy < linkedin-post.txt`
+**Post** (1222/3000; hook 103 characters, before the "see more" fold): `pbcopy < linkedin-post.txt`
 
 ```text
 "Use exactly-once" is the answer that fails the ad-click question. The grade is on what you do instead.
 
-I've published a 72-minute reference solution for counting ad impressions and clicks at the Staff bar: theory, a three-version design, and six challenges, on 482 numbered slides.
+I've published a 57-minute reference solution for counting ad impressions and clicks at the Staff bar, run like a real round: one C4 diagram that evolves through six interviewer challenges, on 0 numbered slides.
 
 The idea that unlocks it: one log, one aggregation code run twice. Fast and provisional for the dashboard, exact and pinned for the bill, and every number replaced by key rather than incremented, so a retry, a replay or a fraud correction can never double anything.
 
@@ -36,5 +36,4 @@ Written reference design, stage by stage: https://github.com/nirmata78/design-ro
 Run this round yourself, with an AI interviewer that won't help you: https://github.com/nirmata78/design-room
 ```
 
-**Media: attach the reference design.** In the post composer, More (+) → Add a document → `../../SD-03_Ad_Click_Aggregation_Reference_Design.pdf` (26 pages, 1.5 MB; limit 300 pages, 100 MB).
-Document title, shown on the viewer: **Event counting and billing rollups: a Staff-level reference design**. A post carries one attachment, so the video stays a link in the text, and the document is what shows in the feed.
+**Media.** The full video is too long to upload natively (about 15 minutes at most, from a computer), so it goes by link, and its preview shows the thumbnail.

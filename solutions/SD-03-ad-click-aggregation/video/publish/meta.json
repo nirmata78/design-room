@@ -12,9 +12,9 @@
     "playlist": "System design reference solutions · design-room (create it once, reuse it)",
     "tags": ["system design", "system design interview", "ad click aggregation", "ad click counter", "usage metering", "stream processing", "event time", "watermarks", "exactly once", "lambda kappa", "flink", "kafka", "staff engineer", "distributed systems"],
     "description_top": [
-      "Counting clicks sounds like n = n + 1. At thirty million events a second, with retries, phones that were offline for a day and a fraud team that changes its mind a week later, the hard part is counting once, in the right hour, and proving it. A compact reference solution at the Staff bar (L6/L7): theory, a three-version design, an alternate path, and six challenges that break it. {DURATION} minutes, {SLIDES} numbered slides.",
+      "Counting clicks sounds like n = n + 1. At thirty million events a second, with retries, phones that were offline for a day and a fraud team that changes its mind a week later, the hard part is counting once, in the right hour, and proving it. A Staff-bar (L6/L7) reference solution run like a real round: the design starts as a C4 container view and evolves only because an interviewer breaks it, six times, with each mechanism and technology introduced at the moment it is needed. {DURATION} minutes, {SLIDES} numbered slides.",
       "The thesis: count once, from one log, with one piece of code run twice, fast and provisional for the dashboard, exact and pinned for the bill. Never increment a number you can recompute: replace it, and keep every version you billed.",
-      "IN THIS VIDEO\n• Estimates from one scale line: 10 M events a second, 6 GB/s at peak, 0.7 TB of dedup state, and $375 M a month in duplicate clicks if retries are not removed\n• Theory: five mechanisms (event IDs, watermarks, replace-not-increment, two-stage aggregation, HyperLogLog) and Lambda against Kappa\n• Six challenges: retries, late and skewed events, one ad at 2 million a second, a four-hour replay, fraud after the invoice, and a wrong number nobody notices",
+      "IN THIS VIDEO\n• Estimates from one scale line: 10 M events a second, 6 GB/s at peak, 0.7 TB of dedup state, and $375 M a month in duplicate clicks if retries are not removed\n• V1 → V2 → V3 on one C4 container view, with component zooms for every fix\n• Six challenges: a dashboard that must be 10 s fresh, the same click three times (and a four-hour replay), late and skewed events, one ad at 2 million a second, fraud after the invoice, and a wrong number nobody notices\n• Mechanisms where they are needed: one aggregation run twice, event IDs, watermarks, two-stage aggregation, replace-not-increment, versions and adjustments",
       "HOW TO USE IT\nRun the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first."
     ],
     "description_bottom": [
@@ -26,7 +26,7 @@
   "linkedin": {
     "post": [
       "\"Use exactly-once\" is the answer that fails the ad-click question. The grade is on what you do instead.",
-      "I've published a {DURATION}-minute reference solution for counting ad impressions and clicks at the Staff bar: theory, a three-version design, and six challenges, on {SLIDES} numbered slides.",
+      "I've published a {DURATION}-minute reference solution for counting ad impressions and clicks at the Staff bar, run like a real round: one C4 diagram that evolves through six interviewer challenges, on {SLIDES} numbered slides.",
       "The idea that unlocks it: one log, one aggregation code run twice. Fast and provisional for the dashboard, exact and pinned for the bill, and every number replaced by key rather than incremented, so a retry, a replay or a fraud correction can never double anything.",
       "What it goes into:\n→ The same click three times, and why the broker's exactly-once doesn't help\n→ Yesterday's events at 6 a.m., and a clock that says 2031\n→ One ad at 2 million impressions a second\n→ Fraud after the invoice, without editing it",
       "Best on a second pass: pause after each question and answer it first.",

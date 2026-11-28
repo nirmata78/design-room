@@ -1,0 +1,33 @@
+[
+  [
+    "e:cli"
+  ],
+  [
+    "e:col",
+    "l:cli-col"
+  ],
+  [
+    "e:log",
+    "l:col-log"
+  ],
+  [
+    "e:lake",
+    "l:lake-log"
+  ],
+  [
+    "e:batch",
+    "l:batch-lake"
+  ],
+  [
+    "e:bill",
+    "l:batch-bill"
+  ],
+  [
+    "e:api",
+    "l:api-bill"
+  ],
+  [
+    "e:adv",
+    "l:adv-api"
+  ]
+]

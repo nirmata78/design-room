@@ -102,7 +102,7 @@ waits without spending any worker. On Sunday evening a probe succeeds, the endpo
 a second, and the refund arrives, in sequence order, with everything else it missed. The partner bank, in
 its own pool, never noticed either of them.
 
-![The baseline at the end of the round (V6), along the path of one event: commit with the outbox row, relay to the log, fan-out renders and writes rows, the dispatcher claims under a cap and sends through the egress proxy.](diagrams/video-base-final.svg)
+![The baseline at the end of the round (V6), along the path of one event: commit with the outbox row, relay to the log, fan-out renders and writes rows, the dispatcher claims under a cap and sends through the egress proxy.](video/svg/base-final.svg)
 
 ## The central contrast
 
@@ -187,7 +187,7 @@ webhooks we receive (SD-45), push to customers' phones (SD-12), a second region.
 > sequence, signature, version.
 
 
-![C4 level 1: origination and servicing produce events; the platform sends signed POSTs to merchant tills and accounting systems and loan-level events to the partner bank; developers register and replay; a key service holds the secrets.](diagrams/video-c4-context.svg)
+![C4 level 1: origination and servicing produce events; the platform sends signed POSTs to merchant tills and accounting systems and loan-level events to the partner bank; developers register and replay; a key service holds the secrets.](video/svg/c4-context.svg)
 
 # Stage 2: Back-of-the-envelope
 
@@ -272,7 +272,7 @@ What makes this problem hard, in words that outlive any product name. Properties
 - **Rules out.** A lost event after a crash; an event for a rolled-back change.
 - **Costs.** A table and a relay per producer; at-least-once into the log.
 
-![Figure 3.1 — the event is a row in the same commit; the relay marks it sent only after the log acknowledges](diagrams/video-m-outbox.svg)
+![Figure 3.1 — the event is a row in the same commit; the relay marks it sent only after the log acknowledges](video/svg/m-outbox.svg)
 
 ### A durable, replayable log · C4
 *Theory · 4 of 5 · mechanism 2 of 6*
@@ -281,7 +281,7 @@ What makes this problem hard, in words that outlive any product name. Properties
 - **Rules out.** One consumer's bug losing events for everyone; no way to rewind after a bad deploy.
 - **Costs.** A cluster to run; ordering only within a key.
 
-![Figure 3.2 — C4 container view: appended once, read by many groups, each with its own offset](diagrams/video-m-log.svg)
+![Figure 3.2 — C4 container view: appended once, read by many groups, each with its own offset](video/svg/m-log.svg)
 
 ### A queue per endpoint, with a concurrency cap · ERD
 *Theory · 4 of 5 · mechanism 3 of 6*
@@ -290,7 +290,7 @@ What makes this problem hard, in words that outlive any product name. Properties
 - **Rules out.** Head-of-line blocking; one slow endpoint holding every worker.
 - **Costs.** A failing endpoint drains slower; caps to tune per tier.
 
-![Figure 3.3 — the queue is rows keyed by endpoint; the cap lives on the endpoint](diagrams/video-m-queue.svg)
+![Figure 3.3 — the queue is rows keyed by endpoint; the cap lives on the endpoint](video/svg/m-queue.svg)
 
 ### Backoff with full jitter, a breaker, a ramp · STATE MACHINE
 *Theory · 4 of 5 · mechanism 4 of 6*
@@ -299,7 +299,7 @@ What makes this problem hard, in words that outlive any product name. Properties
 - **Rules out.** A retry storm; synchronised retries knocking a recovering endpoint over.
 - **Costs.** Slower recovery for an endpoint that was only briefly down.
 
-![Figure 3.4 — an endpoint's life: closed, open, probing, ramping](diagrams/video-m-breaker.svg)
+![Figure 3.4 — an endpoint's life: closed, open, probing, ramping](video/svg/m-breaker.svg)
 
 ### The consumer contract · SEQUENCE
 *Theory · 4 of 5 · mechanism 5 of 6*
@@ -308,7 +308,7 @@ What makes this problem hard, in words that outlive any product name. Properties
 - **Rules out.** Double-processing a retry; a stale state overwriting a newer one; a forged approval.
 - **Costs.** Merchants must store IDs and verify signatures: documentation and SDK work.
 
-![Figure 3.5 — an ID, a sequence number and a signature make a retry harmless and a replay visible](diagrams/video-m-contract.svg)
+![Figure 3.5 — an ID, a sequence number and a signature make a retry harmless and a replay visible](video/svg/m-contract.svg)
 
 ### An egress proxy · C4
 *Theory · 4 of 5 · mechanism 6 of 6*
@@ -317,7 +317,7 @@ What makes this problem hard, in words that outlive any product name. Properties
 - **Rules out.** Server-side request forgery, including DNS rebinding after validation.
 - **Costs.** One more hop and one more thing to keep up.
 
-![Figure 3.6 — C4 container view: the proxy resolves, checks, and connects to the address it checked](diagrams/video-m-egress.svg)
+![Figure 3.6 — C4 container view: the proxy resolves, checks, and connects to the address it checked](video/svg/m-egress.svg)
 
 ### A · Call the URL inside the request · C4
 *Theory · 5 of 5 · option A*
@@ -327,7 +327,7 @@ What makes this problem hard, in words that outlive any product name. Properties
 - 🔴 Pitfall: A till takes 30 s and holds a worker
 - 🔴 Pitfall: A crash loses the event; a rollback still sends it
 
-![opt-a](diagrams/video-opt-a.svg)
+![opt-a](video/svg/opt-a.svg)
 
 ### B · One shared queue and a worker pool · C4
 *Theory · 5 of 5 · option B*
@@ -339,7 +339,7 @@ What makes this problem hard, in words that outlive any product name. Properties
 - 🔴 Pitfall: One slow endpoint holds the pool
 - 🔴 Pitfall: Events for healthy merchants wait behind it
 
-![opt-b](diagrams/video-opt-b.svg)
+![opt-b](video/svg/opt-b.svg)
 
 ### C · A topic or retry topic per endpoint · C4
 *Theory · 5 of 5 · option C*
@@ -351,7 +351,7 @@ What makes this problem hard, in words that outlive any product name. Properties
 - 🔴 Pitfall: Head-of-line blocking inside a partition
 - 🔴 Pitfall: Topic count grows with endpoints
 
-![opt-c](diagrams/video-opt-c.svg)
+![opt-c](video/svg/opt-c.svg)
 
 ### D · A log for events, delivery rows by endpoint, claimed under a cap · C4
 *Theory · 5 of 5 · option D*
@@ -363,7 +363,7 @@ What makes this problem hard, in words that outlive any product name. Properties
 - 🔴 Pitfall: A claim without a lease strands rows
 - 🔴 Pitfall: Caps must be tuned per tier
 
-![opt-d](diagrams/video-opt-d.svg)
+![opt-d](video/svg/opt-d.svg)
 
 ### E · Managed pub/sub with push subscriptions · C4
 *Theory · 5 of 5 · option E*
@@ -374,7 +374,7 @@ What makes this problem hard, in words that outlive any product name. Properties
 - 🔴 Pitfall: A slow endpoint still piles up
 - 🔴 Pitfall: Private addresses cannot be refused
 
-![opt-e](diagrams/video-opt-e.svg)
+![opt-e](video/svg/opt-e.svg)
 
 ### F · Buy a webhook service · C4
 *Theory · 5 of 5 · option F*
@@ -386,7 +386,7 @@ What makes this problem hard, in words that outlive any product name. Properties
 - 🔴 Pitfall: Their retry policy, not ours
 - 🔴 Pitfall: Lock-in on payload shapes
 
-![opt-f](diagrams/video-opt-f.svg)
+![opt-f](video/svg/opt-f.svg)
 
 ### The matrix, as a summary
 *Theory · 5 of 5 · the options, side by side*
@@ -415,9 +415,9 @@ everything else, including a timeout, is retried. 429 and 503 honour `Retry-Afte
 `POST /v1/deliveries/{id}/redeliver`; `POST /v1/webhook-endpoints/{id}/replay {since, rate, mode}` where
 `mode` is *full* or *latest per loan*.
 
-![Conceptual model: a merchant owns endpoints; an endpoint listens to subscriptions; an event fans out to deliveries; a delivery goes to one endpoint and is tried by attempts.](diagrams/video-erd-chen.svg)
+![Conceptual model: a merchant owns endpoints; an endpoint listens to subscriptions; an event fans out to deliveries; a delivery goes to one endpoint and is tried by attempts.](video/svg/erd-chen.svg)
 
-![Physical model: the delivery row is sharded by endpoint, unique on endpoint and event, with its state, attempt number, next attempt time and lease; attempts are partitioned by day.](diagrams/video-erd-physical.svg)
+![Physical model: the delivery row is sharded by endpoint, unique on endpoint and event, with its state, attempt number, next attempt time and lease; attempts are partitioned by day.](video/svg/erd-physical.svg)
 
 > [!NOTE]
 > **Why? What is it?**
@@ -435,11 +435,11 @@ The producer POSTs to every subscribed URL inside the booking request. **The obj
 30 s holds the booking request for 30 s; a crash after commit loses the event; a call made before a
 rollback tells a merchant about a loan that does not exist.
 
-![V1: the producer calls the merchant inside the request.](diagrams/video-base-v1.svg)
+![V1: the producer calls the merchant inside the request.](video/svg/base-v1.svg)
 
 ### The objection to V1, as a sequence
 
-![The failing case of V1: a thirty-second till, a crash, and a rollback.](diagrams/video-obj-v1.svg)
+![The failing case of V1: a thirty-second till, a crash, and a rollback.](video/svg/obj-v1.svg)
 
 ## Version 2: no event without its commit
 
@@ -448,11 +448,11 @@ consume the log and POST with in-process retries. **The objection:** one slow ti
 (1,200 sockets of 600); retries live in memory and vanish on restart; healthy merchants queue behind the
 slow one in the same partition; nothing records what was sent.
 
-![V2: outbox, relay, log, dispatcher.](diagrams/video-base-v2.svg)
+![V2: outbox, relay, log, dispatcher.](video/svg/base-v2.svg)
 
 ### The objection to V2, as a sequence
 
-![The holes of V2: one slow till takes the shared pool, retries live in memory, nothing records what was sent.](diagrams/video-obj-v2.svg)
+![The holes of V2: one slow till takes the shared pool, retries live in memory, nothing records what was sent.](video/svg/obj-v2.svg)
 
 ## Version 3: a queue per endpoint, as rows
 
@@ -460,7 +460,7 @@ Fan-out consumes the log, matches subscriptions and writes one delivery row per 
 store, sharded by endpoint. The dispatcher claims due rows only for endpoints under their cap, with a lease;
 every attempt is written to the attempt log; the webhooks API reads the log and replays by writing rows.
 
-![V3: fan-out, delivery store, attempt log and API.](diagrams/video-base-v3.svg)
+![V3: fan-out, delivery store, attempt log and API.](video/svg/base-v3.svg)
 
 ```sql
 WITH due AS (
@@ -484,7 +484,7 @@ RETURNING delivery.id;
 
 ## Where an event ends and an HTTPS call begins
 
-![C4 container view: events dashed blue, HTTPS solid.](diagrams/video-hld-boundary.svg)
+![C4 container view: events dashed blue, HTTPS solid.](video/svg/hld-boundary.svg)
 
 Inside our boundary an event is a row and a log entry; only at the very edge does the dispatcher turn a delivery row into a signed HTTPS call to a server we do not control. What the merchant's server sees, and how it answers:
 
@@ -503,19 +503,19 @@ HTTP/1.1 200 OK            2xx: delivered
 
 ## The numbered flows and sequences
 
-![FR2, emit: the commit with the outbox row, the relay, fan-out, one row per endpoint.](diagrams/video-flow-fr2.svg)
+![FR2, emit: the commit with the outbox row, the relay, fan-out, one row per endpoint.](video/svg/flow-fr2.svg)
 
-![FR3, deliver: the row, the claim under the cap, the signed POST through the proxy, the attempt.](diagrams/video-flow-fr3.svg)
+![FR3, deliver: the row, the claim under the cap, the signed POST through the proxy, the attempt.](video/svg/flow-fr3.svg)
 
-![FR1, register: the verification ping goes through the egress proxy; the secret is shown once.](diagrams/video-seq-fr1.svg)
+![FR1, register: the verification ping goes through the egress proxy; the secret is shown once.](video/svg/seq-fr1.svg)
 
-![FR2, emit: publish, wait for the acknowledgement, then mark sent.](diagrams/video-seq-fr2.svg)
+![FR2, emit: publish, wait for the acknowledgement, then mark sent.](video/svg/seq-fr2.svg)
 
-![FR3, deliver: insert unique on endpoint and event, claim, send, record.](diagrams/video-seq-fr3.svg)
+![FR3, deliver: insert unique on endpoint and event, claim, send, record.](video/svg/seq-fr3.svg)
 
-![FR4, replay: dead rows back to pending, oldest first, at the merchant's rate.](diagrams/video-seq-fr4.svg)
+![FR4, replay: dead rows back to pending, oldest first, at the merchant's rate.](video/svg/seq-fr4.svg)
 
-![C4 level 2 at V3: relay, log, fan-out, delivery store, dispatcher, attempt log, API.](diagrams/video-c4-containers.svg)
+![C4 level 2 at V3: relay, log, fan-out, delivery store, dispatcher, attempt log, API.](video/svg/c4-containers.svg)
 
 # Stage 5: Why these choices
 
@@ -533,9 +533,9 @@ Generated from `stack.json`.
 
 ## The dispatcher and fan-out, one level down
 
-![C4 level 3, the dispatcher: claimer, tier pools, endpoint limiter, breaker, signer with the key service, HTTP client, result writer reporting to endpoint health.](diagrams/video-c4-comp-dsp.svg)
+![C4 level 3, the dispatcher: claimer, tier pools, endpoint limiter, breaker, signer with the key service, HTTP client, result writer reporting to endpoint health.](video/svg/c4-comp-dsp.svg)
 
-![C4 level 3, fan-out: log consumer, subscription cache, matcher, renderer with the schema registry, payload writer, sequence check, delivery writer.](diagrams/video-c4-comp-fan.svg)
+![C4 level 3, fan-out: log consumer, subscription cache, matcher, renderer with the schema registry, payload writer, sequence check, delivery writer.](video/svg/c4-comp-fan.svg)
 
 <!-- stack:sections -->
 
@@ -686,7 +686,7 @@ Each fix in Stage 6 rejects one tool by name:
 
 ## When you don't need all this (the alternate path)
 
-![The alternate path changes one box: the dispatcher becomes a managed webhook service; the outbox, the log, fan-out and the contract stay ours.](diagrams/video-alt.svg)
+![The alternate path changes one box: the dispatcher becomes a managed webhook service; the outbox, the log, fan-out and the contract stay ours.](video/svg/alt.svg)
 
 **The simpler design.** Buy the delivery engine: a managed webhook service stores, signs, retries and
 shows merchants their logs. Keep what is ours: the outbox, the log, fan-out and the public contract.
@@ -714,7 +714,7 @@ alone, building wins only past about 800 M deliveries a month.
 The seven challenges of the video, in the order where each fix creates the next question. Versions follow
 the challenges: V4 (endpoint health), V5 (egress proxy), V6 (contract renderer).
 
-![The challenge map: seven attack points on the same baseline.](diagrams/video-map.svg)
+![The challenge map: seven attack points on the same baseline.](video/svg/map.svg)
 
 ## 6.1 Why not publish after the commit? (correctness)
 
@@ -748,13 +748,13 @@ partner bank?"* **The naive answer.** "Autoscale the pool."
 **The case.** 2,400 deliveries a second; the vendor's 120 a second at 10 s each holds 1,200 calls; the pool
 has 600; the bank's p99 goes from 0.3 s to minutes; doubling the pool gives the vendor 1,200 of 1,200.
 
-![The dispatcher's limiter and client under a slow endpoint.](diagrams/video-ch2-attack.svg)
+![The dispatcher's limiter and client under a slow endpoint.](video/svg/ch2-attack.svg)
 
 **The fix.** Claim only where `in_flight < cap`; `in_flight` rises in the claim's commit and falls in the
 result's, so it cannot drift from the rows. Tier pools (bank, large merchants, long tail) never share
 workers. A breaker opens after five consecutive failures.
 
-![Tier pools, the endpoint limiter and the breaker.](diagrams/video-ch2-fix.svg)
+![Tier pools, the endpoint limiter and the breaker.](video/svg/ch2-fix.svg)
 
 | Endpoint | Rate at peak | × answer time | Needed | Cap |
 |---|---|---|---|---|
@@ -789,9 +789,9 @@ minute. On success the endpoint opens at one call a second and doubles each clea
 over 5 % errors halves it. After an hour open, the technical contact is emailed; after 72 hours the
 endpoint is disabled. A 410 unsubscribes at once.
 
-![Version 4 on the baseline: endpoint health reads outcomes and pauses, probes and ramps.](diagrams/video-base-v4.svg)
+![Version 4 on the baseline: endpoint health reads outcomes and pauses, probes and ramps.](video/svg/base-v4.svg)
 
-![The ramp: probe, half-open at one a second, double each clean minute, halve on errors.](diagrams/video-seq-ch3-ramp.svg)
+![The ramp: probe, half-open at one a second, double each clean minute, halve on errors.](video/svg/seq-ch3-ramp.svg)
 
 **Why it works.** `[L3-recovery-no-relapse]`: recovery is earned. Full jitter spreads 240,000 retries so they never arrive in step.
 **What it does not cover:** an endpoint that is up but answers 400 to everything; those deliveries die after
@@ -812,7 +812,7 @@ loan's version, incremented in the same transaction as the change and copied int
 monotonic and gap-free per loan; the receiver applies an event only if its sequence is higher than the last
 it saw. Thin events and `GET /loans/{id}` for current state.
 
-![The fan-out sequence check and delivery writer carry the producer's sequence.](diagrams/video-ch4-fix.svg)
+![The fan-out sequence check and delivery writer carry the producer's sequence.](video/svg/ch4-fix.svg)
 
 **The push.** *"Why not strict order per endpoint?"* An ordered mode is one call in flight: at 0.25 s,
 4 a second for that endpoint, and one failing event blocks everything behind it. Offer it; default to
@@ -831,9 +831,9 @@ network policy leaves no other route. Each call is signed: `v1 = HMAC-SHA256(sec
 body)`; the receiver recomputes, compares in constant time, and rejects $|now - t| > 300$ s. Answers are
 truncated and scrubbed before they reach a log.
 
-![Version 5: the egress proxy on the only path between the dispatcher and the merchant.](diagrams/video-base-v5.svg)
+![Version 5: the egress proxy on the only path between the dispatcher and the merchant.](video/svg/base-v5.svg)
 
-![What the till checks, in order.](diagrams/video-seq-ch5-verify.svg)
+![What the till checks, in order.](video/svg/seq-ch5-verify.svg)
 
 **Defence in depth.** Merchants confirm high-value approvals with `GET /loans/{id}` before releasing goods;
 the partner bank uses mutual TLS.
@@ -854,7 +854,7 @@ version, and a producer's build fails if any stops rendering: a consumer-driven 
 producer's own pipeline. Additive fields go into the current version; a rename or split is a new version;
 versions are supported for 12 months; usage is measured per endpoint.
 
-![Version 6: the contract renderer beside fan-out.](diagrams/video-base-v6.svg)
+![Version 6: the contract renderer beside fan-out.](video/svg/base-v6.svg)
 
 | Team | Owns | Contract with the others |
 |---|---|---|
