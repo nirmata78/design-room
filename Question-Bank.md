@@ -85,7 +85,7 @@ minutes (`levels.md` §3).
 | ID | Question | T | Kind | Domain | Levels | Asked by | Loads |
 |---|---|:-:|---|---|---|---|---|
 | SD-24 | Distributed lock / coordination service · [**solution**](solutions/SD-24-distributed-lock/SD-24_Distributed_Lock_Reference_Design.md) | 2 | Build | infra | St Pr | G★ A | consensus, fencing, lease expiry, safety vs liveness |
-| SD-25 | Rate limiter (distributed) · [**solution**](solutions/SD-25-rate-limiter.md) | 1 | Build | infra | Sr St EM | G★ M★ A MS | algorithms, distributed counters, cell-local vs global |
+| SD-25 | Rate limiter (distributed) · [**solution**](solutions/SD-25-rate-limiter/SD-25_Rate_Limiter_Reference_Design.md) · [**reference video**](solutions/SD-25-rate-limiter/video/README.md) | 1 | Build | infra | Sr St EM | G★ M★ A MS | algorithms, distributed counters, cell-local vs global |
 | SD-26 | Feature flags & config delivery | 2 | Build | infra | Sr St EM | M★ N G | push vs poll, staleness, kill switches, targeting |
 | SD-27 | Authorization / permission graph (Zanzibar-like) | 2 | Build | infra saas | St Pr | G★ MS | graph evaluation, caching consistency, tuple storage |
 | SD-28 | Workflow orchestrator / distributed job scheduler | 1 | Build | infra | St EM | A★ G MS | durable state machines, retries, exactly-once effects |

@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 760" width="1600" height="760">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<g data-k="t:ti"><rect x="30" y="40" width="470" height="284" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M30,48 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v47 h-470 z" fill="#4285f4"/>
+<text x="44" y="77.4" font-family="'Roboto Mono', monospace" font-size="27.3" font-weight="700" fill="#fff">tier  (PostgreSQL)</text>
+<rect x="44" y="104.2" width="49.4" height="27.6" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="68.7" y="125.4" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="21.8" font-weight="700" fill="#C5221F">PK</text>
+<text x="102.4" y="126.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124" font-weight="700">tier_id</text>
+<text x="486" y="126.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">text</text>
+<rect x="31" y="141" width="468" height="46" fill="#f8f9fa"/>
+<text x="102.4" y="172.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124">rate_per_min</text>
+<text x="486" y="172.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">int</text>
+<text x="102.4" y="218.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124">burst</text>
+<text x="486" y="218.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">int</text>
+<rect x="31" y="233" width="468" height="46" fill="#f8f9fa"/>
+<text x="102.4" y="264.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124">windows</text>
+<text x="486" y="264.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">jsonb</text>
+<text x="44" y="306.3" font-family="Inter, Roboto, sans-serif" font-size="22.4" font-style="italic" fill="#5f6368">about 20 tiers; most policies inherit one</text></g>
+<g data-k="t:po"><rect x="570" y="40" width="470" height="422" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M570,48 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v47 h-470 z" fill="#ea4335"/>
+<text x="584" y="77.4" font-family="'Roboto Mono', monospace" font-size="27.3" font-weight="700" fill="#fff">policy  (PostgreSQL)</text>
+<rect x="584" y="104.2" width="49.4" height="27.6" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="608.7" y="125.4" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="21.8" font-weight="700" fill="#C5221F">PK</text>
+<text x="642.4" y="126.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124" font-weight="700">customer_id</text>
+<text x="1026" y="126.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">bigint</text>
+<rect x="571" y="141" width="468" height="46" fill="#f8f9fa"/>
+<rect x="584" y="150.2" width="49.4" height="27.6" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="608.7" y="171.4" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="21.8" font-weight="700" fill="#C5221F">PK</text>
+<text x="642.4" y="172.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124" font-weight="700">endpoint</text>
+<text x="1026" y="172.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">text</text>
+<rect x="584" y="196.2" width="49.4" height="27.6" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="608.7" y="217.4" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="21.8" font-weight="700" fill="#C5221F">PK</text>
+<text x="642.4" y="218.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124" font-weight="700">version</text>
+<text x="1026" y="218.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">int</text>
+<rect x="571" y="233" width="468" height="46" fill="#f8f9fa"/>
+<rect x="584" y="242.2" width="49.4" height="27.6" rx="3" fill="#e8f0fe" stroke="#4285f4" stroke-width="0.8"/>
+<text x="608.7" y="263.4" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="21.8" font-weight="700" fill="#1967D2">FK</text>
+<text x="642.4" y="264.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124">tier_id</text>
+<text x="1026" y="264.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">text</text>
+<text x="642.4" y="310.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124">scope · mode</text>
+<text x="1026" y="310.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">enum</text>
+<rect x="571" y="325" width="468" height="46" fill="#f8f9fa"/>
+<text x="642.4" y="356.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124">on_failure</text>
+<text x="1026" y="356.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">open | closed</text>
+<text x="642.4" y="402.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124">state</text>
+<text x="1026" y="402.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">text</text>
+<text x="584" y="444.3" font-family="Inter, Roboto, sans-serif" font-size="22.4" font-style="italic" fill="#5f6368">a change is a new version; owner and expiry</text></g>
+<g data-k="t:de"><rect x="1110" y="40" width="460" height="422" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M1110,48 a8,8 0 0 1 8,-8 h444 a8,8 0 0 1 8,8 v47 h-460 z" fill="#5f6368"/>
+<text x="1124" y="77.4" font-family="'Roboto Mono', monospace" font-size="27.3" font-weight="700" fill="#fff">decision  (ClickHouse)</text>
+<rect x="1124" y="104.2" width="49.4" height="27.6" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="1148.7" y="125.4" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="21.8" font-weight="700" fill="#C5221F">PK</text>
+<text x="1182.4" y="126.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124" font-weight="700">decision_id</text>
+<text x="1556" y="126.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">uuid</text>
+<rect x="1111" y="141" width="458" height="46" fill="#f8f9fa"/>
+<text x="1182.4" y="172.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124">ts</text>
+<text x="1556" y="172.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">ts</text>
+<rect x="1124" y="196.2" width="49.4" height="27.6" rx="3" fill="#fef7e0" stroke="#b06000" stroke-width="0.8"/>
+<text x="1148.7" y="217.4" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="21.8" font-weight="700" fill="#b06000">IX</text>
+<text x="1182.4" y="218.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124">customer, endpoint</text>
+<text x="1556" y="218.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">key</text>
+<rect x="1111" y="233" width="458" height="46" fill="#f8f9fa"/>
+<text x="1182.4" y="264.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124">allowed</text>
+<text x="1556" y="264.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">bool</text>
+<text x="1182.4" y="310.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124">policy_v</text>
+<text x="1556" y="310.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">int</text>
+<rect x="1111" y="325" width="458" height="46" fill="#f8f9fa"/>
+<text x="1182.4" y="356.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124">lease, tokens</text>
+<text x="1556" y="356.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">int</text>
+<text x="1182.4" y="402.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124">sync_age_ms</text>
+<text x="1556" y="402.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">int</text>
+<text x="1124" y="444.3" font-family="Inter, Roboto, sans-serif" font-size="22.4" font-style="italic" fill="#5f6368">every 429, 1 % of allows; 30 days</text></g>
+<g data-k="t:lb"><rect x="30" y="460" width="470" height="284" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M30,468 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v47 h-470 z" fill="#202124"/>
+<text x="44" y="497.4" font-family="'Roboto Mono', monospace" font-size="27.3" font-weight="700" fill="#fff">local bucket  (memory)</text>
+<rect x="44" y="524.2" width="49.4" height="27.6" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="68.7" y="545.4" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="21.8" font-weight="700" fill="#C5221F">PK</text>
+<text x="102.4" y="546.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124" font-weight="700">key</text>
+<text x="486" y="546.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">customer:endpoint</text>
+<rect x="31" y="561" width="468" height="46" fill="#f8f9fa"/>
+<text x="102.4" y="592.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124">tokens</text>
+<text x="486" y="592.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">float</text>
+<text x="102.4" y="638.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124">refilled_at</text>
+<text x="486" y="638.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">monotonic</text>
+<rect x="31" y="653" width="468" height="46" fill="#f8f9fa"/>
+<text x="102.4" y="684.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124">lease, lease_until</text>
+<text x="486" y="684.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">int, ts</text>
+<text x="44" y="726.3" font-family="Inter, Roboto, sans-serif" font-size="22.4" font-style="italic" fill="#5f6368">one per active key, per server</text></g>
+<g data-k="t:gb"><rect x="570" y="460" width="470" height="284" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M570,468 a8,8 0 0 1 8,-8 h454 a8,8 0 0 1 8,8 v47 h-470 z" fill="#202124"/>
+<text x="584" y="497.4" font-family="'Roboto Mono', monospace" font-size="27.3" font-weight="700" fill="#fff">global bucket  (quota svc)</text>
+<rect x="584" y="524.2" width="49.4" height="27.6" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="608.7" y="545.4" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="21.8" font-weight="700" fill="#C5221F">PK</text>
+<text x="642.4" y="546.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124" font-weight="700">key</text>
+<text x="1026" y="546.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">customer:endpoint</text>
+<rect x="571" y="561" width="468" height="46" fill="#f8f9fa"/>
+<text x="642.4" y="592.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124">tokens</text>
+<text x="1026" y="592.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">float</text>
+<text x="642.4" y="638.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124">asked</text>
+<text x="1026" y="638.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">per server</text>
+<rect x="571" y="653" width="468" height="46" fill="#f8f9fa"/>
+<text x="642.4" y="684.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124">policy_v</text>
+<text x="1026" y="684.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">int</text>
+<text x="584" y="726.3" font-family="Inter, Roboto, sans-serif" font-size="22.4" font-style="italic" fill="#5f6368">memory, mirrored to a standby</text></g>
+<g data-k="t:xb"><rect x="1110" y="460" width="460" height="238" rx="8" fill="#ffffff" stroke="#5f6368" stroke-width="1.4"/>
+<path d="M1110,468 a8,8 0 0 1 8,-8 h444 a8,8 0 0 1 8,8 v47 h-460 z" fill="#202124"/>
+<text x="1124" y="497.4" font-family="'Roboto Mono', monospace" font-size="27.3" font-weight="700" fill="#fff">exact bucket  (Redis hash)</text>
+<rect x="1124" y="524.2" width="49.4" height="27.6" rx="3" fill="#fce8e6" stroke="#ea4335" stroke-width="0.8"/>
+<text x="1148.7" y="545.4" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="21.8" font-weight="700" fill="#C5221F">PK</text>
+<text x="1182.4" y="546.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124" font-weight="700">rl:{customer}:endpoint</text>
+<text x="1556" y="546.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">key</text>
+<rect x="1111" y="561" width="458" height="46" fill="#f8f9fa"/>
+<text x="1182.4" y="592.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124">tokens</text>
+<text x="1556" y="592.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">float</text>
+<text x="1182.4" y="638.3" font-family="'Roboto Mono', monospace" font-size="22.4" fill="#202124">ts</text>
+<text x="1556" y="638.3" text-anchor="end" font-family="'Roboto Mono', monospace" font-size="21.8" fill="#5f6368">ms</text>
+<text x="1124" y="680.3" font-family="Inter, Roboto, sans-serif" font-size="22.4" font-style="italic" fill="#5f6368">exact-mode keys only; TTL 2 × refill</text></g>
+<g data-k="r:0"><path d="M570.0,187.7 L500.0,139.4" fill="none" stroke="#5f6368" stroke-width="1.8"/>
+<circle cx="570.0" cy="187.7" r="4" fill="#5f6368"/>
+<text x="564.2" y="177.0" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="23.4" font-weight="700" fill="#ea4335">N</text>
+<circle cx="500.0" cy="139.4" r="4" fill="#5f6368"/>
+<text x="505.8" y="168.3" text-anchor="middle" font-family="Inter, Roboto, sans-serif" font-size="23.4" font-weight="700" fill="#ea4335">1</text></g>
+</svg>

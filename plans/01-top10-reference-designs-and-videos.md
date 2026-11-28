@@ -57,7 +57,7 @@ tasks in this order: shared ideas first, heavier machinery later.
 | # | Task | Bank ID · folder | Starts from | Cue sheet |
 |---|---|---|---|---|
 | 1 | Distributed cache | SD-20 · `solutions/SD-20-distributed-cache/` | nothing | `questions/C-storage-data-consistency.md` `### SD-20` |
-| 2 | Rate limiter and quota enforcement | SD-25 · `solutions/SD-25-rate-limiter/` | short solution `solutions/SD-25-rate-limiter.md`; a video at the older EM bar in `video/` | `questions/D-infrastructure-control-planes.md` `### SD-25` |
+| 2 | Rate limiter and quota enforcement | SD-25 · `solutions/SD-25-rate-limiter/` | re-cut 2026-11-28 in the six-chapter format: `SD-25_Rate_Limiter_Reference_Design.md` (the short solution and the EM mock video are in git history) | `questions/D-infrastructure-control-planes.md` `### SD-25` |
 | 3 | Blocking / denylist distribution | **SD-95 (new)** · `solutions/SD-95-denylist-distribution/` | nothing; needs a bank row and a compact cue sheet (§7) | to be written in `questions/D-…` |
 | 4 | Real-time aggregation: trending, top-K, counters, leaderboard | SD-02 · `solutions/SD-02-trending-top-k/` | nothing | `questions/A-streaming-analytics.md` `### SD-02` (read SD-01 and SD-03 too) |
 | 5 | Fleet monitoring: metrics, logs, alerting | SD-04 · `solutions/SD-04-metrics-monitoring/` | nothing | `questions/A-…` `### SD-04` (read SD-05 for the logs variant) |

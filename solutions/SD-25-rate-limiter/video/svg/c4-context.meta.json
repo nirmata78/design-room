@@ -1,0 +1,35 @@
+{
+  "key": "c4-context",
+  "slot": "stage",
+  "viewbox": [
+    0.0,
+    0.0,
+    1800.0,
+    860.0
+  ],
+  "scale_1080p": 1.0,
+  "min_font_svg_px": 18.0,
+  "min_rendered_1080p_px": 18.0,
+  "min_px": 18.0,
+  "legibility_ok": true,
+  "forbidden_fonts_found": [],
+  "node_keys": [
+    "e:cli",
+    "e:team",
+    "e:be",
+    "e:meter",
+    "e:rl"
+  ],
+  "edge_keys": [
+    "l:cli-rl",
+    "l:rl-be",
+    "l:team-rl",
+    "l:meter-rl"
+  ],
+  "unknown_aliases": [],
+  "canon": "c4:c4-context",
+  "full": true,
+  "source": "c4-context",
+  "overflow": [],
+  "renderer": "native"
+}

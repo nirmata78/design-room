@@ -1,0 +1,13 @@
+[
+  [
+    "e:dlog",
+    "p:new:dlog",
+    "l:api-dlog"
+  ],
+  [
+    "e:dstore",
+    "p:new:dstore",
+    "l:dstore-dlog",
+    "l:pol-dstore"
+  ]
+]

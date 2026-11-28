@@ -1,0 +1,301 @@
+{
+  "_doc": "Every C4 picture of SD-25, drawn by c4-structurizr's native renderer from workspace.dsl. Each exported view has a 'grid' (rows of DSL identifiers, '.' = empty cell); derived views name their source with 'from' and keep its grid and canvas, so no box moves from V1 to the recap. Zooms dim the rest of the full component view instead of cropping it.",
+  "views": {
+    "c4-context": {
+      "slot": "stage",
+      "box": [
+        380,
+        170
+      ],
+      "grid": [
+        " .     team    .  ",
+        "cli    rl     be ",
+        " .     meter   .  "
+      ],
+      "steps": [
+        "cli",
+        "rl",
+        "be",
+        "team",
+        "meter"
+      ]
+    },
+    "containers": {
+      "slot": "stage",
+      "box": [
+        300,
+        176
+      ],
+      "grid": [
+        "peer   cli    be     team ",
+        "quota  api    pol    pdb  ",
+        "store  .      dlog   dstore"
+      ]
+    },
+    "alt": {
+      "slot": "stage",
+      "box": [
+        380,
+        180
+      ],
+      "grid": [
+        "cli   api   be",
+        " .   store  . "
+      ],
+      "alternate": [
+        "store"
+      ]
+    },
+    "comp-api": {
+      "slot": "stage",
+      "box": [
+        250,
+        170
+      ],
+      "grid": [
+        " .     be     cli      pol     .      .    ",
+        "dlog  dsamp  handler  pcache  fallb  .    ",
+        "store exact   .       bucket  sync   quota"
+      ],
+      "steps": [
+        [
+          "handler",
+          "cli",
+          "be"
+        ],
+        [
+          "pcache",
+          "pol"
+        ],
+        [
+          "exact",
+          "store",
+          "bucket"
+        ],
+        [
+          "sync",
+          "quota",
+          "fallb"
+        ],
+        [
+          "dsamp",
+          "dlog"
+        ]
+      ]
+    },
+    "v1": {
+      "from": "containers",
+      "slot": "stage",
+      "hide": [
+        "quota",
+        "peer",
+        "dlog",
+        "dstore"
+      ],
+      "steps": [
+        "cli",
+        "api",
+        "store",
+        "be",
+        "pol",
+        "pdb",
+        "team"
+      ]
+    },
+    "flow-v1": {
+      "from": "containers",
+      "slot": "stage",
+      "hide": [
+        "quota",
+        "peer",
+        "dlog",
+        "dstore"
+      ],
+      "flow": [
+        "cli->api",
+        "api->store",
+        "api->be",
+        "team->pol",
+        "pol->pdb",
+        "api->pol"
+      ]
+    },
+    "v1-fix": {
+      "from": "containers",
+      "slot": "stage",
+      "hide": [
+        "quota",
+        "peer",
+        "dlog",
+        "dstore"
+      ],
+      "fix": [
+        "store"
+      ]
+    },
+    "v1-break": {
+      "from": "containers",
+      "slot": "stage",
+      "hide": [
+        "quota",
+        "peer",
+        "dlog",
+        "dstore"
+      ],
+      "breaks": [
+        "store"
+      ]
+    },
+    "v2": {
+      "from": "containers",
+      "slot": "stage",
+      "hide": [
+        "peer",
+        "dlog",
+        "dstore"
+      ],
+      "new": [
+        "quota"
+      ]
+    },
+    "flow-v2": {
+      "from": "containers",
+      "slot": "stage",
+      "hide": [
+        "peer",
+        "dlog",
+        "dstore"
+      ],
+      "flow": [
+        "cli->api",
+        "api->be",
+        "api->quota"
+      ]
+    },
+    "v2-break": {
+      "from": "containers",
+      "slot": "stage",
+      "hide": [
+        "peer",
+        "dlog",
+        "dstore"
+      ],
+      "breaks": [
+        "quota"
+      ]
+    },
+    "v3": {
+      "from": "containers",
+      "slot": "stage",
+      "hide": [
+        "dlog",
+        "dstore"
+      ],
+      "new": [
+        "peer"
+      ]
+    },
+    "pol-break": {
+      "from": "containers",
+      "slot": "stage",
+      "hide": [
+        "dlog",
+        "dstore"
+      ],
+      "breaks": [
+        "pol"
+      ]
+    },
+    "pol-fix": {
+      "from": "containers",
+      "slot": "stage",
+      "hide": [
+        "dlog",
+        "dstore"
+      ],
+      "fix": [
+        "pol",
+        "pdb"
+      ]
+    },
+    "v4": {
+      "from": "containers",
+      "slot": "stage",
+      "new": [
+        "dlog",
+        "dstore"
+      ]
+    },
+    "recap": {
+      "from": "containers",
+      "slot": "stage",
+      "badges": {
+        "api": "lease · floor",
+        "store": "exact keys",
+        "quota": "leases by demand",
+        "peer": "budgets, 2 s",
+        "pol": "staged versions",
+        "dstore": "false-limit SLI"
+      }
+    },
+    "share-fix": {
+      "from": "comp-api",
+      "slot": "stage",
+      "keep": [
+        "handler",
+        "bucket",
+        "sync"
+      ],
+      "fix": [
+        "bucket",
+        "sync"
+      ]
+    },
+    "down-break": {
+      "from": "comp-api",
+      "slot": "stage",
+      "keep": [
+        "bucket",
+        "sync",
+        "fallb"
+      ],
+      "breaks": [
+        "sync"
+      ]
+    },
+    "down-fix": {
+      "from": "comp-api",
+      "slot": "stage",
+      "keep": [
+        "bucket",
+        "sync",
+        "fallb"
+      ],
+      "fix": [
+        "fallb"
+      ]
+    },
+    "lkg-fix": {
+      "from": "comp-api",
+      "slot": "stage",
+      "keep": [
+        "handler",
+        "pcache"
+      ],
+      "fix": [
+        "pcache"
+      ]
+    },
+    "obs-fix": {
+      "from": "comp-api",
+      "slot": "stage",
+      "keep": [
+        "handler",
+        "dsamp"
+      ],
+      "fix": [
+        "dsamp"
+      ]
+    }
+  }
+}

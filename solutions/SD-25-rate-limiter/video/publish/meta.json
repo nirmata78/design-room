@@ -1,0 +1,41 @@
+{
+  "mp4": "rate-limiter-reference.mp4",
+  "teaser_chapter": null,
+  "thumbnail": {
+    "kicker": "Staff reference solution",
+    "title": "Never the outage.<br><em>Lease</em>, don't ask.",
+    "sub": "A rate limiter on 3 M requests a second: decided in memory, bounded, explained.",
+    "id": "design-room · SD-25"
+  },
+  "youtube": {
+    "title": "Distributed Rate Limiter System Design: Staff-Level Reference (Token Bucket, Leases, Fail-Open)",
+    "playlist": "System design reference solutions · design-room (create it once, reuse it)",
+    "tags": ["system design", "system design interview", "rate limiter", "distributed rate limiter", "token bucket", "api rate limiting", "quota", "fail open", "static stability", "redis lua", "staff engineer", "distributed systems"],
+    "description_top": [
+      "A rate limiter sounds like a counter and an if statement. At three million requests a second over five hundred servers in three regions, with one millisecond to decide, the counter has to live somewhere, and wherever it lives it sits on every request. A Staff-bar (L6/L7) reference solution run like a real round: the design starts as a C4 container view and evolves only because an interviewer breaks it, six times, with each mechanism and technology introduced at the moment it is needed. {DURATION} minutes, {SLIDES} numbered slides.",
+      "The thesis: a rate limiter sits on every request, so its availability and latency matter more than its accuracy. Decide in memory from a token bucket, lease the global budget to where the traffic lands, and know exactly how wrong you can be.",
+      "IN THIS VIDEO\n• Estimates from one scale line: 1,000 a minute over 500 servers is 2 per server per minute, and a round trip at p99 is over the whole 1 ms budget\n• V1 → V2 → V3 → V4 on one C4 container view, with component zooms of the limiter for every fix\n• Six challenges: the fixed-window boundary burst, taking the round trip off the hot path, the quota service going down, one quota across three regions, a 10× burst every hour, and a customer limited while under its limit\n• Mechanisms where they are needed: the token bucket in one atomic script, leases sized by demand, static stability to a bounded floor, regional budgets, staged policy versions, a false-limit SLI",
+      "HOW TO USE IT\nRun the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first."
+    ],
+    "description_bottom": [
+      "LINKS\nWritten reference design: https://github.com/nirmata78/design-room/blob/main/solutions/SD-25-rate-limiter/SD-25_Rate_Limiter_Reference_Design.md\nRun this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room\nAll videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md",
+      "ABOUT THIS VIDEO\nThis is a scripted walkthrough, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script, diagrams and the written design were produced with Claude Code. Numbers are back-of-the-envelope estimates for the exercise, labelled as given, illustrative or initial targets, not any company's real figures, and this is not any company's actual design. The technical content has not been reviewed by a person.",
+      "#SystemDesign #SoftwareEngineering #DistributedSystems"
+    ]
+  },
+  "linkedin": {
+    "post": [
+      "\"Put a counter in Redis\" is the answer that fails the rate-limiter question. The grade is on what happens to every request while it waits.",
+      "I've published a {DURATION}-minute reference solution for a distributed rate limiter at the Staff bar, run like a real round: one C4 diagram that evolves through six interviewer challenges, on {SLIDES} numbered slides.",
+      "The idea that unlocks it: the limiter is on every request, so its own availability and latency matter more than its accuracy. Decide in memory, lease the global budget to the servers in proportion to where the traffic actually lands, and state the error as a number.",
+      "What it goes into:\n→ 1,000 requests at 11:59:59 and 1,000 more at 12:00:00\n→ Why dividing the limit by 500 servers throttles a customer at 0.6 % of its quota\n→ The quota service is down: fail open, fail closed, or neither\n→ \"You limited us while we were under\", and how you'd have known first",
+      "Best on a second pass: pause after each question and answer it first.",
+      "▶ {YOUTUBE_URL}",
+      "It's a scripted walkthrough with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator.",
+      "What does your limiter do when its own store is unreachable?",
+      "#SystemDesign #SoftwareEngineering #DistributedSystems"
+    ],
+    "first_comment": "Written reference design, stage by stage: https://github.com/nirmata78/design-room/blob/main/solutions/SD-25-rate-limiter/SD-25_Rate_Limiter_Reference_Design.md\n\nRun this round yourself, with an AI interviewer that won't help you: https://github.com/nirmata78/design-room",
+    "document": null
+  }
+}

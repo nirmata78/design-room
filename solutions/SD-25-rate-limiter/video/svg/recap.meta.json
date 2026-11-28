@@ -1,0 +1,48 @@
+{
+  "key": "recap",
+  "slot": "stage",
+  "viewbox": [
+    0.0,
+    0.0,
+    1800.0,
+    860.0
+  ],
+  "scale_1080p": 1.0,
+  "min_font_svg_px": 18.0,
+  "min_rendered_1080p_px": 18.0,
+  "min_px": 18.0,
+  "legibility_ok": true,
+  "forbidden_fonts_found": [],
+  "node_keys": [
+    "e:cli",
+    "e:team",
+    "e:be",
+    "e:peer",
+    "e:api",
+    "e:store",
+    "e:quota",
+    "e:pol",
+    "e:pdb",
+    "e:dlog",
+    "e:dstore"
+  ],
+  "edge_keys": [
+    "l:cli-api",
+    "l:api-be",
+    "l:api-store",
+    "l:api-pol",
+    "l:pol-pdb",
+    "l:team-pol",
+    "l:api-quota",
+    "l:quota-peer",
+    "l:api-dlog",
+    "l:dstore-dlog",
+    "l:pol-dstore"
+  ],
+  "unknown_aliases": [],
+  "canon": "c4:containers",
+  "full": false,
+  "source": "containers",
+  "overflow": [],
+  "renderer": "native"
+}
