@@ -10,10 +10,11 @@ Run with any python3; the thumbnail step re-invokes the pdf-kit venv for Playwri
 """
 import os as _os, pathlib as _pl
 _os.environ.setdefault("PANGOCAIRO_BACKEND", "fc")   # rsvg-convert: use fontconfig so the bundled Google Fonts resolve
-_os.environ.setdefault("FONTCONFIG_FILE", str(_pl.Path.home() / "Projects/design-room/pdf-kit/fonts/fonts.conf"))
+import sys as _sys; _sys.path.insert(0, str(_pl.Path(__file__).resolve().parent)); import paths as _paths
+_os.environ.setdefault("FONTCONFIG_FILE", str(_paths.FONTS_CONF))
 import argparse, html, json, os, pathlib, re, subprocess, sys
 
-VENV = pathlib.Path.home() / "Projects/design-room/pdf-kit/.venv/bin/python"
+VENV = _paths.PY
 LIMITS = {"YouTube title": 100, "YouTube description": 5000, "YouTube tags": 500, "LinkedIn post": 3000, "LinkedIn first comment": 1250}
 FOLD_MOBILE = 140                 # third-party measurements; LinkedIn does not document the "see more" cut
 PENDING = "[YouTube link: rerun publish_kit.py with --youtube-url]"
@@ -35,7 +36,7 @@ def check_chapters(ch):
     errs += [f"chapter under 10 s, YouTube drops the whole list: {t!r} ({e - s:.1f} s)" for s, e, t in ch if e - s < 10]
     return errs
 
-FONTS = (pathlib.Path.home() / "Projects/design-room/pdf-kit/fonts/google").as_uri()
+FONTS = (_paths.PDFKIT / "fonts/google").as_uri()
 THUMB = """<!doctype html><meta charset="utf-8"><style>
 @font-face{{font-family:"Plus Jakarta Sans";src:url("{fonts}/PlusJakartaSans-Variable.ttf");font-weight:200 800}}
 @font-face{{font-family:"Inter";src:url("{fonts}/Inter-Variable.ttf");font-weight:100 900}}

@@ -3,8 +3,21 @@
   1. Validates Structurizr DSL inside the warm Docker container (c4_runtime.sh)
   2. Batch-exports all views to raw SVG
   3. Normalizes every view with svg_normalizer.py (DESIGN-TOKENS.md + 1080p legibility gate)
-  4. Optionally renders @2x PNG previews via Playwright Chromium
-  5. Emits structured JSON report; exits 0 (OK), 2 (DSL error), or 3 (legibility/token gate fail)
+  4. Derives every extra view declared in views.json with "from": version cuts (hide), status overlays
+     (new/breaks/fix/focus/alternate), badges, keep/crop zooms and numbered flows, all from the one exported layout,
+     with the viewBox locked to the source view so boxes never move between V1 … Vn
+  5. Optionally renders @2x PNG previews via Playwright Chromium
+  6. Emits structured JSON report; exits 0 (OK), 2 (DSL error), or 3 (legibility/token gate or unknown alias)
+
+views.json:
+  {"views": {
+     "containers": {"slot": "stage"},                                   # an exported view, normalized as is
+     "v1": {"from": "containers", "hide": ["stream", "live"]},          # a version cut of it, same pixel positions
+     "v2": {"from": "containers", "new": ["stream", "live"]},           # carried boxes on frame 0, new ones revealed
+     "ch1-break": {"from": "comp-stream", "keep": ["dedup", "comb"], "crop": true, "breaks": ["dedup"]},
+     "flow-live": {"from": "containers", "flow": ["cli->col", "col->log"]},
+     "comp-stream": {"video": false}                                    # Markdown only: no 1080p gate
+  }}
 """
 from __future__ import annotations
 
@@ -24,14 +37,23 @@ SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
 SKILL_DIR = SCRIPT_DIR.parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from svg_normalizer import ViewMeta, normalize_svg  # noqa: E402
+from svg_normalizer import Overlay, ViewMeta, normalize_svg  # noqa: E402
 
 
-class ViewSpec(BaseModel):
-    slot: Literal["full", "composite", "split"] = "full"
+class ViewSpec(Overlay):
+    """One output SVG. Overlay fields (hide, new, breaks, fix, focus, alternate, badges, keep, crop, flow) come from Overlay."""
+    model_config = {"populate_by_name": True}
+    from_: str = Field("", alias="from")
+    slot: Literal["full", "stage", "composite", "split"] = "full"
     steps: list[Any] = Field(default_factory=list)
     canon: str = ""
     full: bool = True
+    lock_viewbox_to: str = ""
+    min_px: float = 18.0
+    video: bool = True
+
+    def overlay(self) -> Overlay:
+        return Overlay(**{k: getattr(self, k) for k in Overlay.model_fields})
 
 
 class WorkspaceSpec(BaseModel):
@@ -142,24 +164,32 @@ def run_render(
 
         metas: list[ViewMeta] = []
         out_svgs: list[pathlib.Path] = []
-        for raw_svg in sorted(raw_dir.glob("*.svg")):
-            if raw_svg.stem.endswith("-key"):
-                continue
-            key = raw_svg.stem
-            vspec = spec.views.get(key, ViewSpec())
+        raws = {p.stem: p for p in sorted(raw_dir.glob("*.svg")) if not p.stem.endswith("-key")}
+
+        def _norm(key: str, raw: pathlib.Path, vspec: ViewSpec, lock=None, source: str = "") -> ViewMeta:
             dest = out_dir / f"{key}.svg"
-            meta = normalize_svg(
-                raw_svg,
-                dest,
-                key=key,
-                slot=vspec.slot,
-                alias_by_title=alias_by_title,
-                reveal_steps=vspec.steps or None,
-                canon=vspec.canon,
-                full=vspec.full,
-            )
+            meta = normalize_svg(raw, dest, key=key, slot=vspec.slot, alias_by_title=alias_by_title,
+                                 reveal_steps=vspec.steps or None, override_viewbox=lock, canon=vspec.canon or f"c4:{source or key}",
+                                 full=vspec.full, overlay=vspec.overlay(), min_px=vspec.min_px if vspec.video else 0.0,
+                                 source=source or key)
             metas.append(meta)
             out_svgs.append(dest)
+            return meta
+
+        base: dict[str, ViewMeta] = {}
+        for key, raw in raws.items():                       # 1. every exported view, as declared (or plain)
+            base[key] = _norm(key, raw, spec.views.get(key, ViewSpec()))
+        missing = []
+        for key, vspec in spec.views.items():               # 2. derived views, in declaration order
+            if key in raws:
+                continue
+            src = vspec.from_
+            if src not in raws:
+                missing.append({"key": key, "from": src})
+                continue
+            lock_key = vspec.lock_viewbox_to or src
+            lock = None if vspec.crop else (base[lock_key].viewbox if lock_key in base else None)
+            base[key] = _norm(key, raws[src], vspec, lock=lock, source=src)
 
         if export_png and out_svgs:
             _render_pngs(out_svgs)
@@ -167,23 +197,35 @@ def run_render(
     finally:
         shutil.rmtree(tmp_stage, ignore_errors=True)
 
-    failures = [m for m in metas if (not m.legibility_ok) or m.forbidden_fonts_found]
+    failures = [m for m in metas if (not m.legibility_ok) or m.forbidden_fonts_found or m.unknown_aliases]
+
+    def _remedy(m: ViewMeta) -> str:
+        if m.unknown_aliases:
+            return f"views.json names aliases or edges not drawn in '{m.source}': {m.unknown_aliases}. Use DSL identifiers (last segment) and 'a->b' for edges."
+        if m.forbidden_fonts_found:
+            return "Remove the font family from the DSL styles; only c4-google-tokens.dsl fonts are allowed."
+        return (f"Smallest text renders at {m.min_rendered_1080p_px}px (< {m.min_px}px) in slot '{m.slot}': crop to fewer boxes "
+                "(keep + crop), use slot 'stage', flip autoLayout lr <-> tb, or raise fontSize in the workspace styles. "
+                "Mark Markdown-only views with \"video\": false.")
+
     summary = {
-        "status": "ok" if not failures else "gate_failed",
+        "status": "ok" if not failures and not missing else ("gate_failed" if failures else "spec_error"),
         "views_rendered": len(metas),
+        "missing_sources": [{**m, "remedy": "'from' must name a view key exported by workspace.dsl"} for m in missing],
         "failures": [
             {
                 "key": m.key,
                 "min_rendered_1080p_px": m.min_rendered_1080p_px,
                 "forbidden_fonts": m.forbidden_fonts_found,
-                "remedy": "Switch autoLayout lr <-> tb, reduce nodes per view, or shorten descriptions.",
+                "unknown_aliases": m.unknown_aliases,
+                "remedy": _remedy(m),
             }
             for m in failures
         ],
         "views": [m.model_dump() for m in metas],
     }
     print(json.dumps(summary, indent=2))
-    return (0 if not failures else 3), metas
+    return (0 if not failures and not missing else 3), metas
 
 
 def main() -> None:

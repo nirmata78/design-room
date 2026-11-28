@@ -172,3 +172,12 @@ pre.code.hl.keys .ln.key * { opacity: 1; }
 .pickopt .verdict { outline: 1.4pt solid var(--g-green); }
 .wirepair { display: flex; flex-direction: column; gap: 10pt; } .wirepair .line { padding: 0; border: 0; background: none; }
 .objection h1.q { font-size: 30pt; }
+
+/* stage (2026-11-28, issue #5): a diagram-only slide for C4 views and their deltas. The kicker sits inside a one-line
+   header so the figure gets about 1800 × 880 frame px — the c4-structurizr "stage" slot. */
+.slide.stage { padding: 0.26in 0.4in 0.3in; }
+.slide.stage h1 { font-size: 22pt; margin: 0 0 4pt !important; padding: 0 0 4pt; }
+.slide.stage h1 .k { display: inline; font-size: 11pt; margin: 0 12pt 0 0; vertical-align: 3pt; }
+.slide.stage h1 .vtag { font-size: 0.8em; }
+.slide.stage figure.grow { flex: 1; }
+.slide.stage figcaption { display: none; }
