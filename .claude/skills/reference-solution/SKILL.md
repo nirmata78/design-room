@@ -1,6 +1,6 @@
 ---
 name: reference-solution
-description: Build, rebuild, re-cut or plan the design-room reference solution for one question-bank ID — a 40–55 minute candidate-led video in six chapters (prompt + clarifying Q&A + C4 context, back-of-the-envelope, API + data model, the design as a C4 container view V1 that evolves V2 → V3 … through 5–6 interviewer challenges with mechanisms, C4 component zooms and technology cards introduced just in time, the alternate simpler path, recap with trade-offs and follow-ups), the Markdown reference design generated from the same source (GitHub Pages ready), every C4 picture from one Structurizr workspace via c4-structurizr, and the YouTube/LinkedIn publish kit. Staged and deterministic (scripts/ref_solution.py, JSON status with remedies), so Claude CLI, Antigravity/Gemini and Grok run it the same way. Invoke as "/reference-solution SD-96" (new) or "/reference-solution SD-08" (re-cut an older solution); a title fragment also works. Use whenever the author asks to create, regenerate, re-cut, re-render or publish a solution or its video, for an outline or script only, or to analyse a new reference video for the format. All output stays inside the repository.
+description: Build, rebuild, re-cut or plan the design-room reference solution for one question-bank ID — a 40–60 minute candidate-led video in six chapters (prompt + clarifying Q&A + C4 context, back-of-the-envelope, API + data model, the design as a C4 container view V1 that evolves V2 → V3 … through 5–6 interviewer challenges with mechanisms, C4 component zooms and technology cards introduced just in time, the alternate simpler path, recap with trade-offs and follow-ups), the Markdown reference design generated from the same source (GitHub Pages ready), every C4 picture from one Structurizr workspace via c4-structurizr, and the YouTube/LinkedIn publish kit. Staged and deterministic (scripts/ref_solution.py, JSON status with remedies), so Claude CLI, Antigravity/Gemini and Grok run it the same way. Invoke as "/reference-solution SD-96" (new) or "/reference-solution SD-08" (re-cut an older solution); a title fragment also works. Use whenever the author asks to create, regenerate, re-cut, re-render or publish a solution or its video, for an outline or script only, or to analyse a new reference video for the format. All output stays inside the repository.
 ---
 
 # /reference-solution SD-NN — one question, from the prompt to the publish kit
@@ -75,16 +75,22 @@ with the property that rules it out), `summary` (container · choice · rejected
 ### 3 · Diagrams → `$Q/workspace.dsl`, `$Q/views.json`, `$V/diagrams.py`
 
 - **`workspace.dsl`** (GUIDELINES §7.4): one Structurizr workspace with the system context view, **one master container view**
-  holding every container that will ever appear (≤ 11 elements, `autoLayout tb`), the component views of the containers the
-  challenges open, and any alternate view; `!include ../../.claude/skills/c4-structurizr/resources/c4-google-tokens.dsl`; a
-  `styles` block may raise `fontSize`, box sizes and the boundary label until the gate passes.
-- **`views.json`**: V1 … Vn as `from` + `hide` + `new`, flows as `flow`, challenge breaks and fixes as `breaks`/`fix` on the
-  container view or `keep` + `crop` zooms of 2–4 adjacent components, recap `badges`, the alternate's `alternate`; full component
-  views `"video": false`; C4 views shown full-frame `"slot": "stage"`.
+  holding every container that will ever appear (≤ 11 elements), the component views of the containers the challenges open,
+  and any alternate view; `!include ../../.claude/skills/c4-structurizr/resources/c4-google-tokens.dsl`. Every relationship
+  carries a technology (`"Kafka"`, `"HTTPS"`, `"SQL"`); shapes by tag (`Database`, `Queue`, `Bucket`, `App`, `External`);
+  descriptions one short line, technologies one or two words (they are drawn at 18–19 px).
+- **`views.json`**: a **`grid`** for every exported view (rows of identifiers; c4-structurizr SKILL.md has the rules and SD-03 the
+  worked grids) and a `box` size; V1 … Vn as `from` + `hide` + `new`, flows as `flow`, challenge breaks and fixes as `breaks`/`fix`
+  on the container view or as `keep` + `breaks`/`fix` on the full component view (the rest dims; no `crop`), recap `badges`, the
+  alternate's `alternate`; every C4 view `"slot": "stage"`; component views with grouped `steps` (they are shown whole once).
+- **The look is locked.** Never set `"renderer": "structurizr"` for a new solution and never restyle `c4draw.py` per
+  question: the SD-03 diagrams are the approved look, pinned byte-for-byte by c4-structurizr's `tests/test_golden_sd03.py`
+  (run `pytest .claude/skills/c4-structurizr/tests` after any change to the renderer).
 - **`diagrams.py`**: sequences (`seqsvg`), the physical model (`erdsvg`), a lifecycle (`statesvg`), the budget bar
   (`figsvg.budget_bar`) and any figure. It imports from `.claude/skills/reference-solution/kit`, never clears `svg/`.
 - `$R diagrams SD-NN` renders all of it into `$V/svg/` and must print `ok`. On `diagram_gate_failed`, follow each failure's
-  `remedy` (raise the workspace font, flip the layout, crop fewer boxes); on `unknown_aliases`, use the DSL identifier's last segment.
+  `remedy` (shorten a description or technology, fewer grid columns, a `box` size); on `unknown_aliases`, use the DSL identifier's
+  last segment and place every element of the view in its grid.
   Look at the rendered PNGs of the master view and two zooms (`render_c4.py … --png` into a scratch folder).
 
 ### 4 · Slides and narration → `$V/src/`
@@ -93,7 +99,9 @@ with the property that rules it out), `summary` (container · choice · rejected
 `dsl.props(...)`, imports the chapter files, then calls `dsl.write()` and `dsl.write_reference_markdown()`), and the chapter files
 `ch1.py ch2.py ch3.py ch4.py ch5_6.py`, following `templates/script-grammar.md`. Each `S()` call is one logical slide with its
 narration; helpers: `chapter()`, `qs()`, `key()`, `say_slide()`, `plain()`, `dia()`, `stage()`, `table()`, `cards()`, `strip()`,
-`trace()`, `tech(**ST.tech(id))`, `mech_slide()`, `challenge()`, `push()`, `rejl(*ST.rej(n))`, `code()`/`pseudo()`, `followups()`.
+`trace()`, `tech(**ST.tech(id))`, `mech_slide()`, `challenge()`, `push()`, `rejl(*ST.rej(n))`, `code()`/`pseudo()`, `followups()`,
+and **`zoom(kicker, title, view, cards, say)`** for every C4 zoom with an explanation (the picture full frame, then the cards at
+reading size; the narration is split where the figure's reveal steps end). `stage()` refuses a header that would wrap.
 Reveal markers `[+]`, `[+N]`, `[+*]` place every unit; `REVEAL_REPORT=1 python3 $V/src/gen.py` lists every mismatch at once.
 
 `$R deck SD-NN` regenerates and runs the 1080p layout gate; it must print `ok` with **0 failures** and no `redraw` warning. Look at
@@ -107,7 +115,8 @@ challenge and the recap. Never edit the `.md`: change the slide or the narration
 
 ### 6 · Video
 
-`$R video SD-NN` **in the background** (frames by Playwright element screenshots, then Kokoro TTS through `kit/tts_cached.py`,
+`$R video SD-NN` **in the background** (it writes a timestamped log of every tool to `$V/logs/video-<date-time>.log`, kept by
+`clean` and gitignored; `--log FILE` for any other stage) (frames by Playwright element screenshots, then Kokoro TTS through `kit/tts_cached.py`,
 which caches every line; a 50-minute video takes roughly half an hour on a cold cache). Output `$V/<slug>-reference.mp4` with
 `.srt` and `.vtt` beside it, local only; intermediates are deleted unless `--keep-intermediates`. QA:
 - `ffprobe`: H.264 + AAC, 1920×1080, chapters present, no subtitle stream, duration within GUIDELINES §3;

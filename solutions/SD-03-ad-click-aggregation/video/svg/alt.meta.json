@@ -2,14 +2,14 @@
   "key": "alt",
   "slot": "stage",
   "viewbox": [
-    172.0,
-    31.0,
-    2526.0,
-    984.0
+    0.0,
+    0.0,
+    1800.0,
+    860.0
   ],
-  "scale_1080p": 0.7126,
-  "min_font_svg_px": 40.0,
-  "min_rendered_1080p_px": 28.5,
+  "scale_1080p": 1.0,
+  "min_font_svg_px": 18.0,
+  "min_rendered_1080p_px": 18.0,
   "min_px": 18.0,
   "legibility_ok": true,
   "forbidden_fonts_found": [],
@@ -21,13 +21,15 @@
     "e:api"
   ],
   "edge_keys": [
-    "l:e0",
-    "l:e1",
-    "l:e2",
-    "l:e3"
+    "l:cli-col",
+    "l:adv-api",
+    "l:api-live",
+    "l:col-live"
   ],
   "unknown_aliases": [],
   "canon": "c4:alt",
   "full": false,
-  "source": "alt"
+  "source": "alt",
+  "overflow": [],
+  "renderer": "native"
 }

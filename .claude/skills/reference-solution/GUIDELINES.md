@@ -37,7 +37,7 @@ Content, clarity and learning come before length. Never rush a diagram to save m
 
 ## 3 · The shape: six chapters, fixed order
 
-Target **40–55 minutes**; hard limit 90. About **5,500–7,000 spoken words**. Each logical slide is shown as several reveal frames.
+Target **40–60 minutes** (the upper end is soft: clarity wins over the clock — never cut a component view or a card slide to save a minute); hard limit 90. About **5,500–7,500 spoken words**. Each logical slide is shown as several reveal frames.
 
 | # | Chapter | Min | What must be on screen |
 |:-:|---|:-:|---|
@@ -113,9 +113,9 @@ Each challenge is a sub-chapter (`challenge(n, total, title, question)`) of 3–
 |---|---|---|---|
 | 1 Question | Interviewer | `qs`, opened by `challenge()` | A concrete failure, scale bottleneck, race, hot key, crash or replay, late data, or observability gap, against the current design |
 | 2 Case | Candidate | `trace()`: one event per reveal | Concrete IDs, times and numbers that break the naive answer |
-| 3 Break | Candidate | the **C4 container view** marked BREAKS (`breaks:`), or a **C4 component zoom** of the container involved (`keep:` + `crop:` + `breaks:`), with the naive answer and the break as strips | Where it breaks, one level down |
+| 3 Break | Candidate | the **C4 container view** marked BREAKS (`breaks:`), or a **C4 component zoom** of the container involved (`keep:` + `breaks:` on the full component view, the rest dimmed), drawn with `zoom()`: the picture full frame, then the naive answer and the break as cards on their own slide | Where it breaks, one level down |
 | 4 Mechanism | Candidate | `mech_slide()`, then its sequence on its own slide if it has one | The property protected, how it works, what it rules out, what it costs |
-| 5 Fix | Candidate | the **C4 delta**: the next version with NEW boxes (`new:`), or the zoom with FIX marks (`fix:`); the version tag (`vtag="V2"`) when the container view changes | One named mechanism on one named technology, **one level down (§3.3)**, its coverage and limit as strips, and **one Rejected line** (`rejl(*ST.rej(n))`). Pseudocode when the steps are the mechanism (§7.7); the technology card if this is where the container first matters |
+| 5 Fix | Candidate | the **C4 delta**: the next version with NEW boxes (`new:`), or the zoom with FIX marks (`fix:`, via `zoom()`); the version tag (`vtag="V2"`) when the container view changes | One named mechanism on one named technology, **one level down (§3.3)**, its coverage and limit as strips, and **one Rejected line** (`rejl(*ST.rej(n))`). Pseudocode when the steps are the mechanism (§7.7); the technology card if this is where the container first matters |
 | 6 Push | Interviewer | `push("…")` | "What if the fix fails?": restart, replay, 10× load, a quiet partition, the checker itself wrong |
 | 7 Second fix | Candidate | a zoom, a sequence or cards | The next mechanism, or an honest limit and what it costs |
 | 8 "If asked, I'd say" | Key-line voice | `say_slide()` | The 2–4 sentence answer for the real round; then the coach's one-line bridge: "that fix creates the next question" |
@@ -126,7 +126,9 @@ recovery and observability; **the last is always "how would you know it is broke
 **Versions follow the challenges.** V1 is the first container view. Each challenge whose fix adds a container carries the design
 forward as the next version (V2, V3 …), drawn as a delta on the same master layout (boxes never move: `views.json` cuts versions
 from one exported view and locks the viewBox). A challenge answered inside one container changes no version; it zooms into that
-container's component view instead. The recap shows the last version.
+container's component view instead: the **first** time a challenge enters a container, show its whole component view on a `stage()`
+slide (revealed in a few grouped steps), then every zoom of that container is the same picture with the boxes in play marked and
+the rest dimmed. The recap shows the last version.
 
 **Ad-hoc box sketches are not used.** Every architecture picture is a view of `workspace.dsl`.
 
@@ -146,12 +148,16 @@ respells them for the voice, captions keep the written form, and the Markdown re
 
 ### 7.1 Style: clean, light, Google colours and Google Fonts
 
-Full tokens: **`DESIGN-TOKENS.md`**. White page, generous margins, one idea per slide. **Plus Jakarta Sans** for titles and
+Full tokens: **`DESIGN-TOKENS.md`**. Every slide is a white card in a thin frame (a #202124 band with a yellow and a grey wedge);
+chapter and challenge cards use the four-colour frame with diagonal corner stripes and a large centred title (§7.1 of the tokens:
+learned from two author decks, recoloured to Google). Generous margins, one idea per slide. **Plus Jakarta Sans** for titles and
 statements, **Inter** for prose, tables, captions and diagram labels, **Roboto Mono** only for code and wire formats. Tables are
-booktabs; cards are hairline boxes with a coloured left rule. **Colour means role**: Google Blue for services and "in focus", Green
-for data stores and **only** for a fix, Yellow for NEW, cache and cost, Red **only** for failure, grey for external systems. The
-kit's `video.css` + `google-theme.css` and c4-structurizr's `c4-google-tokens.dsl` implement all of this; do not restyle per
-question (per-workspace `styles` may only tune sizes for legibility).
+booktabs; cards are hairline boxes with a coloured left rule. **Colour means role**: Google Blue for what is in scope and "in focus", Green
+**only** for a fix, Yellow for NEW, cache and cost, Red **only** for failure, grey for external systems. In a C4 diagram the role
+of a box is its **shape** (person, cylinder, log, bucket, `>_`, component icon), not its colour. The
+kit's `video.css` + `google-theme.css` and c4-structurizr's native renderer (`c4draw.py`) implement all of this; do not restyle per
+question (a view may only set its `box` size and `grid`). The SD-03 diagrams are the approved look (2026-11-28);
+`.claude/skills/c4-structurizr/tests/test_golden_sd03.py` fails if the renderer drifts from them.
 
 ### 7.2 Progressive disclosure: nothing appears before it is spoken about
 
@@ -176,20 +182,22 @@ Every architecture picture comes from **`<solution>/workspace.dsl`** rendered by
 
 | Need | `views.json` |
 |---|---|
-| the context (L1) | the exported `systemContext` view, `"slot": "stage"`, `steps` in narration order |
-| the master container view | the exported `container` view containing every container that ever appears (`"video": false` if only its versions are shown) |
+| the context (L1) | the exported `systemContext` view, `"slot": "stage"`, a cross-shaped `grid` (the system in the middle), `steps` in narration order |
+| the master container view | the exported `container` view containing every container that ever appears, with a `grid` designed so V1 sits in the middle and later versions fill the edges |
+| a component view (L3) | the exported `component` view, `"slot": "stage"`, a `grid` of ≤ 4 columns × 3 rows (or 5 × 4 with one-line descriptions), grouped `steps`: shown whole the first time a challenge enters the container |
 | V1, V2 … | `"from": "containers"` + `"hide": [...]` for boxes not built yet + `"new": [...]` for this version's boxes — the viewBox is locked to the master, so **boxes never move** |
 | a numbered flow | `"from"` + `"flow": ["a->b", …]` |
 | a break or fix on the container view | `"breaks": [...]`, `"fix": [...]`, `"focus": [...]` |
-| a component zoom | `"from": "comp-x"` + `"keep": [2–4 adjacent components]` + `"crop": true` + `"breaks"`/`"fix"` |
+| a component zoom | `"from": "comp-x"` + `"keep": [2–4 components]` + `"breaks"`/`"fix"`: the rest of the component view dims, nothing moves (no `crop`) |
 | mechanism badges | `"badges": {"alias": "M1 · Dedup"}` |
 | the alternate path | its own exported view + `"alternate": [...]` |
 
-Rules: `!identifiers hierarchical` and `!impliedRelationships false`; arrows in **C4 "uses" direction** (from the reader to what it
-reads), which keeps the layout shallow; relationship technology left empty (the line style already says sync, event or batch);
-`routing Direct`; box descriptions ≤ 40 characters; the master container view ≤ 11 elements, laid out `tb` so it is wider than tall;
-component views are shown on video **only as zooms** of 2–4 adjacent components (a full L3 chain is Markdown-only,
-`"video": false`); tag synchronous boundaries `HTTPS`/`Sync`, asynchronous ones `Event`/`Async`, files and exports `Batch`.
+Rules (c4-structurizr's native renderer, 2026-11-28 — c4model.com look, Google palette): `!identifiers hierarchical` and
+`!impliedRelationships false`; arrows in **C4 "uses" direction** (from the reader to what it reads); every relationship has a
+**technology** (`a -> b "Reads hour H" "Kafka"`, drawn as `[Kafka]`); shapes by tag (`Database`, `Queue`, `Bucket`, `App`, `External`);
+a box description is one short line (≈ 20–28 characters) and a technology one or two words, because the `[Container: …]` line and
+the description are 18–19 px on the frame; every exported view has a `grid` in `views.json` (externals outside the block of
+containers or components in scope; neighbours that talk adjacent); the master container view ≤ 11 elements in ≤ 3 rows × 5 columns.
 Non-C4 pictures (sequences, ERDs, state machines, budget bars, figures) come from `video/diagrams.py` with the kit's `seqsvg`,
 `erdsvg`, `statesvg` and `figsvg`. **No PlantUML anywhere.**
 
@@ -200,8 +208,11 @@ Non-C4 pictures (sequences, ERDs, state machines, budget bars, figures) come fro
 - **Caps per slide**: about 95 words on screen, 7 table rows, 12 reveal steps, a figure plus at most two strips and the Rejected line.
 - The layout gate **fails the build** on overflow, overlapping text, a label wider than its box, small text or long code; dense
   slides and full redraws of one canonical picture are warnings to act on. Fix the slide or the view; never lower a limit to pass.
-- A full container view goes on a **`stage()`** slide (diagram only, one-line header). Zooms and sequences go on `dia()` slides
-  with strips, or on `stage()` when they are tall.
+- A C4 view goes on a **`stage()`** slide (diagram only, one-line header; `stage()` refuses a header that would wrap). A zoom with
+  explanation uses **`zoom()`**: the picture on a stage slide, then its cards (naive answer, break, mechanism, coverage, Rejected)
+  at reading size on the next slide, the narration split where the figure's steps end. Never put a C4 view above a strip of cards:
+  it lands under 14 px. Sequences go on `stage()` when they are tall.
+- Tables reveal row by row and an unrevealed row takes no space (no empty ruled rows on screen).
 
 ### 7.6 Devices
 
@@ -265,7 +276,7 @@ build (`ref_solution.py clean`; `--keep-intermediates` keeps them for debugging)
 
 A reference solution is not done until every line holds.
 
-- [ ] Six chapters in order; the ribbon shows the current one on every chapter card; 40–55 minutes, 5,500–7,000 words
+- [ ] Six chapters in order; the ribbon shows the current one on every chapter card; 40–60 minutes, 5,500–7,500 words
 - [ ] "What this question grades" near the start; the scale line opens chapter 1 and every number traces back to it
 - [ ] Properties stated as safety and liveness with slugs; every mechanism names the property it protects
 - [ ] C4 context (L1) in chapter 1 with sync and async boundaries drawn distinctly
@@ -273,7 +284,7 @@ A reference solution is not done until every line holds.
 - [ ] Chapter 3: wire formats tagged by FR; the physical model built table by table; the lifecycle as a state machine where one exists
 - [ ] V1 is the C4 container view with technologies; its happy path is one numbered flow
 - [ ] 5–6 challenges, every beat of §5; each fix one level down with a Rejected line; the last is observability; each ends with "if asked, I'd say"
-- [ ] Versions V2, V3 … are deltas of one master layout (0 px shift); zooms are C4 component views; no ad-hoc sketches, no PlantUML
+- [ ] Versions V2, V3 … are deltas of one master layout (0 px shift); each container a challenge enters is shown as its whole component view once, and its zooms dim that same picture; no ad-hoc sketches, no PlantUML
 - [ ] Mechanisms, options and technology cards appear inside the challenge that needs them; no separate theory chapter or technology tour
 - [ ] The alternate path is shown, marked ALTERNATE, with what it gives up and the crossover number
 - [ ] The recap shows the final view with mechanism badges, the stack table from `stack.json`, the mistakes and the follow-ups

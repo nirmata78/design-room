@@ -73,6 +73,7 @@ references/video-examples/**/transcript*
 
 # Build logs carry local paths
 build.log
+solutions/*/video/logs/
 
 # theory-first pass outputs (2026-11-25, retired 2026-11-28): never written any more, ignored in case an old build runs
 **/video/frames-theory/

@@ -1,37 +1,29 @@
 [
   [
-    "e:log"
-  ],
-  [
-    "e:live"
-  ],
-  [
+    "e:log",
     "e:src",
-    "l:e0"
+    "l:src-log"
   ],
   [
     "e:time",
-    "l:e1"
+    "l:src-time"
   ],
   [
     "e:dedup",
-    "l:e2"
+    "e:ckpt",
+    "l:time-dedup",
+    "l:dedup-ckpt"
   ],
   [
     "e:comb",
-    "l:e3"
-  ],
-  [
     "e:win",
-    "l:e4"
+    "l:dedup-comb",
+    "l:comb-win"
   ],
   [
     "e:sink",
-    "l:e5",
-    "l:e6"
-  ],
-  [
-    "e:ckpt",
-    "l:e7"
+    "e:live",
+    "l:win-sink",
+    "l:sink-live"
   ]
 ]

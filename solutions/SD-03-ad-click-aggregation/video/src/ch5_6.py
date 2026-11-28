@@ -7,14 +7,12 @@ ST = stack.load(pathlib.Path(__file__).resolve().parents[2])
 chapter(5, "When you don't need all this", 4, "The simpler design, and the number where it stops being enough", [
  "C: Before the recap: a much smaller design is correct at a smaller scale, and I should say where the line is."])
 
-S(dia("Alternate path", "One ClickHouse cluster: buffer, truth and dashboard", "alt",
-      cap="The alternate: collectors insert straight into one ClickHouse cluster",
-      extra=strip(("fixb", "How it works", "Collectors insert batches with a dedup token; a materialised view keeps minutes; a nightly query bills each hour from the deduplicated table."),
-                  ("case", "What it gives up", "No independent log to replay; a heavy query slows ingest; corrections are mutations; dedup is eventual."))), [
+zoom("Alternate path", "One ClickHouse cluster: buffer, truth and dashboard", "alt", strip(("fixb", "How it works", "Collectors insert batches with a dedup token; a materialised view keeps minutes; a nightly query bills each hour from the deduplicated table."),
+                  ("case", "What it gives up", "No independent log to replay; a heavy query slows ingest; corrections are mutations; dedup is eventual.")), [
  "C: The alternate path: no log, no lake, no stream job, no billing job.", P,
  "C: One ClickHouse cluster does everything, marked alternate.", P,
  "C: Collectors insert batches with an insert dedup token. A materialised view keeps minute rollups for the dashboard. And a nightly query bills each hour from the events table, deduplicated by event ID.", P,
- "C: What it gives up, precisely: there is no independent log to replay, because the table is the only copy. A heavy query slows ingest. A correction is a mutation. And dedup happens on merges, so it is eventual."])
+ "C: What it gives up, precisely: there is no independent log to replay, because the table is the only copy. A heavy query slows ingest. A correction is a mutation. And dedup happens on merges, so it is eventual."], cap="The alternate: collectors insert straight into one ClickHouse cluster")
 
 key("Alternate · the crossover", "One cluster ingests on the order of <em>1–2 million rows a second</em>. We average <em>10 million</em>. Below about <em>200,000 events a second</em>, I'd ship the one-cluster version, and say when I'd switch.", [
  "C: Where is the line? From chapter two, our average is ten million events a second. A cluster of about twenty ClickHouse nodes takes on the order of one to two million rows a second. We are past it by an order of magnitude.",

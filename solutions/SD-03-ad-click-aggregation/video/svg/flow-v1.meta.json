@@ -2,14 +2,14 @@
   "key": "flow-v1",
   "slot": "stage",
   "viewbox": [
-    172.0,
-    30.0,
-    3741.0,
-    1880.0
+    0.0,
+    0.0,
+    1800.0,
+    860.0
   ],
-  "scale_1080p": 0.4574,
-  "min_font_svg_px": 40.0,
-  "min_rendered_1080p_px": 18.3,
+  "scale_1080p": 1.0,
+  "min_font_svg_px": 18.0,
+  "min_rendered_1080p_px": 18.0,
   "min_px": 18.0,
   "legibility_ok": true,
   "forbidden_fonts_found": [],
@@ -24,16 +24,18 @@
     "e:api"
   ],
   "edge_keys": [
-    "l:e0",
-    "l:e1",
-    "l:e2",
-    "l:e5",
-    "l:e6",
-    "l:e7",
-    "l:e9"
+    "l:cli-col",
+    "l:col-log",
+    "l:lake-log",
+    "l:batch-lake",
+    "l:batch-bill",
+    "l:adv-api",
+    "l:api-bill"
   ],
   "unknown_aliases": [],
   "canon": "c4:containers",
   "full": false,
-  "source": "containers"
+  "source": "containers",
+  "overflow": [],
+  "renderer": "native"
 }

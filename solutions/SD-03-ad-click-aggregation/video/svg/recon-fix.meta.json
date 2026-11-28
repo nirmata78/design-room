@@ -1,27 +1,51 @@
 {
   "key": "recon-fix",
-  "slot": "full",
+  "slot": "stage",
   "viewbox": [
-    3891.0,
-    876.0,
-    1496.0,
-    731.0
+    0.0,
+    0.0,
+    1800.0,
+    860.0
   ],
-  "scale_1080p": 1.067,
-  "min_font_svg_px": 40.0,
-  "min_rendered_1080p_px": 42.68,
+  "scale_1080p": 1.0,
+  "min_font_svg_px": 18.0,
+  "min_rendered_1080p_px": 18.0,
   "min_px": 18.0,
   "legibility_ok": true,
   "forbidden_fonts_found": [],
   "node_keys": [
+    "e:fraud",
+    "e:invo",
+    "e:live",
+    "e:lake",
+    "e:close",
+    "e:read",
+    "e:xdup",
+    "e:filt",
+    "e:price",
     "e:write",
-    "e:recon"
+    "e:adj",
+    "e:recon",
+    "e:bill"
   ],
   "edge_keys": [
-    "l:e10"
+    "l:read-lake",
+    "l:close-read",
+    "l:read-xdup",
+    "l:xdup-filt",
+    "l:fraud-filt",
+    "l:filt-price",
+    "l:price-write",
+    "l:write-bill",
+    "l:write-adj",
+    "l:invo-adj",
+    "l:recon-write",
+    "l:recon-live"
   ],
   "unknown_aliases": [],
   "canon": "c4:comp-billing",
   "full": false,
-  "source": "comp-billing"
+  "source": "comp-billing",
+  "overflow": [],
+  "renderer": "native"
 }

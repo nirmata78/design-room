@@ -1,6 +1,6 @@
 # SD-03 · Event counting & billing rollups — reference-solution outline (six-chapter, C4-first format)
 
-Target level: staff · Format: GUIDELINES 2026-11-28 (issue #5 pilot) · Target 45–55 min · Word budget 6,000–7,000 · 6 challenges.
+Target level: staff · Format: GUIDELINES 2026-11-28 (issue #5 pilot) · Target 45–60 min · Word budget 6,000–7,500 · 6 challenges.
 The slides and narration are `src/*.py`; the C4 views are `../workspace.dsl` + `../views.json`; the technologies `../stack.json`.
 
 ## Thesis and hook
@@ -80,12 +80,14 @@ retention, 1-second pacing numbers).
 | View key | From | Overlays | Used on |
 |---|---|---|---|
 | c4-context | exported | steps | ch1 |
-| containers | exported (master, `video: false`) | — | Markdown only |
+| containers | exported (master, grid 3 × 5) | — | Markdown only |
 | v1 · flow-v1 · v1-break | containers | hide stream, live, fraud · flow · breaks batch | ch4 |
 | v2 · flow-live | containers | hide fraud · new stream, live · flow | ch4.1 |
 | v3 | containers | new fraud | ch4.5 |
-| dd-break · dd-fix · replay-fix · late-break · late-fix · hot-break · hot-fix | comp-stream | keep + crop + breaks / fix | ch4.2–4.4 |
-| close-fix · fraud-break · fraud-fix · recon-fix | comp-billing | keep + crop + breaks / fix | ch4.3, 4.5, 4.6 |
+| comp-stream | exported (grid 3 × 4, 5 grouped steps) | — | ch4.2, shown whole before the first zoom |
+| comp-billing | exported (grid 4 × 5, 4 grouped steps) | — | ch4.3, shown whole before the first zoom |
+| dd-break · dd-fix · replay-fix · late-break · late-fix · hot-break · hot-fix | comp-stream | keep (rest dimmed) + breaks / fix, via zoom() | ch4.2–4.4 |
+| close-fix · fraud-break · fraud-fix · recon-fix | comp-billing | keep (rest dimmed) + breaks / fix, via zoom() | ch4.3, 4.5, 4.6 |
 | recap | containers | badges | ch6 |
 | alt | exported | alternate live | ch5 |
 
@@ -106,14 +108,17 @@ retention, 1-second pacing numbers).
 | Click fraud detection itself | dismissed aloud: out of scope, a separate system |
 | Ad serving, auctions, budget pacing | dismissed aloud; pacing named as a consumer of live counts |
 
-## Budget (measured by gen.py, 2026-11-28)
+## Budget (measured by gen.py, 2026-11-28, after the C4 restyle)
 
-| Chapter | Words | Logical slides |
-|---|---|---|
-| 1 · Prompt + context | 1,108 | 16 |
-| 2 · Estimates | 459 | 5 |
-| 3 · API + data | 416 | 5 |
-| 4 · Design + challenges | 4,234 | 69 |
-| 5 · Alternate | 181 | 3 |
-| 6 · Recap | 497 | 6 |
-| **Total** | **6,895** (≈ 51 min) | **104** (350 frames) |
+| Chapter | Words |
+|---|---|
+| 1 · Prompt + context | 1,009 |
+| 2 · Estimates | 450 |
+| 3 · API + data | 416 |
+| 4 · Design + challenges | 4,196 |
+| 5 · Alternate | 181 |
+| 6 · Recap | 465 |
+| **Total** | **6,717** (≈ 56 min), **114** logical slides |
+
+Chapter 4 grew by two component-view slides and one card slide per zoom (the picture full frame, then its explanation at reading
+size); no narration was cut for time.

@@ -9,7 +9,7 @@ T = 6   # challenges
 chapter(4, "Design, driven by challenges", 3, "V1 is the C4 container view; every challenge changes it", [
  "C: The design. I start directly with the container view, version one: the simplest thing that is correct. Then the interviewer breaks it, six times, and each fix is a change to this one picture, or a zoom into one of its boxes."])
 
-stage("C4 level 2 · containers", "The simplest thing that is exact: a log, a lake, an hourly job", "v1", [
+stage("C4 level 2 · containers", "The simplest exact design: a log, a lake, an hourly job", "v1", [
  "C: Version one, in the order an event travels.", P,
  "C: Ad clients send batches of events.", P, "C: A collector validates them, stamps the server time, and appends them.", P,
  "C: To a partitioned, replicated event log. This is the one copy everything else is derived from.", P,
@@ -108,14 +108,21 @@ S(trace("Challenge 2 of 6 · the trace", "One click, a lost answer, two retries"
  "C: The 202 is lost on the cell network.", P, "C: Two seconds later the SDK retries: a second copy.", P, "C: And again: a third.", P,
  "C: Nobody did anything wrong. At three tenths of a percent of batches, that's three hundred and seventy-five million dollars a month, billed twice."])
 
-S(dia("Challenge 2 of 6 · the break", "Inside the live aggregator: who notices a repeat?", "dd-break", q=True, red=True,
-      cap="C4 component zoom: the live aggregator's first three components",
-      extra=strip(("case", "Naive answer", "“Kafka is exactly-once, so duplicates can't happen.”"),
-                  ("case", "Break", "The copies were made before Kafka: nothing remembers an ID, so three are counted."))), [
- "C: I zoom into the live aggregator, its first three components. The deduplicator is marked.", P,
+stage("C4 level 3 · the live aggregator", "Inside the live aggregator: seven components", "comp-stream", [
+ "C: Before the fix, one level down: the live aggregator's components. It is one Flink job.", P,
+ "C: A Kafka source reads the event log's partitions; its offsets are kept in the checkpoint.", P,
+ "C: A time assigner gives every event its event time.", P,
+ "C: A deduplicator remembers the IDs it has seen, and the checkpoints keep that state, with the offsets, every thirty seconds.", P,
+ "C: A combiner sums per ad for one second, and the window counter counts per ad and minute.", P,
+ "C: And a store sink writes versioned rows into the live store. The next challenges each mark two or three of these boxes."],
+ cap="C4 component view: the live aggregator, from the event log to the live store")
+
+zoom("Challenge 2 of 6 · the break", "Inside the live aggregator: who notices a repeat?", "dd-break", strip(("case", "Naive answer", "“Kafka is exactly-once, so duplicates can't happen.”"),
+                  ("case", "Break", "The copies were made before Kafka: nothing remembers an ID, so three are counted.")), [
+ "C: The same picture, with the source, the time assigner and the deduplicator in play. The deduplicator is marked.", P,
  "C: In the naive design it isn't there, because of the naive answer.", P,
  "C: Kafka is exactly-once, so duplicates can't happen.", P,
- "C: But the duplicates were made before Kafka. Three copies arrive, nothing remembers an ID, and three are counted, on the dashboard and on the bill."])
+ "C: But the duplicates were made before Kafka. Three copies arrive, nothing remembers an ID, and three are counted, on the dashboard and on the bill."], q=True, red=True, cap="C4 component zoom: the live aggregator's first three components")
 
 mech_slide(2, 4, "Idempotency by event ID", pid("S1"),
            "The SDK or ad server mints an ID when the event happens. Every later stage keeps the first copy of each ID and drops the rest.",
@@ -132,25 +139,21 @@ S(dia("Mechanism 2 · as a sequence", "Three copies in, one count out", "seq-ret
  "C: Both reach the deduplicator.", P, "C: e7f3 is already in state: the second copy is dropped.", P,
  "C: And the billing run keeps the first row per ID in the hour. Once, by construction."])
 
-S(dia("Challenge 2 of 6 · the fix", "Drop a repeat by the ID minted at the source", "dd-fix",
-      cap="C4 component zoom: the deduplicator and its checkpointed state",
-      extra=strip(("fixb", "Mechanism", "Keyed state by event ID in RocksDB, TTL 10 min, checkpointed with the offsets. The billing run keeps the first row per ID over the whole hour."),
-                  ("whyb", "Covers, and does not", "Every retry, redelivery and replay of one event. Not a client minting new IDs per click: that is fraud's job.")) + rejl(*ST.rej(1))), [
+zoom("Challenge 2 of 6 · the fix", "Drop a repeat by the ID minted at the source", "dd-fix", strip(("fixb", "Mechanism", "Keyed state by event ID in RocksDB, TTL 10 min, checkpointed with the offsets. The billing run keeps the first row per ID over the whole hour."),
+                  ("whyb", "Covers, and does not", "Every retry, redelivery and replay of one event. Not a client minting new IDs per click: that is fraud's job.")) + rejl(*ST.rej(1)), [
  "C: The fix, on the same zoom.", P, "C: The deduplicator.", P, "C: And the checkpoints that keep its state.", P,
  "C: One level down: state keyed by event ID, in RocksDB, with a ten-minute lifetime. A record whose ID is already there is dropped. The state is checkpointed together with the Kafka offsets. The log is keyed by event ID, so all three copies land on the same partition and meet the same state.", P,
  "C: It covers every retry, redelivery and replay of one event. Not a client that mints a new ID per click: that's fraud's job.", P,
- "C: Rejected: Kafka's exactly-once, with transactions. It removes a producer's own retry inside one session. An SDK retry over HTTPS is a new request, and only dedup on the event ID removes it."])
+ "C: Rejected: Kafka's exactly-once, with transactions. It removes a producer's own retry inside one session. An SDK retry over HTTPS is a new request, and only dedup on the event ID removes it."], cap="C4 component zoom: the deduplicator and its checkpointed state")
 
 push("You find a bug, redeploy, and replay the stream from four hours ago. Is anyone billed twice?")
-S(dia("Challenge 2 of 6 · one level deeper", "Replace by key and version: a second run rewrites the same rows", "replay-fix",
-      cap="C4 component zoom: the store sink and the live store",
-      extra=strip(("fixb", "Mechanism", "Live rows are keyed (ad, minute, shard) with a version: a newer version replaces, never adds. A billing hour is committed as a whole partition, a pure function of its manifest."),
-                  ("whyb", "Covers, and does not", "Replays, restarts and re-runs with new code. It does not make a buggy run right: it makes the next run safe.")) + rejl(*ST.rej(4))), [
+zoom("Challenge 2 of 6 · one level deeper", "Replace by key and version", "replay-fix", strip(("fixb", "Mechanism", "Live rows are keyed (ad, minute, shard) with a version: a newer version replaces, never adds. A billing hour is committed as a whole partition, a pure function of its manifest."),
+                  ("whyb", "Covers, and does not", "Replays, restarts and re-runs with new code. It does not make a buggy run right: it makes the next run safe.")) + rejl(*ST.rej(4)), [
  "C: The engine's exactly-once is about one run; a replay is a second run. So the fix is at the end of the job.", P,
  "C: The store sink.", P, "C: And the live store.", P,
  "C: A live row is keyed by ad, minute and shard, with a version; ClickHouse keeps the highest. A re-emitted minute replaces the old row. A billing hour is committed whole, a pure function of its manifest.", P,
  "C: It covers replays, restarts and re-runs with new code. It doesn't make a buggy run right; it makes the next one safe.", P,
- "C: Rejected: Flink's two-phase-commit sink on its own. It makes one run's output atomic. A second run from four hours earlier still adds on top, unless the write replaces by key."])
+ "C: Rejected: Flink's two-phase-commit sink on its own. It makes one run's output atomic. A second run from four hours earlier still adds on top, unless the write replaces by key."], cap="C4 component zoom: the store sink and the live store")
 
 say_slide("“Every event carries an ID minted where it happened, so a retry is recognisable. The live path drops repeats in keyed state for ten minutes; the billing run drops them over the whole hour. And I never increment a number I can recompute: rows are replaced by key and version, so a replay rewrites the same rows.”", [
  "V: If asked, I'd say: every event carries an ID minted where it happened, so a retry is recognisable. The live path drops repeats in keyed state for ten minutes, and the billing run drops them over the whole hour. And I never increment a number I can recompute: rows are replaced by key and version, so a replay rewrites the same rows.", "[pause: 1.0]",
@@ -171,13 +174,11 @@ S(trace("Challenge 3 of 6 · the trace", "A flight, a campaign that ended, and a
  "C: And another phone says its clock is in twenty thirty-one. Trust that, and an hour opens that never closes.", P,
  "C: So I need event time, and I can't trust it blindly."])
 
-S(dia("Challenge 3 of 6 · the break", "Which clock decides the hour?", "late-break", q=True, red=True,
-      cap="C4 component zoom: the time assigner",
-      extra=strip(("case", "Naive answer", "“Count them when they arrive.”"),
-                  ("case", "Break", "Arrival time bills Tuesday's impressions in Wednesday 06:00."))), [
+zoom("Challenge 3 of 6 · the break", "Which clock decides the hour?", "late-break", strip(("case", "Naive answer", "“Count them when they arrive.”"),
+                  ("case", "Break", "Arrival time bills Tuesday's impressions in Wednesday 06:00.")), [
  P, "C: The same zoom. The time assigner is marked.", P,
  "C: The naive answer: count them when they arrive.", P,
- "C: Then the time assigner uses arrival time. Tuesday's hours come up short, and Wednesday six o'clock is over."])
+ "C: Then the time assigner uses arrival time. Tuesday's hours come up short, and Wednesday six o'clock is over."], q=True, red=True, cap="C4 component zoom: the time assigner")
 
 mech_slide(3, 4, "Event time, with watermarks", pid("S2") + " and, with early results, " + pid("L2"),
            "Count by the time in the event. A watermark says “nothing older is still coming”; a window fires when it passes, early results before.",
@@ -188,7 +189,7 @@ mech_slide(3, 4, "Event time, with watermarks", pid("S2") + " and, with early re
  "C: It rules out a late or replayed event landing in the hour it happened to arrive in.", P,
  "C: It costs waiting, state for every window still open, and a cutoff. After the cutoff, a late event becomes a correction, not a count."], part="Mechanism")
 
-stage("Mechanism 3 · at protocol level", "A watermark, an early result, an on-time result, a late update", "seq-watermark", [
+stage("Mechanism 3 · at protocol level", "A watermark, then early, on-time and late results", "seq-watermark", [
  "C: At protocol level: one window, ad seventy-seven, the minute starting at fourteen hundred, fed by two partitions.", P,
  "C: Partition one delivers an impression with event time fourteen hundred and fifty-eight seconds.", P,
  "C: Partition two, one at fourteen oh one thirty.", P,
@@ -201,14 +202,12 @@ stage("Mechanism 3 · at protocol level", "A watermark, an early result, an on-t
  "C: Version three, thirteen nineteen. No lock and no wall clock: event times, a minimum, and a version."],
  cap="One window fed by two partitions: versions 1, 2 and 3 of one minute")
 
-S(dia("Challenge 3 of 6 · the fix", "Event time, clamped; a watermark for the dashboard", "late-fix",
-      cap="C4 component zoom: the time assigner and the window counter",
-      extra=strip(("fixb", "Mechanism", "Event time = client time if within 72 h before to 5 min after server time; else server time, flagged. Watermark = min over partitions of latest − 2 min; 1 h of lateness."),
-                  ("whyb", "Covers, and does not", "Late and skewed events up to the billing cutoff. After it, a new version of the hour: challenge five.")) + rejl(*ST.rej(2))), [
+zoom("Challenge 3 of 6 · the fix", "Event time, clamped; a watermark for the dashboard", "late-fix", strip(("fixb", "Mechanism", "Event time = client time if within 72 h before to 5 min after server time; else server time, flagged. Watermark = min over partitions of latest − 2 min; 1 h of lateness."),
+                  ("whyb", "Covers, and does not", "Late and skewed events up to the billing cutoff. After it, a new version of the hour: challenge five.")) + rejl(*ST.rej(2)), [
  "C: The fix, one level down.", P, "C: The time assigner.", P, "C: And the window counter.", P,
  "C: The event time is the client's time if it lies between seventy-two hours before and five minutes after the server's time. Otherwise it's the server time, and the event is flagged as clamped. The watermark is the minimum over partitions of the latest event time minus two minutes, and a minute window accepts an hour of lateness after that.", P,
  "C: It covers late and skewed events up to the billing cutoff. After the cutoff, an event changes a closed hour, and that's challenge five.", P,
- "C: Rejected: processing-time windows. They bill a phone's Tuesday evening in Wednesday's six a.m. hour."])
+ "C: Rejected: processing-time windows. They bill a phone's Tuesday evening in Wednesday's six a.m. hour."], cap="C4 component zoom: the time assigner and the window counter")
 
 S(plain("Challenge 3 of 6 · the rule, as pseudocode", "Clamp, then let the slowest partition set the pace",
   pseudo("t = e.client_ts\nif t < e.server_ts - 72h or t > e.server_ts + 5m:\n    t, e.clamped = e.server_ts, true\ne.event_time = t\n\nwatermark = min(latest(p) - 2m for p in active)\nwhen watermark >= w.end: emit(w, version + 1)\nwhen e is late and watermark < w.end + 1h:\n    add(w, e); emit(w, version + 1)\nelse: count_late(e)       # the lake still has it", hl=(2, 6, 8))), [
@@ -216,14 +215,20 @@ S(plain("Challenge 3 of 6 · the rule, as pseudocode", "Clamp, then let the slow
  "C: Line two: a client time outside the window is replaced by the server time. Line six: the watermark is a minimum over active partitions, two minutes behind. Line eight: a late event inside the hour of allowed lateness updates its window, emitted again with a higher version. Anything later is only counted as late. The lake still has it, so the bill still will.",
  "C: Why it works: a minimum means one fast partition can't close a minute that a slow one is still filling, and the clamp bounds what a bad clock can do."])
 
-S(dia("Challenge 3 of 6 · the bill's half", "The bill waits for the hour to be complete", "close-fix",
-      cap="C4 component zoom: the billing job's hour closer",
-      extra=strip(("fixb", "At H + 48 h", "The hour closer pins a snapshot of hour H's partition: every file landed so far, late ones included. The run reads exactly that."),
-                  ("whyb", "Why 48 hours", "An initial target, to measure: if 99.99 % of events arrive within 36 h, the rest become version 2 at the cost of one adjustment."))), [
- "C: The live path is one half. The bill is the other, so I zoom into the billing job.", P,
+stage("C4 level 3 · the billing job", "Inside the billing job: eight components", "comp-billing", [
+ "C: The live path is one half. The bill is the other, so one level down into the billing job: the same Flink code, in batch mode.", P,
+ "C: An hour closer decides when hour H is complete, and a reader scans exactly that hour from the lake.", P,
+ "C: Exact dedup keeps the first copy of each ID over the whole hour, and the invalid filter drops what the fraud system flagged.", P,
+ "C: Price and sum turns events into money, in integer micros, and the writer commits the hour to the billing tables as a new version.", P,
+ "C: An adjuster turns a new version into an adjustment line for invoicing, and a reconciler checks the live numbers against the final ones."],
+ cap="C4 component view: the billing job, from the event lake to the billing tables")
+
+zoom("Challenge 3 of 6 · the bill's half", "The bill waits for the hour to be complete", "close-fix", strip(("fixb", "At H + 48 h", "The hour closer pins a snapshot of hour H's partition: every file landed so far, late ones included. The run reads exactly that."),
+                  ("whyb", "Why 48 hours", "An initial target, to measure: if 99.99 % of events arrive within 36 h, the rest become version 2 at the cost of one adjustment.")), [
+ "C: For late events, the hour closer is the box in play.", P,
  "C: The hour closer.", P,
  "C: At forty-eight hours it pins a snapshot of that hour's partition: every file landed so far, the late ones included, because the lake is partitioned by event hour, not by arrival. The run reads exactly that snapshot, and nothing that lands later.", P,
- "C: Why forty-eight hours: it's an initial target, to be measured. If ninety-nine point nine nine percent of events arrive within thirty-six hours, the rest become a version two, at the cost of one adjustment."])
+ "C: Why forty-eight hours: it's an initial target, to be measured. If ninety-nine point nine nine percent of events arrive within thirty-six hours, the rest become a version two, at the cost of one adjustment."], cap="C4 component zoom: the billing job's hour closer")
 
 push("One partition goes quiet. Or a bad SDK release sends every clock a day off.")
 S(plain("Challenge 3 of 6 · one level deeper", "An idle timeout, a flag, and versions", cards(
@@ -254,13 +259,11 @@ S(trace("Challenge 4 of 6 · the trace", "Ninety seconds of one ad", [
  "C: Ninety seconds later every advertiser's dashboard is stale, and budget pacing is flying blind, not just for ad seventy-seven.", P,
  "C: Note what is not hot: the log is keyed by event ID, so its partitions are even. The hot spot is one thread."])
 
-S(dia("Challenge 4 of 6 · the break", "One key is one task", "hot-break", q=True, red=True,
-      cap="C4 component zoom: the window counter",
-      extra=strip(("case", "Naive answer", "“Key by ad, and add machines.”"),
-                  ("case", "Break", "A key lives on exactly one task: it gets all 2 M/s, and its backpressure slows every partition."))), [
+zoom("Challenge 4 of 6 · the break", "One key is one task", "hot-break", strip(("case", "Naive answer", "“Key by ad, and add machines.”"),
+                  ("case", "Break", "A key lives on exactly one task: it gets all 2 M/s, and its backpressure slows every partition.")), [
  P, "C: The middle of the live aggregator. The window counter is marked.", P,
  "C: The naive answer: key by ad, and add machines.", P,
- "C: But a key lives on exactly one task. Machines don't help it. That one task gets all two million a second, and its backpressure slows every partition."])
+ "C: But a key lives on exactly one task. Machines don't help it. That one task gets all two million a second, and its backpressure slows every partition."], q=True, red=True, cap="C4 component zoom: the window counter")
 
 mech_slide(4, 4, "Two-stage aggregation: sharded counters", pid("L2") + " under skew",
            "Sum locally where events already are, for a second; then merge the partial sums by key. Store a hot counter as N shard rows; sum on read.",
@@ -272,14 +275,12 @@ mech_slide(4, 4, "Two-stage aggregation: sharded counters", pid("L2") + " under 
  "C: It costs one more stage, a sum on every read, and a second of delay."], part="Mechanism")
 
 
-S(dia("Challenge 4 of 6 · the fix", "Sum where the events are, then merge", "hot-fix",
-      cap="C4 component zoom: the combiner and the window counter",
-      extra=strip(("fixb", "Mechanism", "Each of 512 subtasks sums per (ad, minute) for 1 s, then sends one partial; the merge sees 512 updates a second. The store keeps up to 16 shard rows per ad-minute, summed on read."),
-                  ("whyb", "Covers, and does not", "Any number of hot ads: the cost follows active keys, not events. It adds 1 s of delay, inside the 10 s budget.")) + rejl(*ST.rej(3))), [
+zoom("Challenge 4 of 6 · the fix", "Sum where the events are, then merge", "hot-fix", strip(("fixb", "Mechanism", "Each of 512 subtasks sums per (ad, minute) for 1 s, then sends one partial; the merge sees 512 updates a second. The store keeps up to 16 shard rows per ad-minute, summed on read."),
+                  ("whyb", "Covers, and does not", "Any number of hot ads: the cost follows active keys, not events. It adds 1 s of delay, inside the 10 s budget.")) + rejl(*ST.rej(3)), [
  "C: The fix, in the middle of the job.", P, "C: The combiner.", P, "C: And the window counter, which now merges partial sums.", P,
  "C: One level down. Each of the five hundred and twelve subtasks sums its own events per ad and minute for one second, then sends one partial sum. The window task for ad seventy-seven sees five hundred and twelve updates a second instead of two million. And the store keeps up to sixteen shard rows per ad and minute, summed when the dashboard reads.", P,
  "C: It covers any number of hot ads, because the cost now follows active keys, not events. It adds a second of delay, inside the ten-second budget.", P,
- "C: Rejected: Redis increment-by on one counter key. One key is one shard's thread, about a hundred thousand operations a second against two million. And a replay increments again."])
+ "C: Rejected: Redis increment-by on one counter key. One key is one shard's thread, about a hundred thousand operations a second against two million. And a replay increments again."], cap="C4 component zoom: the combiner and the window counter")
 
 S(tech(**ST.tech("live")), ST.say("live"))
 
@@ -318,22 +319,18 @@ stage("Challenge 5 of 6 · the C4 delta", "Invalidations arrive as events, into 
  "C: The fraud system. Its invalidations arrive on an append-only topic, each with its event's hour, and only the billing job consumes them. Nothing on the live path changes."],
  vtag="V3", cap="V3: the fraud system's invalidations reach the billing job")
 
-S(dia("Challenge 5 of 6 · the break", "Edit the past, or add to it?", "fraud-break", q=True, red=True,
-      cap="C4 component zoom: the billing job's writer",
-      extra=strip(("case", "Naive answer", "“Delete the invalid rows and re-send the invoice.”"),
-                  ("case", "Break", "The writer edits billed hours: the invoice already sent now matches nothing stored."))), [
+zoom("Challenge 5 of 6 · the break", "Edit the past, or add to it?", "fraud-break", strip(("case", "Naive answer", "“Delete the invalid rows and re-send the invoice.”"),
+                  ("case", "Break", "The writer edits billed hours: the invoice already sent now matches nothing stored.")), [
  P, "C: Inside the billing job: the invalid filter, the pricing step, the writer. The writer is marked.", P,
  "C: The naive answer: delete the invalid rows and re-send the invoice.", P,
- "C: Then the writer edits hours that were billed, and the invoice already sent matches nothing we have stored."])
+ "C: Then the writer edits hours that were billed, and the invoice already sent matches nothing we have stored."], q=True, red=True, cap="C4 component zoom: the billing job's writer")
 
-S(dia("Challenge 5 of 6 · the fix", "A new version, and an adjustment line", "fraud-fix",
-      cap="C4 component zoom: the writer, the adjuster and invoicing",
-      extra=strip(("fixb", "Mechanism", "The closer marks invalidated hours dirty and re-runs each as version n + 1; version n stays. The adjuster sends v(n + 1) − invoiced as a credit line."),
-                  ("whyb", "Covers, and does not", "Fraud, events past the cutoff and rate-card fixes: one path. Every invoice line still matches a stored row.")) + rejl(*ST.rej(5))), [
+zoom("Challenge 5 of 6 · the fix", "A new version, and an adjustment line", "fraud-fix", strip(("fixb", "Mechanism", "The closer marks invalidated hours dirty and re-runs each as version n + 1; version n stays. The adjuster sends v(n + 1) − invoiced as a credit line."),
+                  ("whyb", "Covers, and does not", "Fraud, events past the cutoff and rate-card fixes: one path. Every invoice line still matches a stored row.")) + rejl(*ST.rej(5)), [
  "C: The fix, at the end of the billing job.", P, "C: The adjuster, between the writer and invoicing.", P,
  f"C: One level down. The closer marks the invalidated hours dirty and re-runs each as the next version, with a manifest pinning the new invalidation snapshot. Version one stays. The adjuster sends the new version minus what was invoiced as a credit line: minus one point five five million dollars. That protects {ps('S2')}: a sent invoice is never edited.", P,
  "C: One path covers fraud, events past the cutoff, and rate-card fixes. And because the invoiced version is never touched, every invoice line still matches a stored row.", P,
- "C: Rejected: updating billed rows in place. The invoice then matches no stored version, and the audit trail ends at the edit."])
+ "C: Rejected: updating billed rows in place. The invoice then matches no stored version, and the audit trail ends at the edit."], cap="C4 component zoom: the writer, the adjuster and invoicing")
 
 S(plain("Challenge 5 of 6 · the re-run, as pseudocode", "Dirty hours become new versions; differences become lines",
   pseudo("on invalidations(b): mark_dirty(hours(b))\nrerun(h):\n    m = manifest(h, events_snap, rates_v, invalid_snap)\n    v = latest_version(h) + 1\n    rows = price(dedup(read(h, m)) - invalid(m))\n    commit(h, v, rows, m)          # version v - 1 stays\n    for r in rows:\n        d = r.cost - invoiced(r.key)\n        if d != 0: adjustment(r.key, v, d)", hl=(3, 6, 9))), [
@@ -370,10 +367,9 @@ S(trace("Challenge 6 of 6 · the trace", "A units typo, three days of green", [
  "C: On Thursday an advertiser compares their screenshots with their logs and calls.", P,
  "C: Every system was healthy. One number was wrong for three days."])
 
-S(dia("Challenge 6 of 6 · the fix", "A reconciler that checks numbers, not machines", "recon-fix",
-      cap="C4 component zoom: the reconciler inside the billing job", extra=rejl(*ST.rej(6))), [
+zoom("Challenge 6 of 6 · the fix", "A reconciler that checks numbers, not machines", "recon-fix", rejl(*ST.rej(6)), [
  P, "C: The fix is a component in the billing job, because that is where the final number is known. The reconciler.", P,
- "C: Rejected: lag and CPU dashboards. They stay green while the pipeline counts wrong. Only checks on the numbers themselves see a wrong number."])
+ "C: Rejected: lag and CPU dashboards. They stay green while the pipeline counts wrong. Only checks on the numbers themselves see a wrong number."], cap="C4 component zoom: the reconciler inside the billing job")
 
 S(plain("Challenge 6 of 6 · the fix, one level down", "Three checks on the numbers, and a trail for every line", cards(
   ("grn", "Conservation per hop", "Per minute: accepted = appended = landed − duplicates."),

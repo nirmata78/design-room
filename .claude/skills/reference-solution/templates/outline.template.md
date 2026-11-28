@@ -1,6 +1,6 @@
 # SD-NN · <Question> — reference-solution outline (six-chapter, C4-first format)
 
-Target level: staff (manager layer as one recap row) · Target length: __ min (40–55) · Word budget: __ (5,500–7,000)
+Target level: staff (manager layer as one recap row) · Target length: __ min (40–60) · Word budget: __ (5,500–7,500)
 Worked example: `solutions/SD-03-ad-click-aggregation/video/OUTLINE.md`. Format: `.claude/skills/reference-solution/GUIDELINES.md`.
 
 ## Thesis and hook
@@ -73,7 +73,8 @@ Final view badges (alias → mechanism) · the mistakes table · follow-up quest
 | c4-context | exported | steps | ch1 |
 | containers | exported (master, `video: false`) | — | — |
 | v1, flow-v1, v2 … | containers | hide / new / flow / breaks | ch4 |
-| <zoom keys> | comp-<container> | keep + crop + breaks / fix | ch4 |
+| comp-<container> | exported (grid, grouped steps) | — | ch4, the first time a challenge enters it |
+| <zoom keys> | comp-<container> | keep + breaks / fix (rest dimmed) | ch4, via zoom() |
 | recap | containers | badges | ch6 |
 | alt | exported | alternate | ch5 |
 

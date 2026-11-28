@@ -1,29 +1,43 @@
 {
   "key": "replay-fix",
-  "slot": "full",
+  "slot": "stage",
   "viewbox": [
-    3892.0,
-    560.0,
-    2496.0,
-    416.0
+    0.0,
+    0.0,
+    1800.0,
+    860.0
   ],
-  "scale_1080p": 0.6827,
-  "min_font_svg_px": 40.0,
-  "min_rendered_1080p_px": 27.31,
+  "scale_1080p": 1.0,
+  "min_font_svg_px": 18.0,
+  "min_rendered_1080p_px": 18.0,
   "min_px": 18.0,
   "legibility_ok": true,
   "forbidden_fonts_found": [],
   "node_keys": [
-    "e:live",
+    "e:log",
+    "e:src",
+    "e:time",
+    "e:dedup",
+    "e:comb",
     "e:win",
-    "e:sink"
+    "e:sink",
+    "e:ckpt",
+    "e:live"
   ],
   "edge_keys": [
-    "l:e5",
-    "l:e6"
+    "l:src-log",
+    "l:src-time",
+    "l:time-dedup",
+    "l:dedup-comb",
+    "l:comb-win",
+    "l:win-sink",
+    "l:sink-live",
+    "l:dedup-ckpt"
   ],
   "unknown_aliases": [],
   "canon": "c4:comp-stream",
   "full": false,
-  "source": "comp-stream"
+  "source": "comp-stream",
+  "overflow": [],
+  "renderer": "native"
 }

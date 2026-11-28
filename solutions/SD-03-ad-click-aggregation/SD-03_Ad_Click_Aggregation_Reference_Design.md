@@ -276,7 +276,7 @@ And the lifecycle of one billing hour, because it is the thing we bill. It start
 
 The design. I start directly with the container view, version one: the simplest thing that is correct. Then the interviewer breaks it, six times, and each fix is a change to this one picture, or a zoom into one of its boxes.
 
-#### V1The simplest thing that is exact: a log, a lake, an hourly job
+#### V1The simplest exact design: a log, a lake, an hourly job
 
 <sub>C4 level 2 · containers</sub>
 
@@ -426,16 +426,30 @@ Three reasons. The stream's state has a lifetime. Dedup keeps ten minutes of IDs
 
 The trace. At ten o'clock the SDK sends batch B17, with click e7f3. Forty milliseconds later it is at offset eighty-one thousand two hundred and twenty, acknowledged. The 202 is lost on the cell network. Two seconds later the SDK retries: a second copy. And again: a third. Nobody did anything wrong. At three tenths of a percent of batches, that's three hundred and seventy-five million dollars a month, billed twice.
 
+#### Inside the live aggregator: seven components
+
+<sub>C4 level 3 · the live aggregator</sub>
+
+![C4 component view: the live aggregator, from the event log to the live store](video/svg/comp-stream.svg)
+
+Before the fix, one level down: the live aggregator's components. It is one Flink job. A Kafka source reads the event log's partitions; its offsets are kept in the checkpoint. A time assigner gives every event its event time. A deduplicator remembers the IDs it has seen, and the checkpoints keep that state, with the offsets, every thirty seconds. A combiner sums per ad for one second, and the window counter counts per ad and minute. And a store sink writes versioned rows into the live store. The next challenges each mark two or three of these boxes.
+
 #### Inside the live aggregator: who notices a repeat?
 
 <sub>Challenge 2 of 6 · the break</sub>
 
 ![C4 component zoom: the live aggregator's first three components](video/svg/dd-break.svg)
 
+The same picture, with the source, the time assigner and the deduplicator in play. The deduplicator is marked. In the naive design it isn't there, because of the naive answer.
+
+#### Inside the live aggregator: who notices a repeat?
+
+<sub>Challenge 2 of 6 · the break</sub>
+
 - **Naive answer.** “Kafka is exactly-once, so duplicates can't happen.”
 - **Break.** The copies were made before Kafka: nothing remembers an ID, so three are counted.
 
-I zoom into the live aggregator, its first three components. The deduplicator is marked. In the naive design it isn't there, because of the naive answer. Kafka is exactly-once, so duplicates can't happen. But the duplicates were made before Kafka. Three copies arrive, nothing remembers an ID, and three are counted, on the dashboard and on the bill.
+Kafka is exactly-once, so duplicates can't happen. But the duplicates were made before Kafka. Three copies arrive, nothing remembers an ID, and three are counted, on the dashboard and on the bill.
 
 #### Idempotency by event ID
 
@@ -462,25 +476,37 @@ As a sequence. Batch B17. Appended. Acknowledged. The answer is lost. The retry,
 
 ![C4 component zoom: the deduplicator and its checkpointed state](video/svg/dd-fix.svg)
 
+The fix, on the same zoom. The deduplicator. And the checkpoints that keep its state.
+
+#### Drop a repeat by the ID minted at the source
+
+<sub>Challenge 2 of 6 · the fix</sub>
+
 - **Mechanism.** Keyed state by event ID in RocksDB, TTL 10 min, checkpointed with the offsets. The billing run keeps the first row per ID over the whole hour.
 - **Covers, and does not.** Every retry, redelivery and replay of one event. Not a client minting new IDs per click: that is fraud's job.
 - **Rejected:** **Kafka exactly-once (idempotent producer and transactions)**: it removes a producer's own retry inside one session; an SDK retry over HTTP is a new request, and only dedup on the event ID removes it.
 
-The fix, on the same zoom. The deduplicator. And the checkpoints that keep its state. One level down: state keyed by event ID, in RocksDB, with a ten-minute lifetime. A record whose ID is already there is dropped. The state is checkpointed together with the Kafka offsets. The log is keyed by event ID, so all three copies land on the same partition and meet the same state. It covers every retry, redelivery and replay of one event. Not a client that mints a new ID per click: that's fraud's job. Rejected: Kafka's exactly-once, with transactions. It removes a producer's own retry inside one session. An SDK retry over HTTPS is a new request, and only dedup on the event ID removes it.
+One level down: state keyed by event ID, in RocksDB, with a ten-minute lifetime. A record whose ID is already there is dropped. The state is checkpointed together with the Kafka offsets. The log is keyed by event ID, so all three copies land on the same partition and meet the same state. It covers every retry, redelivery and replay of one event. Not a client that mints a new ID per click: that's fraud's job. Rejected: Kafka's exactly-once, with transactions. It removes a producer's own retry inside one session. An SDK retry over HTTPS is a new request, and only dedup on the event ID removes it.
 
 > **Interviewer:** You find a bug, redeploy, and replay the stream from four hours ago. Is anyone billed twice?
 
-#### Replace by key and version: a second run rewrites the same rows
+#### Replace by key and version
 
 <sub>Challenge 2 of 6 · one level deeper</sub>
 
 ![C4 component zoom: the store sink and the live store](video/svg/replay-fix.svg)
 
+The engine's exactly-once is about one run; a replay is a second run. So the fix is at the end of the job. The store sink. And the live store.
+
+#### Replace by key and version
+
+<sub>Challenge 2 of 6 · one level deeper</sub>
+
 - **Mechanism.** Live rows are keyed (ad, minute, shard) with a version: a newer version replaces, never adds. A billing hour is committed as a whole partition, a pure function of its manifest.
 - **Covers, and does not.** Replays, restarts and re-runs with new code. It does not make a buggy run right: it makes the next run safe.
 - **Rejected:** **Flink's two-phase-commit sink alone**: it makes one run's output atomic; a second run from four hours earlier still adds on top unless the write replaces by key.
 
-The engine's exactly-once is about one run; a replay is a second run. So the fix is at the end of the job. The store sink. And the live store. A live row is keyed by ad, minute and shard, with a version; ClickHouse keeps the highest. A re-emitted minute replaces the old row. A billing hour is committed whole, a pure function of its manifest. It covers replays, restarts and re-runs with new code. It doesn't make a buggy run right; it makes the next one safe. Rejected: Flink's two-phase-commit sink on its own. It makes one run's output atomic. A second run from four hours earlier still adds on top, unless the write replaces by key.
+A live row is keyed by ad, minute and shard, with a version; ClickHouse keeps the highest. A re-emitted minute replaces the old row. A billing hour is committed whole, a pure function of its manifest. It covers replays, restarts and re-runs with new code. It doesn't make a buggy run right; it makes the next one safe. Rejected: Flink's two-phase-commit sink on its own. It makes one run's output atomic. A second run from four hours earlier still adds on top, unless the write replaces by key.
 
 > [!TIP]
 > **If asked, I'd say:** Every event carries an ID minted where it happened, so a retry is recognisable. The live path drops repeats in keyed state for ten minutes, and the billing run drops them over the whole hour. And I never increment a number I can recompute: rows are replaced by key and version, so a replay rewrites the same rows.
@@ -516,10 +542,16 @@ The trace. Tuesday evening, three hundred impressions on a phone with no signal.
 
 ![C4 component zoom: the time assigner](video/svg/late-break.svg)
 
+The same zoom. The time assigner is marked.
+
+#### Which clock decides the hour?
+
+<sub>Challenge 3 of 6 · the break</sub>
+
 - **Naive answer.** “Count them when they arrive.”
 - **Break.** Arrival time bills Tuesday's impressions in Wednesday 06:00.
 
-The same zoom. The time assigner is marked. The naive answer: count them when they arrive. Then the time assigner uses arrival time. Tuesday's hours come up short, and Wednesday six o'clock is over.
+The naive answer: count them when they arrive. Then the time assigner uses arrival time. Tuesday's hours come up short, and Wednesday six o'clock is over.
 
 #### Event time, with watermarks
 
@@ -532,7 +564,7 @@ The same zoom. The time assigner is marked. The naive answer: count them when th
 
 The mechanism: event time, with watermarks. It protects `[S2-right-hour-right-version]`, and with early results, `[L2-fresh-in-10s]`. I count by the time in the event, not the time it arrived. A watermark is the job's claim that nothing older is still coming; a window's final result fires when it passes, early results before. It rules out a late or replayed event landing in the hour it happened to arrive in. It costs waiting, state for every window still open, and a cutoff. After the cutoff, a late event becomes a correction, not a count.
 
-#### A watermark, an early result, an on-time result, a late update
+#### A watermark, then early, on-time and late results
 
 <sub>Mechanism 3 · at protocol level</sub>
 
@@ -546,11 +578,17 @@ At protocol level: one window, ad seventy-seven, the minute starting at fourteen
 
 ![C4 component zoom: the time assigner and the window counter](video/svg/late-fix.svg)
 
+The fix, one level down. The time assigner. And the window counter.
+
+#### Event time, clamped; a watermark for the dashboard
+
+<sub>Challenge 3 of 6 · the fix</sub>
+
 - **Mechanism.** Event time = client time if within 72 h before to 5 min after server time; else server time, flagged. Watermark = min over partitions of latest − 2 min; 1 h of lateness.
 - **Covers, and does not.** Late and skewed events up to the billing cutoff. After it, a new version of the hour: challenge five.
 - **Rejected:** **Processing-time windows**: they bill a phone's Tuesday-evening impressions in Wednesday's 6 a.m. hour.
 
-The fix, one level down. The time assigner. And the window counter. The event time is the client's time if it lies between seventy-two hours before and five minutes after the server's time. Otherwise it's the server time, and the event is flagged as clamped. The watermark is the minimum over partitions of the latest event time minus two minutes, and a minute window accepts an hour of lateness after that. It covers late and skewed events up to the billing cutoff. After the cutoff, an event changes a closed hour, and that's challenge five. Rejected: processing-time windows. They bill a phone's Tuesday evening in Wednesday's six a.m. hour.
+The event time is the client's time if it lies between seventy-two hours before and five minutes after the server's time. Otherwise it's the server time, and the event is flagged as clamped. The watermark is the minimum over partitions of the latest event time minus two minutes, and a minute window accepts an hour of lateness after that. It covers late and skewed events up to the billing cutoff. After the cutoff, an event changes a closed hour, and that's challenge five. Rejected: processing-time windows. They bill a phone's Tuesday evening in Wednesday's six a.m. hour.
 
 #### Clamp, then let the slowest partition set the pace
 
@@ -571,16 +609,30 @@ else: count_late(e)       # the lake still has it
 
 As pseudocode, the key lines marked. Line two: a client time outside the window is replaced by the server time. Line six: the watermark is a minimum over active partitions, two minutes behind. Line eight: a late event inside the hour of allowed lateness updates its window, emitted again with a higher version. Anything later is only counted as late. The lake still has it, so the bill still will. Why it works: a minimum means one fast partition can't close a minute that a slow one is still filling, and the clamp bounds what a bad clock can do.
 
+#### Inside the billing job: eight components
+
+<sub>C4 level 3 · the billing job</sub>
+
+![C4 component view: the billing job, from the event lake to the billing tables](video/svg/comp-billing.svg)
+
+The live path is one half. The bill is the other, so one level down into the billing job: the same Flink code, in batch mode. An hour closer decides when hour H is complete, and a reader scans exactly that hour from the lake. Exact dedup keeps the first copy of each ID over the whole hour, and the invalid filter drops what the fraud system flagged. Price and sum turns events into money, in integer micros, and the writer commits the hour to the billing tables as a new version. An adjuster turns a new version into an adjustment line for invoicing, and a reconciler checks the live numbers against the final ones.
+
 #### The bill waits for the hour to be complete
 
 <sub>Challenge 3 of 6 · the bill's half</sub>
 
 ![C4 component zoom: the billing job's hour closer](video/svg/close-fix.svg)
 
+For late events, the hour closer is the box in play. The hour closer.
+
+#### The bill waits for the hour to be complete
+
+<sub>Challenge 3 of 6 · the bill's half</sub>
+
 - **At H + 48 h.** The hour closer pins a snapshot of hour H's partition: every file landed so far, late ones included. The run reads exactly that.
 - **Why 48 hours.** An initial target, to measure: if 99.99 % of events arrive within 36 h, the rest become version 2 at the cost of one adjustment.
 
-The live path is one half. The bill is the other, so I zoom into the billing job. The hour closer. At forty-eight hours it pins a snapshot of that hour's partition: every file landed so far, the late ones included, because the lake is partitioned by event hour, not by arrival. The run reads exactly that snapshot, and nothing that lands later. Why forty-eight hours: it's an initial target, to be measured. If ninety-nine point nine nine percent of events arrive within thirty-six hours, the rest become a version two, at the cost of one adjustment.
+At forty-eight hours it pins a snapshot of that hour's partition: every file landed so far, the late ones included, because the lake is partitioned by event hour, not by arrival. The run reads exactly that snapshot, and nothing that lands later. Why forty-eight hours: it's an initial target, to be measured. If ninety-nine point nine nine percent of events arrive within thirty-six hours, the rest become a version two, at the cost of one adjustment.
 
 > **Interviewer:** One partition goes quiet. Or a bad SDK release sends every clock a day off.
 
@@ -628,10 +680,16 @@ The trace. At twenty fourteen, ad seventy-seven goes from three thousand to two 
 
 ![C4 component zoom: the window counter](video/svg/hot-break.svg)
 
+The middle of the live aggregator. The window counter is marked.
+
+#### One key is one task
+
+<sub>Challenge 4 of 6 · the break</sub>
+
 - **Naive answer.** “Key by ad, and add machines.”
 - **Break.** A key lives on exactly one task: it gets all 2 M/s, and its backpressure slows every partition.
 
-The middle of the live aggregator. The window counter is marked. The naive answer: key by ad, and add machines. But a key lives on exactly one task. Machines don't help it. That one task gets all two million a second, and its backpressure slows every partition.
+The naive answer: key by ad, and add machines. But a key lives on exactly one task. Machines don't help it. That one task gets all two million a second, and its backpressure slows every partition.
 
 #### Two-stage aggregation: sharded counters
 
@@ -650,11 +708,17 @@ The mechanism: two-stage aggregation, the sharded counter applied in time. It pr
 
 ![C4 component zoom: the combiner and the window counter](video/svg/hot-fix.svg)
 
+The fix, in the middle of the job. The combiner. And the window counter, which now merges partial sums.
+
+#### Sum where the events are, then merge
+
+<sub>Challenge 4 of 6 · the fix</sub>
+
 - **Mechanism.** Each of 512 subtasks sums per (ad, minute) for 1 s, then sends one partial; the merge sees 512 updates a second. The store keeps up to 16 shard rows per ad-minute, summed on read.
 - **Covers, and does not.** Any number of hot ads: the cost follows active keys, not events. It adds 1 s of delay, inside the 10 s budget.
 - **Rejected:** **Redis `INCRBY` on one counter key**: one key is one shard's thread, about 100,000 operations a second against 2 million, and a replay increments again.
 
-The fix, in the middle of the job. The combiner. And the window counter, which now merges partial sums. One level down. Each of the five hundred and twelve subtasks sums its own events per ad and minute for one second, then sends one partial sum. The window task for ad seventy-seven sees five hundred and twelve updates a second instead of two million. And the store keeps up to sixteen shard rows per ad and minute, summed when the dashboard reads. It covers any number of hot ads, because the cost now follows active keys, not events. It adds a second of delay, inside the ten-second budget. Rejected: Redis increment-by on one counter key. One key is one shard's thread, about a hundred thousand operations a second against two million. And a replay increments again.
+One level down. Each of the five hundred and twelve subtasks sums its own events per ad and minute for one second, then sends one partial sum. The window task for ad seventy-seven sees five hundred and twelve updates a second instead of two million. And the store keeps up to sixteen shard rows per ad and minute, summed when the dashboard reads. It covers any number of hot ads, because the cost now follows active keys, not events. It adds a second of delay, inside the ten-second budget. Rejected: Redis increment-by on one counter key. One key is one shard's thread, about a hundred thousand operations a second against two million. And a replay increments again.
 
 #### ClickHouse: minute rows that are replaced, never incremented
 
@@ -726,10 +790,16 @@ This one changes the container view, so it is version three. Version two, carrie
 
 ![C4 component zoom: the billing job's writer](video/svg/fraud-break.svg)
 
+Inside the billing job: the invalid filter, the pricing step, the writer. The writer is marked.
+
+#### Edit the past, or add to it?
+
+<sub>Challenge 5 of 6 · the break</sub>
+
 - **Naive answer.** “Delete the invalid rows and re-send the invoice.”
 - **Break.** The writer edits billed hours: the invoice already sent now matches nothing stored.
 
-Inside the billing job: the invalid filter, the pricing step, the writer. The writer is marked. The naive answer: delete the invalid rows and re-send the invoice. Then the writer edits hours that were billed, and the invoice already sent matches nothing we have stored.
+The naive answer: delete the invalid rows and re-send the invoice. Then the writer edits hours that were billed, and the invoice already sent matches nothing we have stored.
 
 #### A new version, and an adjustment line
 
@@ -737,11 +807,17 @@ Inside the billing job: the invalid filter, the pricing step, the writer. The wr
 
 ![C4 component zoom: the writer, the adjuster and invoicing](video/svg/fraud-fix.svg)
 
+The fix, at the end of the billing job. The adjuster, between the writer and invoicing.
+
+#### A new version, and an adjustment line
+
+<sub>Challenge 5 of 6 · the fix</sub>
+
 - **Mechanism.** The closer marks invalidated hours dirty and re-runs each as version n + 1; version n stays. The adjuster sends v(n + 1) − invoiced as a credit line.
 - **Covers, and does not.** Fraud, events past the cutoff and rate-card fixes: one path. Every invoice line still matches a stored row.
 - **Rejected:** **Updating billed rows in place**: the invoice then matches no stored version, and the audit trail ends at the edit.
 
-The fix, at the end of the billing job. The adjuster, between the writer and invoicing. One level down. The closer marks the invalidated hours dirty and re-runs each as the next version, with a manifest pinning the new invalidation snapshot. Version one stays. The adjuster sends the new version minus what was invoiced as a credit line: minus one point five five million dollars. That protects `[S2-right-hour-right-version]`: a sent invoice is never edited. One path covers fraud, events past the cutoff, and rate-card fixes. And because the invoiced version is never touched, every invoice line still matches a stored row. Rejected: updating billed rows in place. The invoice then matches no stored version, and the audit trail ends at the edit.
+One level down. The closer marks the invalidated hours dirty and re-runs each as the next version, with a manifest pinning the new invalidation snapshot. Version one stays. The adjuster sends the new version minus what was invoiced as a credit line: minus one point five five million dollars. That protects `[S2-right-hour-right-version]`: a sent invoice is never edited. One path covers fraud, events past the cutoff, and rate-card fixes. And because the invoiced version is never touched, every invoice line still matches a stored row. Rejected: updating billed rows in place. The invoice then matches no stored version, and the audit trail ends at the edit.
 
 #### Dirty hours become new versions; differences become lines
 
@@ -807,9 +883,15 @@ The trace. Monday at nine, a config push sets the dedup lifetime to ten seconds 
 
 ![C4 component zoom: the reconciler inside the billing job](video/svg/recon-fix.svg)
 
+The fix is a component in the billing job, because that is where the final number is known. The reconciler.
+
+#### A reconciler that checks numbers, not machines
+
+<sub>Challenge 6 of 6 · the fix</sub>
+
 - **Rejected:** **Lag and CPU dashboards**: they stay green while the pipeline counts wrong; only conservation checks and canaries see a wrong number.
 
-The fix is a component in the billing job, because that is where the final number is known. The reconciler. Rejected: lag and CPU dashboards. They stay green while the pipeline counts wrong. Only checks on the numbers themselves see a wrong number.
+Rejected: lag and CPU dashboards. They stay green while the pipeline counts wrong. Only checks on the numbers themselves see a wrong number.
 
 #### Three checks on the numbers, and a trail for every line
 
@@ -862,10 +944,16 @@ Before the recap: a much smaller design is correct at a smaller scale, and I sho
 
 ![The alternate: collectors insert straight into one ClickHouse cluster](video/svg/alt.svg)
 
+The alternate path: no log, no lake, no stream job, no billing job. One ClickHouse cluster does everything, marked alternate.
+
+#### One ClickHouse cluster: buffer, truth and dashboard
+
+<sub>Alternate path</sub>
+
 - **How it works.** Collectors insert batches with a dedup token; a materialised view keeps minutes; a nightly query bills each hour from the deduplicated table.
 - **What it gives up.** No independent log to replay; a heavy query slows ingest; corrections are mutations; dedup is eventual.
 
-The alternate path: no log, no lake, no stream job, no billing job. One ClickHouse cluster does everything, marked alternate. Collectors insert batches with an insert dedup token. A materialised view keeps minute rollups for the dashboard. And a nightly query bills each hour from the events table, deduplicated by event ID. What it gives up, precisely: there is no independent log to replay, because the table is the only copy. A heavy query slows ingest. A correction is a mutation. And dedup happens on merges, so it is eventual.
+Collectors insert batches with an insert dedup token. A materialised view keeps minute rollups for the dashboard. And a nightly query bills each hour from the events table, deduplicated by event ID. What it gives up, precisely: there is no independent log to replay, because the table is the only copy. A heavy query slows ingest. A correction is a mutation. And dedup happens on merges, so it is eventual.
 
 Where is the line? From chapter two, our average is ten million events a second. A cluster of about twenty ClickHouse nodes takes on the order of one to two million rows a second. We are past it by an order of magnitude.
 

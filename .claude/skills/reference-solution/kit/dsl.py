@@ -51,7 +51,7 @@ def chapter(n, title, stage, sub, say, aux=False):
     ribbon = "".join(f'<span class="{"done" if i < stage else ("on" if i == stage else "")}">{s}</span>' for i, s in enumerate(STAGES))
     body = (f'<div class="lbl">Chapter {n} of {META.get("chapters", 9)}</div><div class="s">{title}</div><div class="sub">{sub}</div>'
             f'<div class="ribbon">{ribbon}</div>')
-    S(body, say if isinstance(say, list) else [say], cls="th" + (" aux" if aux else ""), name="card " + title, steps=False)
+    S(body, say if isinstance(say, list) else [say], cls="th chap" + (" aux" if aux else ""), name="card " + title, steps=False)
 
 def subchapter(label, title, intro=None, sub=""):
     """A sub-section (5.1, 7.1 ...) with its own title card and a spoken one-sentence introduction."""
@@ -289,6 +289,8 @@ def hide_css(pid, units, vis, fresh):
                 k = f'#{pid} figure[data-f="{u[1]}"] [data-k="{key}"]'
                 if i >= vis: sel.append(k)
     css = (",".join(sel) + "{visibility:hidden}") if sel else ""
+    rows = [k.replace(' [', ' tr[') for k in sel if ' [data-u=' in k]
+    css += (",".join(rows) + "{display:none}") if rows else ""     # a row not yet revealed takes no space: no empty ruled rows
     css += "".join(f"{k.replace(' [', ' tr[')} > td{{background:var(--now)}}" for k in now)   # only rows match: a soft tint on the row just added
     return f"<style>{css}</style>" if css else ""
 
@@ -549,11 +551,46 @@ def pseudo(src, hl=()):
 
 
 # ══ 2026-11-28 (issue #5): C4-first, challenge-driven helpers ══════════════════════════════════════════════════════════════
-def stage(kicker, title, svg, say, cap=None, vtag=None, extra="", name="", steps=True):
+HEADER_PT = 880      # usable width of a stage header, in points (13.333 in − padding)
+
+def _header_pt(kicker, title):
+    """Approximate width of a stage header: kicker in 11 pt tracked caps, title in 22 pt Plus Jakarta Sans."""
+    t = re.sub(r"<[^>]+>", "", title)
+    return len(kicker) * 11 * 0.78 + 12 + len(t) * 22 * 0.52
+
+
+def stage(kicker, title, svg, say, cap=None, vtag=None, extra="", name="", steps=True, q=False, red=False):
     """A diagram-only slide for a C4 view or a delta of it (c4-structurizr slot "stage"): one-line header, the figure fills
-    the frame. The caption is not drawn on the frame; it becomes the figure's alt text in the Markdown."""
+    the frame. The caption is not drawn on the frame; it becomes the figure's alt text in the Markdown.
+    The header must fit on one line (a wrapped header pushes the figure down and reads as a mistake): shorten the title."""
+    if _header_pt(kicker, title) > HEADER_PT:
+        raise SystemExit(f"{_where()}: stage header too long for one line ({_header_pt(kicker, title):.0f} > {HEADER_PT} pt): "
+                         f"{kicker!r} + {title!r}. Shorten the title (move detail into the narration).")
     v = f'<span class="vtag">{vtag}</span>' if vtag else ""
-    S(f'<h1><span class="k">{kicker}</span>{v}{title}</h1>' + fig(svg, cap) + extra, say, cls="dia stage", name=name or title, steps=steps)
+    h1 = f'<h1 class="q">' if q else "<h1>"
+    k = f'<span class="k{" r" if red else ""}">{kicker}</span>'
+    S(f'{h1}{k}{v}{title}</h1>' + fig(svg, cap) + extra, say, cls="dia stage", name=name or title, steps=steps)
+
+
+def zoom(kicker, title, svg, cards, say, cap=None, q=False, red=False, title2=None):
+    """A C4 zoom in two slides (2026-11-28): the full component (or container) view with the boxes in play marked and the rest
+    dimmed, full frame — then the explanation as cards at full size. Replaces a small diagram over a strip of cards, which put
+    1080p labels under 14 px. The narration is split where the figure's reveal steps run out: the lines up to the last figure
+    step stay with the picture, the rest (one [+] per card) go with the cards. Same title on both, so it reads as one beat."""
+    n_fig = len(json.loads((pathlib.Path(META["svg"]) / f"{svg}.steps.json").read_text()))
+    fig_say, card_say, cnt = [], [], 0
+    for ln in say:
+        m = MARK.match(ln)
+        if m and not card_say and cnt >= n_fig:
+            card_say.append(ln)
+            continue
+        if m and not card_say:
+            cnt += n_fig if m.group(1) == "*" else int(m.group(1) or 1)
+        (card_say if card_say else fig_say).append(ln)
+    if not card_say:
+        raise SystemExit(f"{_where()}: zoom {svg!r}: the narration reveals only the figure's {n_fig} steps; add one [+] per card after them")
+    stage(kicker, title, svg, fig_say, cap=cap, q=q, red=red, name=f"zoom {svg}")
+    S(plain(kicker, title2 or title, cards, q=q, red=red), card_say, cls="zoomcards", name=f"zoom cards {svg}")
 
 
 def challenge(n, total, title, question, intro=None):

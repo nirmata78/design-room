@@ -27,15 +27,31 @@ One visual system for every slide, diagram, video frame, Markdown figure and thu
 **Text-on-light shades.** The brand hex fails 4.5:1 as *small text* on white or on its own tint (blue 3.6, red 3.6, green 3.0, yellow 1.7).
 Coloured **text** therefore uses the Google 700/800 shade, while fills, rules and strokes keep the brand hex:
 blue `#1967D2`, red `#C5221F`, green `#188038`, yellow `#B06000`. In CSS: `var(--g-blue-ink)` …; in Python: `gtheme.ink(colour)`.
-Tints for panels: blue `#E8F0FE`, red `#FCE8E6`, green `#E6F4EA`, yellow `#FEF7E0`. C4 ramp: person `#174EA6`, system `#4285F4`,
-container `#8AB4F8`, component `#E8F0FE`, external `#5F6368`.
+Tints for panels: blue `#E8F0FE`, red `#FCE8E6`, green `#E6F4EA`, yellow `#FEF7E0`.
 
-**Roles in diagrams** (the same in every video; the legend is drawn on the figure): client white / blue outline · edge blue tint ·
-service deeper blue tint / `#1967D2` outline · data store green · cache yellow · queue or log soft grey / ink outline · external dashed grey.
-There is no purple, orange or teal. An async edge is dashed deep blue, a response is dashed green.
+**C4 diagrams** (c4-structurizr native renderer, 2026-11-28; the c4model.com look): white box, 3 px outline, 14 px corners. In scope
+(system, containers, components): outline `#1A73E8`, title `#174EA6` 25 px bold, `[Type: technology]` `#1967D2` 18 px, description
+`#3C4043` 19 px. Person: outline `#174EA6` on `#E8F0FE`, a head and a body. External: outline `#80868B` on `#F1F3F4`, text `#3C4043`.
+Boundary: dashed `#1A73E8` on `#F8FAFF`, its name bottom-left 22 px bold. Edges: dashed `#5F6368`, a filled arrowhead, the label 18 px
+`#3C4043` on a white plate, `[technology]` 18 px italic `#5F6368`. Overlays: BREAKS `#EA4335` on `#FCE8E6`, FIX `#34A853` on
+`#E6F4EA`, NEW `#F9AB00` on `#FEF7E0`, IN FOCUS `#1A73E8` on `#E8F0FE`, ALTERNATE dashed `#F9AB00`; pills 18 px, 800 weight; a flow
+is a `#1A73E8` highlight under the arrow with a numbered `#1967D2` disc.
 
-**Restraint.** White or `#F8F9FA` surfaces only. No gradients (the four-colour stripe on the thumbnail is hard-stopped, not a gradient). A saturated
-full-bleed background is allowed only on a title or end card, and then it is `#202124` or `#4285F4`, never a mix.
+**Roles in diagrams** (the same in every video): in C4 views the role is the **shape** (person, cylinder for a store, log icon for a
+queue, bucket, `>_` for a server-side app, the component icon), the colour says in scope (blue) or external (grey), and red / green /
+yellow are reserved for BREAKS / FIX / NEW. Non-C4 figures (sequences, ERDs, state machines) keep their own role colours from
+`gtheme.py`. There is no purple, orange or teal.
+
+**Restraint.** White or `#F8F9FA` surfaces only inside the card. No gradients (the four-colour stripe on the thumbnail is hard-stopped, not a gradient).
+
+**Frame and card** (2026-11-28, learned from two of the author's decks — a white card floating on a frame of colour bands, three
+diagonal stripes in the corners of a title card, a large light title — and recoloured to Google): every video slide is a white card
+inset 12 CSS px (18 frame px) in a `#202124` frame with a Google Yellow `#FBBC04` wedge bottom-left and a `#DADCE0` wedge on the
+right, a soft shadow under the card. Chapter and challenge cards use a 28 px four-colour frame — Blue `#4285F4` top-left, `#202124`
+top-right, Green `#34A853` bottom-left, Yellow `#FBBC04` bottom-right, hard stops — with three diagonal stripes in each corner and the
+title centred at 52 pt, weight 500. Slide titles carry a 42 pt × 3 pt Google Blue bar instead of a full-width rule (red on a
+question title). All of it is `video.css` (inline SVG backgrounds, no image files); the frame sits inside the slide padding, so no
+layout moves.
 
 ## 2 · Type
 

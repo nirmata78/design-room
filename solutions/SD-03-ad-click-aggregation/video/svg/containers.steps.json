@@ -10,37 +10,37 @@
   ],
   [
     "e:col",
-    "l:e0"
+    "l:cli-col"
   ],
   [
     "e:log",
-    "l:e1"
+    "l:col-log"
   ],
   [
     "e:stream",
-    "l:e3"
+    "l:stream-log"
   ],
   [
     "e:live",
-    "l:e4"
+    "l:stream-live"
   ],
   [
     "e:lake",
-    "l:e2"
+    "l:lake-log"
   ],
   [
     "e:batch",
-    "l:e5",
-    "l:e10"
+    "l:batch-lake",
+    "l:fraud-batch"
   ],
   [
     "e:bill",
-    "l:e6"
+    "l:batch-bill"
   ],
   [
     "e:api",
-    "l:e7",
-    "l:e8",
-    "l:e9"
+    "l:adv-api",
+    "l:api-live",
+    "l:api-bill"
   ]
 ]

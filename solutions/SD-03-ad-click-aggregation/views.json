@@ -1,8 +1,17 @@
 {
-  "_doc": "Every C4 picture of SD-03, derived from the views exported by workspace.dsl (c4-structurizr render_c4.py). Derived views name their source with 'from' and keep its pixel positions (viewBox locked) unless they crop. Aliases are the DSL identifiers' last segment; edges are 'a->b' in either direction.",
+  "_doc": "Every C4 picture of SD-03, drawn by c4-structurizr's native renderer from workspace.dsl. Each exported view has a 'grid' (rows of DSL identifiers, '.' = empty cell); derived views name their source with 'from' and keep its grid and canvas, so no box moves from V1 to the recap. Zooms dim the rest of the full component view instead of cropping it, so the viewer always sees where in the pipeline a challenge is.",
   "views": {
     "c4-context": {
       "slot": "stage",
+      "box": [
+        380,
+        170
+      ],
+      "grid": [
+        " .    adv    .   ",
+        "cli   ac   fraud ",
+        " .    invo   .   "
+      ],
       "steps": [
         "cli",
         "ac",
@@ -13,19 +22,98 @@
     },
     "containers": {
       "slot": "stage",
-      "video": false
+      "box": [
+        236,
+        176
+      ],
+      "grid": [
+        "cli    .       fraud   .      adv",
+        "col    lake    batch   bill   api",
+        "log    stream  .       live   . "
+      ]
     },
     "alt": {
       "slot": "stage",
+      "box": [
+        360,
+        170
+      ],
+      "grid": [
+        "adv  api   .  ",
+        "cli  col  live"
+      ],
       "alternate": [
         "live"
       ]
     },
     "comp-stream": {
-      "video": false
+      "slot": "stage",
+      "box": [
+        290,
+        156
+      ],
+      "grid": [
+        "log   src    time   .   ",
+        " .     .     dedup  ckpt",
+        "live  sink   win    comb"
+      ],
+      "steps": [
+        [
+          "log",
+          "src"
+        ],
+        [
+          "time"
+        ],
+        [
+          "dedup",
+          "ckpt"
+        ],
+        [
+          "comb",
+          "win"
+        ],
+        [
+          "sink",
+          "live"
+        ]
+      ]
     },
     "comp-billing": {
-      "video": false
+      "slot": "stage",
+      "box": [
+        250,
+        136
+      ],
+      "grid": [
+        " .     .      .      fraud   . ",
+        "lake  read   xdup   filt   price",
+        " .    close  recon  write   adj ",
+        " .     .     live   bill   invo "
+      ],
+      "steps": [
+        [
+          "close",
+          "read",
+          "lake"
+        ],
+        [
+          "xdup",
+          "filt",
+          "fraud"
+        ],
+        [
+          "price",
+          "write",
+          "bill"
+        ],
+        [
+          "adj",
+          "invo",
+          "recon",
+          "live"
+        ]
+      ]
     },
     "v1": {
       "from": "containers",
@@ -122,26 +210,24 @@
     },
     "dd-break": {
       "from": "comp-stream",
-      "slot": "full",
+      "slot": "stage",
       "keep": [
         "src",
         "time",
         "dedup"
       ],
-      "crop": true,
       "breaks": [
         "dedup"
       ]
     },
     "dd-fix": {
       "from": "comp-stream",
-      "slot": "full",
+      "slot": "stage",
       "keep": [
         "time",
         "dedup",
         "ckpt"
       ],
-      "crop": true,
       "fix": [
         "dedup",
         "ckpt"
@@ -149,13 +235,12 @@
     },
     "replay-fix": {
       "from": "comp-stream",
-      "slot": "full",
+      "slot": "stage",
       "keep": [
         "win",
         "sink",
         "live"
       ],
-      "crop": true,
       "fix": [
         "sink",
         "live"
@@ -163,27 +248,25 @@
     },
     "late-break": {
       "from": "comp-stream",
-      "slot": "full",
+      "slot": "stage",
       "keep": [
         "src",
         "time",
         "dedup"
       ],
-      "crop": true,
       "breaks": [
         "time"
       ]
     },
     "late-fix": {
       "from": "comp-stream",
-      "slot": "full",
+      "slot": "stage",
       "keep": [
         "time",
         "dedup",
         "comb",
         "win"
       ],
-      "crop": true,
       "fix": [
         "time",
         "win"
@@ -191,39 +274,36 @@
     },
     "close-fix": {
       "from": "comp-billing",
-      "slot": "full",
+      "slot": "stage",
       "keep": [
         "close",
         "read",
         "xdup"
       ],
-      "crop": true,
       "fix": [
         "close"
       ]
     },
     "hot-break": {
       "from": "comp-stream",
-      "slot": "full",
+      "slot": "stage",
       "keep": [
         "comb",
         "win",
         "sink"
       ],
-      "crop": true,
       "breaks": [
         "win"
       ]
     },
     "hot-fix": {
       "from": "comp-stream",
-      "slot": "full",
+      "slot": "stage",
       "keep": [
         "dedup",
         "comb",
         "win"
       ],
-      "crop": true,
       "fix": [
         "comb",
         "win"
@@ -231,38 +311,35 @@
     },
     "fraud-break": {
       "from": "comp-billing",
-      "slot": "full",
+      "slot": "stage",
       "keep": [
         "filt",
         "price",
         "write"
       ],
-      "crop": true,
       "breaks": [
         "write"
       ]
     },
     "fraud-fix": {
       "from": "comp-billing",
-      "slot": "full",
+      "slot": "stage",
       "keep": [
         "price",
         "write",
         "adj"
       ],
-      "crop": true,
       "fix": [
         "adj"
       ]
     },
     "recon-fix": {
       "from": "comp-billing",
-      "slot": "full",
+      "slot": "stage",
       "keep": [
         "write",
         "recon"
       ],
-      "crop": true,
       "fix": [
         "recon"
       ]

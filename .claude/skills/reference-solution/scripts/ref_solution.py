@@ -40,11 +40,33 @@ def out(status: str, stage: str, **kw) -> dict:
     return {"status": status, "stage": stage, **kw}
 
 
+LOG: dict = {"fh": None}       # --log: every tool's output, line by line, with wall-clock stamps and per-step timings
+
+
+def log_line(msg: str) -> None:
+    if LOG["fh"]:
+        import time
+        LOG["fh"].write(f"{time.strftime('%H:%M:%S')}  {msg}\n")
+        LOG["fh"].flush()
+
+
 def run(cmd: list[str], cwd: pathlib.Path | None = None, env: dict | None = None) -> tuple[int, str]:
+    import time
     e = os.environ.copy()
     e.update(env or {})
-    p = subprocess.run(cmd, cwd=str(cwd) if cwd else None, env=e, capture_output=True, text=True)
-    return p.returncode, (p.stdout or "") + (p.stderr or "")
+    if not LOG["fh"]:
+        p = subprocess.run(cmd, cwd=str(cwd) if cwd else None, env=e, capture_output=True, text=True)
+        return p.returncode, (p.stdout or "") + (p.stderr or "")
+    t0 = time.time()
+    log_line("$ " + " ".join(pathlib.Path(c).name if i < 2 else c for i, c in enumerate(cmd)))
+    p = subprocess.Popen(cmd, cwd=str(cwd) if cwd else None, env=e, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+    buf = []
+    for line in p.stdout:
+        buf.append(line)
+        log_line("  " + line.rstrip("\n"))
+    rc = p.wait()
+    log_line(f"  → exit {rc} in {time.time() - t0:.1f} s")
+    return rc, "".join(buf)
 
 
 def tail(s: str, n: int = 25) -> str:
@@ -223,6 +245,9 @@ def main() -> int:
     ap.add_argument("solution", nargs="?", default="")
     ap.add_argument("--keep-intermediates", action="store_true", help="keep frames, slides HTML and scripts after the video stage")
     ap.add_argument("--no-video", action="store_true", help="all: stop after the markdown stage")
+    ap.add_argument("--log", nargs="?", const="auto", default=None,
+                    help="write every tool's output with timestamps and step timings to a file (default for 'video' and 'all': "
+                         "<solution>/video/logs/<stage>-<date-time>.log, kept by clean, gitignored); --log off disables it")
     a = ap.parse_args()
     if a.stage == "doctor":
         print(json.dumps(st_doctor(None, a), indent=2)); return 0
@@ -231,12 +256,26 @@ def main() -> int:
         print(json.dumps(out("solution_not_found", a.stage, remedy="Pass SD-NN or a path to solutions/SD-NN-<slug>/.")))
         return 2
     seq = ["diagrams", "deck", "markdown"] + ([] if a.no_video else ["video", "publish"]) + ["clean"] if a.stage == "all" else [a.stage]
+    if a.log != "off" and (a.log or ("video" in seq)):
+        import time
+        lp = pathlib.Path(a.log) if a.log and a.log != "auto" else sol / "video" / "logs" / f"{a.stage}-{time.strftime('%Y%m%d-%H%M%S')}.log"
+        lp.parent.mkdir(parents=True, exist_ok=True)
+        LOG["fh"] = open(lp, "w", encoding="utf-8")
+        LOG["path"] = lp
+        log_line(f"ref_solution {a.stage} {sol.name}")
     results = []
+    import time
     for s in seq:
+        t0 = time.time()
+        log_line(f"== stage {s}")
         r = STAGES[s](sol, a)
+        log_line(f"== stage {s}: {r['status']} in {time.time() - t0:.1f} s")
         results.append(r)
         if r["status"] != "ok":
             break
+    if LOG["fh"]:
+        results[-1]["render_log"] = str(LOG["path"].relative_to(REPO)) if LOG["path"].is_relative_to(REPO) else str(LOG["path"])
+        LOG["fh"].close()
     final = results[-1] if len(results) == 1 else {"status": results[-1]["status"], "stage": "all", "solution": sol.name, "stages": results}
     print(json.dumps(final, indent=2))
     return 0 if final["status"] == "ok" else 1

@@ -1,53 +1,35 @@
 [
   [
-    "e:fraud"
-  ],
-  [
-    "e:invo"
-  ],
-  [
-    "e:live"
-  ],
-  [
-    "e:lake"
-  ],
-  [
-    "e:bill"
-  ],
-  [
-    "e:close"
-  ],
-  [
+    "e:close",
     "e:read",
-    "l:e0",
-    "l:e1"
+    "e:lake",
+    "l:read-lake",
+    "l:close-read"
   ],
   [
     "e:xdup",
-    "l:e2"
-  ],
-  [
     "e:filt",
-    "l:e3",
-    "l:e4"
+    "e:fraud",
+    "l:read-xdup",
+    "l:xdup-filt",
+    "l:fraud-filt"
   ],
   [
     "e:price",
-    "l:e5"
-  ],
-  [
     "e:write",
-    "l:e6",
-    "l:e7"
+    "e:bill",
+    "l:filt-price",
+    "l:price-write",
+    "l:write-bill"
   ],
   [
     "e:adj",
-    "l:e8",
-    "l:e9"
-  ],
-  [
+    "e:invo",
     "e:recon",
-    "l:e10",
-    "l:e11"
+    "e:live",
+    "l:write-adj",
+    "l:invo-adj",
+    "l:recon-write",
+    "l:recon-live"
   ]
 ]

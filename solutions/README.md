@@ -51,7 +51,7 @@ behind a term or decision · **The number that matters** · **Trap** — what br
 
 ## Videos
 
-**Reference-solution videos** exist for SD-03 in the **current format** (2026-11-28: 40–55 min, six chapters, the design as a
+**Reference-solution videos** exist for SD-03 in the **current format** (2026-11-28: 40–60 min, six chapters, the design as a
 C4 container view that evolves through interviewer challenges) and, in the older ten-chapter format (60–100 min), for SD-29,
 SD-39, SD-97, SD-98, SD-08, SD-24, SD-44, SD-47, SD-77, SD-82, SD-94, SD-95, SD-96, SD-99 and SD-59; see [VIDEOS.md](VIDEOS.md).
 Each is rebuilt with `/reference-solution SD-NN`.

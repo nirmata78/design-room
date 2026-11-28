@@ -181,3 +181,29 @@ pre.code.hl.keys .ln.key * { opacity: 1; }
 .slide.stage h1 .vtag { font-size: 0.8em; }
 .slide.stage figure.grow { flex: 1; }
 .slide.stage figcaption { display: none; }
+
+/* ── frame and card (2026-11-28): learned from two author decks (a geometric frame of colour bands around a white card,
+   diagonal stripes in the corners of title cards, large light titles), recoloured to the Google palette. Every slide is a white
+   card inside a thin #202124 frame with a Google Yellow wedge bottom-left and a grey wedge on the right; chapter and challenge
+   cards use a four-colour frame (Blue · #202124 · Green · Yellow, hard stops, never a gradient) with three diagonal stripes in
+   each corner. The frame sits inside the slide padding, so no layout moves. Colours stay semantic inside the card. */
+.slide { background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1280 720' preserveAspectRatio='none'%3E%3Cdefs%3E%3Cfilter id='s' x='-5%25' y='-5%25' width='110%25' height='110%25'%3E%3CfeDropShadow dx='0' dy='2' stdDeviation='3' flood-color='%23000' flood-opacity='.35'/%3E%3C/filter%3E%3C/defs%3E%3Crect width='1280' height='720' fill='%23202124'/%3E%3Cpolygon points='0,360 0,720 520,720' fill='%23FBBC04'/%3E%3Cpolygon points='1280,200 1280,720 900,720' fill='%23DADCE0'/%3E%3Crect x='12' y='12' width='1256' height='696' fill='%23fff' filter='url%28%23s%29'/%3E%3C/svg%3E") 0 0 / 100% 100% no-repeat; }
+.slide.th, .slide.qs { background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1280 720' preserveAspectRatio='none'%3E%3Cdefs%3E%3Cfilter id='s' x='-5%25' y='-5%25' width='110%25' height='110%25'%3E%3CfeDropShadow dx='0' dy='2' stdDeviation='3' flood-color='%23000' flood-opacity='.35'/%3E%3C/filter%3E%3C/defs%3E%3Crect width='1280' height='720' fill='%23202124'/%3E%3Cpolygon points='0,360 0,720 520,720' fill='%23FBBC04'/%3E%3Cpolygon points='1280,200 1280,720 900,720' fill='%23DADCE0'/%3E%3Crect x='12' y='12' width='1256' height='696' fill='%23fff' filter='url%28%23s%29'/%3E%3C/svg%3E") 0 0 / 100% 100% no-repeat; }
+.slide.th.chap, .slide.th.card { background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1280 720' preserveAspectRatio='none'%3E%3Cdefs%3E%3Cfilter id='s' x='-5%25' y='-5%25' width='110%25' height='110%25'%3E%3CfeDropShadow dx='0' dy='3' stdDeviation='5' flood-color='%23000' flood-opacity='.35'/%3E%3C/filter%3E%3C/defs%3E%3Crect width='1280' height='720' fill='%23202124'/%3E%3Cpolygon points='0,0 720,0 0,420' fill='%234285F4'/%3E%3Cpolygon points='0,420 0,720 560,720' fill='%2334A853'/%3E%3Cpolygon points='1280,260 1280,720 520,720' fill='%23FBBC04'/%3E%3Crect x='28' y='28' width='1224' height='664' fill='%23fff' filter='url%28%23s%29'/%3E%3Cg fill='%234285F4'%3E%3Cpolygon points='120,150 146,150 386,0 360,0'/%3E%3Cpolygon points='160,150 186,150 426,0 400,0'/%3E%3Cpolygon points='200,150 226,150 466,0 440,0'/%3E%3C/g%3E%3Cg fill='%23202124'%3E%3Cpolygon points='1000,108 1012,108 1185,0 1173,0'/%3E%3Cpolygon points='1040,108 1052,108 1225,0 1213,0'/%3E%3Cpolygon points='1080,108 1092,108 1265,0 1253,0'/%3E%3C/g%3E%3Cg fill='%2334A853'%3E%3Cpolygon points='60,720 92,720 345,565 313,565'/%3E%3Cpolygon points='120,720 152,720 405,565 373,565'/%3E%3Cpolygon points='180,720 212,720 465,565 433,565'/%3E%3C/g%3E%3Cg fill='%23fff'%3E%3Cpolygon points='930,720 952,720 1012,692 990,692'/%3E%3Cpolygon points='975,720 997,720 1057,692 1035,692'/%3E%3Cpolygon points='1020,720 1042,720 1102,692 1080,692'/%3E%3C/g%3E%3C/svg%3E") 0 0 / 100% 100% no-repeat;
+  align-items: center; text-align: center; padding: 0.9in 1.3in; }
+.th.chap .s, .th.card .s { font-weight: 500; font-size: 52pt; letter-spacing: -0.6pt; max-width: none; }
+.th.chap .lbl, .th.card .lbl { font-size: 14pt; letter-spacing: 3pt; }
+.th.chap .sub, .th.card .sub { font-style: normal; color: var(--muted); max-width: 10in; }
+.th.chap .ribbon { width: 100%; }
+.th.chap::after, .th.card::after { display: none; }
+/* titles: no rule under them, a short Google Blue bar instead (same height, so nothing moves) */
+.slide h1 { border-bottom: 0; background: linear-gradient(var(--g-blue), var(--g-blue)) left bottom / 42pt 3pt no-repeat; font-weight: 650; }
+.slide h1.q { background-image: linear-gradient(var(--g-red), var(--g-red)); }
+.slide.stage h1 { background: none; white-space: nowrap; }
+/* zoom cards: the explanation of a C4 zoom, on its own slide, at reading size */
+.zoomcards .strip { grid-template-columns: 1fr 1fr; gap: 22pt; margin-top: 18pt; }
+.zoomcards .case, .zoomcards .fixb, .zoomcards .whyb, .zoomcards .hedge { font-size: 21pt; line-height: 1.42; padding: 16pt 22pt 18pt; }
+.zoomcards .case b.t, .zoomcards .fixb b.t, .zoomcards .whyb b.t, .zoomcards .hedge b.t { font-size: 13pt; margin-bottom: 8pt; }
+.zoomcards .rejb { font-size: 19pt; padding: 10pt 18pt; margin-top: 18pt; }
+.zoomcards .rejb b.t { font-size: 12pt; }
+.zoomcards .cards .cd p { font-size: 20pt; }

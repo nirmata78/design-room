@@ -3,7 +3,7 @@
     "type": "function",
     "function": {
       "name": "render_c4_workspace",
-      "description": "Validate a Structurizr DSL workspace inside the containerized Playwright runtime, batch-export all C4 views to normalized 1080p-ready SVGs with Mode A progressive .steps.json sidecars, and run the DESIGN-TOKENS.md font and legibility gates.",
+      "description": "Validate a Structurizr DSL workspace in the warm Docker runtime, export it as JSON and draw every view natively (c4model.com shapes, Google palette, laid out on each view's grid, sized to its 1080p slot), with .steps.json reveal plans and .meta.json gate results (18 px minimum, text must fit its box).",
       "parameters": {
         "type": "object",
         "properties": {
@@ -17,7 +17,7 @@
           },
           "spec": {
             "type": "string",
-            "description": "Optional views.json: per-view slot (stage|full|composite|split), reveal steps, and derived views ('from') with overlays: hide, new, breaks, fix, focus, alternate, badges, keep + crop, flow, min_px, video:false, lock_viewbox_to. See SKILL.md."
+            "description": "views.json: per exported view a 'grid' (rows of DSL identifiers, '.' = empty), 'box' [w, h], 'slot' (stage|full|composite|split), reveal 'steps'; derived views name their source with 'from' and add overlays: hide, new, breaks, fix, focus, alternate, badges, keep (+ crop), flow, min_px, video:false, legend. See SKILL.md."
           },
           "png": {
             "type": "boolean",

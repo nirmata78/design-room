@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Main CLI for the c4-structurizr skill (Mode A: single master SVG + .steps.json):
   1. Validates Structurizr DSL inside the warm Docker container (c4_runtime.sh)
-  2. Batch-exports all views to raw SVG
-  3. Normalizes every view with svg_normalizer.py (DESIGN-TOKENS.md + 1080p legibility gate)
+  2. Exports the workspace as JSON (no browser) and draws every view with c4draw.py — the default "native" renderer
+     (2026-11-28): c4model.com shapes in the Google palette, laid out on the view's "grid", sized to its slot.
+     "renderer": "structurizr" at the top of views.json keeps the older path: batch-export raw SVG and normalize it
+     with svg_normalizer.py (DESIGN-TOKENS.md + 1080p legibility gate)
   4. Derives every extra view declared in views.json with "from": version cuts (hide), status overlays
      (new/breaks/fix/focus/alternate), badges, keep/crop zooms and numbered flows, all from the one exported layout,
      with the viewBox locked to the source view so boxes never move between V1 … Vn
@@ -16,7 +18,10 @@ views.json:
      "v2": {"from": "containers", "new": ["stream", "live"]},           # carried boxes on frame 0, new ones revealed
      "ch1-break": {"from": "comp-stream", "keep": ["dedup", "comb"], "crop": true, "breaks": ["dedup"]},
      "flow-live": {"from": "containers", "flow": ["cli->col", "col->log"]},
-     "comp-stream": {"video": false}                                    # Markdown only: no 1080p gate
+     "comp-stream": {"video": false},                                   # Markdown only: no 1080p gate
+     "c4-context": {"grid": ["  .   adv   .  ",                         # native renderer: rows of DSL identifiers,
+                             " cli  ac  fraud",                         # "." = empty cell; derived views inherit
+                             "  .  invo   .  "]}                        # their source's grid (nothing moves)
   }}
 """
 from __future__ import annotations
@@ -51,12 +56,17 @@ class ViewSpec(Overlay):
     lock_viewbox_to: str = ""
     min_px: float = 18.0
     video: bool = True
+    grid: list[str] = Field(default_factory=list)
+    box: tuple[float, float] | None = None
+    legend: bool = False
 
     def overlay(self) -> Overlay:
         return Overlay(**{k: getattr(self, k) for k in Overlay.model_fields})
 
 
 class WorkspaceSpec(BaseModel):
+    model_config = {"extra": "ignore"}
+    renderer: Literal["native", "structurizr"] = "native"
     views: dict[str, ViewSpec] = Field(default_factory=dict)
 
 
@@ -152,6 +162,8 @@ def run_render(
             return 2, []
 
         c_raw = _container_path(raw_dir, workspace_root)
+        if spec.renderer == "native":
+            return _run_native(runtime, env, c_dsl, c_raw, raw_dir, out_dir, spec, export_png)
         exp = subprocess.run(
             [str(runtime), "exec", "export", "-w", c_dsl, "-f", "svg", "-o", c_raw],
             env=env,
@@ -222,6 +234,79 @@ def run_render(
             }
             for m in failures
         ],
+        "views": [m.model_dump() for m in metas],
+    }
+    print(json.dumps(summary, indent=2))
+    return (0 if not failures and not missing else 3), metas
+
+
+def native_specs(model, spec: "WorkspaceSpec", missing: list | None = None):
+    """(key, ViewSpec, c4draw.Spec) for every view the native renderer draws: the workspace's own views first, then the
+    derived ones in declaration order, each inheriting its source's grid, box and canvas. The golden test uses this too."""
+    from c4draw import Spec
+
+    def _sp(key: str, vspec: ViewSpec, source: str, src_spec: ViewSpec) -> Spec:
+        return Spec(key=key, source=source, slot=vspec.slot, grid=vspec.grid or src_spec.grid, box=vspec.box or src_spec.box,
+                    overlay=vspec.overlay(), steps=vspec.steps, min_px=vspec.min_px if vspec.video else 0.0,
+                    canon=vspec.canon or f"c4:{source}", full=vspec.full, legend=vspec.legend, canvas=src_spec.slot)
+
+    for key in model.views:
+        vs = spec.views.get(key, ViewSpec())
+        yield key, vs, _sp(key, vs, key, vs)
+    for key, vspec in spec.views.items():
+        if key in model.views:
+            continue
+        if vspec.from_ not in model.views:
+            if missing is not None:
+                missing.append({"key": key, "from": vspec.from_})
+            continue
+        yield key, vspec, _sp(key, vspec, vspec.from_, spec.views.get(vspec.from_, ViewSpec()))
+
+
+def _run_native(runtime, env, c_dsl, c_raw, raw_dir, out_dir, spec, export_png) -> tuple[int, list[ViewMeta]]:
+    from c4draw import Model, render_view
+
+    exp = subprocess.run([str(runtime), "exec", "export", "-w", c_dsl, "-f", "json", "-o", c_raw], env=env,
+                         capture_output=True, text=True)
+    js = sorted(raw_dir.glob("*.json"))
+    if exp.returncode != 0 or not js:
+        print(json.dumps({"status": "export_error", "stderr": exp.stderr, "stdout": exp.stdout}, indent=2), file=sys.stderr)
+        return 2, []
+    if os.environ.get("C4_SAVE_JSON"):                            # keep the export, e.g. as a golden-test fixture
+        shutil.copyfile(js[0], os.environ["C4_SAVE_JSON"])
+    model = Model(json.loads(js[0].read_text(encoding="utf-8")))
+    metas: list[ViewMeta] = []
+    overflow: dict[str, list[str]] = {}
+    out_svgs: list[pathlib.Path] = []
+    missing = []
+
+    for key, vspec, sp in native_specs(model, spec, missing):
+        m, ovf = render_view(model, sp, out_dir)
+        metas.append(m)
+        out_svgs.append(out_dir / f"{key}.svg")
+        if ovf and vspec.video:
+            overflow[key] = ovf
+    if export_png and out_svgs:
+        _render_pngs(out_svgs)
+    failures = [m for m in metas if (not m.legibility_ok) or m.unknown_aliases]
+
+    def _remedy(m: ViewMeta) -> str:
+        if m.unknown_aliases:
+            return (f"views.json names aliases or edges not in view '{m.source}': {m.unknown_aliases}. Use DSL identifiers (last "
+                    "segment), 'a->b' for edges, and put every element of the view in its grid.")
+        if m.key in overflow:
+            return (f"Text does not fit inside {overflow[m.key]}: shorten the description in workspace.dsl, give the view fewer "
+                    "columns or rows in its grid, or set \"box\": [width, height].")
+        return (f"Smallest text renders at {m.min_rendered_1080p_px}px (< {m.min_px}px) in slot '{m.slot}': use slot 'stage', "
+                "fewer columns in the grid, or crop fewer boxes. Mark Markdown-only views with \"video\": false.")
+
+    summary = {
+        "status": "ok" if not failures and not missing else ("gate_failed" if failures else "spec_error"),
+        "renderer": "native",
+        "views_rendered": len(metas),
+        "missing_sources": [{**m, "remedy": "'from' must name a view key exported by workspace.dsl"} for m in missing],
+        "failures": [{"key": m.key, "min_rendered_1080p_px": m.min_rendered_1080p_px, "unknown_aliases": m.unknown_aliases,
+                      "overflow": overflow.get(m.key, []), "remedy": _remedy(m)} for m in failures],
         "views": [m.model_dump() for m in metas],
     }
     print(json.dumps(summary, indent=2))
