@@ -106,6 +106,8 @@ Rework: update the existing booklet to the outline instead of starting again.
 
 ## 3 · Diagrams
 
+> **Deprecated 2026-11-28 — do not use PlantUML (`pumlsvg.py`, `plantuml -tsvg`) for new or reworked solutions.** Its Graphviz layout renders poorly on video; `.claude/skills/c4-structurizr` supersedes it for every C4 view, and issue #5 removes `pumlsvg.py`, `c4svg.py` and `basesvg.py` from the kit. The paragraph below documents how SD-59, SD-95 and SD-99 were built (they rebuild as-is until issue #5 re-cuts them).
+
 **PlantUML and C4 (2026-11-25).** `$KIT/scripts/pumlsvg.py` (mirrored in the repo at `.claude/skills/reference-solution/kit/`) renders PlantUML (including the bundled C4 library, offline) to a themed SVG with a reveal plan and meta sidecar: `render(src, "svg/x.svg", kind="c4"|"seq"|"state"|"erd", level=…, order=…)`. Use it for sequences of the failing case behind each version objection, state machines, and any C4 view the native `c4svg` cannot lay out; the same SVG is copied into the Markdown design. Event versus HTTPS: `c4svg` edges take `proto="event"|"https"`, PlantUML has `ev()` / `https()`. **Pick the diagram type per mechanism**: state machine (lifecycle), sequence (protocol, race), C4 (placement), ERD (keys).
 
 `$V/diagrams.py` → `$V/svg/`, as `$MODEL/video/diagrams.py`:
