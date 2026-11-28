@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """ref_solution.py — the deterministic, staged runner for a reference solution (issue #5, Workstream 1).
 
-    ref_solution.py <stage> <SD-NN | solution dir> [--keep-intermediates] [--no-video]
+    ref_solution.py <stage> <SD-NN | solution dir> [--keep-intermediates] [--no-video] [--encoder x264|videotoolbox]
+                    [--verbose] [--log [FILE|off]]
 
 Stages (each prints one JSON object on stdout and exits 0 on "ok"):
     doctor     what is installed (ref_runtime.sh doctor)
@@ -9,7 +10,9 @@ Stages (each prints one JSON object on stdout and exits 0 on "ok"):
     diagrams   video/svg/ from workspace.dsl + views.json (c4-structurizr) and video/diagrams.py (sequences, ERDs, figures)
     deck       video/src/gen.py → slides + narration (build intermediates), then the 1080p layout gate
     markdown   video/src/gen.py → SD-NN_<Title>_Reference_Design.md, then the GitHub lint (md_github.py)
-    video      frames (Playwright element screenshots) → narrated <stem>.mp4 + .srt + .vtt; cleans intermediates
+    video      gen.py → frames (one Chromium pass: the layout gate, then element screenshots, cached by slide HTML) →
+               narrated <stem>.mp4 + .srt + .vtt (TTS pool for uncached sentences, per-slide segments encoded in parallel
+               and cached); cleans intermediates. --encoder videotoolbox for a fast draft; the published master is x264.
     publish    video/publish/* from video/publish/meta.json (publish_kit.py)
     clean      removes every build intermediate (frames, slides HTML, scripts, layout reports, PDFs)
     all        diagrams → deck → markdown → video → publish → clean   (--no-video stops after markdown)
@@ -18,10 +21,15 @@ Status values: ok · outline_created · solution_not_found · diagram_gate_faile
 layout_gate_failed · markdown_lint_failed · render_failed · publish_failed · missing_dependency.
 Every non-ok result carries a "remedy" an agent can act on, and "log" with the tail of the failing tool's output.
 Exit codes: 0 ok · 1 a stage failed · 2 usage or missing solution.
+
+Timings (issue #7): every tool prints "[time] <step>: <s> s · key=value …"; each stage's JSON carries them as "timings"
+and the render log (video/logs/) ends each stage with a timing table. --verbose (REF_VERBOSE=1) adds one log line per
+frame, sentence, audio line and segment with its cache decision. Caches live in $SD_CACHE (default ~/.cache/sd-course):
+tts/ lines/ master/ frames/ segments/ — deleting the folder only costs time.
 """
 from __future__ import annotations
 
-import argparse, json, os, pathlib, re, shutil, subprocess, sys
+import argparse, json, os, pathlib, re, shutil, subprocess, sys, time
 
 HERE = pathlib.Path(__file__).resolve().parent
 SKILL = HERE.parent
@@ -45,18 +53,20 @@ LOG: dict = {"fh": None}       # --log: every tool's output, line by line, with 
 
 def log_line(msg: str) -> None:
     if LOG["fh"]:
-        import time
         LOG["fh"].write(f"{time.strftime('%H:%M:%S')}  {msg}\n")
         LOG["fh"].flush()
 
 
 def run(cmd: list[str], cwd: pathlib.Path | None = None, env: dict | None = None) -> tuple[int, str]:
-    import time
     e = os.environ.copy()
     e.update(env or {})
     if not LOG["fh"]:
+        t0 = time.time()
         p = subprocess.run(cmd, cwd=str(cwd) if cwd else None, env=e, capture_output=True, text=True)
-        return p.returncode, (p.stdout or "") + (p.stderr or "")
+        o = (p.stdout or "") + (p.stderr or "")
+        collect_timings(o)
+        TIMINGS.append({"step": "$ " + pathlib.Path(cmd[1] if len(cmd) > 1 else cmd[0]).name, "s": round(time.time() - t0, 1)})
+        return p.returncode, o
     t0 = time.time()
     log_line("$ " + " ".join(pathlib.Path(c).name if i < 2 else c for i, c in enumerate(cmd)))
     p = subprocess.Popen(cmd, cwd=str(cwd) if cwd else None, env=e, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
@@ -66,7 +76,19 @@ def run(cmd: list[str], cwd: pathlib.Path | None = None, env: dict | None = None
         log_line("  " + line.rstrip("\n"))
     rc = p.wait()
     log_line(f"  → exit {rc} in {time.time() - t0:.1f} s")
-    return rc, "".join(buf)
+    o = "".join(buf)
+    collect_timings(o)
+    TIMINGS.append({"step": "$ " + pathlib.Path(cmd[1] if len(cmd) > 1 else cmd[0]).name, "s": round(time.time() - t0, 1)})
+    return rc, o
+
+
+TIMINGS: list = []          # (tool step, seconds, details) parsed from "[time]" lines, per stage
+
+
+def collect_timings(log: str) -> None:
+    for m in re.finditer(r"^\s*\[time\] ([^:]+): ([\d.]+) s(.*)$", log, flags=re.M):
+        TIMINGS.append({"step": m.group(1).strip(), "s": float(m.group(2)),
+                        **({"detail": m.group(3).strip(" ·")} if m.group(3).strip() else {})})
 
 
 def tail(s: str, n: int = 25) -> str:
@@ -187,7 +209,8 @@ def st_markdown(sol, a):
 
 
 def st_video(sol, a):
-    r = st_deck(sol, a)
+    # one Chromium pass (issue #7): the layout gate runs inside the frame render, on the page the frames are shot from
+    r = _gen(sol)
     if r["status"] != "ok":
         return {**r, "stage": "video"}
     v, stem = sol / "video", stem_of(sol)
@@ -195,20 +218,28 @@ def st_video(sol, a):
     shutil.rmtree(frames, ignore_errors=True)
     frames.mkdir()
     rc, log = run([PY, str(KIT / "render_slides.py"), "--html", str(v / "video-slides.html"), "--prefix", "v", "--svg-dir", str(v / "svg"),
-                   "--css-dir", str(KIT), "--out", str(frames)], env={"LAYOUT_CHECK": "off"})
+                   "--css-dir", str(KIT), "--out", str(frames)], env={"LAYOUT_CHECK": "fail"})
+    gate = next((l.strip() for l in log.splitlines() if re.search(r"\bslides?\b.*\bfail", l, re.I)), "")
     if rc != 0:
+        if "layout check failed" in log:
+            rep = v / "layout-report.txt"
+            fails = [l.strip() for l in rep.read_text(encoding="utf-8").splitlines() if " FAIL " in l][:15] if rep.exists() else []
+            return out("layout_gate_failed", "video", summary=gate, failures=fails, report=str(rep),
+                       remedy="Each FAIL names slide data-n and the element: shorten text, split the slide, crop the figure "
+                              "or use dsl.stage() for a C4 view. Re-run the video stage.")
         return out("render_failed", "video", log=tail(log), remedy="Frame rendering failed: see the Playwright error in log.")
     tts = str(paths.kokoro_python())
     if not pathlib.Path(tts).exists():
         return out("missing_dependency", "video", remedy="Set KOKORO_PYTHON to the Kokoro TTS venv python (see ref_runtime.sh doctor).")
     rc, log = run([tts, str(KIT / "tts_cached.py"), str(v / f"{stem}.script.md"), "--frames", str(frames), "--out", str(v / f"{stem}.mp4"),
-                   "--dissolve", "0.3", "--chapter-gap", "0", "--captions", "sidecar", "--reveal-fade", "0.4", "--max-minutes", "90"])
+                   "--dissolve", "0.3", "--chapter-gap", "0", "--captions", "sidecar", "--reveal-fade", "0.4", "--max-minutes", "90",
+                   "--encoder", a.encoder])
     (v / "build.log").write_text(log, encoding="utf-8")
     if rc != 0:
         return out("render_failed", "video", log=tail(log), remedy="The narrated build failed: see build.log (missing frame names a [slide:] cue).")
     if not a.keep_intermediates:
         st_clean(sol, a)
-    return out("ok", "video", mp4=str((v / f"{stem}.mp4").relative_to(REPO)), log=tail(log, 6))
+    return out("ok", "video", mp4=str((v / f"{stem}.mp4").relative_to(REPO)), layout=gate, encoder=a.encoder, log=tail(log, 6))
 
 
 def st_publish(sol, a):
@@ -245,10 +276,15 @@ def main() -> int:
     ap.add_argument("solution", nargs="?", default="")
     ap.add_argument("--keep-intermediates", action="store_true", help="keep frames, slides HTML and scripts after the video stage")
     ap.add_argument("--no-video", action="store_true", help="all: stop after the markdown stage")
+    ap.add_argument("--encoder", choices=["x264", "videotoolbox"], default="x264",
+                    help="video: x264 (the published master, default) or videotoolbox (hardware, for drafts)")
+    ap.add_argument("--verbose", "-v", action="store_true", help="one log line per frame, sentence, audio line and segment")
     ap.add_argument("--log", nargs="?", const="auto", default=None,
                     help="write every tool's output with timestamps and step timings to a file (default for 'video' and 'all': "
                          "<solution>/video/logs/<stage>-<date-time>.log, kept by clean, gitignored); --log off disables it")
     a = ap.parse_args()
+    if a.verbose:
+        os.environ["REF_VERBOSE"] = "1"
     if a.stage == "doctor":
         print(json.dumps(st_doctor(None, a), indent=2)); return 0
     sol = find_solution(a.solution) if a.solution else None
@@ -257,19 +293,25 @@ def main() -> int:
         return 2
     seq = ["diagrams", "deck", "markdown"] + ([] if a.no_video else ["video", "publish"]) + ["clean"] if a.stage == "all" else [a.stage]
     if a.log != "off" and (a.log or ("video" in seq)):
-        import time
         lp = pathlib.Path(a.log) if a.log and a.log != "auto" else sol / "video" / "logs" / f"{a.stage}-{time.strftime('%Y%m%d-%H%M%S')}.log"
         lp.parent.mkdir(parents=True, exist_ok=True)
         LOG["fh"] = open(lp, "w", encoding="utf-8")
         LOG["path"] = lp
         log_line(f"ref_solution {a.stage} {sol.name}")
     results = []
-    import time
     for s in seq:
         t0 = time.time()
         log_line(f"== stage {s}")
+        TIMINGS.clear()
         r = STAGES[s](sol, a)
-        log_line(f"== stage {s}: {r['status']} in {time.time() - t0:.1f} s")
+        el = time.time() - t0
+        r["seconds"] = round(el, 1)
+        if TIMINGS:
+            r["timings"] = list(TIMINGS)
+            log_line(f"== timings, stage {s}")
+            for tm in TIMINGS:
+                log_line(f"   {tm['s']:8.1f} s  {tm['step']}" + (f"  ({tm['detail']})" if tm.get("detail") else ""))
+        log_line(f"== stage {s}: {r['status']} in {el:.1f} s")
         results.append(r)
         if r["status"] != "ok":
             break
