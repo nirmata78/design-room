@@ -1,0 +1,185 @@
+{
+  "_doc": "Single source for SD-25's technology choices: each container's pick, how it is built one level down, the rivals rejected and why, and each challenge's fix-slide rejection. Read by the kit's stack.py (tech cards in chapter 4, the matrix in chapter 6); the generated Markdown carries them through the slides. Container technologies on the C4 boxes live in workspace.dsl. Text is Markdown-lite: `code` and **bold** only.",
+  "stack": [
+    {
+      "id": "lib",
+      "heading": "Limiter library: in process, inside every API server",
+      "kicker": "Technology · limiter library",
+      "title": "A library in the API server: the decision never leaves the process",
+      "pick": "A Go library linked into the API server",
+      "why": "Zero network hops: a lookup and a take, about two microseconds.",
+      "how": "A sharded map from `(customer, endpoint)` to a bucket: tokens, last refill on the monotonic clock, a lease and its expiry. Nothing blocks on I/O.",
+      "detail": "The library holds three things in memory: the policy snapshot (watched from the policy service, written to local disk as last-known-good), one bucket per active key (evicted after ten minutes idle), and the share syncer's outbox. A decision costs about two microseconds of CPU; at 6,000 requests a second per server at peak, that is about 1.2 % of one core. Every library version is shipped with the API server, so a limiter change is an API server rollout: canaried like any other release. A sidecar was considered for teams that are not on Go: the same library behind a loopback gRPC call, at about a tenth of a millisecond.",
+      "rejected": [
+        [
+          "A sidecar proxy that asks a central rate-limit service",
+          "A network call per request: V1's round trip, behind another process."
+        ],
+        [
+          "A gateway plugin at the edge only",
+          "The edge sees the request before authentication and routing, so it cannot key by customer and endpoint."
+        ]
+      ],
+      "summary": [
+        "Limiter library",
+        "Go, in process",
+        "sidecar + central service",
+        "no hop on the decision"
+      ],
+      "course": "building-blocks course, part 12 §12.1 (the token bucket) and part 11 §11.4 (the API gateway)",
+      "parts": "12 §12.1, 11 §11.4"
+    },
+    {
+      "id": "store",
+      "heading": "Limit store: Redis Cluster, one script per key",
+      "kicker": "Technology · limit store",
+      "title": "Redis Cluster: a token bucket in one Lua script, on the key's shard",
+      "pick": "Redis Cluster, a primary and a replica per shard",
+      "why": "A script runs to completion on the one thread that owns the key: read, refill, take and write are one atomic step, at about 100,000 scripted operations a second per shard.",
+      "how": "A hash `{tokens, ts}` per key, with a TTL. The script reads the shard's clock with `TIME`, refills, takes and writes in one step.",
+      "detail": "In V1 every request runs the script: 3 million a second at peak, about 30 primaries with replicas (illustrative). From V2 on, only exact-mode keys use it — login attempts per account, hard-capped paid tiers — a few percent of traffic, and their owners accepted a round trip of about a millisecond. The client has a 2 ms timeout and the policy's failure mode decides what a timeout means. Keys use a hash tag on the customer so one customer's endpoints share a shard. Replication is asynchronous: a failover can lose the last few hundred milliseconds of takes, which over-admits by at most that much and is stated.",
+      "rejected": [
+        [
+          "Memcached `incr`",
+          "No scripts: refill and take become read-then-write from the client, and two servers race for the last token."
+        ],
+        [
+          "DynamoDB conditional writes",
+          "Exact, but about 5–10 ms and a paid write per request."
+        ]
+      ],
+      "summary": [
+        "Limit store",
+        "Redis Cluster, Lua",
+        "Memcached, DynamoDB",
+        "atomic on one thread; exact keys only"
+      ],
+      "course": "building-blocks course, part 8 §8.2 (conditional writes) and part 12 §12.1",
+      "parts": "8 §8.2, 12 §12.1",
+      "drill": [
+        "Why must the script read the time with TIME instead of taking it from the caller?",
+        "Five hundred servers have five hundred clocks. A server whose clock runs a second fast would refill a second of tokens on every call. Inside the script there is one clock per key, the shard's, so refill is consistent.",
+        "one clock per key: the shard's"
+      ]
+    },
+    {
+      "id": "quota",
+      "heading": "Quota service: leases sized by demand",
+      "kicker": "Technology · quota service",
+      "title": "A quota service that leases tokens to where the traffic is",
+      "pick": "A Go service per region, 8 shards by key, state in memory",
+      "why": "It sees every server's demand for a key, so it can split by demand, and it is off the request path.",
+      "how": "Shards own keys by consistent hashing. Every 100 ms a server sends per key admitted, asked and the policy version; the shard returns its next lease.",
+      "detail": "Lease for server i = available tokens × asked_i ÷ Σ asked, plus 5 % headroom, valid for 10 seconds if the next sync never comes. A key nobody asks for in a minute is dropped. Each shard has a warm standby that receives the same batches; on failover the standby's buckets are at most one interval behind, and a fresh start sets every bucket full — one burst of over-admission, stated. The limit itself travels in the batch with its policy version; the shard keeps the highest version it has seen, so a lagging server cannot loosen a limit. Peak load per region: about 1,700 batches a second carrying up to a million key-updates, about 125,000 per shard. This is the shape of Google's Doorman: rate shares granted under leases.",
+      "rejected": [
+        [
+          "Redis as the coordinator",
+          "Splitting by demand needs every server's demand per key; in a script that is a 500-field hash per hot key on one thread."
+        ],
+        [
+          "Gossip between API servers",
+          "No centre, but over-admission is about the rate times the interval, and 500 peers chatter quadratically."
+        ]
+      ],
+      "summary": [
+        "Quota service",
+        "Go, sharded, in memory",
+        "Redis coordinator, gossip",
+        "splits by demand; off the request path"
+      ],
+      "course": "building-blocks course, part 12 §12.3 (distributed enforcement, leased capacity) and part 6 §6.5 (hot keys)",
+      "parts": "12 §12.3, 6 §6.5",
+      "drill": [
+        "A limit is lowered from 10,000 to 1,000 a second. When does it bite?",
+        "Leases already granted are spent on the old terms, so the new limit bites within one interval, 100 ms, as each lease is renewed. For an emergency cut, the policy version on every local decision lets a server drop leases older than the new version at once.",
+        "within one lease interval; revoke by version"
+      ]
+    },
+    {
+      "id": "pol",
+      "heading": "Policy service: versioned, scheduled, staged",
+      "kicker": "Technology · policy service",
+      "title": "Policies as versioned configuration, watched by every server",
+      "pick": "A Go service over PostgreSQL, pushed over a gRPC stream",
+      "why": "A limit change is a production change: versions, an audit trail and a staged rollout come from a relational store, and a stream gets it to 500 servers in seconds.",
+      "how": "Each change is a new row `(customer, endpoint, version)` with an owner and an expiry, streamed to servers, which keep it on disk as last-known-good.",
+      "detail": "About 2 million policy rows, most of them inherited from about 20 tiers, so a snapshot is a few tens of megabytes and a change is a small delta. A new version moves draft → shadow → canary → enforced: in shadow, servers evaluate it beside the enforced version and log what it would have done; in canary, 1 % of servers enforce it for five minutes; the rollout stops by itself if the canaries' 429 rate doubles. Servers keep the last three versions, so a rollback is a pointer move, pushed in under ten seconds. The service is not on the request path: if it is down, servers keep the snapshot they have.",
+      "rejected": [
+        [
+          "etcd as the policy store",
+          "Watch is right, but millions of rows and the audit queries are not what it is for."
+        ],
+        [
+          "A config file polled from object storage",
+          "Minutes to propagate, and no shadow or canary step."
+        ]
+      ],
+      "summary": [
+        "Policy service",
+        "Go + PostgreSQL, streamed",
+        "etcd, polled files",
+        "versions, audit, staged rollout"
+      ],
+      "course": "building-blocks course, part 4 §4.6 (configuration distribution) and part 13 §13.7 (static stability)",
+      "parts": "4 §4.6, 13 §13.7"
+    },
+    {
+      "id": "dstore",
+      "heading": "Decision log and store: Kafka into ClickHouse",
+      "kicker": "Technology · decision store",
+      "title": "Every 429 kept, one allow in a hundred, queryable in seconds",
+      "pick": "Kafka into ClickHouse, 30 days",
+      "why": "Twenty thousand decisions a second is an append workload with slice-and-dice reads: a log for durability, a columnar store for the questions support asks.",
+      "how": "The library appends without waiting; ClickHouse loads `decision` by day, ordered by `(customer, endpoint, ts)`: one customer's hour is a range scan.",
+      "detail": "Every 429 is kept and 1 % of allows are sampled: about 20,000 records a second, 150 bytes each, 3 MB/s, about 1.6 TB compressed for 30 days (illustrative). The append is fire-and-forget into a bounded in-memory queue: if Kafka is slow, records are dropped and counted, never waited for, because the limiter must not slow a request to log it. The false-limit rate is a scheduled query joining decisions with the quota service's per-key global totals, written back as a metric per customer and minute.",
+      "rejected": [
+        [
+          "Elasticsearch",
+          "Indexing every field of 20,000 records a second costs several times the storage, for queries that are ranges by key."
+        ],
+        [
+          "Logging every decision",
+          "A million records a second to answer questions that every 429 and a 1 % sample answer."
+        ]
+      ],
+      "summary": [
+        "Decision store",
+        "Kafka → ClickHouse",
+        "Elasticsearch, log everything",
+        "every 429 kept; range scans by key"
+      ],
+      "course": "building-blocks course, part 14 §14.7 (logging pipelines) and §14.9 (columnar storage)",
+      "parts": "14 §14.7, 14 §14.9"
+    }
+  ],
+  "challenges": {
+    "1": [
+      "A sliding-window log",
+      "exact, but one timestamp per request: 1,000 per key × 2 M keys × 8 B = 16 GB, and a trim on every check."
+    ],
+    "2": [
+      "GET, compare, then SET from the API server",
+      "two servers both read one token and both admit; under load it leaks steadily — a real production bug."
+    ],
+    "3": [
+      "A static split: the limit ÷ 500 servers",
+      "2 per server per minute; a customer whose traffic lands on 3 servers is throttled at 0.6 % of its quota."
+    ],
+    "4": [
+      "Fail closed everywhere",
+      "the limiter becomes the single point of failure of the whole API."
+    ],
+    "5": [
+      "One global counter in one region",
+      "a 70–150 ms round trip per decision from the other two regions: a hundred times the budget."
+    ],
+    "6": [
+      "Hand-edited per-customer exceptions",
+      "no owner, no expiry, no staged rollout; two hundred of them and every top of the hour is a capacity incident."
+    ],
+    "7": [
+      "Sampling the 429s like the allows",
+      "the rejection the customer is asking about is the one you dropped."
+    ]
+  }
+}

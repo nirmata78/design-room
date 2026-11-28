@@ -1,0 +1,29 @@
+[
+  [
+    "e:cli"
+  ],
+  [
+    "e:api",
+    "l:cli-api"
+  ],
+  [
+    "e:store",
+    "l:api-store"
+  ],
+  [
+    "e:be",
+    "l:api-be"
+  ],
+  [
+    "e:pol",
+    "l:api-pol"
+  ],
+  [
+    "e:pdb",
+    "l:pol-pdb"
+  ],
+  [
+    "e:team",
+    "l:team-pol"
+  ]
+]

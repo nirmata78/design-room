@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
-# Rebuild the SD-25 rate limiter mock-round video (L6 EM framing, 1080p) with the system-design-video skill.
-#   video/build-video.sh            diagrams → slides → frames → limiter-mock.mp4
-#   video/build-video.sh --frames   stop after the frames
+# build-video.sh — copy into solutions/SD-NN-<slug>/video/. The one entry point for a solution's build; every stage is the
+# kit's ref_solution.py (issue #5), so the build is the same for Claude CLI, Gemini/Antigravity, Grok and a human.
+#   build-video.sh                 diagrams → deck (layout gate) → markdown (lint) → video → publish → clean
+#   build-video.sh --no-video      stop after the Markdown
+#   build-video.sh <stage>         one stage: diagrams | deck | markdown | video | publish | clean
 set -euo pipefail
-here="$(cd "$(dirname "$0")" && pwd)"; kit="$HOME/.claude/skills/slide-video-kit/scripts"
-python3 "$here/diagrams.py"
-"$HOME/Projects/design-room/pdf-kit/.venv/bin/python" "$kit/render_slides.py" --html "$here/video-slides.html" --prefix v \
-  --svg-dir "$here/svg" --css-dir "$here" --out "$here/frames" >/dev/null 2>&1
-if [[ ${1:-} == --frames ]]; then exit 0; fi
-"$kit/build_video.py" "$here/limiter-mock.script.md" --frames "$here/frames" --gap-scale 1.3 --max-minutes 30
+here="$(cd "$(dirname "$0")" && pwd)"; sol="$(dirname "$here")"
+runner="$(cd "$here/../../.." && pwd)/.claude/skills/reference-solution/scripts/ref_solution.py"
+case "${1:-all}" in
+  --no-video) exec python3 "$runner" all "$sol" --no-video ;;
+  all|"")     exec python3 "$runner" all "$sol" ;;
+  *)          exec python3 "$runner" "$1" "$sol" "${@:2}" ;;
+esac

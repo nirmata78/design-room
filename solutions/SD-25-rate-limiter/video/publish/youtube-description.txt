@@ -1,0 +1,36 @@
+A rate limiter sounds like a counter and an if statement. At three million requests a second over five hundred servers in three regions, with one millisecond to decide, the counter has to live somewhere, and wherever it lives it sits on every request. A Staff-bar (L6/L7) reference solution run like a real round: the design starts as a C4 container view and evolves only because an interviewer breaks it, six times, with each mechanism and technology introduced at the moment it is needed. 66 minutes, 0 numbered slides.
+
+The thesis: a rate limiter sits on every request, so its availability and latency matter more than its accuracy. Decide in memory from a token bucket, lease the global budget to where the traffic lands, and know exactly how wrong you can be.
+
+IN THIS VIDEO
+• Estimates from one scale line: 1,000 a minute over 500 servers is 2 per server per minute, and a round trip at p99 is over the whole 1 ms budget
+• V1 → V2 → V3 → V4 on one C4 container view, with component zooms of the limiter for every fix
+• Six challenges: the fixed-window boundary burst, taking the round trip off the hot path, the quota service going down, one quota across three regions, a 10× burst every hour, and a customer limited while under its limit
+• Mechanisms where they are needed: the token bucket in one atomic script, leases sized by demand, static stability to a bounded floor, regional budgets, staged policy versions, a false-limit SLI
+
+HOW TO USE IT
+Run the round cold first. Then watch once straight through. On the second pass, pause after each interviewer question and answer it first.
+
+CHAPTERS
+0:00 1 Prompt, questions and context
+9:19 2 Estimates
+13:44 3 API and data model
+18:02 4 Design, driven by challenges
+20:59 4.1 Challenge 1: 1,000 at 11:59:59, 1,000 at 12:00:00
+26:51 4.2 Challenge 2: Take the round trip off the hot path
+36:52 4.3 Challenge 3: The quota service is down
+42:35 4.4 Challenge 4: One quota, three regions
+47:47 4.5 Challenge 5: 10× burst for 30 seconds, every hour
+53:53 4.6 Challenge 6: “You limited us while we were under”
+1:00:09 5 When you don't need all this
+1:01:38 6 Recap
+
+LINKS
+Written reference design: https://github.com/nirmata78/design-room/blob/main/solutions/SD-25-rate-limiter/SD-25_Rate_Limiter_Reference_Design.md
+Run this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room
+All videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md
+
+ABOUT THIS VIDEO
+This is a scripted walkthrough, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script, diagrams and the written design were produced with Claude Code. Numbers are back-of-the-envelope estimates for the exercise, labelled as given, illustrative or initial targets, not any company's real figures, and this is not any company's actual design. The technical content has not been reviewed by a person.
+
+#SystemDesign #SoftwareEngineering #DistributedSystems

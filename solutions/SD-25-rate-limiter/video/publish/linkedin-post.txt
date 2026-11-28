@@ -1,0 +1,21 @@
+"Put a counter in Redis" is the answer that fails the rate-limiter question. The grade is on what happens to every request while it waits.
+
+I've published a 66-minute reference solution for a distributed rate limiter at the Staff bar, run like a real round: one C4 diagram that evolves through six interviewer challenges, on 0 numbered slides.
+
+The idea that unlocks it: the limiter is on every request, so its own availability and latency matter more than its accuracy. Decide in memory, lease the global budget to the servers in proportion to where the traffic actually lands, and state the error as a number.
+
+What it goes into:
+→ 1,000 requests at 11:59:59 and 1,000 more at 12:00:00
+→ Why dividing the limit by 500 servers throttles a customer at 0.6 % of its quota
+→ The quota service is down: fail open, fail closed, or neither
+→ "You limited us while we were under", and how you'd have known first
+
+Best on a second pass: pause after each question and answer it first.
+
+▶ [YouTube link: rerun publish_kit.py with --youtube-url]
+
+It's a scripted walkthrough with synthetic voices, built with Claude Code from design-room, my open-source system design interview simulator.
+
+What does your limiter do when its own store is unreachable?
+
+#SystemDesign #SoftwareEngineering #DistributedSystems

@@ -1,0 +1,52 @@
+{
+  "key": "down-fix",
+  "slot": "stage",
+  "viewbox": [
+    0.0,
+    0.0,
+    1800.0,
+    860.0
+  ],
+  "scale_1080p": 1.0,
+  "min_font_svg_px": 18.0,
+  "min_rendered_1080p_px": 18.0,
+  "min_px": 18.0,
+  "legibility_ok": true,
+  "forbidden_fonts_found": [],
+  "node_keys": [
+    "e:cli",
+    "e:be",
+    "e:handler",
+    "e:pcache",
+    "e:bucket",
+    "e:exact",
+    "e:sync",
+    "e:fallb",
+    "e:dsamp",
+    "e:store",
+    "e:quota",
+    "e:pol",
+    "e:dlog"
+  ],
+  "edge_keys": [
+    "l:cli-handler",
+    "l:handler-be",
+    "l:handler-pcache",
+    "l:handler-bucket",
+    "l:handler-exact",
+    "l:handler-dsamp",
+    "l:pcache-pol",
+    "l:sync-bucket",
+    "l:sync-quota",
+    "l:fallb-bucket",
+    "l:fallb-sync",
+    "l:exact-store",
+    "l:dsamp-dlog"
+  ],
+  "unknown_aliases": [],
+  "canon": "c4:comp-api",
+  "full": false,
+  "source": "comp-api",
+  "overflow": [],
+  "renderer": "native"
+}

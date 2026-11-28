@@ -24,7 +24,7 @@ into these pages instead of re-teaching.
 | Fan-out on write vs read | 5, 6 | [SD-08 News feed](../solutions/SD-08-news-feed.md) |
 | Store-before-deliver, cursors, sequence numbers | 6, 9 | [SD-09 Chat](../solutions/SD-09-chat-messaging.md) |
 | Quorums, consensus, PACELC, conflict resolution | 4 | [SD-15 Distributed KV store](../solutions/SD-15-distributed-kv-store.md) |
-| Token bucket, local vs shared state, fail-open | 8 | [SD-25 Rate limiter](../solutions/SD-25-rate-limiter.md) |
+| Token bucket, local vs shared state, fail-open | 8 | [SD-25 Rate limiter](../solutions/SD-25-rate-limiter/SD-25_Rate_Limiter_Reference_Design.md) |
 | Idempotency keys, sagas, double entry, reconciliation | 7 | [SD-44 Payments & ledger](../solutions/SD-44-payments-ledger.md) |
 
 ## How to study with it

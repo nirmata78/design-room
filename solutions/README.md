@@ -14,7 +14,7 @@ curveball, failure modes, SLOs and cost, what changes by level, and the four-sen
 
 | ID | Problem | The insight in one line | Asked most at | Theory it leans on |
 |---|---|---|---|---|
-| [SD-25](SD-25-rate-limiter.md) | Distributed rate limiter | the limiter's availability and latency matter more than its accuracy — decide locally, reconcile async | Google, Meta, Amazon, Microsoft | [8](../theory/08-reliability-and-operations.md), [7](../theory/07-correctness-under-failure.md) |
+| [SD-25](SD-25-rate-limiter/SD-25_Rate_Limiter_Reference_Design.md) | Distributed rate limiter | the limiter's availability and latency matter more than its accuracy — decide in memory, lease the budget by demand | Google, Meta, Amazon, Microsoft | [8](../theory/08-reliability-and-operations.md), [7](../theory/07-correctness-under-failure.md) |
 | [SD-08](SD-08-news-feed.md) | News feed / home timeline | hybrid fan-out with a threshold: push for normal accounts, pull for celebrities | Meta, Google | [5](../theory/05-caching.md), [6](../theory/06-messaging-and-streams.md) |
 | [SD-09](SD-09-chat-messaging.md) | Chat / messaging | mailbox first, socket second: durable sequenced log + per-device cursors | Meta, Microsoft | [9](../theory/09-real-time-and-connections.md), [6](../theory/06-messaging-and-streams.md) |
 | [SD-15](SD-15-distributed-kv-store.md) | Globally distributed KV store | consistency is a per-operation product choice; say what each level costs | Google, Amazon, Microsoft | [4](../theory/04-replication-and-consistency.md), [3](../theory/03-partitioning-and-storage.md) |
@@ -51,7 +51,7 @@ behind a term or decision · **The number that matters** · **Trap** — what br
 
 ## Videos
 
-**Reference-solution videos** exist for SD-03 in the **current format** (2026-11-28: 40–60 min, six chapters, the design as a
+**Reference-solution videos** exist for SD-03 and SD-25 in the **current format** (2026-11-28: 40–60 min, six chapters, the design as a
 C4 container view that evolves through interviewer challenges) and, in the older ten-chapter format (60–100 min), for SD-29,
 SD-39, SD-97, SD-98, SD-08, SD-24, SD-44, SD-47, SD-77, SD-82, SD-94, SD-95, SD-96, SD-99 and SD-59; see [VIDEOS.md](VIDEOS.md).
 Each is rebuilt with `/reference-solution SD-NN`.
@@ -65,7 +65,6 @@ The MP4s and frames are gitignored. Built with the `system-design-video` skill.
 |---|---|---|
 | SD-09 | `SD-09-chat-messaging/video/` | encryption announced on stage · a deploy restarts a zone · a burning on-call · storage cost −40% |
 | SD-15 | `SD-15-distributed-kv-store/video/` | build or buy · a region goes dark · "strong everywhere" · the transfer bill |
-| SD-25 | `SD-25-rate-limiter/video/` | a customer wants no limits · a zero-limit policy push · billing from the limiter · the decision-log bill |
 
 ## Booklet-length solutions
 
@@ -77,6 +76,7 @@ internals appendix for the "how does that tool actually work?" probe.
 | [SD-47](SD-47-ticket-booking/SD-47_Ticket_Booking_Reference_Design.md) | Ticket booking under contention, Staff bar | `SD-47-ticket-booking/` | The written companion to the reference-solution video ([notes](SD-47-ticket-booking/video/README.md)): thesis and what is graded, a theory chapter (seven mechanisms, an options matrix), the design in three versions, eight challenges (the same-millisecond click, the hold that outlives its owner, the expired hold that is paid, a million at the door, a fair line and bots, the seat map, mid-sale changes, observability), the build cost, a canon check, and PostgreSQL / Redis / Kafka / signed-token appendices |
 | [SD-09](SD-09-chat-messaging/SD-09_Chat_Messaging_Reference_Design.md) | Chat and messaging, Staff bar | `SD-09-chat-messaging/` | The written companion to the video: 34 figures shared with it where possible, ten deep dives (ordering and leader failover, the lost ACK, groups, receipts, reconnect storms, a month offline, the sync races, storage and buckets, degradation, regions), four worked deltas, WebSocket / Raft / wide-column / log and CDC / Redis / push-service / E2E internals, a one-page cheat card |
 | [SD-24](SD-24-distributed-lock/SD-24_Distributed_Lock_Reference_Design.md) | Distributed lock service, Staff bar | `SD-24-distributed-lock/` | The written companion to the reference-solution video: 43 figures shared with it where possible, seven deep dives (the paused holder and the fencing token, a resource that cannot check, clocks and leases, partition and disaster recovery, the top of the hour, a hot name, observability), each with what the first draft glosses over, five worked deltas, consensus / leases and clocks / coordination-store / conditional-write / idempotency / linearizability-testing internals, build cost in engineer-months, a one-page cheat card |
+| [SD-25](SD-25-rate-limiter/SD-25_Rate_Limiter_Reference_Design.md) | Rate limiter (distributed), Staff bar | `SD-25-rate-limiter/` | Re-cut 2026-11-28 in the six-chapter C4-first format (generated from the video sources): token bucket in one atomic script, leases sized by demand (quota service), static stability to a bounded floor, regional budgets, scheduled and staged policies, a false-limit SLI; six challenges. The older L6 EM mock video was retired (git history) |
 | [SD-03](SD-03-ad-click-aggregation/SD-03_Ad_Click_Aggregation_Reference_Design.md) | Event counting & billing rollups (ad clicks, usage metering), Staff bar | `SD-03-ad-click-aggregation/` | **The pilot of the 2026-11-28 format** (six chapters, C4-first, challenge-driven; generated from the video sources): event IDs and dedup, event time and a 48-hour cutoff, one aggregation run twice (Flink streaming and batch), replace-not-increment (ClickHouse, Iceberg), versioned corrections, reconciliation; six challenges |
 | [SD-29](SD-29-device-fleet/SD-29_Device_Fleet_Reference_Design.md) | Device-fleet control plane (IoT), Staff bar | `SD-29-device-fleet/` | Compact-cut companion: desired vs reported state, cohort waves with automatic halt, A/B slots and a watchdog, jittered reconnects, fleet census |
 | [SD-08](SD-08-news-feed/SD-08_News_Feed_Reference_Design.md) | News feed / home timeline, Staff bar | `SD-08-news-feed/` | The written companion to the reference-solution video: figures shared with it, eight deep dives (celebrity, threshold, deletes, duplicates, lost shard, slow ranker, catch-up, observability), the EM layer, internals appendices |

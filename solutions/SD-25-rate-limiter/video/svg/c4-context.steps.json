@@ -1,0 +1,21 @@
+[
+  [
+    "e:cli"
+  ],
+  [
+    "e:rl",
+    "l:cli-rl"
+  ],
+  [
+    "e:be",
+    "l:rl-be"
+  ],
+  [
+    "e:team",
+    "l:team-rl"
+  ],
+  [
+    "e:meter",
+    "l:meter-rl"
+  ]
+]

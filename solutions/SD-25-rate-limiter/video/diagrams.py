@@ -1,214 +1,147 @@
-#!/usr/bin/env python3
-"""C4, deployment, sequence and follow-up diagrams for the SD-25 rate-limiter video → ./svg/*.svg.
-Generators: ~/.claude/skills/slide-video-kit/scripts/{c4svg,seqsvg}.py.  Run: python3 diagrams.py
-Content follows ../../SD-25-rate-limiter.md; the follow-up diagrams (fu-*) are new for this video."""
+"""SD-25: the pictures that are not C4 views -> ./svg/ (sequences, the physical data model, the policy lifecycle, figures).
+Every C4 view (context, containers, V1 -> V4, flows, challenge zooms, recap, alternate) comes from ../workspace.dsl +
+../views.json through c4-structurizr; this file never draws a box of the architecture.
+Run by ref_solution.py diagrams (which renders the C4 views first, into the same folder); never clears svg/."""
 import pathlib, sys
-sys.path.insert(0, str(pathlib.Path.home() / ".claude/skills/slide-video-kit/scripts"))
-import c4svg as c4, seqsvg as sq
+ROOT = pathlib.Path(__file__).resolve().parents[3]                     # the repo
+sys.path.insert(0, str(ROOT / ".claude/skills/reference-solution/kit"))
+import seqsvg as sq                                                     # noqa: E402
+import erdsvg as er                                                     # noqa: E402
+from statesvg import States                                             # noqa: E402
+from figsvg import budget_bar, svgdoc, T, R, L                         # noqa: E402
 
-OUT = pathlib.Path(__file__).resolve().parent / "svg"
-OUT.mkdir(exist_ok=True)
-GREEN, GREEN_BG, RED, RED_BG, BLUE, BLUE_BG = "#2d8a4e", "#e7f4ec", "#c8341f", "#fdecea", "#2f6fb5", "#e8f0fa"
+OUT = pathlib.Path(__file__).resolve().parent / "svg"; OUT.mkdir(exist_ok=True)
+INK, RED, GREEN, BLUE, GREY, AMBER = "#202124", "#ea4335", "#34a853", "#4285f4", "#5f6368", "#fbbc05"
 
-def seq(size=22, row=50):
-    return sq.Seq(1500, size=size, row=row, head=66)
 
-def row_of(name, items, note=None, tone=(BLUE, BLUE_BG), arrows=False, focus=None, h=560):
-    d = c4.Diagram(1600, h)
-    n = len(items); w = (1520 - (n - 1) * 40) // n
-    for i, (t, ty, desc) in enumerate(items):
-        k = "focus" if (i == focus or (isinstance(focus, tuple) and i in focus)) else "container"
-        d.node(f"n{i}", 40 + i * (w + 40), 70, w, 240, k, t, ty, desc, size=25 if n > 3 else 27)
-    if arrows:
-        for i in range(n - 1):
-            d.edge(f"n{i}", f"n{i+1}", "", src="r", dst="l", dashed=False)
-    if note:
-        d.note(40, 370, 1520, note, size=21, colour=tone[0], bg=tone[1])
-    d.save(OUT / f"{name}.svg")
+# ── sequences ──
+def seq(name, parts, steps, size=24, row=54, width=1500):
+    q = sq.Seq(width, size=size, row=row)
+    for p in parts: q.part(*p)
+    for st in steps:
+        k = st[0]
+        if k == "m": q.msg(st[1], st[2], st[3], **(st[4] if len(st) > 4 else {}))
+        elif k == "r": q.ret(st[1], st[2], st[3], **(st[4] if len(st) > 4 else {}))
+        elif k == "n": q.note(st[1], st[2], st[3], *(st[4:5]))
+    q.save(OUT / f"{name}.svg")
 
-# ── C4 level 1: system context ───────────────────────────────────────────────────────────────────
-d = c4.Diagram(1600, 760)
-d.node("cust", 40, 60, 340, 160, "person", "API customers", "Person", "1 M requests a second; some 100× others")
-d.node("ops", 40, 480, 340, 160, "person", "Support and product", "Person", "policies, exceptions, 'why was I limited?'")
-d.node("api", 620, 240, 380, 220, "focus", "API platform with rate limiting", "Software System",
-       "enforces per-customer, per-endpoint quotas across 500 servers")
-d.node("bill", 1240, 60, 320, 160, "ext", "Billing and metering", "External System", "exact counts, separate pipeline")
-d.node("mon", 1240, 480, 320, 160, "ext", "Monitoring", "External System", "SLIs, alerts, decision log")
-d.edge("cust", "api", "HTTPS", "", src="r:0.5", dst="l:0.25", at=(500, 150), width=80)
-d.edge("ops", "api", "policies", "", src="r:0.5", dst="l:0.8", at=(500, 540), width=90)
-d.edge("api", "bill", "usage events", "async", src="r:0.2", dst="l:0.5", at=(1120, 150), width=130)
-d.edge("api", "mon", "metrics", "", src="r:0.8", dst="l:0.5", at=(1120, 530), width=80)
-d.legend(40, 735, ("person", "focus", "ext"))
-d.save(OUT / "c4-context.svg")
+# challenge 2: one key, two servers, two intervals — leases follow demand
+seq("seq-share",
+    [("a", "API server A", "container"), ("q", "Quota service, shard 3", "container"), ("b", "API server B", "container")],
+    [("m", "a", "q", "sync: key 42:/search admitted 700, asked 700"),
+     ("m", "b", "q", "sync: admitted 300, asked 300"),
+     ("n", "q", "q", "budget 1,000 per 100 ms; split by asked, + 5 %", "blue"),
+     ("r", "q", "a", "lease 735 for the next 100 ms"),
+     ("r", "q", "b", "lease 315"),
+     ("n", "b", "b", "traffic moves to B: asked 700, 315 admitted, 385 get 429", "amber"),
+     ("m", "b", "q", "sync: admitted 315, asked 700"),
+     ("m", "a", "q", "sync: admitted 200, asked 200"),
+     ("r", "q", "b", "lease 815: the share followed the demand", dict(hl=True))], size=25, row=52, width=1700)
 
-# ── C4 level 2: containers ───────────────────────────────────────────────────────────────────────
-d = c4.Diagram(1600, 800)
-d.boundary(250, 20, 1330, 760, "API platform, one region")
-d.node("c", 20, 300, 200, 150, "person", "Client", "")
-d.node("lb", 300, 290, 220, 170, "container", "Load balancer", "")
-d.node("api", 620, 240, 380, 270, "focus", "API servers × ~170", "with the limiter library",
-       "token bucket per (customer, endpoint), in memory")
-d.node("co", 1120, 70, 400, 170, "db", "Regional coordinator", "Redis cluster + Lua", "usage reports, shares, every 100 ms")
-d.node("pol", 1120, 320, 400, 150, "container", "Policy service", "Container", "pushes changes; cached everywhere")
-d.node("log", 1120, 560, 400, 150, "db", "Decision log", "sampled, columnar", "all rejections, some allows")
-d.edge("c", "lb", "", src="r:0.5", dst="l:0.5")
-d.edge("lb", "api", "", src="r:0.5", dst="l:0.5")
-d.edge("api", "co", "report, get share", "async", src="r:0.15", dst="l:0.5", at=(1060, 140), width=150)
-d.edge("pol", "api", "push", "", src="l:0.5", dst="r:0.55", at=(1060, 395), width=60)
-d.edge("api", "log", "sampled", "", src="r:0.9", dst="l:0.5", via=[(1060, 483), (1060, 635)], at=(1060, 560), width=90)
-d.save(OUT / "c4-containers.svg")
+# challenge 3: the quota shard fails; leases, then the floor, then the standby
+seq("seq-down",
+    [("s", "API server", "container"), ("q", "Quota shard 3", "container"), ("w", "Standby shard 3", "container")],
+    [("m", "s", "q", "sync: admitted, asked"),
+     ("n", "q", "q", "the primary is gone: no answer in 50 ms", "amber"),
+     ("n", "s", "s", "keep spending the last lease: valid 10 s", "green"),
+     ("n", "s", "s", "after 10 s: floor = 3 × regional limit ÷ 167 servers", "amber"),
+     ("m", "s", "w", "sync to the promoted standby: admitted, asked"),
+     ("r", "w", "s", "leases again, one interval later", dict(hl=True))], size=25, row=56, width=1600)
 
-# ── C4 level 3: the limiter library ──────────────────────────────────────────────────────────────
-d = c4.Diagram(1600, 760)
-d.boundary(240, 20, 1000, 720, "Limiter library, in each API server", "Component")
-d.node("h", 20, 80, 190, 140, "container", "Request handler", "")
-d.node("dec", 300, 70, 420, 150, "focus", "Decide", "Component", "take a token; set headers; 429 with Retry-After")
-d.node("pc", 820, 70, 380, 150, "component", "Policy cache", "Component", "rate, burst, scope, mode, version")
-d.node("bk", 300, 300, 420, 150, "component", "Local buckets", "in memory", "tokens, last refill, current share")
-d.node("sm", 820, 300, 380, 150, "component", "Share manager", "every 100 ms", "report demand, receive share")
-d.node("fb", 820, 520, 380, 150, "component", "Fallback", "Component", "last shares, decaying to a safe default")
-d.node("smp", 300, 520, 420, 150, "component", "Decision sampler", "Component", "every 429; a sample of allows")
-d.node("co", 1340, 300, 230, 150, "db", "Coordinator", "")
-d.edge("h", "dec", "allow?", "", src="r:0.5", dst="l:0.5", at=(255, 125), width=70)
-d.edge("dec", "pc", "", src="r:0.5", dst="l:0.5")
-d.edge("dec", "bk", "", src="b:0.5", dst="t:0.5")
-d.edge("bk", "sm", "", src="r:0.5", dst="l:0.5")
-d.edge("sm", "co", "", src="r:0.5", dst="l:0.5")
-d.edge("sm", "fb", "coordinator down", "", src="b:0.5", dst="t:0.5", at=(1010, 485), width=170)
-d.edge("dec", "smp", "", src="l:0.7", dst="l:0.5", via=[(270, 175), (270, 595)])
-d.save(OUT / "c4-component-limiter.svg")
+# challenge 4: three regions re-split one global budget every 2 s
+seq("seq-regions",
+    [("eu", "Quota service, eu-west", "container"), ("us", "Quota service, us-east", "container"), ("ap", "Quota service, ap-south", "container")],
+    [("m", "eu", "us", "every 2 s: key 7 admitted 790/s, asked 800/s", dict(kind="async")),
+     ("m", "us", "eu", "admitted 150/s, asked 150/s", dict(kind="async")),
+     ("m", "ap", "eu", "admitted 50/s, asked 50/s", dict(kind="async")),
+     ("n", "eu", "ap", "global 1,000/s split by asked: eu 800, us 150, ap 50", "blue"),
+     ("n", "us", "us", "16:00: us asks 700/s; it is held to 150 for at most 2 s", "amber"),
+     ("m", "us", "eu", "admitted 150/s, asked 700/s", dict(kind="async")),
+     ("n", "eu", "ap", "re-split: eu 270, us 680, ap 50", "green")], size=25, row=56, width=1700)
 
-# ── Deployment ───────────────────────────────────────────────────────────────────────────────────
-d = c4.Diagram(1600, 700)
-for i, (rid, name) in enumerate([("a", "Region A"), ("b", "Region B"), ("c", "Region C")]):
-    x = 40 + i * 520
-    d.boundary(x, 30, 480, 450, name)
-    d.node(f"s{rid}", x + 40, 100, 400, 140, "container", "~170 API servers", "limiter in-process")
-    d.node(f"r{rid}", x + 40, 300, 400, 130, "focus", "Coordinator", "Redis cluster, a few shards")
-    d.edge(f"s{rid}", f"r{rid}", "100 ms", "", src="b:0.5", dst="t:0.5", at=(x + 240, 270), width=80)
-d.edge("ra", "rb", "", src="r:0.5", dst="l:0.5")
-d.edge("rb", "rc", "", src="r:0.5", dst="l:0.5")
-d.note(40, 540, 1520, "scope: region is exact per region with no cross-region traffic. scope: global exchanges totals "
-       "every few seconds; overshoot is one sync interval of demand shift.", size=20, colour=BLUE, bg=BLUE_BG)
-d.save(OUT / "c4-deployment.svg")
+# ── the physical data model ──
+e = er.ERD(1600, 760, size=26)
+e.entity("ti", 30, 40, 470, "tier  (PostgreSQL)", [("tier_id", "text", "PK"), ("rate_per_min", "int", ""), ("burst", "int", ""),
+         ("windows", "jsonb", "")], caption="about 20 tiers; most policies inherit one")
+e.entity("po", 570, 40, 470, "policy  (PostgreSQL)", [("customer_id", "bigint", "PK"), ("endpoint", "text", "PK"), ("version", "int", "PK"),
+         ("tier_id", "text", "FK"), ("scope · mode", "enum", ""), ("on_failure", "open | closed", ""),
+         ("state", "text", "")], kind="focus", caption="a change is a new version; owner and expiry")
+e.entity("de", 1110, 40, 460, "decision  (ClickHouse)", [("decision_id", "uuid", "PK"), ("ts", "ts", ""), ("customer, endpoint", "key", "IX"),
+         ("allowed", "bool", ""), ("policy_v", "int", ""), ("lease, tokens", "int", ""), ("sync_age_ms", "int", "")],
+         kind="ext", caption="every 429, 1 % of allows; 30 days")
+e.entity("lb", 30, 460, 470, "local bucket  (memory)", [("key", "customer:endpoint", "PK"), ("tokens", "float", ""), ("refilled_at", "monotonic", ""),
+         ("lease, lease_until", "int, ts", "")], kind="redis", caption="one per active key, per server")
+e.entity("gb", 570, 460, 470, "global bucket  (quota svc)", [("key", "customer:endpoint", "PK"), ("tokens", "float", ""), ("asked", "per server", ""),
+         ("policy_v", "int", "")], kind="redis", caption="memory, mirrored to a standby")
+e.entity("xb", 1110, 460, 460, "exact bucket  (Redis hash)", [("rl:{customer}:endpoint", "key", "PK"), ("tokens", "float", ""), ("ts", "ms", "")],
+         kind="redis", caption="exact-mode keys only; TTL 2 × refill")
+e.rel("po", "ti", "N", "1", src="l:0.35", dst="r:0.35", label="")
+e.save(OUT / "erd-physical.svg", order=["ti", "po", "lb", "gb", "xb", "de"])
 
-# ── Sequence: one request on the hot path ────────────────────────────────────────────────────────
-s = seq()
-for pid, lab, k in [("c", "Client", "person"), ("api", "API server", "container"), ("lib", "Limiter library", "focus"),
-                    ("b", "Local bucket", "db"), ("h", "Handler", "container")]:
-    s.part(pid, lab, k)
-s.msg("c", "api", "GET /orders")
-s.msg("api", "lib", "allow(customer, endpoint)")
-s.msg("lib", "b", "refill, take one token: microseconds", hl=True)
-s.frame("alt", "token available")
-s.msg("api", "h", "handle")
-s.ret("api", "c", "200 + RateLimit-Remaining, Reset")
-s.end()
-s.frame("alt", "bucket empty")
-s.ret("api", "c", "429 + Retry-After", hl=True)
-s.end()
-s.note("c", "h", "No network hop on the hot path. The limiter adds well under a millisecond.", "green")
-s.save(OUT / "seq-request.svg")
+# ── the lifecycle of one policy version (chapter 3, challenge 5) ──
+m = States(1640, 600, box=(330, 140), size=31)
+m.state("draft", 40, 60, "Draft", "validated")
+m.start("draft")
+m.state("shadow", 460, 60, "Shadow", "logged, not enforced")
+m.go("draft", "shadow", "approve")
+m.state("canary", 880, 60, "Canary", "1 % of servers, 5 min", kind="warn")
+m.go("shadow", "canary", "looks right")
+m.state("enf", 1290, 60, "Enforced", "every server", kind="final")
+m.go("canary", "enf", "429s steady")
+m.state("rb", 880, 400, "Rolled back", "previous version", kind="bad")
+m.go("canary", "rb", "429s double")
+m.go("enf", "rb", "one command")
+m.state("sup", 1290, 400, "Superseded", "kept 3 versions")
+m.go("enf", "sup", "next version")
+m.save(OUT / "state-policy.svg")
 
-# ── Sequence: the share sync ─────────────────────────────────────────────────────────────────────
-s = seq()
-for pid, lab, k in [("s1", "Server 1", "container"), ("s2", "Server 2", "container"), ("co", "Coordinator", "focus"),
-                    ("og", "Other regions", "ext")]:
-    s.part(pid, lab, k)
-s.frame("loop", "every ~100 ms")
-s.msg("s1", "co", "used 40 for key K")
-s.msg("s2", "co", "used 4 for key K")
-s.msg("co", "co", "share_i = remaining × demand_i / Σ demand", hl=True)
-s.ret("co", "s1", "share 90%")
-s.ret("co", "s2", "share 10%")
-s.end()
-s.msg("co", "og", "totals for global keys, every few seconds", "async")
-s.save(OUT / "seq-share.svg")
 
-# ── Shares follow demand ─────────────────────────────────────────────────────────────────────────
-row_of("shares", [("Static split", "1,000 ÷ 500 servers", "2 per server per minute: useless"),
-                  ("Demand-weighted", "recomputed every 100 ms", "the busy server gets the budget"),
-                  ("Error bound", "one interval of demand shift", "a few tokens; 1–2% for the heaviest")],
-       note="Uneven load balancing stops mattering: shares follow traffic, not node count.",
-       focus=1)
+# ── figures ──
+def tension():
+    """One customer, three answers to 'how does each server know?'."""
+    p = [T(40, 50, "1,000 requests a minute, 500 servers: three ways for each server to know", 28, INK, 800)]
+    stages = [("Exact", "One central counter", "+1.2 ms at p99", "every request waits on the store; when it is down, so is the API", RED, "#fce8e6"),
+              ("Split", "The limit ÷ 500", "2 per server per minute", "traffic on 3 servers: throttled at 0.6 % of the quota", AMBER, "#fef7e0"),
+              ("Leased", "Leases that follow demand", "≤ 5 % over · 2 µs", "decided in memory; survives its own dependencies", GREEN, "#e6f4ea")]
+    for i, (t, name, n, note, col, fill) in enumerate(stages):
+        x = 60 + i * 510
+        p += [R(x, 100, 470, 270, fill, col, rx=14), T(x + 24, 150, t, 30, col, 800), T(x + 24, 196, name, 26, INK, 800),
+              T(x + 24, 250, n, 32, INK, 800)]
+        words, line, ys = note.split(), "", 296
+        for w_ in words:
+            if len(line) + len(w_) > 36: p.append(T(x + 24, ys, line, 22, INK, 500)); line, ys = w_, ys + 30
+            else: line = (line + " " + w_).strip()
+        p.append(T(x + 24, ys, line, 22, INK, 500))
+    p += [L(60, 420, 1540, 420, BLUE, 4), T(60, 462, "← exact, slow, a dependency", 24, RED, 800),
+          T(1540, 462, "bounded, fast, never the outage →", 24, GREEN, 800, "end")]
+    (OUT / "tension.svg").write_text(svgdoc(1600, 490, "".join(p)))
 
-# ── Sequence: a cold key ─────────────────────────────────────────────────────────────────────────
-s = seq()
-for pid, lab, k in [("c", "Client", "person"), ("lib", "Limiter library", "focus"), ("co", "Coordinator", "db")]:
-    s.part(pid, lab, k)
-s.msg("c", "lib", "first request for key K on this server")
-s.msg("lib", "co", "share for K? once, in-region, ~0.5 ms", hl=True)
-s.ret("co", "lib", "share")
-s.msg("lib", "lib", "cache it; later requests are local")
-s.ret("lib", "c", "allow")
-s.save(OUT / "seq-cold.svg")
 
-# ── Sequence: coordinator down ───────────────────────────────────────────────────────────────────
-s = seq()
-for pid, lab, k in [("c", "Clients", "person"), ("lib", "Limiter library", "focus"), ("co", "Coordinator (down)", "ext"),
-                    ("on", "On-call", "person")]:
-    s.part(pid, lab, k)
-s.msg("lib", "co", "report usage")
-s.ret("co", "lib", "timeout")
-s.msg("lib", "lib", "keep last shares, decay toward a safe default", hl=True)
-s.msg("c", "lib", "requests")
-s.ret("lib", "c", "still enforced, roughly: API stays up", hl=True)
-s.msg("lib", "on", "alert: degraded, not an outage", "async")
-s.save(OUT / "seq-coord-down.svg")
+def boundary():
+    """The fixed window's boundary burst against a token bucket, on the same two seconds."""
+    p = [T(40, 48, "The same 2,000 requests, 11:59:59 and 12:00:00, limit 1,000 a minute", 28, INK, 800)]
+    rows = [("Fixed window, per minute", [("11:59:59", 1000, 0, "1,000 admitted: window 11:59 empty"), ("12:00:00", 1000, 0, "1,000 admitted: a new window")],
+             "2,000 in one second", RED),
+            ("Token bucket, 16.7/s, burst 200", [("11:59:59", 200, 800, "200 admitted, 800 get 429"), ("12:00:00", 17, 983, "17 admitted: one second of refill")],
+             "217: at most b + r × t", GREEN)]
+    y = 100
+    for title, bars, verdict, col in rows:
+        p.append(T(60, y + 34, title, 26, INK, 800))
+        p.append(T(1540, y + 34, verdict, 26, col, 800, "end"))
+        by = y + 60
+        for j, (t, ok, rej, note) in enumerate(bars):
+            yy = by + j * 70
+            p.append(T(60, yy + 38, t, 24, GREY, 700))
+            sc = 0.9
+            p.append(R(200, yy + 8, max(ok * sc, 6), 44, "#e8f0fe" if col == GREEN else "#fce8e6", BLUE if col == GREEN else RED, rx=6))
+            if rej: p.append(R(200 + ok * sc, yy + 8, rej * sc, 44, "#f1f3f4", GREY, rx=6, sw=1.6))
+            p.append(T(1130, yy + 38, note, 23, INK, 600))
+        y += 230
+    (OUT / "boundary.svg").write_text(svgdoc(1600, 580, "".join(p)))
 
-# ── Sequence: policy rollout ─────────────────────────────────────────────────────────────────────
-s = seq()
-for pid, lab, k in [("op", "Operator", "person"), ("ps", "Policy service", "focus"), ("can", "Canary servers", "container"),
-                    ("all", "All servers", "container"), ("log", "Decision log", "db")]:
-    s.part(pid, lab, k)
-s.msg("op", "ps", "new policy, mode: shadow")
-s.msg("ps", "all", "push: would-reject counted, nothing blocked", hl=True)
-s.msg("log", "op", "how many 429s would this cause?", "async")
-s.msg("op", "ps", "mode: enforce")
-s.msg("ps", "can", "canary first")
-s.msg("ps", "all", "then everyone; rollback in seconds", hl=True)
-s.save(OUT / "seq-policy.svg")
 
-# ── Multi-region scopes ──────────────────────────────────────────────────────────────────────────
-row_of("scopes", [("scope: region", "the default", "limit × regional weight; exact per region"),
-                  ("scope: global", "sync every few seconds", "overshoot: one interval of cross-region shift"),
-                  ("Exact global", "rejected", "~100 ms per decision; the budget is 1 ms")],
-       note="Say the honest answer: an exact global limit can't fit the latency budget.", focus=1)
-
-# ── Mid-round ────────────────────────────────────────────────────────────────────────────────────
-row_of("midround-burst", [("Scheduled policy", "burst ×10 at :00–:00:30", "pushed by the policy service"),
-                          ("Push back", "the cost", "special cases accumulate"),
-                          ("Productise", "burst credits", "a tier, with an owner and an expiry")],
-       note="Say yes to the customer and no to the hand-edited exception.", arrows=True, focus=2)
-
-# ── EM phasing ───────────────────────────────────────────────────────────────────────────────────
-row_of("em-phases", [("Week one", "local buckets", "conservative static share; shadow mode; decision log"),
-                     ("Week four", "the coordinator", "demand-weighted shares, fail open"),
-                     ("Later", "global scope", "only for policies that need it")],
-       note="The decision log and the false-limit SLI ship in week one: the first real problem is "
-            "'why was I limited?'", tone=(GREEN, GREEN_BG), arrows=True, focus=0)
-
-# ── Follow-ups ───────────────────────────────────────────────────────────────────────────────────
-row_of("fu-exempt", [("Understand", "the real need", "launch day? a batch job? a bigger tier?"),
-                     ("Offer", "a higher limit", "not 'no limit': protection stays"),
-                     ("Govern", "owner + expiry", "every exception reviewed"),
-                     ("Escalate", "if needed", "risk written down, decided by the right owner")],
-       note="An unlimited customer can take down the API for everyone else. Price the risk; don't just refuse.",
-       focus=1)
-row_of("fu-incident", [("Detect", "minute 1", "429 rate spikes; false-limit SLI fires"),
-                       ("Roll back", "minute 3", "previous policy version, one command"),
-                       ("Tell", "minute 10", "status page; support script; affected customers"),
-                       ("Prevent", "next week", "shadow mode and canary become mandatory")],
-       note="The fix is a process: config is code, and code ships through shadow and canary.",
-       tone=(RED, RED_BG), arrows=True, focus=1)
-row_of("fu-billing", [("Different jobs", "protect vs charge", "approximate is fine for one, not the other"),
-                      ("Separate pipeline", "exact, async", "usage events from the log, deduplicated"),
-                      ("Shared source", "one event stream", "two consumers, two guarantees")],
-       note="Mixing them would force exactness onto the hot path for no reason. Name the owner of each.",
-       focus=1)
-row_of("fu-cost", [("Slice", "what grew?", "allows logged, rejections, retention"),
-                   ("Sample allows", "1%", "keep every rejection"),
-                   ("Tier retention", "hot 7 days", "cold after; aggregates kept longer"),
-                   ("Keep the tool", "support works", "answer 'why' in minutes")],
-       note="Cut the cost without losing the ability to explain a single 429.", tone=(GREEN, GREEN_BG), focus=1)
-print("diagrams →", OUT)
+tension()
+boundary()
+budget_bar(OUT / "budget.svg", [("lookup + script", 0.1, "service"), ("Redis round trip at p99", 1.2, "data")],
+           total=1, unit="ms", title="The exact path: one script per request, against a 1 ms p99 budget (illustrative)")
+print(sorted(p.name for p in OUT.glob("*.svg")))
