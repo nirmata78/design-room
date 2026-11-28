@@ -65,7 +65,7 @@
     "type": "function",
     "function": {
       "name": "ref_solution_render_video",
-      "description": "Render 1920x1080 frames by Playwright element screenshots and the narrated MP4 with sidecar .srt/.vtt captions (Kokoro TTS), then delete every intermediate (frames, slides HTML, scripts, layout reports). Runs: python3 .claude/skills/reference-solution/scripts/ref_solution.py video <solution>. Returns one JSON object: status (ok | outline_created | solution_not_found | diagram_gate_failed | dsl_error | missing_reveal_markers | layout_gate_failed | markdown_lint_failed | render_failed | publish_failed | missing_dependency) and, when not ok, an actionable remedy.",
+      "description": "Render 1920x1080 frames by Playwright element screenshots and the narrated MP4 with sidecar .srt/.vtt captions (Kokoro TTS), with the layout gate in the same Chromium pass, frames, sentences, audio lines, the master and per-slide video segments cached by content (a re-cut re-renders only what changed), then delete every intermediate (frames, slides HTML, scripts, layout reports). Runs: python3 .claude/skills/reference-solution/scripts/ref_solution.py video <solution>. Returns one JSON object (with per-step \"timings\"): status (ok | outline_created | solution_not_found | diagram_gate_failed | dsl_error | missing_reveal_markers | layout_gate_failed | markdown_lint_failed | render_failed | publish_failed | missing_dependency) and, when not ok, an actionable remedy.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -77,6 +77,20 @@
             "type": "boolean",
             "default": false,
             "description": "Keep frames and slides HTML for debugging."
+          },
+          "encoder": {
+            "type": "string",
+            "enum": [
+              "x264",
+              "videotoolbox"
+            ],
+            "default": "x264",
+            "description": "x264 is the published master. videotoolbox is a hardware option; measured slower and 4x larger on slide video, so not for publishing."
+          },
+          "verbose": {
+            "type": "boolean",
+            "default": false,
+            "description": "One log line per frame, sentence, audio line and segment with its cache decision."
           }
         },
         "required": [

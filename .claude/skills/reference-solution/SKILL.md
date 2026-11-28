@@ -116,8 +116,14 @@ challenge and the recap. Never edit the `.md`: change the slide or the narration
 ### 6 · Video
 
 `$R video SD-NN` **in the background** (it writes a timestamped log of every tool to `$V/logs/video-<date-time>.log`, kept by
-`clean` and gitignored; `--log FILE` for any other stage) (frames by Playwright element screenshots, then Kokoro TTS through `kit/tts_cached.py`,
-which caches every line; a 50-minute video takes roughly half an hour on a cold cache). Output `$V/<slug>-reference.mp4` with
+`clean` and gitignored, ending each stage with a timing table; `--log FILE` for any other stage; `--verbose` adds one line per
+frame, sentence, audio line and segment with its cache decision). One Chromium pass runs the layout gate and shoots the frames
+(4 pages in parallel; frames cached by slide HTML); uncached sentences go to a pool of Kokoro workers; each logical slide is one
+video segment, encoded in parallel and cached by content, then stream-copied together (issue #7). Measured on SD-03 (56 min,
+M2 Max): about 2¼ min with only the TTS cache warm, about 1¼ min after a one-line narration change, 8 s when nothing changed;
+a cold TTS cache adds roughly 10–15 min. Caches: `$SD_CACHE` (default `~/.cache/sd-course`: `tts/ lines/ master/ frames/
+segments/`; deleting it only costs time). `--encoder videotoolbox` exists but is slower and 4× larger on slide video; publish
+x264. `REF_ENCODE=pipe` runs the previous encoder for comparison. Output `$V/<slug>-reference.mp4` with
 `.srt` and `.vtt` beside it, local only; intermediates are deleted unless `--keep-intermediates`. QA:
 - `ffprobe`: H.264 + AAC, 1920×1080, chapters present, no subtitle stream, duration within GUIDELINES §3;
 - the `.srt`/`.vtt` start at 00:00 and end within a second of the video; cues ≤ 2 lines of ≤ 42 characters; VTT cues carry `<v Name>`;

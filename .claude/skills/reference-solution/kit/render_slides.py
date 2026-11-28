@@ -14,7 +14,7 @@ import os as _os, pathlib as _pl
 _os.environ.setdefault("PANGOCAIRO_BACKEND", "fc")   # rsvg-convert: use fontconfig so the bundled Google Fonts resolve
 import sys as _sys; _sys.path.insert(0, str(_pl.Path(__file__).resolve().parent)); import paths as _paths
 _os.environ.setdefault("FONTCONFIG_FILE", str(_paths.FONTS_CONF))
-import argparse, html, pathlib, subprocess, sys
+import argparse, hashlib, html, os, pathlib, shutil, subprocess, sys, time
 
 KIT = _paths.PDFKIT
 
@@ -53,14 +53,76 @@ def from_html(src, prefix, out, svg_dir, css_dir=None):
                 if fails and mode != "warn":
                     b.close()
                     raise SystemExit(f"render_slides: layout check failed ({fails} failures) — no frames rendered; see {report}")
-            slides = pg.locator(".slide")
-            n = slides.count(); w = max(2, len(str(n)))
-            for i in range(n):
-                el = slides.nth(i)
-                name = el.get_attribute("data-frame") or f"{prefix}-{i + 1:0{w}d}"
-                el.screenshot(path=str(out / f"{name}.png"), animations="disabled")
+            # frame cache (issue #7): a frame is keyed by its slide's outerHTML (SVGs are inlined, so a changed diagram changes
+            # it), every <style>/<link> of the page, the scale and the width. Unchanged slides are copied from the cache;
+            # the rest are shot, in parallel pages when there are many. FRAME_CACHE=off renders every frame.
+            t0 = time.time()
+            head = pg.evaluate("[...document.querySelectorAll('style,link')].map(e => e.outerHTML).join('')")
+            htmls = pg.locator(".slide").evaluate_all("els => els.map(e => [e.getAttribute('data-frame'), e.outerHTML])")
+            n = len(htmls); w = max(2, len(str(n)))
+            salt = hashlib.sha1(f"frame-v1|{WIDTH}|{scale}|".encode() + head.encode()).hexdigest()
+            use_cache = _os.environ.get("FRAME_CACHE", "on") != "off"
+            todo, hits = [], 0
+            for i, (fr, h) in enumerate(htmls):
+                name = fr or f"{prefix}-{i + 1:0{w}d}"
+                key = hashlib.sha1((salt + h).encode()).hexdigest()
+                c = FRAME_CACHE / f"{key}.png"
+                if use_cache and c.exists():
+                    _link(c, out / f"{name}.png"); os.utime(c); hits += 1; _vlog(f"frame {name} cached")
+                else:
+                    todo.append((i, name, key))
+            workers = min(int(_os.environ.get("REF_FRAME_WORKERS", "4")), max(1, len(todo) // 40))
+            if workers <= 1:
+                slides = pg.locator(".slide")
+                for i, name, key in todo:
+                    slides.nth(i).screenshot(path=str(out / f"{name}.png"), animations="disabled"); _vlog(f"frame {name} rendered")
+            else:
+                import multiprocessing as mp
+                from concurrent.futures import ProcessPoolExecutor
+                parts = [todo[k::workers] for k in range(workers)]
+                with ProcessPoolExecutor(workers, mp_context=mp.get_context("spawn")) as ex:
+                    for got in ex.map(_shoot, [built.as_uri()] * workers, parts, [str(out)] * workers, [scale] * workers):
+                        _vlog(f"page rendered {got} frames")
+            if use_cache:
+                FRAME_CACHE.mkdir(parents=True, exist_ok=True)
+                for i, name, key in todo:
+                    tmp = FRAME_CACHE / f".{key}.{os.getpid()}"; shutil.copyfile(out / f"{name}.png", tmp); tmp.replace(FRAME_CACHE / f"{key}.png")
+            print(f"[time] frames: {time.time() - t0:.1f} s · frames={n} · cached={hits} · rendered={len(todo)} · pages={max(1, workers)}",
+                  file=sys.stderr, flush=True)
             b.close()
     return out
+
+FRAME_CACHE = pathlib.Path(_os.environ.get("SD_CACHE", pathlib.Path.home() / ".cache/sd-course")).expanduser() / "frames"
+
+
+def _vlog(msg):
+    if _os.environ.get("REF_VERBOSE") == "1":
+        print(f"  · {msg}", file=sys.stderr, flush=True)
+
+
+def _link(src, dst):
+    try:
+        if dst.exists():
+            dst.unlink()
+        os.link(src, dst)
+    except OSError:
+        shutil.copyfile(src, dst)
+
+
+def _shoot(uri, jobs, out, scale):
+    """One extra Chromium page for the parallel frame render: load the built deck, shoot the given slides."""
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        pg = b.new_page(viewport={"width": 1280, "height": 720}, device_scale_factor=scale)
+        pg.emulate_media(media="print")
+        pg.goto(uri, wait_until="load"); pg.evaluate("document.fonts.ready.then(() => true)")
+        slides = pg.locator(".slide")
+        for i, name, _ in jobs:
+            slides.nth(i).screenshot(path=str(pathlib.Path(out) / f"{name}.png"), animations="disabled")
+        b.close()
+    return len(jobs)
+
 
 def from_image(img, name, out, title):
     """Letterbox one diagram onto a white 1280x720 frame, optional title strip."""
