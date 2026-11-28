@@ -52,6 +52,8 @@ STATUS = {  # overlay -> (stroke, pill fill, pill text colour, label, dashed)
     "alternate": (YELLOW, YELLOW, INK, "ALTERNATE", True),
 }
 
+HEADROOM = 84.0   # svg px above the top row reserved for status pills and badges
+
 FOOTER_PATTERNS = (
     re.compile(r"^(System Context|Container|Component|Dynamic|Deployment|System Landscape) View:", re.I),
     re.compile(r"^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+\w+\s+\d{1,2},\s+\d{4}", re.I),
@@ -272,6 +274,15 @@ def _primary_shapes(g: etree._Element) -> list[etree._Element]:
     return out
 
 
+def _cap_height(g: etree._Element) -> float:
+    """A cylinder's top ellipse sits above its box rect: the ry of its relative arc ("a 190,30 …"), else 0."""
+    for pth in g.xpath(".//*[local-name()='path']"):
+        m = re.search(r"\ba\s*-?[\d.]+\s*,\s*([\d.]+)", pth.get("d") or "")
+        if m:
+            return float(m.group(1))
+    return 0.0
+
+
 def _title_font(g: etree._Element) -> float:
     for b in g.xpath(".//*[local-name()='text' and (@font-weight='bold' or @font-weight='700')]"):
         if _visible_text(b):
@@ -289,7 +300,7 @@ def _pill(parent: etree._Element, x: float, y: float, text: str, fill: str, fg: 
     """A rounded label. (x, y) is the right end (anchor="end") or the centre (anchor="middle") of the pill's baseline row."""
     h = size * 1.45
     w = len(text) * size * 0.64 + size * 1.1
-    left = x - w if anchor == "end" else x - w / 2
+    left = x - w if anchor == "end" else (x if anchor == "start" else x - w / 2)
     g = _svg("g", parent, **{"class": "c4-pill"})
     _svg("rect", g, x=f"{left:.1f}", y=f"{y - h / 2:.1f}", width=f"{w:.1f}", height=f"{h:.1f}", rx=f"{h / 2:.1f}",
          fill=fill, stroke="#FFFFFF", stroke_width="3")
@@ -393,6 +404,26 @@ def normalize_svg(
         if FORBIDDEN_FONTS_RE.search(sv):
             el.set("style", re.sub(r"font-family\s*:[^;]+", f"font-family: {APPROVED_FONT}", sv))
 
+    # 2b. drop Structurizr's invisible placeholders: the "-" metadata line (fill-opacity 0), empty label texts and hidden
+    #     icon groups. They render nothing, but a browser-based layout gate measures them as overlapping, too-small labels.
+    for t in root.xpath(".//*[local-name()='text']"):
+        txt = _text_of(t)
+        invisible = any("fill-opacity: 0" in (ts.get("style") or "") or "fill-opacity:0" in (ts.get("style") or "")
+                        for ts in t.xpath(".//*[local-name()='tspan']"))
+        if (not txt) or txt == "-" or invisible:
+            if (p := t.getparent()) is not None:
+                p.remove(t)
+    for g in root.xpath(".//*[local-name()='g' and @display='none']"):
+        if "display:block" not in (g.get("style") or "").replace(" ", "") and (p := g.getparent()) is not None:
+            p.remove(g)
+
+    # 2c. widen edge-label plates by 12 %: JointJS measured the text in its own font, the frame draws it in Inter
+    for r in root.xpath(".//*[@label-idx]/*[local-name()='rect']"):
+        w = _parse_float(r.get("width"))
+        if w > 0:
+            r.set("width", f"{w * 1.12:.1f}")
+            r.set("x", f"{_parse_float(r.get('x')) - w * 0.06:.1f}")
+
     # 3. classify cells and tag data-k
     alias_map = {k.lower(): v for k, v in (alias_by_title or {}).items()}
     nodes: dict[str, etree._Element] = {}
@@ -490,10 +521,11 @@ def normalize_svg(
             pad_c = pad + 60.0                                        # room for the pills above the boxes
         else:
             u = _union([b for g in [*nodes.values(), *edges.values(), *boundaries] if (b := _shape_bbox(g))])
-            pad_c = pad + (60.0 if ov.marked() else 0.0)
+            pad_c = pad
         if u:
-            vx, vy = round(u[0] - pad_c, 1), round(u[1] - pad_c, 1)
-            vw, vh = round(u[2] - u[0] + 2 * pad_c, 1), round(u[3] - u[1] + 2 * pad_c, 1)
+            head = HEADROOM if not ov.crop else 0.0             # room for status pills above the top row, in every view, so
+            vx, vy = round(u[0] - pad_c, 1), round(u[1] - pad_c - head, 1)   # a view locked to this one never clips a pill
+            vw, vh = round(u[2] - u[0] + 2 * pad_c, 1), round(u[3] - u[1] + 2 * pad_c + head, 1)
         else:
             vx, vy, vw, vh = 0.0, 0.0, 1704.0, 780.0
 
@@ -508,7 +540,17 @@ def normalize_svg(
     top = _svg("g", layer[0] if layer[0] is not root else root, **{"class": "c4-overlays"})
     pill_keys: list[str] = []
 
-    if ov.keep:
+    if ov.keep and ov.crop:
+        # a zoom shows only what it keeps: anything else would spill labels past the cropped frame
+        keep = {a for r in ov.keep if (a := _resolve(r))} | focus_set
+        for k in [k for k, (s_, d_) in ends.items() if k in edges and not (s_ in keep and d_ in keep)]:
+            edges[k].getparent().remove(edges[k]); del edges[k]
+        for a in [a for a in nodes if a not in keep]:
+            nodes[a].getparent().remove(nodes[a]); del nodes[a]
+        for b in boundaries:
+            if (p_ := b.getparent()) is not None:
+                p_.remove(b)
+    elif ov.keep:
         keep = {a for r in ov.keep if (a := _resolve(r))} | focus_set
         for a, g in nodes.items():
             if a not in keep:
@@ -531,7 +573,7 @@ def normalize_svg(
                 _restroke(g, stroke, dashed=dashed)
             x0, y0, x1, _ = node_bboxes[a]
             size = max(30.0, _title_font(g) * 0.72)
-            p = _pill(top, x1 - 6, y0, label, fill, fg, size)
+            p = _pill(top, x1 - 6, y0 - _cap_height(g) - size * 0.8, label, fill, fg, size)
             p.set("data-k", f"p:{kind}:{a}")
             if kind != "new":                                         # NEW pills arrive with their box
                 pill_keys.append(f"p:{kind}:{a}")
@@ -541,31 +583,40 @@ def normalize_svg(
         a = _resolve(raw)
         if not a or a not in node_bboxes:
             continue
-        x0, _, x1, y1 = node_bboxes[a]
-        size = max(28.0, _title_font(nodes[a]) * 0.62)
-        p = _pill(top, (x0 + x1) / 2, y1, text, "#FFFFFF", BLUE_INK, size, anchor="middle")
+        x0, y0, x1, y1 = node_bboxes[a]
+        size = max(30.0, _title_font(nodes[a]) * 0.72)
+        p = _pill(top, x0 + 6, y0 - _cap_height(nodes[a]) - size * 0.8, text, "#FFFFFF", BLUE_INK, size, anchor="start")
         p[0].set("stroke", BLUE_INK)
         p.set("data-k", f"p:badge:{a}")
 
     flow_keys: list[str] = []
+    disc_font = max(36.0, max((_title_font(g) for g in nodes.values()), default=40.0) * 0.8)
     for n, spec in enumerate(ov.flow, 1):
         k = _edge(spec)
         if not k or k not in edges or len(edge_pts[k]) < 2:
             continue
-        g = _svg("g", top, **{"class": "c4-flow", "data-k": f"f:{n}"})
-        hl = copy.deepcopy(edges[k].xpath(".//*[local-name()='path' and @joint-selector='line']")[0])
+        line = edges[k].xpath(".//*[local-name()='path' and @joint-selector='line']")[0]
+        hl = copy.deepcopy(line)                               # the highlight goes under the edge's own label
+        for att in ("id", "marker-end", "marker-start"):
+            hl.attrib.pop(att, None)
         hl.set("stroke", BLUE_INK)
         hl.set("stroke-width", "9")
         hl.set("stroke-dasharray", "")
-        hl.attrib.pop("marker-end", None)
-        tx, ty = _parse_translate(edges[k].get("transform"))
-        if tx or ty:
-            hl.set("transform", f"translate({tx},{ty})")
-        g.append(hl)
-        cx, cy = _point_on_path(edge_pts[k], 0.32)
-        r = 30.0
+        hl.set("data-k", f"f:{n}")
+        line.addnext(hl)
+        labels = [lb for anc in edges[k].xpath(".//*[@label-idx]") if (lb := _shape_bbox(anc)) is not None]
+        r = disc_font * 0.85
+        def _clear(pt):
+            return all(pt[0] + r < l[0] or pt[0] - r > l[2] or pt[1] + r < l[1] or pt[1] - r > l[3] for l in labels)
+        cands = [_point_on_path(edge_pts[k], f) for f in (0.22, 0.78, 0.12, 0.88, 0.35, 0.65, 0.5, 0.06, 0.94)]
+        hit = next((c for c in cands if _clear(c)), None)
+        if hit is None and labels:                             # the edge is mostly label: sit beside the label instead
+            l = labels[0]
+            hit = (l[2] + r + 8, (l[1] + l[3]) / 2)
+        cx, cy = hit or cands[0]
+        g = _svg("g", top, **{"class": "c4-flow", "data-k": f"f:{n}"})
         _svg("circle", g, cx=f"{cx:.1f}", cy=f"{cy:.1f}", r=f"{r:g}", fill=BLUE_INK, stroke="#FFFFFF", stroke_width="4")
-        t = _svg("text", g, x=f"{cx:.1f}", y=f"{cy + r * 0.38:.1f}", fill="#FFFFFF", text_anchor="middle", font_size="36px",
+        t = _svg("text", g, x=f"{cx:.1f}", y=f"{cy + r * 0.38:.1f}", fill="#FFFFFF", text_anchor="middle", font_size=f"{disc_font:.0f}px",
                  font_weight="800", font_family=APPROVED_FONT)
         t.text = str(n)
         flow_keys.append(f"f:{n}")

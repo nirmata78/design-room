@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ERD and data-structure diagrams as SVG, in the slide-video-kit palette (same fonts and colours as c4svg).
+"""ERD and data-structure diagrams as SVG, in the Google theme (the same fonts and colours as the c4-structurizr C4 views).
 
     from erdsvg import ERD
     d = ERD(1600, 820)
@@ -14,7 +14,7 @@ Chen notation (conceptual model; the Lucid ERD tutorial's convention): see class
 
 kind: "table" (blue header), "focus" (red header), "redis" (dark header, for key-value structures), "ext" (grey).
 flag: "PK", "FK", "UK", "PK,FK", "IX" or "" — shown as a small badge before the column name.
-Anchors as in c4svg: "l", "r", "t", "b" with an optional fraction ("r:0.3").
+Anchors: "l", "r", "t", "b" with an optional fraction ("r:0.3").
 """
 import html, pathlib, sys
 sys.path.insert(0, str(pathlib.Path(__file__).parent))

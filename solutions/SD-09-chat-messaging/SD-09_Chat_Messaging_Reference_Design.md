@@ -184,7 +184,7 @@ ask "what is that?", the answer is here.
 Before any architecture, here is the product from the user's side. Every box later exists to make
 one of these moments true.
 
-![One message's life on the sender's screen. Every state after SENT is a cursor comparison, not a stored record per message.](diagrams/sd09-message-states.pdf){width=62%}
+![One message's life on the sender's screen. Every state after SENT is a cursor comparison, not a stored record per message.](diagrams/sd09-message-states.svg)
 
 **Step by step, with what the screen shows:**
 
@@ -215,7 +215,7 @@ The device's side of the protocol is a small state machine. It's the clearest wa
 happens if the socket drops right here?"*: every failure sends the device back to a state that knows
 what to do.
 
-![The life of one device. There is no special offline mode: being offline only means the cursor is further behind when SYNCING starts.](diagrams/sd09-device-states.pdf){width=58%}
+![The life of one device. There is no special offline mode: being offline only means the cursor is further behind when SYNCING starts.](diagrams/sd09-device-states.svg)
 
 ::: why
 **Why is REGISTERED before SYNCING?** Because of a race Stage 6.7 walks through. A device registers
@@ -227,9 +227,9 @@ while the device waits its turn.
 
 ## Socket first against mailbox first
 
-![The central contrast. On the left, two code paths and a crash window between them. On the right, one path: the sender appends to the log, and every device reads it.](diagrams/video-socket-vs-mailbox.pdf){width=100%}
+![The central contrast. On the left, two code paths and a crash window between them. On the right, one path: the sender appends to the log, and every device reads it.](video/svg/socket-vs-mailbox.svg){width=100%}
 
-![What a cursor buys. One gap-free log, three devices of one person, one question each. Offline is simply a cursor that's further behind.](diagrams/video-log-cursors.pdf){width=92%}
+![What a cursor buys. One gap-free log, three devices of one person, one question each. Offline is simply a cursor that's further behind.](video/svg/log-cursors.svg){width=92%}
 
 ## One message, millisecond by millisecond
 
@@ -254,7 +254,7 @@ The single most useful picture for the round. **Two different scaling dimensions
 tier is sized by *sockets*, whether anyone is talking or not, and the message path is sized by
 *messages*. Mixing them up is the commonest sizing mistake.
 
-![Load map at peak. Red is the only part that must be strictly correct. Every figure is derived in Stage 2, including the planning assumptions behind it.](diagrams/sd09-load-map.pdf){width=68%}
+![Load map at peak. Red is the only part that must be strictly correct. Every figure is derived in Stage 2, including the planning assumptions behind it.](diagrams/sd09-load-map.svg)
 
 ::: load
 **Read the arrows.** 3.3 M heartbeats a second stop at the first box. 1 M sends become 1 M commits,
@@ -405,7 +405,7 @@ others is a million deliveries for one message, so the receipt flow is a thousan
 flow. In large groups I aggregate, and never fan out."*
 :::
 
-![The numbers as a picture. Top row: the connection tier, sized by sockets. Bottom row: the message path, sized by messages. The red box is the trap, found by arithmetic.](diagrams/video-load-funnel.pdf){width=92%}
+![The numbers as a picture. Top row: the connection tier, sized by sockets. Bottom row: the message path, sized by messages. The red box is the trap, found by arithmetic.](video/svg/load-funnel.svg){width=92%}
 
 ## The full table, row by row
 
@@ -576,9 +576,9 @@ make the gateway smarter, and we want it dumb.
 Start conceptual, in Chen notation: rectangles are entities, diamonds relationships, ovals attributes,
 numbers cardinality.
 
-![Conceptual model. A device tracking a position in a conversation is the key modelling choice: delivered and read sequence belong to that relationship, and to neither side alone. Message and Device are weak entities: a message has no identity without its conversation, and its partial key is seq.](diagrams/video-erd-chen.pdf){width=100%}
+![Conceptual model. A device tracking a position in a conversation is the key modelling choice: delivered and read sequence belong to that relationship, and to neither side alone. Message and Device are weak entities: a message has no identity without its conversation, and its partial key is seq.](video/svg/erd-chen.svg){width=100%}
 
-![The same model as physical tables. Red is the one that matters.](diagrams/video-erd.pdf){width=100%}
+![The same model as physical tables. Red is the one that matters.](video/svg/erd.svg){width=100%}
 
 ```sql
 -- The truth. Wide-column. Rows are never rewritten except by an edit or a delete.
@@ -637,7 +637,7 @@ CREATE TABLE device_cursors (user_id bigint, device_id bigint, conv_id bigint,
   the maximum across their devices.
 :::
 
-![Wide-column: three Raft groups, and in red, one partition. "Conversation 9001, everything after 1234" is one partition and one sequential read, already in order. That's sync, and that's history.](diagrams/video-wide-column.pdf){width=90%}
+![Wide-column: three Raft groups, and in red, one partition. "Conversation 9001, everything after 1234" is one partition and one sequential read, already in order. That's sync, and that's history.](video/svg/wide-column.svg){width=90%}
 
 **The hot tier lives in memory**, around the one table that matters:
 
@@ -649,9 +649,9 @@ CREATE TABLE device_cursors (user_id bigint, device_id bigint, conv_id bigint,
 | `inbox:{user}` | sorted set | conversation, scored by last change | Rebuilds from membership + `last_seq` |
 | `cursor:{user}:{device}` | hash | conversation -> delivered, read | Device re-syncs, and dedups locally |
 
-![How the hot keys point at each other. A push follows the top arrows, a sync the bottom ones.](diagrams/video-keys.pdf){width=100%}
+![How the hot keys point at each other. A push follows the top arrows, a sync the bottom ones.](video/svg/keys.svg){width=100%}
 
-![Where each key comes from: four writers, each driven by an event or a frame.](diagrams/video-writers.pdf){width=96%}
+![Where each key comes from: four writers, each driven by an event or a frame.](video/svg/writers.svg){width=96%}
 
 ::: load
 **Inbox index: about a terabyte, about 5 M upserts a second.** Assume 100–300 M active users with 50
@@ -690,11 +690,11 @@ once to a recipient who is offline, once to a recipient online on two devices.
 interview you draw L1 in seconds, spend your time on L2, and zoom to L3 only in a deep dive.
 :::
 
-![C4 Level 1: system context. In grey, what we don't own: the push platform, and behind it Apple's and Google's push services, the only way to wake a sleeping phone. Those are other people's risks, managed with a deadline.](diagrams/video-c4-context.pdf){width=96%}
+![C4 Level 1: system context. In grey, what we don't own: the push platform, and behind it Apple's and Google's push services, the only way to wake a sleeping phone. Those are other people's risks, managed with a deadline.](video/svg/c4-context.svg){width=96%}
 
-![C4 Level 2: containers on the send path. The ACK returns from the message service. Everything to the right of the store happens after it.](diagrams/video-c4-containers-send.pdf){width=100%}
+![C4 Level 2: containers on the send path. The ACK returns from the message service. Everything to the right of the store happens after it.](video/svg/c4-containers-send.svg){width=100%}
 
-![C4 Level 2: containers on the sync path. Receipts take the lower lane, at lower priority, so they can never delay messages.](diagrams/video-c4-containers-sync.pdf){width=100%}
+![C4 Level 2: containers on the sync path. Receipts take the lower lane, at lower priority, so they can never delay messages.](video/svg/c4-containers-sync.svg){width=100%}
 
 **Every container, and why it's separate:**
 
@@ -737,7 +737,7 @@ draw one only if the interviewer asks.
 
 ### Phase 1 — The commit, and the promise
 
-![The commit in detail. The message and the dedup row travel in one Raft entry. A crash before commit means no ACK, so the app retries. A crash after commit means the retry finds the original.](diagrams/video-seq-commit.pdf){width=96%}
+![The commit in detail. The message and the dedup row travel in one Raft entry. A crash before commit means no ACK, so the app retries. A crash after commit means the retry finds the original.](video/svg/seq-commit.svg){width=96%}
 
 1. Alice's phone stores the message locally and sends `SEND {convId, clientMsgId, body}`.
 2. The gateway routes by `conv_id` to the **conversation's partition leader**.
@@ -747,7 +747,7 @@ draw one only if the interviewer asks.
 
 ### Phase 2 — Bob is offline
 
-![The whole trip with Bob offline. Bob's state played no part in Alice's ACK. Nothing is queued for Bob: the message sits at 1234, and Bob's phone will ask for it.](diagrams/video-seq-send.pdf){width=100%}
+![The whole trip with Bob offline. Bob's state played no part in Alice's ACK. Nothing is queued for Bob: the message sits at 1234, and Bob's phone will ask for it.](video/svg/seq-send.svg){width=100%}
 
 6. The commit stream publishes `MessageStored` to the log. A delivery worker consumes it.
 7. It looks up Bob's session: no device online. It asks the push platform for a wake-up.
@@ -755,7 +755,7 @@ draw one only if the interviewer asks.
 
 ### Phase 3 — What the worker branches on
 
-![Two inputs, three branches: tier from the event, online or not from the registry. The sender's own other devices are recipients too.](diagrams/video-delivery-routing.pdf){width=100%}
+![Two inputs, three branches: tier from the event, online or not from the registry. The sender's own other devices are recipients too.](video/svg/delivery-routing.svg){width=100%}
 
 9. An online device, in any tier, gets a batched push through its gateway with a 200 ms deadline.
    Offline in a small group: one notification per message. Offline in a large group: collapsed, at
@@ -763,11 +763,11 @@ draw one only if the interviewer asks.
 
 ### Phase 4 — The same message, Bob online on two devices
 
-![Two pushes, each with a deadline, and each device acknowledges for itself, so each cursor moves separately. A failed push isn't retried by the worker: the log has it, and the device will get it.](diagrams/video-seq-online.pdf){width=100%}
+![Two pushes, each with a deadline, and each device acknowledges for itself, so each cursor moves separately. A failed push isn't retried by the worker: the log has it, and the device will get it.](video/svg/seq-online.svg){width=100%}
 
 ### Phase 5 — Bob comes back
 
-![The return. Registering comes before any read, and that order matters (Stage 6.7).](diagrams/video-seq-sync.pdf){width=96%}
+![The return. Registering comes before any read, and that order matters (Stage 6.7).](video/svg/seq-sync.svg){width=96%}
 
 10. The phone connects, resuming TLS. The gateway **registers the session first**.
 11. The phone sends its cursors. The sync service asks the inbox which conversations changed, reads the
@@ -999,7 +999,7 @@ and the conversation stops making sense. Worse, everybody's history disagrees fo
 
 **The mechanism.** Not the clocks. One authority per conversation assigns numbers in arrival order.
 
-![Clocks skew and users change them. Member Y's phone says an earlier time, but member X reached the leader first. X gets 501, Y gets 502, and every device renders 501 then 502.](diagrams/video-seq-order.pdf){width=92%}
+![Clocks skew and users change them. Member Y's phone says an earlier time, but member X reached the leader first. X gets 501, Y gets 502, and every device renders 501 then 502.](video/svg/seq-order.svg){width=92%}
 
 That order is the truth for every participant on every device. Your own message shows as pending until
 the ACK brings its number, then it slots into place.
@@ -1016,7 +1016,7 @@ conversation is preserved by construction.
 
 **Why per conversation and not one sequencer for everything.**
 
-![C4 Level 3: inside the message service. The conversation router finds the partition leader; the dedup check comes next; if it's new, the sequencer, in red, and the writer, which puts the message and dedup row into one Raft entry.](diagrams/video-c4-component-message.pdf){width=100%}
+![C4 Level 3: inside the message service. The conversation router finds the partition leader; the dedup check comes next; if it's new, the sequencer, in red, and the writer, which puts the message and dedup row into one Raft entry.](video/svg/c4-component-message.svg){width=100%}
 
 ::: {.load title="Sizing the leaders: two constraints, not one"}
 **Throughput.** 1 M messages/s at about 10,000 per leader is 100 leaders at minimum. Group commit is what
@@ -1034,7 +1034,7 @@ copy. So storage is what pushes the count to **about 1,000**, at about 1,000 mes
 
 This is the question that separates "a leader" from Staff.
 
-![Failover. The old leader (term 5) appends 900 to follower 1 and dies before a majority confirms. No ACK reaches the phone. Follower 1 wins the election, since its log is the most complete. The phone retries with the same ID, and the dedup row is in that same entry, so the new leader returns 900.](diagrams/video-seq-failover.pdf){width=96%}
+![Failover. The old leader (term 5) appends 900 to follower 1 and dies before a majority confirms. No ACK reaches the phone. Follower 1 wins the election, since its log is the most complete. The phone retries with the same ID, and the dedup row is in that same entry, so the new leader returns 900.](video/svg/seq-failover.svg){width=96%}
 
 **The two branches, both safe:**
 
@@ -1090,7 +1090,7 @@ may be lost.
 **The mechanism.** A retry reuses the same `clientMsgId`, and the dedup check returns the original
 number.
 
-![The lost ACK. Commit as 1234; the ACK goes out and the tunnel swallows it. The app still shows pending. When the network returns it retries with the same ID, the dedup table has it, and the ACK returns the original number.](diagrams/video-seq-lost-ack.pdf){width=96%}
+![The lost ACK. Commit as 1234; the ACK goes out and the tunnel swallows it. The app still shows pending. When the network returns it retries with the same ID, the dedup table has it, and the ACK returns the original number.](video/svg/seq-lost-ack.svg){width=96%}
 
 **Every crash point has one outcome:**
 
@@ -1109,7 +1109,7 @@ number.
 2. **The dedup table only protects after commit.** Between the first try's proposal and its commit, a
    second try would read "not in dedup". So the leader keeps an in-flight map as well.
 
-![Why the leader needs an in-flight map as well as the dedup table. A fast retry arrives while the first try is still being committed.](diagrams/sd09-seq-retry-inflight.pdf){width=62%}
+![Why the leader needs an in-flight map as well as the dedup table. A fast retry arrives while the first try is still being committed.](diagrams/sd09-seq-retry-inflight.svg)
 
 ::: why
 **Why not assign the number when the entry is applied, inside the state machine?** You can, and it's
@@ -1143,7 +1143,7 @@ is **at-least-once plus idempotent receivers**, and it looks the same to the use
 **The probe.** *"Group of a thousand. Do you copy each message into a thousand inboxes? Defend that, or
 don't."*
 
-![Shared log against per-member copies. One write, one row per edit, storage times one. Each member just has a cursor into it.](diagrams/video-groups.pdf){width=92%}
+![Shared log against per-member copies. One write, one row per edit, storage times one. Each member just has a cursor into it.](video/svg/groups.svg){width=92%}
 
 | | Per-member inbox copies | **Shared log + cursors** |
 |--------|--------------------|---------------------|
@@ -1181,7 +1181,7 @@ what comes back.
 **A membership change is a log entry too**, which removes a whole class of races. It takes a `seq`, and
 `join_seq` is that number.
 
-![Adding a member. The member row and the event are one Raft entry, so join_seq is exact: everything from it onward is visible, and nothing before.](diagrams/sd09-seq-membership.pdf){width=96%}
+![Adding a member. The member row and the event are one Raft entry, so join_seq is exact: everything from it onward is visible, and nothing before.](diagrams/sd09-seq-membership.svg)
 
 ::: why
 **Why does membership need to be that careful?** Because the check for "can this person read this
@@ -1203,7 +1203,7 @@ some delay on the membership call, which is rare.
 
 **The risk.** The receipt flow quietly becomes the largest thing in the system, and delays messages.
 
-![Receipts as cursors. The reader sends READ up to 1240. The service keeps the larger value, so a late frame can't move a cursor back. In a small group, forward the cursor. In a large group, nothing is forwarded, and message info counts on demand.](diagrams/video-seq-receipts.pdf){width=96%}
+![Receipts as cursors. The reader sends READ up to 1240. The service keeps the larger value, so a late frame can't move a cursor back. In a small group, forward the cursor. In a large group, nothing is forwarded, and message info counts on demand.](video/svg/seq-receipts.svg){width=96%}
 
 **Why thirty-two, and not a hundred?** Because the cost is squared:
 
@@ -1254,7 +1254,7 @@ something has to give, receipts lag before messages do. Nobody calls support bec
 **The first sentence to say:** the messages are safe. They were never in the gateway. **What isn't
 safe is the reconnect.**
 
-![The reconnect. Half a million sockets drop. Each device waits a random delay of up to sixty seconds. The load balancer picks the least-loaded gateway, TLS resumption saves most of the handshake, and sync is a small delta. If sync is over capacity it answers retry-after, and the device stays connected.](diagrams/video-seq-reconnect.pdf){width=96%}
+![The reconnect. Half a million sockets drop. Each device waits a random delay of up to sixty seconds. The load balancer picks the least-loaded gateway, TLS resumption saves most of the handshake, and sync is a small delta. If sync is over capacity it answers retry-after, and the device stays connected.](video/svg/seq-reconnect.svg){width=96%}
 
 **The arithmetic:**
 
@@ -1314,7 +1314,7 @@ causes the storm it would otherwise look like. **A pipeline should enforce this*
 **The risk.** A year's worth of a busy group arrives over a mobile connection, the app freezes, the
 battery drains, and the sync service gets a very large read for one device.
 
-![A month offline. Newest conversation first, newest twenty messages of each: useful in a second and capped per device. The phone records a hole, and older pages arrive only when the user scrolls.](diagrams/video-seq-month.pdf){width=96%}
+![A month offline. Newest conversation first, newest twenty messages of each: useful in a second and capped per device. The phone records a hole, and older pages arrive only when the user scrolls.](video/svg/seq-month.svg){width=96%}
 
 1. `SYNC`, with cursors a month old. If the inbox key is gone, the server rebuilds it from
    `convs_by_user` and each conversation's `last_seq`, comparing with the device's cursors.
@@ -1352,7 +1352,7 @@ This is the deep dive to choose yourself, because it's where the *"never lose"* 
 
 ### Race 2: a push fails while the device stays connected
 
-![Gap-free numbers pay off. The laptop is at 1234 and receives 1236: the push of 1235 timed out. It sees the gap, holds 1236 back and syncs from 1234. The upsert makes the second copy of 1236 a no-op. Loss becomes detectable, on the device.](diagrams/video-seq-gap.pdf){width=96%}
+![Gap-free numbers pay off. The laptop is at 1234 and receives 1236: the push of 1235 timed out. It sees the gap, holds 1236 back and syncs from 1234. The upsert makes the second copy of 1236 a no-op. Loss becomes detectable, on the device.](video/svg/seq-gap.svg){width=96%}
 
 ### Race 3: live pushes during a sync
 
@@ -1367,7 +1367,7 @@ in a conversation is the one whose push was lost, nothing follows it, and a conn
 perfectly up to date. The worker has already committed its offset. In a quiet chat, that message could stay
 missing for hours.
 
-![The tail loss. Nothing follows 1241, so there's no gap to see. A periodic head check closes it.](diagrams/sd09-seq-tail-loss.pdf){width=78%}
+![The tail loss. Nothing follows 1241, so there's no gap to see. A periodic head check closes it.](diagrams/sd09-seq-tail-loss.svg)
 
 **The fix: a periodic head check.** Every few minutes, a connected device asks which conversations have
 changed since its last check, using the same inbox call as sync. If a head is past its cursor, it syncs
@@ -1476,7 +1476,7 @@ the diagram: the leader doesn't call the registry, the log, or anything else bef
 
 **The probe.** *"A whole region goes down. What about 'zero loss'?"*
 
-![Conversations are homed in one region. A send from elsewhere is forwarded to the home leader. Replication between regions is asynchronous, so region loss has a cost that must be stated.](diagrams/sd09-regions.pdf){width=70%}
+![Conversations are homed in one region. A send from elsewhere is forwarded to the home leader. Replication between regions is asynchronous, so region loss has a cost that must be stated.](diagrams/sd09-regions.svg)
 
 | Option | Send latency | Region loss | Fits when |
 |--------|--------|--------------------|-------------------|
@@ -1517,7 +1517,7 @@ format is looking for.
 **What doesn't change:** the log, the sequencer, cursors, sync. **What changes:** one new `kind`, and one
 row update.
 
-![The delta. An edit is another message in the log, with its own number and a target. It's one Raft entry with the update of the original row. The old app skips the unknown kind and still moves its cursor.](diagrams/sd09-seq-edit.pdf){width=100%}
+![The delta. An edit is another message in the log, with its own number and a target. It's one Raft entry with the update of the original row. The old app skips the unknown kind and still moves its cursor.](diagrams/sd09-seq-edit.svg)
 
 Because the log is the single source of truth, an edit is an event: kind `EDIT`, naming the target, with its
 own `seq`. A delete is the same. Online, offline and multi-device already work, and cursors move past it
@@ -1664,7 +1664,7 @@ In a Staff round, give this a sentence at most. In an EM round (`levels.md`), it
 - **Half the team?** Ship one-to-one with cursors, dedup and a single region. **Never cut commit-before-ACK or
   the integrity probes.** Those can't be added later without breaking promises already made.
 
-![The phases. Each builds on the invariant of the first.](diagrams/video-em-phases.pdf){width=92%}
+![The phases. Each builds on the invariant of the first.](video/svg/em-phases.svg){width=92%}
 
 **The on-call follow-up.** *"The messaging-core team was paged forty times last month. Two engineers have asked
 to move teams."* First, talk to the two engineers, and listen. Then measure: forty pages, by alert and by hour.

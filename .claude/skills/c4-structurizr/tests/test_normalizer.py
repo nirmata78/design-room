@@ -112,7 +112,7 @@ def _render(tmp_path: pathlib.Path, name: str, **kw):
 def test_invisible_placeholder_text_is_not_measured(tmp_path: pathlib.Path) -> None:
     meta, _, _ = _render(tmp_path, "plain")
     assert meta.min_font_svg_px == 30.0          # the 21px "-" placeholder Structurizr leaves in every box is ignored
-    assert meta.viewbox == (72.0, 72.0, 1856.0, 276.0)   # shapes only: text never inflates the crop
+    assert meta.viewbox == (72.0, -12.0, 1856.0, 360.0)  # shapes only (text never inflates the box) + pill headroom
 
 
 def test_hide_cuts_a_version_and_keeps_positions(tmp_path: pathlib.Path) -> None:
@@ -143,7 +143,9 @@ def test_keep_crop_zooms_and_dims(tmp_path: pathlib.Path) -> None:
     meta, svg, _ = _render(tmp_path, "zoom", overlay=Overlay(keep=["b", "c"], crop=True, focus=["c"]))
     assert meta.viewbox[2] < plain.viewbox[2]               # cropped to Beta and Gamma
     assert meta.viewbox[0] > 700
-    assert 'opacity="0.25"' in svg                          # Alpha and its edge are dimmed
+    assert "Alpha" not in svg and "calls" not in svg        # a zoom drops what it does not keep
+    _, dimmed, _ = _render(tmp_path, "dim", overlay=Overlay(keep=["b", "c"]))
+    assert 'opacity="0.25"' in dimmed                       # without crop, the rest is dimmed instead
     assert meta.scale_1080p > plain.scale_1080p
 
 
@@ -163,3 +165,15 @@ def test_legibility_gate_uses_min_px(tmp_path: pathlib.Path) -> None:
     assert meta.legibility_ok is False                      # 1856 wide into 820 px: 30 px text renders at ~13 px
     meta2, _, _ = _render(tmp_path, "md", slot="split", min_px=0)
     assert meta2.legibility_ok is True                      # Markdown-only views skip the 1080p gate
+
+
+def test_ids_are_namespaced_per_view(tmp_path: pathlib.Path) -> None:
+    raw = tmp_path / "ids.svg"
+    raw.write_text('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><marker id="m1"/></defs>'
+                   '<g id="j_1" transform="translate(10,10)"><rect width="40" height="20" fill="#fff" stroke="#000"/>'
+                   '<text font-weight="bold" font-size="20px">Box</text></g>'
+                   '<path d="M 0 0 L 9 9" marker-end="url(#m1)" stroke="#000"/></svg>', encoding="utf-8")
+    out = tmp_path / "v.svg"
+    normalize_svg(raw, out, key="flow-live")
+    svg = out.read_text(encoding="utf-8")
+    assert 'id="flow-live--m1"' in svg and 'url(#flow-live--m1)' in svg and 'id="m1"' not in svg

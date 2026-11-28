@@ -1,15 +1,14 @@
 # Design tokens · Google colours and Google Fonts (2026-11-22)
 
-One visual system for every slide, diagram, video frame, booklet page and thumbnail this skill produces. It replaces the earlier
+One visual system for every slide, diagram, video frame, Markdown figure and thumbnail this skill produces. It replaces the earlier
 "scientific" serif style (Charter, muted blue/purple/amber). **Do not restyle per question.** Sources of truth, kept in step:
 
 | File | Used by |
 |---|---|
 | `pdf-kit/google-theme.css` | HTML slides → frames, HTML booklets (load **last**, after `style.css`, `deck.css`, `video.css`) |
-| `~/.claude/skills/slide-video-kit/scripts/gtheme.py` | `basesvg`, `c4svg`, `seqsvg`, `erdsvg`, `build_video`, `publish_kit` (SVG diagrams, chips, thumbnail) |
+| `.claude/skills/reference-solution/kit/gtheme.py` | `seqsvg`, `erdsvg`, `statesvg`, `figsvg`, `build_video`, `publish_kit` (non-C4 diagrams, chips, thumbnail) |
+| `.claude/skills/c4-structurizr/resources/c4-google-tokens.dsl` | every C4 view (context, containers, components, versions, zooms), rendered by c4-structurizr |
 | `pdf-kit/fonts/google/` (variable `.ttf`, OFL) and `fonts/google/static/` (static instances) | Chromium (`@font-face`, offline), XeLaTeX (static), `rsvg-convert` (`fonts/fonts.conf`) |
-| `pdf-kit/google.theme` | pandoc code highlighting in the booklet |
-| `solutions/SD-96-url-shortener/sd-preamble.tex` | booklet callout boxes and headings (copy: `$KIT/templates/reference-design/`) |
 
 ## 1 · Colour
 
@@ -69,9 +68,8 @@ Minimum on-screen text at 1080p: 22 px. One idea per frame; no paragraph longer 
 | Renderer | How |
 |---|---|
 | HTML → Chromium (slides, frames) | `<link rel="stylesheet" href="google-theme.css">` last; `build.py` / `render_slides.py` rewrite the relative `url()`s to file URIs, so it is **offline**. On a web page: `<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700&family=Inter:wght@400;500;600&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">` |
-| SVG generators (`basesvg`, `c4svg`, `seqsvg`, `erdsvg`) | `font-family="Inter, Roboto, sans-serif"` for every label, Plus Jakarta Sans for diagram titles; inlined into the HTML, so Chromium resolves them through `google-theme.css` |
-| `rsvg-convert` (booklet figures, letterboxed images, chips) | `PANGOCAIRO_BACKEND=fc FONTCONFIG_FILE=pdf-kit/fonts/fonts.conf` (the kit scripts and `build-sd-booklet.sh` set both) |
-| XeLaTeX booklet | `build-sd-booklet.sh` passes `-V mainfont=Inter-Regular.otf` (+ Bold/Italic), `-V sansfont=PlusJakartaSans-SemiBold.ttf` (+ Bold), `-V monofont=RobotoMono-Regular.ttf`, each with `Path=…`; XeTeX cannot use the variable files, so the static instances live in `fonts/google/static/` (made with `fonttools varLib.instancer`) |
+| SVG generators (`seqsvg`, `erdsvg`, `statesvg`, `figsvg`; c4-structurizr normalizes its exports to the same family) | `font-family="Inter, Roboto, sans-serif"` for every label, Plus Jakarta Sans for diagram titles; inlined into the HTML, so Chromium resolves them through `google-theme.css` |
+| `rsvg-convert` (letterboxed images, chips) | `PANGOCAIRO_BACKEND=fc FONTCONFIG_FILE=pdf-kit/fonts/fonts.conf` (the kit scripts set both) |
 | Remotion / React video (if a project uses it) | `npm i @remotion/google-fonts`; `import {loadFont} from "@remotion/google-fonts/PlusJakartaSans"` (weights `600`, `700`) and `…/Inter` (`400`, `500`, `600`); `await` the load with `delayRender` before the first frame; colours from the table above |
 | Google Slides / Slides API | font names `Plus Jakarta Sans`, `Inter`, `Roboto Mono` (all in the Slides font menu); `Google Sans` is not offered by Slides, so use Plus Jakarta Sans for display; colours as RGB floats of the hex above |
 | PPTX | the three families embedded or installed; fall back to Roboto, never Calibri or Arial |

@@ -87,11 +87,11 @@ either drown it in location writes or make claims as weak as locations.
 6. The driver accepts, naming the offer; the trip starts and holds a 30-second lease renewed by heartbeats.
 7. The driver's positions are forwarded to the rider's map until pickup.
 
-![Two problems that look like one.](diagrams/video-tension.pdf){width=95%}
+![Two problems that look like one.](video/svg/tension.svg){width=95%}
 
 ## The whole design on one page
 
-![Version 4, with the mechanisms on it.](diagrams/video-recap.pdf){width=100%}
+![Version 4, with the mechanisms on it.](video/svg/recap.svg){width=100%}
 
 ::: load
 **Gateway:** 5 M streams, 1.25 M location updates a second. **Index:** the same 1.25 M overwrites a second, ~1 GB in total.
@@ -116,7 +116,7 @@ conditional claims a second. **Routing:** ~42,000 ETA pairs a second, batched pe
 FR1 Report · FR2 Match · FR3 Accept · FR4 Track. NFRs (initial targets): zero double assignments; 5 s p95; no location older than
 8 s; 99.95 % per city. Pooled rides are out, and worth naming: they turn a claim from one-or-zero into a seat count.
 
-![C4 level 1.](diagrams/video-c4-context.pdf){width=90%}
+![C4 level 1.](video/svg/c4-context.svg){width=90%}
 
 # Stage 2: Back-of-the-envelope
 
@@ -137,7 +137,7 @@ contention problem."
 Density: 3,000 drivers within 2 km downtown ≈ 180 per resolution-8 cell, the busiest over 300 (split to resolution 9). ETA pairs:
 2,100 × 20 = 42,000 a second, so shortlist and batch.
 
-![The latency budget.](diagrams/video-budget.pdf){width=95%}
+![The latency budget.](video/svg/budget.svg){width=95%}
 
 # Stage 3: API and data
 
@@ -155,17 +155,17 @@ Idempotency-Key: 7c1e...
 The driver stream carries `Locations` (position, heading, `seq`) upward and `Offer` / `Accept(offer_id, driver_version)` both
 ways. An accept for an expired offer or an older version is refused; a retried accept returns the same trip.
 
-![Conceptual model.](diagrams/video-erd-chen.pdf){width=95%}
+![Conceptual model.](video/svg/erd-chen.svg){width=95%}
 
-![Physical model.](diagrams/video-erd-physical.pdf){width=95%}
+![Physical model.](video/svg/erd-physical.svg){width=95%}
 
 # Stage 4: High-level design
 
-![V1: everything in one database.](diagrams/video-base-v1.pdf){width=100%}
+![V1: everything in one database.](video/svg/base-v1.svg){width=100%}
 
-![V2: locations move to an in-memory cell index.](diagrams/video-base-v2.pdf){width=100%}
+![V2: locations move to an in-memory cell index.](video/svg/base-v2.svg){width=100%}
 
-![V3: one matcher per city, routing, a location log.](diagrams/video-base-v3.pdf){width=100%}
+![V3: one matcher per city, routing, a location log.](video/svg/base-v3.svg){width=100%}
 
 | State | Leaves by | Timer |
 |---|---|---|
@@ -175,21 +175,21 @@ ways. An accept for an expired offer or an older version is refused; a retried a
 | arriving | pickup, cancel, a lapsed lease | 30 s lease, renewed |
 | on trip | drop-off, handed to the trip lifecycle | — |
 
-![FR1: a location.](diagrams/video-flow-location.pdf){width=100%}
+![FR1: a location.](video/svg/flow-location.svg){width=100%}
 
-![FR2 and FR3: a request to an offer.](diagrams/video-flow-match.pdf){width=100%}
+![FR2 and FR3: a request to an offer.](video/svg/flow-match.svg){width=100%}
 
-![FR2: a batch, candidates, a matrix, an assignment.](diagrams/video-seq-request.pdf){width=85%}
+![FR2: a batch, candidates, a matrix, an assignment.](video/svg/seq-request.svg){width=85%}
 
-![FR3: a claim, an offer, an idempotent accept.](diagrams/video-seq-offer.pdf){width=85%}
+![FR3: a claim, an offer, an idempotent accept.](video/svg/seq-offer.svg){width=85%}
 
 # Stage 5: Components and technologies
 
-![The matcher.](diagrams/video-c4-comp-matcher.pdf){width=100%}
+![The matcher.](video/svg/c4-comp-matcher.svg){width=100%}
 
-![The location index.](diagrams/video-c4-comp-geo.pdf){width=100%}
+![The location index.](video/svg/c4-comp-geo.svg){width=100%}
 
-![The container view with technologies.](diagrams/video-c4-containers-tech.pdf){width=100%}
+![The container view with technologies.](video/svg/c4-containers-tech.svg){width=100%}
 
 <!-- stack:sections -->
 
@@ -275,7 +275,7 @@ Each fix in Stage 6 rejects one tool by name:
 
 ## When you don't need all this
 
-![ALTERNATE: PostgreSQL with PostGIS and SKIP LOCKED.](diagrams/video-alt.pdf){width=100%}
+![ALTERNATE: PostgreSQL with PostGIS and SKIP LOCKED.](video/svg/alt.svg){width=100%}
 
 For one or two cities: drivers update a PostGIS row every 15 s; a request runs a radius query on a GiST index and claims with
 `SELECT … FOR UPDATE SKIP LOCKED`. It gives up durable writes for soft data, batching, and per-city isolation. 20,000 drivers ÷ 15 s
@@ -300,7 +300,7 @@ UPDATE driver_state
 RETURNING version;
 ```
 
-![The claim at protocol level: a deposed leader learns it lost from the database.](diagrams/video-seq-th-claim.pdf){width=80%}
+![The claim at protocol level: a deposed leader learns it lost from the database.](video/svg/seq-th-claim.svg){width=80%}
 
 ::: warn
 **Redis `SETNX` as the claim.** Replication is asynchronous: after a fail-over the new primary may not have the key, and the driver
@@ -324,7 +324,7 @@ accepts carry the offer ID. A phone returning after 40 s presents its trip and v
 
 ## 6.3 Boundaries and hot cells
 
-![A radius as 19 lookups: the pickup's cell and two rings.](diagrams/video-kring.pdf){width=95%}
+![A radius as 19 lookups: the pickup's cell and two rings.](video/svg/kring.svg){width=95%}
 
 ```
 cell = h3(pickup, res = 9 if hot(pickup) else 8)
@@ -380,7 +380,7 @@ A gateway deploy stops forwarding a tenth of a city's drivers; they expire from 
 with a 100 % success rate. **Fix (V4):** probe riders (a fake driver and rider per city per minute, end to end); "no drivers"
 answers with idle drivers nearby; online drivers missing from the index per gateway pod; time to offer per city.
 
-![V4: probe riders.](diagrams/video-base-v4.pdf){width=100%}
+![V4: probe riders.](video/svg/base-v4.svg){width=100%}
 
 | SLI | Target |
 |---|---|

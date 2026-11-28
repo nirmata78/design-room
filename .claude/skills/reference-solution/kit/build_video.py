@@ -36,12 +36,12 @@ Captions — ONE caption source per video, never two, so nothing overlaps on scr
 Captions show written forms ('SMS', 'P0') even where the script spells them for the voice ('S-M-S', 'P-zero').
 
 Timing is frame-exact: frames are piped to ffmpeg at a fixed rate (10 fps in, 25 fps out), each frame chosen
+from the caption timeline. (The concat-demuxer approach used before 2026-10-28 drifted ~9 s by minute 8.)
+"""
 import os as _os, pathlib as _pl
 _os.environ.setdefault("PANGOCAIRO_BACKEND", "fc")   # rsvg-convert: use fontconfig so the bundled Google Fonts resolve
 import sys as _sys; _sys.path.insert(0, str(_pl.Path(__file__).resolve().parent)); import paths as _paths
 _os.environ.setdefault("FONTCONFIG_FILE", str(_paths.FONTS_CONF))
-from the caption timeline. (The concat-demuxer approach used before 2026-10-28 drifted ~9 s by minute 8.)
-"""
 import argparse, html, os, pathlib, re, subprocess, sys, tempfile
 
 SKILL = _paths.audio_skill_dir()

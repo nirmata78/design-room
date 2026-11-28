@@ -173,7 +173,7 @@ That last sentence is the whole point of the design: the worker is *asked* to st
 
 ## The same story as the lock's states
 
-![The life of one lock name. A grant is a log entry. A name is held until released, expired (the lease ran out), or revoked, and the next grant always carries a higher token.](diagrams/sd24-lock-states.pdf){width=74%}
+![The life of one lock name. A grant is a log entry. A name is held until released, expired (the lease ran out), or revoked, and the next grant always carries a higher token.](diagrams/sd24-lock-states.svg)
 
 Two details matter. **HELD has no way back to HELD with the same token after EXPIRED**: a renewed lease
 is the same grant, but an expired one is gone, and the next holder gets a strictly higher token. And
@@ -182,9 +182,9 @@ safe to build. The old holder is fenced by an ordinary comparison.
 
 ## Why a lock alone cannot make a system safe
 
-![A holder (A) pauses 15 seconds with a 10-second lease. Nothing at the resource tells A's write from B's, and both are accepted.](diagrams/video-pause-unfenced.pdf){width=94%}
+![A holder (A) pauses 15 seconds with a 10-second lease. Nothing at the resource tells A's write from B's, and both are accepted.](video/svg/pause-unfenced.svg){width=94%}
 
-![The same story when the resource checks the token. A's write carries 41, B's carried 42, and 41 is smaller. Nothing else changed.](diagrams/video-pause-fenced.pdf){width=94%}
+![The same story when the resource checks the token. A's write carries 41, B's carried 42, and 41 is smaller. Nothing else changed.](video/svg/pause-fenced.svg){width=94%}
 
 The lock service did not misbehave in the first picture. It issued one lease at a time and expired A's on
 schedule. The two parties are connected only by a lock service that neither of them can ask at the
@@ -199,7 +199,7 @@ touches the cause, which is that the check and the write are two steps. The next
 trade in one line.
 :::
 
-![Lease length is one trade at every setting. No setting removes a 15-second pause. A 70-second pause beats a 60-second lease.](diagrams/video-ttl-slider.pdf){width=92%}
+![Lease length is one trade at every setting. No setting removes a 15-second pause. A 70-second pause beats a 60-second lease.](video/svg/ttl-slider.svg){width=92%}
 
 ## One acquisition, millisecond by millisecond
 
@@ -221,11 +221,11 @@ measurement.
 trip between zones and a disk sync. That is why a quorum across regions, where the round trip alone is
 30 to 250 ms, cannot meet the target.
 
-![The same budget as one bar that sums to the target, with the spare drawn.](diagrams/video-budget.pdf){width=95%}
+![The same budget as one bar that sums to the target, with the spare drawn.](video/svg/budget.svg){width=95%}
 
 ## Where the load lands
 
-![Load map at peak. The only part that must be strictly correct is the committed write path. Every figure is derived in Stage 2.](diagrams/sd24-load-map.pdf){width=88%}
+![Load map at peak. The only part that must be strictly correct is the committed write path. Every figure is derived in Stage 2.](diagrams/sd24-load-map.svg)
 
 ::: load
 **At peak (3 times the average):** about 30,000 acquisition attempts a second reach the gateways. About
@@ -457,9 +457,9 @@ out. Designed out, not guarded against.
 
 ## The data model
 
-![Conceptual model in Chen notation. A name has at most one holder at a time, which is why locks are independent per name and the service shards.](diagrams/video-erd-chen.pdf){width=96%}
+![Conceptual model in Chen notation. A name has at most one holder at a time, which is why locks are independent per name and the service shards.](video/svg/erd-chen.svg){width=96%}
 
-![Physical model. Everything inside a group is keyed by name and lives in exactly one group, so there are no cross-group transactions. The epoch and the token floors live outside the group.](diagrams/video-erd-physical.pdf){width=96%}
+![Physical model. Everything inside a group is keyed by name and lives in exactly one group, so there are no cross-group transactions. The epoch and the token floors live outside the group.](video/svg/erd-physical.svg){width=96%}
 
 **The state machine** is small enough to read whole, which is the point: everything hard is in the
 replication, not the logic.
@@ -483,7 +483,7 @@ background sweep**: the leader runs a timer and *proposes* `SessionExpired`; fol
 anything else. If the leader dies first, the next leader re-derives pending expiries from state.
 :::
 
-![A token is one 64-bit number. The epoch is in the top 16 bits, the log index in the low 48.](diagrams/video-token-bits.pdf){width=86%}
+![A token is one 64-bit number. The epoch is in the top 16 bits, the log index in the low 48.](video/svg/token-bits.svg){width=86%}
 
 **Which stores, and can you lose them?**
 
@@ -508,7 +508,7 @@ screen: later pictures are views of one baseline, and boxes never move.
 
 ## Version 1: the simplest thing that works
 
-![V1: the library, one lock server holding a map of name to owner and expiry, and the resource drawn on top.](diagrams/video-base-v1.pdf){width=92%}
+![V1: the library, one lock server holding a map of name to owner and expiry, and the resource drawn on top.](video/svg/base-v1.svg){width=92%}
 
 An application with a lock library, and one lock server that keeps a map from name to owner and expiry in
 memory. Acquire checks the map. A lease means a dead holder's name frees itself. For an *efficiency* lock
@@ -521,7 +521,7 @@ team that uses it.
 
 ## Version 2: replace the box with a consensus group
 
-![V2: a consensus group of five replicas replaces the single server. The token is the log index of the grant.](diagrams/video-base-v2.pdf){width=92%}
+![V2: a consensus group of five replicas replaces the single server. The token is the log index of the grant.](video/svg/base-v2.svg){width=92%}
 
 Five replicas, one leader. Every grant is a **log entry**, and counts only once a **majority** (3 of 5) holds
 it. If the leader dies, a follower that has all committed entries takes over, so no grant is forgotten. And the
@@ -540,7 +540,7 @@ part of the product.
 
 ## Version 3: sessions, a library, and a gateway
 
-![V3, the baseline. The library holds a session, tracks a monotonic local deadline, and fires LockLost. A stateless gateway authenticates, applies quotas and routes to the leader.](diagrams/video-base-v3.pdf){width=96%}
+![V3, the baseline. The library holds a session, tracks a monotonic local deadline, and fires LockLost. A stateless gateway authenticates, applies quotas and routes to the leader.](video/svg/base-v3.svg){width=96%}
 
 The library holds **one session** with one heartbeat (the dashed purple arrow). It keeps a **local deadline**
 on a monotonic clock and calls back with `LockLost` the moment it passes. A stateless **gateway** sits in
@@ -568,7 +568,7 @@ their expected duration.
 
 ## The numbered flows, one per functional requirement
 
-![FR1, acquire: the library sends Acquire; the gateway authenticates, checks quota and routes; the leader commits; token and lease come back.](diagrams/video-flow-fr1.pdf){width=92%}
+![FR1, acquire: the library sends Acquire; the gateway authenticates, checks quota and routes; the leader commits; token and lease come back.](video/svg/flow-fr1.svg){width=92%}
 
 **FR1 Acquire.** One: the library sends `Acquire` with the name and a request id. Two: the gateway
 authenticates, checks the tenant's quota, hashes the name to a slot and routes to that group's leader. Inside
@@ -576,26 +576,26 @@ the group: the leader appends, a majority acknowledges, it commits, and `apply` 
 the token. Three: token and lease return to the gateway. Four: back to the library, which sets its deadline
 from when it *sent* the request.
 
-![FR2, hold and renew: a heartbeat per session, answered by the leader under its lease.](diagrams/video-flow-fr2.pdf){width=92%}
+![FR2, hold and renew: a heartbeat per session, answered by the leader under its lease.](video/svg/flow-fr2.svg){width=92%}
 
 **FR2 Hold and renew.** One: the heartbeat (dashed, asynchronous). Two: the gateway passes it on as a
 "session alive" note. The leader keeps liveness in memory under its leader lease, so **a heartbeat is not a
 consensus write**. Only an actual expiry becomes a log entry.
 
-![FR3, release and expiry: release by token, with a hand-off to the head waiter in the same step.](diagrams/video-flow-fr3.pdf){width=92%}
+![FR3, release and expiry: release by token, with a hand-off to the head waiter in the same step.](video/svg/flow-fr3.svg){width=92%}
 
 **FR3 Release and expiry.** Release by token takes the same four arrows. The leader commits; `apply`
 compares the token, frees the name, and hands it to the head waiter *in the same step*. A dead holder takes no
 arrow at all: its heartbeats stop, and after one lease the leader proposes a single `SessionExpired` that
 frees everything that session held.
 
-![FR4, fence: the write carries the token; the resource compares it with the highest it has accepted.](diagrams/video-flow-fr4.pdf){width=92%}
+![FR4, fence: the write carries the token; the resource compares it with the highest it has accepted.](video/svg/flow-fr4.svg){width=92%}
 
 **FR4 Fence.** One: the application writes to the resource with the token. Two: the resource compares. Not
 smaller: accept and store. Smaller: reject `FencedOut`, log both tokens, alert. **This arrow never touches the
 lock service.** The service issued an order; the resource enforces it.
 
-![FR5, inspect and revoke: audited, and the next grant carries a higher token.](diagrams/video-flow-fr5.pdf){width=92%}
+![FR5, inspect and revoke: audited, and the next grant carries a higher token.](video/svg/flow-fr5.svg){width=92%}
 
 **FR5 Inspect and revoke.** The operator console calls `ForceRevoke` with a reason; the gateway checks the
 operator's identity; the leader commits a revoke entry and an audit entry. The old holder learns on its next
@@ -603,17 +603,17 @@ heartbeat, and even if it does not, its next write is fenced.
 
 ## The C4 views and the sequences
 
-![C4 level 1. Note the arrow from the application straight to the protected resources: the write does not go through the lock service.](diagrams/video-c4-context.pdf){width=96%}
+![C4 level 1. Note the arrow from the application straight to the protected resources: the write does not go through the lock service.](video/svg/c4-context.svg){width=96%}
 
-![C4 level 2. The library runs inside the application; the gateway is stateless; four groups of five replicas; an epoch store used only on a rebuild.](diagrams/video-c4-containers.pdf){width=96%}
+![C4 level 2. The library runs inside the application; the gateway is stateless; four groups of five replicas; an epoch store used only on a rebuild.](video/svg/c4-containers.svg){width=96%}
 
-![Acquire, message by message. A majority acknowledgement commits the entry, and the token is its log index.](diagrams/video-seq-acquire.pdf){width=86%}
+![Acquire, message by message. A majority acknowledgement commits the entry, and the token is its log index.](video/svg/seq-acquire.svg){width=86%}
 
-![Losing the lease. The client stops first, by design: its deadline is 7 s from the last send, the server waits the full 10 s.](diagrams/video-seq-heartbeat-loss.pdf){width=86%}
+![Losing the lease. The client stops first, by design: its deadline is 7 s from the last send, the server waits the full 10 s.](video/svg/seq-heartbeat-loss.svg){width=86%}
 
-![Release with a direct hand-off: one committed write, one waiter woken, no polling.](diagrams/video-seq-release-handoff.pdf){width=80%}
+![Release with a direct hand-off: one committed write, one waiter woken, no polling.](video/svg/seq-release-handoff.svg){width=80%}
 
-![The resource's check: accept the current holder, reject the stale one.](diagrams/video-seq-fence-write.pdf){width=70%}
+![The resource's check: accept the current holder, reject the stale one.](video/svg/seq-fence-write.svg){width=70%}
 
 **What correct caller code looks like.** Show it on the board: it shows the design from the caller's side.
 
@@ -837,11 +837,11 @@ A checks "still held: yes" and pauses. t = 10.0 the lease expires. t = 10.4 B ac
 writes. t = 15.3 A resumes and writes with 41. Rejected: 41 is smaller than 42. Raising the lease to 60 s moves
 the failure to a 70 s pause and makes every real crash stall its name for a minute.
 
-![The attack on the baseline: the arrow to the resource, where the write lands unchecked.](diagrams/video-ch1-attack.pdf){width=88%}
+![The attack on the baseline: the arrow to the resource, where the write lands unchecked.](video/svg/ch1-attack.svg){width=88%}
 
-![The fix: a check at the resource.](diagrams/video-ch1-fix.pdf){width=88%}
+![The fix: a check at the resource.](video/svg/ch1-fix.svg){width=88%}
 
-![The fix as a sequence.](diagrams/video-seq-ch1-pause.pdf){width=84%}
+![The fix as a sequence.](video/svg/seq-ch1-pause.svg){width=84%}
 
 > "A lease cannot guarantee exclusion at the resource, because the holder cannot know it still holds the lock when
 > its write lands. So the grant carries a token that only increases, and the resource rejects anything older than
@@ -859,7 +859,7 @@ repair a stale read. Two ways to close it:
    (`UPDATE ... SET fence = :t WHERE id = :id AND fence <= :t`): it takes the row lock, so a stale holder's later
    bump either fails or waits, and the lost-update window closes.
 
-![Claim first, then read: the stored maximum becomes 42 before B reads, so a stale write by 41 is rejected.](diagrams/video-seq-ch1-claim.pdf){width=70%}
+![Claim first, then read: the stored maximum becomes 42 before B reads, so a stale write by 41 is rejected.](video/svg/seq-ch1-claim.svg){width=70%}
 
 **Weak answers.** "Use a longer TTL." "Check the lease before writing." "Use a lock in Redis with a random value."
 "The client should know." **Strong:** names the pause unprompted, puts a token at the resource, states what the
@@ -876,11 +876,11 @@ lock is an *efficiency* tool. (2) Does the resource have a conditional write? It
 Otherwise put a **validating proxy** in front. (4) If none fits, ship an efficiency lock and say so plainly in the
 contract.
 
-![The attack: a partner API with no conditional write.](diagrams/video-ch2-attack.pdf){width=86%}
+![The attack: a partner API with no conditional write.](video/svg/ch2-attack.svg){width=86%}
 
-![The fix: a proxy that keeps the highest token per resource.](diagrams/video-ch2-fix.pdf){width=86%}
+![The fix: a proxy that keeps the highest token per resource.](video/svg/ch2-fix.svg){width=86%}
 
-![The proxy, accept and reject.](diagrams/video-seq-ch2-proxy.pdf){width=84%}
+![The proxy, accept and reject.](video/svg/seq-ch2-proxy.svg){width=84%}
 
 **Sort the callers before building (illustrative survey of 100):** 55 only avoid duplicate work (efficiency lock,
 no token); 30 write to a store with a conditional write or version column (their own version is the token); 10 call
@@ -902,7 +902,7 @@ retry horizon* (illustratively 24 hours for a 60-second lease), or a late duplic
 **The risk.** A client's clock is five seconds slow, or time is stepped back eight seconds mid-lease. The naive
 design returns an expiry timestamp and the client compares it with its own clock.
 
-![A slow client clock: for five seconds two holders both believe they hold the lock.](diagrams/video-clock-skew.pdf){width=92%}
+![A slow client clock: for five seconds two holders both believe they hold the lock.](video/svg/clock-skew.svg){width=92%}
 
 **The mechanism.** **Durations, not timestamps.** Three kinds of time, each with one job: the **wall clock** can
 jump either way (never for lease arithmetic); a **monotonic clock** never goes backwards on one machine but means
@@ -911,7 +911,7 @@ but is totally ordered (use it for the token). The client measures `deadline = s
 monotonic clock; the server counts the lease from its own commit on its own monotonic clock; **no timestamp
 crosses the wire**.
 
-![The client stops first. Seven seconds against ten: a three-second margin for round trips and scheduling.](diagrams/video-clock-fixed.pdf){width=92%}
+![The client stops first. Seven seconds against ten: a three-second margin for round trips and scheduling.](video/svg/clock-fixed.svg){width=92%}
 
 ::: why
 **Why measure from the send time?** The server's lease started when it *received and committed* the request,
@@ -939,7 +939,7 @@ masquerading as a safety one.
 **The risk.** The leader dies mid-grant, and a partition leaves two of five replicas talking to some clients.
 The naive answer: promote a follower fast and let the minority side keep serving, to stay available.
 
-![A partition: R1 (old leader) and R2 are cut off from R3, R4, R5. R1 sees 2 of 5 and cannot commit.](diagrams/video-partition.pdf){width=90%}
+![A partition: R1 (old leader) and R2 are cut off from R3, R4, R5. R1 sees 2 of 5 and cannot commit.](video/svg/partition.svg){width=90%}
 
 **The mechanism.** **Majority commit and terms.** Only the majority side commits; a stale leader steps down when
 it sees a higher term and discards uncommitted entries. Heartbeats are answered by the leader under a short
@@ -947,7 +947,7 @@ it sees a higher term and discards uncommitted entries. Heartbeats are answered 
 **grace period**), or a failover would read every heartbeat gap as a death and evict every lock at once. Tokens are
 log indexes, so they stay monotonic across terms.
 
-![Both sides ask for the same name: the majority commits; the minority answers "unavailable".](diagrams/video-seq-ch4-election.pdf){width=86%}
+![Both sides ask for the same name: the majority commits; the minority answers "unavailable".](video/svg/seq-ch4-election.svg){width=86%}
 
 ::: why
 **The honest CP position.** Safety unconditional; liveness given up on the minority side. There is no clever third
@@ -965,7 +965,7 @@ through. **Tokens must never go backwards, even across a disaster.**
 
 So disaster recovery is not a restore: it is **start empty with a higher epoch**, then **wait one maximum lease**.
 
-![Disaster recovery: bump the durable epoch, start empty, seed the token floor, wait 60 seconds, then grant.](diagrams/video-seq-ch4-recovery.pdf){width=82%}
+![Disaster recovery: bump the durable epoch, start empty, seed the token floor, wait 60 seconds, then grant.](video/svg/seq-ch4-recovery.svg){width=82%}
 
 > "Under partition I choose safety: the minority side refuses, it does not guess. After the loss of a whole group I
 > start empty with a higher epoch, so every new token exceeds every old one, and I wait out the longest possible
@@ -994,17 +994,17 @@ queueing. The library retries with jittered exponential backoff. Sessions keep r
 than 480. The leader batches many entries into one disk sync. This works because locks are independent per name:
 **there are no cross-group transactions**, so the partition costs nothing.
 
-![The attack: one group at three times the load.](diagrams/video-ch5-attack.pdf){width=86%}
+![The attack: one group at three times the load.](video/svg/ch5-attack.svg){width=86%}
 
-![The fix: groups by hash of the name, and shedding at the gateway.](diagrams/video-ch5-fix.pdf){width=86%}
+![The fix: groups by hash of the name, and shedding at the gateway.](video/svg/ch5-fix.svg){width=86%}
 
-![Shed at the edge, retry with jitter.](diagrams/video-seq-ch5-admission.pdf){width=76%}
+![Shed at the edge, retry with jitter.](video/svg/seq-ch5-admission.svg){width=76%}
 
 **The second-level push: one group goes bad, or a slot must move while its locks are held.** A bad group takes a
 quarter of the names with it and **fails closed**; the other three are untouched. That is the blast radius, and it
 is why we shard even though the data is tiny. Moving a slot is the dangerous operation:
 
-![Moving a slot: freeze, drain held locks (at most one maximum lease), bump the slot's epoch, unfreeze in the new group.](diagrams/video-slots.pdf){width=90%}
+![Moving a slot: freeze, drain held locks (at most one maximum lease), bump the slot's epoch, unfreeze in the new group.](video/svg/slots.svg){width=90%}
 
 Without the **epoch bump**, a name that moves to a group with a lower log index would see its tokens go backwards.
 Same rule as before.
@@ -1027,16 +1027,16 @@ name; each release wakes them all and 29 lose (a **herd**); with an unbounded qu
 and after 10 s a new waiter waits about 30 s, longer than its own lease. Sharding does not help: one name lives in
 one group.
 
-![One name, 100 ms holds: capacity 10 a second against 40 arriving.](diagrams/video-hot-key.pdf){width=90%}
+![One name, 100 ms holds: capacity 10 a second against 40 arriving.](video/svg/hot-key.svg){width=90%}
 
 **The mechanism.** **A bounded wait with directed hand-off.** Waiters queue per name, with a depth cap,
 **scoped to sessions** so a dead waiter is reaped. `Release` grants to the head waiter *in the same committed
 step*: one write, one waiter woken. Beyond the cap or the wait budget the answer is `contended, retry-after`.
 Waiting costs no writes. The herd is gone.
 
-![The fix on the baseline: a bounded per-name waiter queue.](diagrams/video-ch6-fix.pdf){width=86%}
+![The fix on the baseline: a bounded per-name waiter queue.](video/svg/ch6-fix.svg){width=86%}
 
-![Release hands over in one step.](diagrams/video-seq-ch6-queue.pdf){width=80%}
+![Release hands over in one step.](video/svg/seq-ch6-queue.svg){width=80%}
 
 **The second-level push: a team asks to acquire three locks atomically.** Push back first: atomic multi-name
 acquisition across groups is a distributed transaction. If it must be done: a **canonical order** (the library
@@ -1088,7 +1088,7 @@ broken somewhere it does not look.
 Plus a **canary lock** acquired continuously (a quiet failure shows up as a missed acquire), and an **offline
 checker** that replays the grant log for overlapping holds.
 
-![The error budget turns a target into a constraint: 259 seconds a month, about 130 elections a group.](diagrams/video-error-budget.pdf){width=88%}
+![The error budget turns a target into a constraint: 259 seconds a month, about 130 elections a group.](video/svg/error-budget.svg){width=88%}
 
 **The second-level push: fenced-out is zero this week. Are you safe?** No. Zero could mean nobody is sending
 tokens. Track **coverage**: the share of protected writes that carry a token, and count writes that arrive

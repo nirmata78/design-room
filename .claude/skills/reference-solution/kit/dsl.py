@@ -145,7 +145,7 @@ def lint_props():
                 bad.append((s["src"], "speech", ln[:60]))
     if bad: raise SystemExit("bare property codes (use pid('S1') on slides and ps('S1') in speech):\n" + "\n".join(map(str, bad[:12])))
 
-_KIND = {"c4": "C4", "seq": "SEQUENCE", "erd": "ERD", "state": "STATE MACHINE", "none": ""}
+_KIND = {"c4": "C4", "seq": "SEQUENCE", "erd": "ERD", "state": "STATE MACHINE", "fig": "FIGURE", "none": ""}
 def dtag(kind):
     """The diagram-type pill: which picture type fits this mechanism or option (C4 · SEQUENCE · ERD · STATE MACHINE)."""
     return f'<span class="dtag {kind}">{_KIND[kind]}</span>' if kind != "none" else ""
@@ -549,11 +549,11 @@ def pseudo(src, hl=()):
 
 
 # ══ 2026-11-28 (issue #5): C4-first, challenge-driven helpers ══════════════════════════════════════════════════════════════
-def stage(kicker, title, svg, say, cap=None, vtag=None, extra="", name=""):
+def stage(kicker, title, svg, say, cap=None, vtag=None, extra="", name="", steps=True):
     """A diagram-only slide for a C4 view or a delta of it (c4-structurizr slot "stage"): one-line header, the figure fills
     the frame. The caption is not drawn on the frame; it becomes the figure's alt text in the Markdown."""
     v = f'<span class="vtag">{vtag}</span>' if vtag else ""
-    S(f'<h1><span class="k">{kicker}</span>{v}{title}</h1>' + fig(svg, cap) + extra, say, cls="dia stage", name=name or title)
+    S(f'<h1><span class="k">{kicker}</span>{v}{title}</h1>' + fig(svg, cap) + extra, say, cls="dia stage", name=name or title, steps=steps)
 
 
 def challenge(n, total, title, question, intro=None):
@@ -677,12 +677,12 @@ def _body_md(n, figdir):
         if "rejb" in c:
             out.append(f"- **Rejected:** {_clean(_text(x)).replace('Rejected', '', 1).strip()}"); return
         if "grade" in c:
-            t = _first(x, lambda y: "t" in y.cls); body = _clean(_text(x)).replace(_clean(_plain(t)) if t else "", "", 1)
+            t = _first(x, lambda y: "t" in y.cls); body = _clean("".join(_text(k) for k in x.kids if k is not t))
             out.extend(["", "> [!IMPORTANT]", f"> **{_clean(_plain(t)) if t else 'Graded here'}.** {body.strip()}", ""]); return
         if c & set(_BLOCK):
             t = _first(x, lambda y: y.tag == "b" and "t" in y.cls)
             title = _clean(_plain(t)) if t else _BLOCK[next(iter(c & set(_BLOCK)))]
-            body = _clean(_text(x))
+            body = _clean("".join(_text(k) for k in x.kids if k is not t))
             out.append(f"- **{title}.** {body}" if title else f"- {body}"); return
         if "verdict" in c: out.append(f"**{_clean(_text(x))}**"); return
         if "chips" in c: out.append("*" + _clean(_plain(x)).replace("·", " · ") + "*"); return
@@ -702,10 +702,13 @@ def _body_md(n, figdir):
 _SPOKEN_NUM = {"two-oh-two": "202", "four-oh-nine": "409", "four-twenty-nine": "429", "five-oh-three": "503", "four-oh-four": "404"}
 def say_to_prose(s):
     """TTS respellings → the written form a reader expects: A-P-I → API, two-oh-two → 202, Kahf-kah → Kafka."""
+    for k, slug in PROPS.items():                       # ps("S1") → `[S1-count-once]`
+        s = s.replace(ps(k), f"`[{k}-{slug}]`")
     pairs = []
     for item in (META.get("say") or "").split():
         if "=" in item:
-            w, sp = item.split("=", 1); pairs.append((sp.replace("_", " "), w))
+            w, sp = item.split("=", 1)
+            if "-" in sp: pairs.append((sp, w))          # only TTS respellings (A-P-I, Kahf-kah); plain words stay words
     for sp, w in sorted(pairs, key=lambda p: -len(p[0])):
         s = re.sub(rf"(?<![\w-]){re.escape(sp)}(?![\w-])", w, s)
     for sp, w in _SPOKEN_NUM.items(): s = re.sub(rf"\b{sp}\b", w, s, flags=re.I)
@@ -714,24 +717,30 @@ def say_to_prose(s):
 
 _WHO = {"I": "Interviewer", "Q": "Interviewer", "C": None, "V": "If asked, I'd say", "N": "Coach", "E": "Aside"}
 def _transcript_md(lines):
-    """Spoken lines as reading text: consecutive candidate lines become one paragraph; others become callouts."""
-    out, para = [], []
-    def flush():
-        if para: out.extend(["", " ".join(para), ""]); para.clear()
+    """Spoken lines as reading text: consecutive lines of one speaker merge; the candidate is prose, the others callouts."""
+    groups = []
     for ln in lines:
         m = re.match(r"^([A-Z]): (.*)$", ln, re.S)
         if not m: continue
         who, txt = m.group(1), say_to_prose(m.group(2).strip())
-        if who == "C": para.append(txt); continue
-        flush()
-        if who in ("I", "Q"): out.extend(["", f"> **Interviewer:** {txt}", ""])
-        elif who == "V": out.extend(["", "> [!TIP]", f"> **If asked, I'd say:** {txt}", ""])
-        elif who == "N": out.extend(["", "> [!IMPORTANT]", f"> **Coach:** {txt}", ""])
-        else: out.extend(["", f"*{txt}*", ""])
-    flush()
+        if who == "V": txt = re.sub(r"^If asked, I'd say:\s*", "", txt)
+        txt = txt[:1].upper() + txt[1:]
+        if groups and groups[-1][0] == who: groups[-1][1].append(txt)
+        else: groups.append((who, [txt]))
+    out = []
+    for who, txts in groups:
+        body = " ".join(txts)
+        if who == "C": out.extend(["", body, ""])
+        elif who in ("I", "Q"): out.extend(["", f"> **Interviewer:** {body}", ""])
+        elif who == "V": out.extend(["", "> [!TIP]", f"> **If asked, I'd say:** {body}", ""])
+        elif who == "N": out.extend(["", "> [!IMPORTANT]", f"> **Coach:** {body}", ""])
+        else: out.extend(["", f"*{body}*", ""])
     return "\n".join(out).strip()
 
-def _slug(s): return re.sub(r"[^a-z0-9]+", "-", re.sub(r"<[^>]+>", "", s).lower()).strip("-")
+def _slug(s):
+    """GitHub's anchor rule: lower-case, drop punctuation except hyphens, spaces become hyphens."""
+    s = re.sub(r"<[^>]+>", "", s).lower()
+    return re.sub(r"[^\w\- ]", "", s).replace(" ", "-")
 
 def write_reference_markdown(path, figdir="video/svg/", lab=None):
     """Write the whole reference design from SL. path: the .md file (beside stack.json). figdir: relative to it.
@@ -746,13 +755,13 @@ def write_reference_markdown(path, figdir="video/svg/", lab=None):
             "video. Edit video/src/*.py, then re-run gen.py; never edit this file. -->", ""]
     if m.get("lede"): body += [f"> {m['lede']}", ""]
     chapters = [(s["chapter"], s) for s in SL if s["name"].startswith("card ") and s["chapter"]]
-    toc = [f"- [{c[0]} · {c[1]}](#{_slug(f'{c[0]} {c[1]}')})" for c, _ in chapters if "." not in str(c[0])]
+    toc = [f"- [{c[0]} · {c[1]}](#{_slug(f'{c[0]} · {c[1]}')})" for c, _ in chapters if "." not in str(c[0])]
     body += ["**Contents**", ""] + toc + ["- [Implementation Lab & Reproducible Workspace](#implementation-lab--reproducible-workspace)", ""]
     for s in SL:
         h = s["html"]
         if s["name"].startswith("card "):
             c, t = s["chapter"]
-            body += ["", f"{'###' if '.' in str(c) else '##'} {c} {t}", ""]
+            body += ["", f"{'###' if '.' in str(c) else '##'} {c} · {t}", ""]
             sub = re.search(r'<div class="sub">(.*?)</div>', h, re.S)
             if sub and "." not in str(c): body += [f"*{_clean(_text(_tree(sub.group(1))))}*", ""]
             tr = _transcript_md(s["say"])

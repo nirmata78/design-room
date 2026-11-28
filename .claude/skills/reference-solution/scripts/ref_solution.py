@@ -108,7 +108,7 @@ def st_diagrams(sol, a):
         except (ValueError, json.JSONDecodeError):
             j = {}
         if rc != 0:
-            return out("diagram_gate_failed" if rc == 3 else "dsl_error", "diagrams", log=tail(log, 40),
+            return out("diagram_gate_failed" if rc == 3 else "dsl_error", "diagrams", log="" if j else tail(log, 40),
                        failures=j.get("failures", []), missing_sources=j.get("missing_sources", []),
                        remedy=(j.get("failures") or [{}])[0].get("remedy") or "Fix the DSL error reported by Structurizr (line and token in log).")
         res["c4_views"] = j.get("views_rendered", 0)
@@ -142,11 +142,11 @@ def st_deck(sol, a):
     (v / "layout-report.txt").write_text(log, encoding="utf-8")
     last = log.strip().splitlines()[-1] if log.strip() else ""
     if rc != 0:
-        fails = [l for l in log.splitlines() if l.startswith("FAIL")][:15]
+        fails = [l.strip() for l in log.splitlines() if " FAIL " in l][:15]
         return out("layout_gate_failed", "deck", summary=last, failures=fails, report=str(v / "layout-report.txt"),
                    remedy="Each FAIL names slide data-n and the element: shorten text, split the slide, crop the figure "
                           "(views.json keep+crop) or use dsl.stage() for a C4 view. Re-run the deck stage.")
-    warns = [l for l in log.splitlines() if l.startswith("WARN")]
+    warns = [l for l in log.splitlines() if " WARN " in l]
     return out("ok", "deck", summary=last, warnings=len(warns), gen=r.get("log"))
 
 

@@ -17,7 +17,7 @@
           },
           "spec": {
             "type": "string",
-            "description": "Optional path to views.json specifying per-view slot (full|composite|split) and ordered progressive reveal steps."
+            "description": "Optional views.json: per-view slot (stage|full|composite|split), reveal steps, and derived views ('from') with overlays: hide, new, breaks, fix, focus, alternate, badges, keep + crop, flow, min_px, video:false, lock_viewbox_to. See SKILL.md."
           },
           "png": {
             "type": "boolean",
@@ -25,7 +25,10 @@
             "description": "Also render @2x PNG previews via Playwright Chromium."
           }
         },
-        "required": ["dsl", "out"]
+        "required": [
+          "dsl",
+          "out"
+        ]
       }
     }
   },
@@ -72,7 +75,11 @@
             "description": "Optional opacity for unrevealed elements (default 0.0 = visibility: hidden; e.g. 0.10 for faint silhouettes)."
           }
         },
-        "required": ["svg", "out", "title"]
+        "required": [
+          "svg",
+          "out",
+          "title"
+        ]
       }
     }
   }

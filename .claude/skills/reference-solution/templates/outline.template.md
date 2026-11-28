@@ -1,128 +1,94 @@
-# SD-NN · <Question> — reference-solution video outline
+# SD-NN · <Question> — reference-solution outline (six-chapter, C4-first format)
 
-Target level: staff (manager layer AUX) · Target length: __ min (75–100) · Word budget: __ (≈ minutes × 120) · Reveal steps: __
+Target level: staff (manager layer as one recap row) · Target length: __ min (40–55) · Word budget: __ (5,500–7,000)
+Worked example: `solutions/SD-03-ad-click-aggregation/video/OUTLINE.md`. Format: `.claude/skills/reference-solution/GUIDELINES.md`.
 
-## Thesis and definition
+## Thesis and hook
 
 - **Thesis** (one sentence, key-line voice):
-- **Definition to say aloud** (what the system is, every clause load-bearing):
-- **Hook** (why it is harder than it looks):
+- **Hook** (why it is harder than it looks, as one picture):
 
 ## Scale line (GUIDELINES §3.1)
 
 Volume per month: · Total over the retention period: · Peak and its cause:
-(every estimate below names which of these it starts from)
+(every number below names which of these it starts from)
 
-## 0 · What this question grades
+## 1 · Prompt, clarifying Q&A and C4 context
 
-| Axis | Weak signal | Strong signal |
-|---|---|---|
-| Requirements | | |
-| Correctness | | |
-| Trade-offs | | |
-| Depth | | |
-| Operations | | |
+- **What this question grades** (weak · strong): Requirements · Correctness · Trade-offs · Depth · Operations
+- **Clarifying questions** (4–6) and the interviewer's answers, each with what it moves in the design:
+- **FR1 …** :
+- **NFRs** with numbers (initial targets):
+- **Properties** — safety `S1-<slug>` …, liveness `L1-<slug>` …:
+- **IN / OUT** of scope:
+- **C4 context (L1)**: actors and external systems; which boundaries are `[HTTPS]`, which `[Event]` / `[Batch]`:
+- **The core is N things**:
 
-## 1 · Requirements and scope
+## 2 · Back-of-the-envelope
 
-- Clarifying questions and the interviewer's answers:
-- Functional requirements (FR1 …):
-- Non-functional requirements, with numbers:
-- IN scope / OUT of scope:
-- "The core is N things":
-
-## 2 · Estimates
-
-| Number | From (scale line) | Arithmetic | Label (illustrative · target · measured) | Decision it drives |
+| Number | From (scale line) | Arithmetic | Label | The constraint it forces (rules out · requires) |
 |---|---|---|---|---|
 
-## 3 · Theory
+Budget bar (latency or freshness): stages and the spare.
 
-1. Is / is not:
-2. Safety (must never happen): · Liveness (must eventually happen):
-3. Central tension (and the picture for it):
-4. Mechanisms — property (slug: `[S1-…]`, never a bare code) → how → failure ruled out → cost; diagram type per mechanism (c4 · seq · erd · state):
-   | Mechanism | Protects | Rules out | Costs |
-   |---|---|---|---|
-5. Options: one infographic per option (pros · cons · C4 view · red pitfall boxes), then the matrix (rows = approaches, columns = deciding properties, last column = fails when). Pick: · Gives up:
-   Mechanisms at work: the container view labelled by mechanism; 1–2 sequences at protocol level (which mechanism, which messages):
-6. Failure list — outline only, no theory slide; it becomes the challenge map (ch. 6) and the follow-up questions (ch. 9):
+## 3 · API contracts and the data model
 
-## 4 · API and entities
-
-| API | Serves | Reads / writes | Wire-format notes |
+| Endpoint / event | Serves | Idempotency key · status codes | What the response says |
 |---|---|---|---|
 
-Entities (conceptual), then physical tables and keys:
+Physical tables (key, partition key, indexes), in build order: · Lifecycle (state machine), if the core entity has one:
 
-## 5 · High-level design
+## 4 · The design, driven by challenges
 
-| Version | Adds | Objection it answers | Objection it leaves |
+**V1** (the C4 container view, technologies on the boxes): the boxes, and why this is the simplest correct design:
+Happy-path flow on V1 (numbered arrows):
+Technology cards shown with V1 (from `stack.json`):
+
+### Challenges
+
+Each: the interviewer's question · the case (trace) · the break (container view or component zoom, `views.json` key) · the
+mechanism (property protected → how → rules out → costs) · the fix one level down (what is written, what it covers and does not,
+why this tool and not the one under it) · the Rejected line · the version it produces (V2, V3 … or "zoom only") · the push and the
+second fix · "if asked, I'd say" · the bridge to the next.
+
+#### Challenge 1 · <title>
+#### Challenge 2 · <title>
+#### Challenge 3 · <title>
+#### Challenge 4 · <title>
+#### Challenge 5 · <title>
+#### Challenge 6 · How would you know it is broken?   (observability, always last)
+
+## 5 · When you don't need all this
+
+The simpler design (its own view, ALTERNATE) · what it gives up · the crossover number from chapter 2:
+
+## 6 · Recap
+
+Final view badges (alias → mechanism) · the mistakes table · follow-up questions with where each is answered · the close:
+
+## C4 plan (`workspace.dsl` + `views.json`)
+
+| View key | From | Overlays | Used on |
 |---|---|---|---|
-| V1 | | (none: simplest thing that works) | |
-| V2 | | | |
-| V3 | | | |
-
-Baseline spine, left to right (this is also the reveal order):
-C4 context (chapter 1): actors and external systems:
-C4 containers = the carried baseline, built V1 → V3 (`since=`); one line per container, what the narration says about it:
-
-Canonical diagram plan (GUIDELINES §7.5): each level drawn in full once; every later slide that shows it, and its delta:
-
-| Slide | Canonical diagram | Delta (new= · badges= · flow= · keep=/attack=/fix=/focus= · OVERRIDE) |
-|---|---|---|
-Flows and sequences, one of each per functional requirement (numbered steps):
-
-## 5.1 · Components and technologies
-
-C4 component view per in-scope service (components, library or mechanism, timeouts):
-
-Write the choices into `../stack.json` (SKILL step 2a), not here: `stack.py sync` fills the region below.
-
-<!-- stack:outline -->
-<!-- /stack:outline -->
-
-Drill interlude: which 4–5 boxes, each with its probe (the `drill` field in `stack.json`).
-
-## 5.2 · When you don't need all this (alternate path)
-
-Simpler design (the one box that changes): · How it works, one level down: · What it gives up: · Crossover number (from the
-scale line) and why: · What the narration says when it would switch:
-
-## 7 · Challenges
-
-One block per challenge, 6–10 in total. The last is observability. Versions follow the challenges: V4, V5 … for each fix that
-changes the design.
-
-### Challenge N · <short name>
-
-- Q (interviewer):
-- Naive answer:
-- Case (IDs, times, numbers):
-- Break (which component, inside which container; the C4 component view it is drawn on):
-- Fix (mechanism) · sequence? pseudocode (key lines)?:
-- One level down (what is written or appended; which failure it covers and which it does not; why this tool and not the one under it; when the simpler option is fine):
-- Version after the fix (V4, V5 … or "no change"):
-- Rejected on the fix slide (tool · why; `challenges` in `stack.json`):
-- Why it works (property):
-- "What if the fix fails?":
-- Second fix or honest limit:
-- If asked, I'd say:
-
-## 8 · Build cost (AUX)
-
-V1 / V2 / V3 scope · people and months · buy against build · top risks:
-
-## 9 · Recap
-
-Final diagram · one sentence per path · common mistakes in this round · closing line:
+| c4-context | exported | steps | ch1 |
+| containers | exported (master, `video: false`) | — | — |
+| v1, flow-v1, v2 … | containers | hide / new / flow / breaks | ch4 |
+| <zoom keys> | comp-<container> | keep + crop + breaks / fix | ch4 |
+| recap | containers | badges | ch6 |
+| alt | exported | alternate | ch5 |
 
 ## Canon check
 
-| Canonical point | Source | Covered at (chapter / slide) or dismissed because |
-|---|---|---|
+| Point the standard treatments make | Covered where (slide) / dismissed why |
+|---|---|
 
 ## Budget
 
-| Chapter | Minutes | Words | Slides |
+| Chapter | Minutes | Words | Logical slides |
 |---|---|---|---|
+| 1 · Prompt + context | 4–6 | | |
+| 2 · Estimates | 4–5 | | |
+| 3 · API + data | 4–5 | | |
+| 4 · Design + challenges | 22–32 | | |
+| 5 · Alternate | 2–3 | | |
+| 6 · Recap | 3–4 | | |
