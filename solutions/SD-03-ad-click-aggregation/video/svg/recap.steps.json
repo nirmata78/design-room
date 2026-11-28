@@ -1,1 +1,17 @@
-[["n:src", "n:fraud", "n:recon", "n:col", "n:lake", "n:stream", "n:log", "n:batch", "n:live", "n:api", "n:bill", "n:adv", "n:invo", "e:0", "e:1", "e:2", "e:3", "e:4", "e:5", "e:6", "e:7", "e:9", "e:10", "e:11", "e:12", "e:13", "e:14"], ["b:col"], ["b:stream"], ["b:live"], ["b:batch"], ["b:bill"], ["b:recon"]]
+[
+  [
+    "p:badge:stream"
+  ],
+  [
+    "p:badge:live"
+  ],
+  [
+    "p:badge:batch"
+  ],
+  [
+    "p:badge:bill"
+  ],
+  [
+    "p:badge:api"
+  ]
+]

@@ -1,0 +1,41 @@
+{
+  "key": "comp-stream",
+  "slot": "full",
+  "viewbox": [
+    172.0,
+    31.0,
+    6206.0,
+    1493.0
+  ],
+  "scale_1080p": 0.2746,
+  "min_font_svg_px": 40.0,
+  "min_rendered_1080p_px": 10.98,
+  "min_px": 0.0,
+  "legibility_ok": true,
+  "forbidden_fonts_found": [],
+  "node_keys": [
+    "e:log",
+    "e:live",
+    "e:src",
+    "e:time",
+    "e:dedup",
+    "e:comb",
+    "e:win",
+    "e:sink",
+    "e:ckpt"
+  ],
+  "edge_keys": [
+    "l:e0",
+    "l:e1",
+    "l:e2",
+    "l:e3",
+    "l:e4",
+    "l:e5",
+    "l:e6",
+    "l:e7"
+  ],
+  "unknown_aliases": [],
+  "canon": "c4:comp-stream",
+  "full": true,
+  "source": "comp-stream"
+}

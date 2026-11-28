@@ -1,0 +1,29 @@
+{
+  "key": "replay-fix",
+  "slot": "full",
+  "viewbox": [
+    3892.0,
+    560.0,
+    2496.0,
+    416.0
+  ],
+  "scale_1080p": 0.6827,
+  "min_font_svg_px": 40.0,
+  "min_rendered_1080p_px": 27.31,
+  "min_px": 18.0,
+  "legibility_ok": true,
+  "forbidden_fonts_found": [],
+  "node_keys": [
+    "e:live",
+    "e:win",
+    "e:sink"
+  ],
+  "edge_keys": [
+    "l:e5",
+    "l:e6"
+  ],
+  "unknown_aliases": [],
+  "canon": "c4:comp-stream",
+  "full": false,
+  "source": "comp-stream"
+}

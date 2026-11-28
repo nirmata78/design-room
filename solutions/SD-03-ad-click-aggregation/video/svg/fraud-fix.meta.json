@@ -1,0 +1,29 @@
+{
+  "key": "fraud-fix",
+  "slot": "full",
+  "viewbox": [
+    3891.0,
+    954.0,
+    2416.0,
+    698.0
+  ],
+  "scale_1080p": 0.7053,
+  "min_font_svg_px": 40.0,
+  "min_rendered_1080p_px": 28.21,
+  "min_px": 18.0,
+  "legibility_ok": true,
+  "forbidden_fonts_found": [],
+  "node_keys": [
+    "e:price",
+    "e:write",
+    "e:adj"
+  ],
+  "edge_keys": [
+    "l:e6",
+    "l:e8"
+  ],
+  "unknown_aliases": [],
+  "canon": "c4:comp-billing",
+  "full": false,
+  "source": "comp-billing"
+}

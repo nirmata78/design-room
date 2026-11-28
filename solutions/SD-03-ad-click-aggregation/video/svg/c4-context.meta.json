@@ -1,1 +1,33 @@
-{"canon": "c4:c4-context", "full": true}
+{
+  "key": "c4-context",
+  "slot": "stage",
+  "viewbox": [
+    172.0,
+    31.0,
+    1476.0,
+    1680.0
+  ],
+  "scale_1080p": 0.5119,
+  "min_font_svg_px": 40.0,
+  "min_rendered_1080p_px": 20.48,
+  "min_px": 18.0,
+  "legibility_ok": true,
+  "forbidden_fonts_found": [],
+  "node_keys": [
+    "e:cli",
+    "e:adv",
+    "e:fraud",
+    "e:invo",
+    "e:ac"
+  ],
+  "edge_keys": [
+    "l:e0",
+    "l:e1",
+    "l:e2",
+    "l:e3"
+  ],
+  "unknown_aliases": [],
+  "canon": "c4:c4-context",
+  "full": true,
+  "source": "c4-context"
+}

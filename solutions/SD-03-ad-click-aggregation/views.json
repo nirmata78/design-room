@@ -1,0 +1,271 @@
+{
+  "_doc": "Every C4 picture of SD-03, derived from the views exported by workspace.dsl (c4-structurizr render_c4.py). Derived views name their source with 'from' and keep its pixel positions (viewBox locked) unless they crop. Aliases are the DSL identifiers' last segment; edges are 'a->b' in either direction.",
+  "views": {
+    "c4-context": {
+      "slot": "stage",
+      "steps": [
+        "cli",
+        "ac",
+        "adv",
+        "fraud",
+        "invo"
+      ]
+    },
+    "containers": {
+      "slot": "stage",
+      "video": false
+    },
+    "alt": {
+      "slot": "stage",
+      "alternate": [
+        "live"
+      ]
+    },
+    "comp-stream": {
+      "video": false
+    },
+    "comp-billing": {
+      "video": false
+    },
+    "v1": {
+      "from": "containers",
+      "slot": "stage",
+      "hide": [
+        "stream",
+        "live",
+        "fraud"
+      ],
+      "steps": [
+        "cli",
+        "col",
+        "log",
+        "lake",
+        "batch",
+        "bill",
+        "api",
+        "adv"
+      ]
+    },
+    "flow-v1": {
+      "from": "containers",
+      "slot": "stage",
+      "hide": [
+        "stream",
+        "live",
+        "fraud"
+      ],
+      "flow": [
+        "cli->col",
+        "col->log",
+        "lake->log",
+        "batch->lake",
+        "batch->bill",
+        "adv->api",
+        "api->bill"
+      ]
+    },
+    "v1-break": {
+      "from": "containers",
+      "slot": "stage",
+      "hide": [
+        "stream",
+        "live",
+        "fraud"
+      ],
+      "breaks": [
+        "batch"
+      ]
+    },
+    "v2": {
+      "from": "containers",
+      "slot": "stage",
+      "hide": [
+        "fraud"
+      ],
+      "new": [
+        "stream",
+        "live"
+      ]
+    },
+    "flow-live": {
+      "from": "containers",
+      "slot": "stage",
+      "hide": [
+        "fraud"
+      ],
+      "flow": [
+        "cli->col",
+        "col->log",
+        "stream->log",
+        "stream->live",
+        "adv->api",
+        "api->live"
+      ]
+    },
+    "v3": {
+      "from": "containers",
+      "slot": "stage",
+      "new": [
+        "fraud"
+      ]
+    },
+    "recap": {
+      "from": "containers",
+      "slot": "stage",
+      "badges": {
+        "stream": "M2 M3 M4",
+        "live": "replace by version",
+        "batch": "M1 M2 M3",
+        "bill": "versions",
+        "api": "provisional | final"
+      }
+    },
+    "dd-break": {
+      "from": "comp-stream",
+      "slot": "full",
+      "keep": [
+        "src",
+        "time",
+        "dedup"
+      ],
+      "crop": true,
+      "breaks": [
+        "dedup"
+      ]
+    },
+    "dd-fix": {
+      "from": "comp-stream",
+      "slot": "full",
+      "keep": [
+        "time",
+        "dedup",
+        "ckpt"
+      ],
+      "crop": true,
+      "fix": [
+        "dedup",
+        "ckpt"
+      ]
+    },
+    "replay-fix": {
+      "from": "comp-stream",
+      "slot": "full",
+      "keep": [
+        "win",
+        "sink",
+        "live"
+      ],
+      "crop": true,
+      "fix": [
+        "sink",
+        "live"
+      ]
+    },
+    "late-break": {
+      "from": "comp-stream",
+      "slot": "full",
+      "keep": [
+        "src",
+        "time",
+        "dedup"
+      ],
+      "crop": true,
+      "breaks": [
+        "time"
+      ]
+    },
+    "late-fix": {
+      "from": "comp-stream",
+      "slot": "full",
+      "keep": [
+        "time",
+        "dedup",
+        "comb",
+        "win"
+      ],
+      "crop": true,
+      "fix": [
+        "time",
+        "win"
+      ]
+    },
+    "close-fix": {
+      "from": "comp-billing",
+      "slot": "full",
+      "keep": [
+        "close",
+        "read",
+        "xdup"
+      ],
+      "crop": true,
+      "fix": [
+        "close"
+      ]
+    },
+    "hot-break": {
+      "from": "comp-stream",
+      "slot": "full",
+      "keep": [
+        "comb",
+        "win",
+        "sink"
+      ],
+      "crop": true,
+      "breaks": [
+        "win"
+      ]
+    },
+    "hot-fix": {
+      "from": "comp-stream",
+      "slot": "full",
+      "keep": [
+        "dedup",
+        "comb",
+        "win"
+      ],
+      "crop": true,
+      "fix": [
+        "comb",
+        "win"
+      ]
+    },
+    "fraud-break": {
+      "from": "comp-billing",
+      "slot": "full",
+      "keep": [
+        "filt",
+        "price",
+        "write"
+      ],
+      "crop": true,
+      "breaks": [
+        "write"
+      ]
+    },
+    "fraud-fix": {
+      "from": "comp-billing",
+      "slot": "full",
+      "keep": [
+        "price",
+        "write",
+        "adj"
+      ],
+      "crop": true,
+      "fix": [
+        "adj"
+      ]
+    },
+    "recon-fix": {
+      "from": "comp-billing",
+      "slot": "full",
+      "keep": [
+        "write",
+        "recon"
+      ],
+      "crop": true,
+      "fix": [
+        "recon"
+      ]
+    }
+  }
+}

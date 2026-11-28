@@ -1,0 +1,13 @@
+[
+  [
+    "e:stream",
+    "p:new:stream",
+    "l:e3"
+  ],
+  [
+    "e:live",
+    "p:new:live",
+    "l:e4",
+    "l:e8"
+  ]
+]

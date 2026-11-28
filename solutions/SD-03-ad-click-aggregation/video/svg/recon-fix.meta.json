@@ -1,0 +1,27 @@
+{
+  "key": "recon-fix",
+  "slot": "full",
+  "viewbox": [
+    3891.0,
+    876.0,
+    1496.0,
+    731.0
+  ],
+  "scale_1080p": 1.067,
+  "min_font_svg_px": 40.0,
+  "min_rendered_1080p_px": 42.68,
+  "min_px": 18.0,
+  "legibility_ok": true,
+  "forbidden_fonts_found": [],
+  "node_keys": [
+    "e:write",
+    "e:recon"
+  ],
+  "edge_keys": [
+    "l:e10"
+  ],
+  "unknown_aliases": [],
+  "canon": "c4:comp-billing",
+  "full": false,
+  "source": "comp-billing"
+}
