@@ -3,7 +3,7 @@
 The standard for every design-room **reference solution**: one question from the bank, worked from the prompt to the recap, as
 a candidate would present it to an interviewer, as a video and a written booklet. Decided with the author on 2026-11-12;
 **revised 2026-11-21** (progressive disclosure, light style, captions as files, C4 earlier and deeper, every component one
-level down with concrete technologies and rejected alternatives); **restyled 2026-11-22** to Google colours and Google Fonts (`DESIGN-TOKENS.md`); **revised again 2026-11-22** after the SD-96 / SD-08 review (scale line §3.1, alternate path §3.2, challenges one level down and versions past V3 §3.3 and §5, one canonical diagram per level §7.5, the measured layout gate §7.6, code §7.7). It builds on three analysed references
+level down with concrete technologies and rejected alternatives); **restyled 2026-11-22** to Google colours and Google Fonts (`DESIGN-TOKENS.md`); **revised 2026-11-25** (theory first, Markdown instead of PDF booklet, descriptive property slugs, mechanism and option infographics, PlantUML/C4 pipeline, objections as diagrams, event-versus-HTTPS boundaries, recap with follow-ups instead of a failure catalogue — §4b); **revised again 2026-11-22** after the SD-96 / SD-08 review (scale line §3.1, alternate path §3.2, challenges one level down and versions past V3 §3.3 and §5, one canonical diagram per level §7.5, the measured layout gate §7.6, code §7.7). It builds on three analysed references
 (`references/video-examples/`) and on the house video rules (`~/.claude/skills/slide-video-kit/STANDARD.md`); the workflow is
 `SKILL.md` in this folder. Where this file and STANDARD.md disagree, this file wins for reference solutions.
 
@@ -48,7 +48,7 @@ Target **75–100 minutes**; hard limit **180**. One video, not parts. About 10,
 | 6 | **Bridge** | 1 | "It works. Where does it break first?" and the challenge map: the canonical view with the attack points marked one by one |
 | 7 | **Challenges** (6–10) | 36–50 | See §5. Each fix that changes the design carries the baseline forward: V3 → V4 → V5 …, as many versions as the challenges need. The last one is always "how would you know it is broken?" |
 | 8 | **Build cost** (AUX) | 4 | V1/V2/V3 scope; people and months; buy against build; the top risks. Marked AUX as the manager layer |
-| 9 | **Recap** | 4 | The final diagram drawn once more; one sentence per path; the common mistakes in this round; the thesis |
+| 9 | **Recap and follow-ups** | 4 | The final diagram drawn once more; one sentence per path; the common mistakes in this round; the thesis; **the follow-up questions** an interviewer asks next, each with where this video answers it (`followups()`) |
 
 There is **no separate follow-up section**. A question that would have been a follow-up becomes a challenge.
 
@@ -101,21 +101,25 @@ path, the component views a challenge is drawn on, or the observability challeng
 ## 4 · The theory chapter
 
 It comes after the estimates and before any design, so the design can refer back to it. It answers one question:
-*what makes this problem hard, in terms that outlive any product name?* Six parts, in this order:
+*what makes this problem hard, in terms that outlive any product name?* Five parts, in this order (the former sixth part, the failure catalogue, is gone: §4b):
 
 1. **What it is, and what it is not.** One definition sentence to say aloud, then 2–4 neighbours it is confused with.
-2. **Properties, stated separately.** Safety: what must never happen. Liveness: what must eventually happen.
+2. **Properties, stated separately.** Safety: what must never happen. Liveness: what must eventually happen. **Every property has a
+   descriptive slug, never a bare code** (`[S1-no-twice-coll]`, `[L2-every-unknown-ends]`): §4b.
 3. **The central tension.** The trade this problem forces, drawn as one picture.
-4. **The mechanisms.** The 4–7 mechanisms the design will use, one slide each in a fixed form: *property it protects → how it
+4. **The mechanisms.** The 4–7 mechanisms the design will use, one slide each (`mech_slide()`: the name with its diagram-type pill and the picture beside the four blocks), in a fixed form: *property it protects → how it
    works → the failure it rules out → what it costs.* Mechanism first, product name second.
    **Then the mechanisms at work (2–3 slides):** where each mechanism will live, as a table (mechanism · container · one clause),
    not as a drawing of the system: the system is drawn once, in chapter 5 (§7.5). The mechanism labels come back later as
    badges on the canonical container view (`badges=`). Then one or
    two sequence diagrams that show the hardest mechanism operating at protocol level (a compare-and-set through a consensus log;
    cache-aside with single flight and a lifetime as the backstop). The viewer must see the mechanism, not only its name.
-5. **The options matrix.** 3–6 serious approaches as rows; the deciding properties as columns; the failure that rules each out.
-   One row picked, the rest greyed and kept visible. Say what the pick gives up.
-6. **The failure catalogue.** It becomes the challenge list.
+5. **The options.** 3–6 serious approaches, **each its own infographic slide** (`option_slide()`, §4b): pros, cons, the architecture
+   drawn as a C4 view, and red pitfall boxes. Then the compact matrix as the summary (rows = approaches, columns = deciding
+   properties), one row picked, the rest greyed and kept visible. Say what the pick gives up.
+
+The failure catalogue is **not** a theory part and not a slide (2026-11-25): the failures live in the outline, become the
+challenge map in chapter 6, and the open ones come back as follow-up questions in chapter 9.
 
 Rules: define every term on first use; no theory slide without a consequence for this design; if a part has nothing to say, say
 so in one line and move on.
@@ -145,6 +149,34 @@ A choice changed in one place only is a defect.
 Rules: a product is named only after its mechanism has been explained; the choice must be consistent everywhere else (challenges,
 booklet, build cost, recap); prefer the boring, operable choice and say so; the rejected alternative is the one an interviewer
 will actually name (Cassandra, DynamoDB, ZooKeeper, Memcached, Hazelcast, RabbitMQ …).
+
+## 4b · The 2026-11-25 rules (author's feedback notes)
+
+1. **Theory first.** The theory chapter is written, gated and rendered before any other chapter: `build-video.sh` runs the theory
+   pass (`ONLY_CHAPTER=3`: `video-theory.html`, `<stem>-theory.script.md`, `frames-theory/`) before the whole deck, and
+   `build-video.sh --theory` stops there. A layout or wording defect in the vocabulary slides must fail in minutes.
+2. **Markdown, not booklet PDFs.** The written reference design is `SD-NN_<Title>_Reference_Design.md` and nothing else: no PDF, no
+   LaTeX. It must render on GitHub: callouts are GitHub alerts (`> [!NOTE]`), figures are `![caption](diagrams/x.svg)`, diagrams
+   are SVG from PlantUML or the kit generators (or a ```mermaid fence). `build-md.sh` + `md_github.py` convert and lint.
+3. **Descriptive property ids.** `props(S1="no-twice-coll", …)` once; `pid("S1")` on slides prints `[S1-no-twice-coll]`; `ps("S1")` in
+   narration says "S-one, no twice coll". A bare `S1`/`L2` on a slide or in speech fails `gen.py` (`lint_props`); `md_github.py`
+   fails the Markdown the same way. Slugs: 2–4 lower-case words that state the property (`no-late-recall`, `create-never-waits`).
+4. **A mechanism is its name plus the picture type that fits it**: `mech_slide(..., diagram=("seq"|"c4"|"erd"|"state", svg, caption))`
+   — a state machine for lifecycles, a sequence for protocols and races, a C4 view for placement, an ERD for keys and invariants.
+   The slide is a composite infographic (blocks left, picture right); the diagram-type pill sits beside the title.
+5. **Every option of the options matrix has its own infographic** (`option_slide()`): pros, cons, the architecture as a C4 view,
+   and **red pitfall boxes** for edge cases and what rules it out. The matrix table follows as a summary only.
+6. **HLD versions are C4 component/container deltas** (`v1`, `v2`, `v3` …, one convention: carried boxes at once, then the new
+   ones, `new=`); the **objection to each version is a sequence diagram of the failing case** (`objection()`), never a timetable.
+7. **Event versus HTTPS.** Where an event crosses a boundary an API call also crosses (`Loan Booked` against `POST /loans`), the C4
+   view draws both: an event is dashed deep blue and tagged `[event]`, a synchronous call is solid and tagged `[HTTPS]`
+   (`c4svg` `proto="event"|"https"`; PlantUML macros `ev()` and `https()`). For money questions, show the concrete external rail API
+   shape (card network authorisation, bank debit file or API) with `wire(req, resp, …)` next to the entity/schema slide.
+8. **(Deprecated 2026-11-28: use `.claude/skills/c4-structurizr` for C4 views; this item only describes SD-59/95/99 until issue #5 removes it.)** **PlantUML is a first-class renderer.** `pumlsvg.render(src, "svg/name.svg", kind="c4|seq|state|erd", level=…, order=…)` writes
+   the themed SVG, its reveal plan and meta sidecar, so a PlantUML diagram reveals step by step exactly like a kit diagram and
+   the same SVG goes into the Markdown. State machines and lifecycles use `kind="state"`; pacing class `sm` keeps their
+   transitions short (no long lead pause). **C4-PlantUML draws the technology line at a fixed 12 px**, under the 18 px gate: leave the `techn` argument empty and write the technology into the description or label (`Container(api, "Servicing API", "", "Go · keys, quotes")`). A baseline carried across versions is declared once as a list and shown with `render_versions(prefix, items, out_dir, keep={4: [...]})` (carried boxes at once, new boxes outlined and revealed one by one, a close-up for a local delta). The composite mechanism and option slides put the picture full width under the blocks, so a diagram of up to about eight boxes clears the gate; wider ones need fewer labels or `Lay_D`/`Lay_R` hints.
+9. **No standalone failure catalogue in theory**; chapter 9 ends with the follow-up questions, and challenges stay the centre.
 
 ## 5 · The challenge grammar
 
@@ -301,7 +333,9 @@ A reference solution is not done until every line holds.
 - [ ] Chapters 0–9 (and 5.1) present, in order; the ribbon shows the current one on every chapter card
 - [ ] "What this question grades" table near the start; common mistakes in the recap
 - [ ] C4 context in chapter 1; C4 containers right after V3, walked container by container; a C4 component view per in-scope service
-- [ ] Theory chapter has all six parts, plus a mechanism map and 1–2 mechanism sequences; safety and liveness separately; the matrix has a pick and a stated cost
+- [ ] Theory chapter has five parts (no failure catalogue), rendered first; each mechanism is a composite infographic with its diagram type; each option has its own infographic with pros, cons, a C4 view and red pitfall boxes; safety and liveness separately, every property named by slug; the matrix has a pick and a stated cost
+- [ ] The written design is Markdown only and renders on GitHub (`md_github.py` prints GitHub-ready); no PDF is built
+- [ ] Version objections are sequence diagrams; event and HTTPS boundaries are drawn distinctly; chapter 9 ends with follow-up questions
 - [ ] V1 → V2 → V3, each version introduced by the objection it answers
 - [ ] One numbered flow **and one sequence diagram** per functional requirement; narration uses the numbers
 - [ ] One technology slide per in-scope container: how it is built, the pick, ≥ 2 named rejected alternatives with reasons, a theory citation; the stack on one slide; the drill interlude; the choices are used consistently in challenges, build cost, recap and booklet

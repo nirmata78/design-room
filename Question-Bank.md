@@ -157,7 +157,7 @@ See also archetype **I** for AI & LLM systems — SD-42 is the serving prerequis
 | SD-56 | Migration — monolith → services, or datacentre → cloud | 1 | Strategy | general | St EM SEM | A★ MS★ G | sequencing, dual-write/backfill, rollback, org staging |
 | SD-57 | Capacity, cost & FinOps review | 1 | Review | general | EM SEM Dir | A★ N G | unit economics, cost drivers, the levers, forecasting |
 | SD-58 | Reliability & SLO design for an existing system | 1 | Review | general | St EM SEM | G★ A N | SLI selection, error budgets, alerting, on-call load |
-| SD-59 | Multi-team decomposition & API contracts | 1 | Strategy | general | Pr EM SEM | G★ MS A | Conway's law, seams, contract versioning, dependency risk |
+| SD-59 | Multi-team decomposition & API contracts · [**solution**](solutions/SD-59-team-decomposition/SD-59_Team_Decomposition_Reference_Design.md) · [**reference video**](solutions/SD-59-team-decomposition/video/README.md) | 1 | Strategy | general | Pr EM SEM | G★ MS A | Conway's law, seams, contract versioning, dependency risk |
 | SD-60 | Platform consolidation / tech-debt strategy | 2 | Strategy | general | Pr SEM Dir | MS A G | portfolio judgment, deprecation, migration incentives |
 | SD-61 | Incident → design fix | 2 | Review | general | St EM | A★ G N | RCA discipline, systemic vs local fixes, prevention |
 | SD-62 | Build vs buy | 2 | Strategy | general | EM SEM Dir | MS A G | TCO, differentiation, exit cost, team capability |

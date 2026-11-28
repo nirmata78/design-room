@@ -1,13 +1,13 @@
 # SD-95 · Instalment loan servicing: reference-solution video
 
-Staff bar (L6/L7), manager layer marked AUX. **Length 1:35:42**, 20 chapters, **180 numbered slides** in **590 reveal frames**, **11,470 spoken words** (candidate 87.8 %, interviewer 4.0 %, key line 3.7 %, coach 4.6 %). Built 2026-11-21 in the SD-94 reference format; it replaces
+Staff bar (L6/L7), manager layer marked AUX. **Length 1:45:48**, 20 chapters, **189 numbered slides** in **703 reveal frames**, **12,680 spoken words** (candidate 87.8 %, interviewer 4.0 %, key line 3.7 %, coach 4.6 %). Built 2026-11-21 in the SD-94 reference format; it replaces
 problem 2 of the 2026-11-20 fintech mock series, which has been retired. Scripted walkthrough with synthetic voices; numbers are
 illustrative, not any company's figures; bank-debit return rules checked against public rule summaries in November 2026; not legal,
 accounting or compliance advice. **The technical content has not been reviewed by a person, and the video has not been watched end
 to end.**
 
 Output: `loan-servicing-reference.mp4` (local only, gitignored). Written companion: `../SD-95_Loan_Servicing_Reference_Design.md`
-(PDF beside it, 34 pages, about 15k words). Publish kit: `publish/` (YouTube title, description with chapters, tags, thumbnail,
+(GitHub Markdown only since 2026-11-25: no PDF). Publish kit: `publish/` (YouTube title, description with chapters, tags, thumbnail,
 LinkedIn post). Plan: `OUTLINE.md`.
 
 ## Chapters
@@ -18,22 +18,22 @@ LinkedIn post). Plan: `OUTLINE.md`.
 | 03:14 | 1 Requirements and scope |
 | 08:29 | 2 Estimates |
 | 13:03 | 3 Theory |
-| 23:27 | 4 API and entities |
-| 29:02 | 5 High-level design |
-| 37:24 | 5.1 Components and technologies |
-| 50:03 | 5.2 When you don't need all this |
-| 51:42 | 6 Bridge |
-| 52:26 | 7 Challenges |
-| 52:45 | 7.1 Challenge 1: The processor timed out |
-| 57:24 | 7.2 Challenge 2: The morning of the 1st |
-| 1:02:08 | 7.3 Challenge 3: It settled, then it came back |
-| 1:08:12 | 7.4 Challenge 4: A refund in the middle of the loan |
-| 1:12:32 | 7.5 Challenge 5: Paying off with a debit in flight |
-| 1:16:56 | 7.6 Challenge 6: Four hundred dollars more than the bank |
-| 1:21:23 | 7.7 Challenge 7: The card processor is down on the 1st |
-| 1:25:08 | 7.8 Challenge 8: How would you know before month-end? |
-| 1:30:15 | 8 Build cost |
-| 1:32:49 | 9 Recap |
+| 30:10 | 4 API and entities |
+| 38:13 | 5 High-level design |
+| 46:49 | 5.1 Components and technologies |
+| 59:27 | 5.2 When you don't need all this |
+| 1:01:06 | 6 Bridge |
+| 1:01:51 | 7 Challenges |
+| 1:02:09 | 7.1 Challenge 1: The processor timed out |
+| 1:06:48 | 7.2 Challenge 2: The morning of the 1st |
+| 1:11:32 | 7.3 Challenge 3: It settled, then it came back |
+| 1:17:37 | 7.4 Challenge 4: A refund in the middle of the loan |
+| 1:21:56 | 7.5 Challenge 5: Paying off with a debit in flight |
+| 1:26:20 | 7.6 Challenge 6: Four hundred dollars more than the bank |
+| 1:30:48 | 7.7 Challenge 7: The card processor is down on the 1st |
+| 1:34:33 | 7.8 Challenge 8: How would you know before month-end? |
+| 1:39:39 | 8 Build cost |
+| 1:42:13 | 9 Recap |
 
 ## The eight challenges
 
@@ -116,3 +116,7 @@ Reviewed against an EM-level lending checklist and rebuilt (`.v2-review-2026-11-
 - Layout gate: 57 failures → **0** (C4 views and both data models re-laid, code ≤ 56 × 12, one strip per fix slide, kit sequence badges enlarged and moved off the labels).
 
 QA of this build: `check_layout.py` 0 failures; `ffprobe` H.264 + AAC 1920×1080, 20 chapters, no subtitle stream; `.srt`/`.vtt` beside the MP4, no line over 42 characters, every VTT cue with a voice span; Whisper check on 20 excerpts found only transcription noise; frames of the new slides read as images. **Not watched end to end.**
+
+## Reworked on 2026-11-25 (the new engine)
+
+Theory rendered first and rewritten: five parts, no failure catalogue; every mechanism is a composite infographic paired with the diagram type that fits (sequence, state machine, ERD, C4); each option of the matrix has its own infographic with pros, cons, a C4 view and red pitfall boxes. Properties are named by slug (`[S1-…]`), never bare codes. V1 to V3 are C4 container deltas (PlantUML), the version objections are sequence diagrams, event versus HTTPS boundaries are drawn distinctly, and the external rail or endpoint shapes are on the wire slides. Chapter 9 ends with follow-up questions. The written design is Markdown only. Challenge overlays (`ch*-attack` / `ch*-fix`) are unchanged from the earlier native diagrams. Not watched end to end.

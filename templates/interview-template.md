@@ -24,6 +24,7 @@ been granted mid-round.*
 | **Kind / domain** | |
 | **Attempt** | *(N on this question)* |
 | **Mode / format / pace / difficulty** | |
+| **Numbers** | *(varied · seed N — or sheet)* |
 | **Started** | |
 | **Budget** | *(certifying: live clock — `scripts/clock.py watch --notify` in a second terminal · practice: no clock)* |
 
@@ -41,7 +42,7 @@ been granted mid-round.*
 
 ## 1 · Requirements & Scope
 
-*Budget: ~12 min. Signal the gate when §1.1–§1.4 are populated.*
+*Budget: ~12 min (blitz ~5). Signal the gate when §1.1–§1.4 are populated.*
 
 ### 1.1 Functional requirements
 
@@ -85,7 +86,7 @@ changes the premise.*
 
 ## 2 · Estimation
 
-*Budget: ~9 min. Orders of magnitude, not decimals.*
+*Budget: ~9 min (blitz ~4). Orders of magnitude, not decimals.*
 
 | Quantity | Working | Result |
 |---|---|---|
@@ -130,7 +131,7 @@ GET    /...
 
 ## 4 · High-Level Design
 
-*Budget: ~18 min including §3. Few boxes. Label every arrow with its protocol. Then be ready to walk
+*Budget: ~18 min including §3 (blitz ~10). Few boxes. Label every arrow with its protocol. Then be ready to walk
 one request end to end — you will be asked, every time.*
 
 **Drawing in Excalidraw?** Export PNG with *Embed scene* ticked into `board/` at the repo root
@@ -167,7 +168,7 @@ you haven't traced is where designs fall apart.*
 
 ## 5 · Deep Dives
 
-*Budget: ~22 min. The interviewer drives this phase and picks the targets. This is where most of
+*Budget: ~22 min (blitz ~10). The interviewer drives this phase and picks the targets. This is where most of
 your score is decided.*
 
 ### 5.1 Deep dive: *(component)*
@@ -192,7 +193,7 @@ your score is decided.*
 
 ## 6 · Failure Modes, Reliability & Operations
 
-*Budget: part of the ~9 min wrap. **This is the manager bar** — for an EM loop it carries as much
+*Budget: part of the ~9 min wrap (blitz ~4). **This is the manager bar** — for an EM loop it carries as much
 weight as the architecture. Don't leave it to the last two minutes.*
 
 | What fails | Blast radius | Detection | Mitigation | Recovery |

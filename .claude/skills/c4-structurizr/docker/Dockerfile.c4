@@ -1,0 +1,12 @@
+# Thin font-hermetic layer over Structurizr Playwright base image.
+# Supports either official structurizr/structurizr:<tag>-playwright (or :preview)
+# OR a local pre-built structurizr.war copied onto mcr.microsoft.com/playwright/java:v1.64.0-noble.
+ARG BASE_IMAGE=structurizr/structurizr:preview
+FROM ${BASE_IMAGE}
+
+USER root
+COPY resources/fonts/*.ttf /usr/local/share/fonts/google/
+RUN fc-cache -f && mkdir -p /workspace && chmod 777 /workspace
+
+WORKDIR /workspace
+

@@ -1,6 +1,6 @@
 ---
 title: "SD-nn · Question title — practice"
-subtitle: "Practice session · Level (track) · Help dial start → end · Domain"
+subtitle: "Practice session · Level (track) · Help dial start → end · Domain · Numbers varied (seed N)"
 date: "YYYY-MM-DD · practice N on this question · duration h:mm (no clock)"
 ---
 

@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """The round clock: real wall-clock time, phase budgets, alarms. Certifying sessions only.
 
-    scripts/clock.py start [--pace typing-adjusted|realtime|hour|<N>] [--mode full|hld|framing|wrap|review]
+    scripts/clock.py start [--pace typing-adjusted|realtime|hour|<N>] [--mode full|blitz|hld|framing|wrap|review]
     scripts/clock.py status            # elapsed, current phase by budget, time left — one line
     scripts/clock.py schedule          # the whole plan with wall-clock times
     scripts/clock.py watch [--notify]  # live ticking display for the candidate's second terminal
     scripts/clock.py wait              # block until the next alarm, print it, exit (interviewer, in background)
+                                       #   also exits with HEARTBEAT after --max seconds (default 480) and with
+                                       #   IDLE when interview.md has not changed for --idle minutes (default 6)
+    scripts/clock.py seen              # the candidate just wrote in chat: reset the idle timer
     scripts/clock.py mark <label>      # log an actual phase transition (for "where the time went")
     scripts/clock.py pause | resume | stop
 
@@ -38,7 +41,12 @@ OTHER_MODES = {
     "hld":     [("Framing", 1), ("P1 Requirements & scope", 8), ("P2 Estimation", 6), ("P3 High-level design", 15)],
     "wrap":    [("P5 Failure, SLOs, cost, summary", 12)],
     "review":  [("Read the design", 4), ("Critique", 12), ("Prioritise + summarise", 4)],
+    # blitz: a short certifying round, all five phases, half the probes (CLAUDE.md §18)
+    "blitz":   [("Framing", 1), ("P1 Requirements & scope", 5), ("P2 Estimation", 4),
+                ("P3 High-level design", 10), ("P4 Deep dives", 10), ("P5 Wrap + summary", 4), ("Slack", 1)],
 }
+SCALABLE = {"blitz"}  # modes whose shape `--pace <N>` rescales to N minutes
+WORKSPACE = ROOT / "interview.md"
 WARN_BEFORE_END = 10 * 60  # the T−10 announcement (CLAUDE.md §4.2)
 
 
@@ -63,12 +71,12 @@ def ms(sec):
 
 
 def plan(pace, mode):
-    if mode != "full":
+    if mode != "full" and not (mode in SCALABLE and str(pace).isdigit()):
         return OTHER_MODES[mode]
-    if pace in FULL:
+    if mode == "full" and pace in FULL:
         return FULL[pace]
-    total = int(pace)  # a custom total: scale the typing-adjusted shape
-    base = FULL["typing-adjusted"]
+    total = int(pace)  # a custom total: scale the mode's shape
+    base = OTHER_MODES[mode] if mode in SCALABLE else FULL["typing-adjusted"]
     scale = total / sum(m for _, m in base)
     phases = [(n, max(1, round(m * scale))) for n, m in base]
     drift = total - sum(m for _, m in phases)
@@ -154,7 +162,9 @@ def cmd_schedule(_):
 
 
 def cmd_status(_):
-    print(line(load()))
+    s = load()
+    touch(s)
+    print(line(s))
 
 
 def cmd_watch(a):
@@ -181,12 +191,25 @@ def cmd_watch(a):
         print()
 
 
-def cmd_wait(_):
-    """Sleep until the next alarm, print it and exit — run in the background by the interviewer."""
+def last_activity(s):
+    """Latest of: a candidate edit to interview.md, `seen`, `status`, `mark`, the start."""
+    t = max(s["start"], s.get("seen") or 0)
+    if WORKSPACE.exists():
+        t = max(t, WORKSPACE.stat().st_mtime)
+    return t
+
+
+def cmd_wait(a):
+    """Sleep until the next event, print it and exit — run in the background by the interviewer.
+
+    Events, first word of the output: PHASE · T-10 · END (alarms) · IDLE (no file edit or chat for
+    --idle minutes; once per quiet stretch) · HEARTBEAT (nothing happened for --max seconds, so a
+    background-task time limit can never kill the alarm silently). Relaunch after every exit."""
+    began = time.time()
     while True:
         s = load()
         if s.get("stopped"):
-            print("clock stopped")
+            print("STOPPED clock stopped — do not relaunch")
             return
         e = elapsed(s)
         upcoming = [(at, msg) for at, msg in alarms(s) if at > e + 0.5]
@@ -194,22 +217,46 @@ def cmd_wait(_):
             print(f"END    over time · {line(s)}")
             return
         at, msg = upcoming[0]
+        now = time.time()
+        quiet = now - last_activity(s)
+        if (a.idle and not s.get("paused_at") and quiet >= a.idle * 60
+                and s.get("idle_reported", 0) < last_activity(s)):
+            s["idle_reported"] = now
+            save(s)
+            print(f"IDLE   no edit to interview.md and no chat for {ms(quiet)} — nudge once (runbook: IDLE)")
+            print(line(s))
+            return
+        if now - began >= a.max:
+            print(f"HEARTBEAT  no event in {ms(a.max)} — relaunch `wait`; nothing to say to the candidate")
+            print(line(s))
+            return
         if s.get("paused_at"):
             time.sleep(5)
             continue
-        time.sleep(min(at - e, 30))  # re-check: a pause or resume may move the alarm
+        time.sleep(max(1, min(at - e, 15, a.max - (now - began))))  # re-check: a pause, resume or idle may come first
         s = load()
         if not s.get("paused_at") and elapsed(s) >= at:
-            print(f"{time.strftime('%H:%M:%S')}  {hms(at)}  {msg}")
-            print(line(s))
+            print(f"{msg}")
+            print(f"{time.strftime('%H:%M:%S')}  at {hms(at)}  ·  {line(s)}")
             return
+
+
+def touch(s):
+    s["seen"] = time.time()
+    save(s)
+
+
+def cmd_seen(_):
+    s = load()
+    touch(s)
+    print(line(s))
 
 
 def cmd_mark(a):
     s = load()
     e = elapsed(s)
     s["marks"].append([round(e), a.label])
-    save(s)
+    touch(s)
     print(f"{time.strftime('%H:%M:%S')}  {hms(e)}  {a.label}")
 
 
@@ -258,7 +305,10 @@ def main():
     w.add_argument("--notify", action="store_true", help="macOS notification on every alarm")
     m = sub.add_parser("mark")
     m.add_argument("label")
-    for c in ("status", "schedule", "wait", "pause", "resume", "stop"):
+    wt = sub.add_parser("wait")
+    wt.add_argument("--max", type=int, default=480, help="exit with HEARTBEAT after this many seconds")
+    wt.add_argument("--idle", type=float, default=6, help="minutes of no edit/chat before IDLE (0 = off)")
+    for c in ("status", "schedule", "seen", "pause", "resume", "stop"):
         sub.add_parser(c)
     a = ap.parse_args()
     if a.cmd == "start" and a.pace not in FULL and not a.pace.isdigit():

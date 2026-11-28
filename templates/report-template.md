@@ -1,6 +1,6 @@
 ---
 title: "SD-nn · Question title"
-subtitle: "Company · Level (track) · Mode · Difficulty · Domain"
+subtitle: "Company · Level (track) · Mode · Difficulty · Domain · Numbers varied (seed N)"
 date: "YYYY-MM-DD · attempt N on this question · round N overall"
 ---
 

@@ -32,42 +32,51 @@ S(dia("Data · physical model", "Tables, keys, and the timer as a column", "erd-
  "C: The delivery: sharded by endpoint, unique on endpoint and event, with its state, attempt number, next attempt time and lease. The attempt table, partitioned by day. And the note: the timer is a column, with a partial index on the next attempt time for pending rows."], cls="dia")
 
 # ───────────────────────── 5 · high-level design ─────────────────────────
+import dsl as _d
+S(dia("API · the boundary", "Where an event ends and an HTTPS call begins", "hld-boundary", cap="Figure 4.3 — C4 container view: events dashed blue, HTTPS solid"), [
+ "C: One picture to settle the boundary. A dashed blue line is an event, a solid line is a synchronous call over H-T-T-P-S.", "[+]",
+ "C: The merchant's developer registers an endpoint with an H-T-T-P-S call: it needs an answer now.", "[+]",
+ "C: The producer commits the loan and an outbox row together, then the relay appends loan booked to the log. An event, inside our boundary.", "[+]",
+ "C: Then the outbox row goes to the relay.", "[+]", "C: The relay publishes loan booked to the durable log. Still an event.", "[+]", "C: Fan-out consumes it, and writes one delivery row per matching endpoint.", "[+]",
+ "C: The dispatcher claims a row and signs it.", "[+]", "C: And only at the very edge does it become an H-T-T-P-S call, to a server we do not control. The boundary is where our guarantees end and a stranger's begin."], cls="dia")
+
+_d.wire("""POST /hooks/loans
+Webhook-Id: evt_91
+Webhook-Sequence: 7
+Webhook-Signature: t=1767225600,v1=5f2c…
+{"type": "loan.booked", "id": "ln_5531"}""", """HTTP/1.1 200 OK
+2xx: delivered
+4xx, 5xx, timeout: retry
+410 Gone: pause""", "API · the merchant's endpoint", "One delivery, as the merchant sees it", [
+ "C: What the merchant's server receives. An event I-D, a sequence number per loan, and a signature that carries its own timestamp and covers the body. The payload is thin: a type and a loan I-D.", "[+]",
+ "C: What we do with its answer. Any two-hundred is delivered. A client error, a server error or a timeout means retry with backoff. And four-ten gone tells us to pause the endpoint."], lang="http")
+
 chapter(5, "High-level design", 4, "Three versions, each answering the objection to the one before", [
  "C: Now the design, in three versions, each introduced by the objection to the one before. The boxes never move: every later picture is a view of the same baseline."])
 
-S(dia("High-level design · version 1 of 3", "The simplest thing that works", "base-v1", vtag="V1",
+S(dia("High-level design · version 1 of 3", "The simplest thing that works", "hld-v1", vtag="V1", cap="Figure 5.3 — C4 container view, V1: new boxes outlined",
       chip=chips("a POST inside the request", "no queue", "no retry")), [
  "C: Version one. The producer, say origination, books the loan, and in the same request it POSTs to every subscribed merchant U-R-L. It is the simplest thing that works, and for a handful of merchants on a good day, it does."], cls="dia")
 
-S(trace("V1 · the objection", "A thirty-second till, a crash, and a rollback", [
-  ("14:31:07.200", "ln_5531 booked; the request POSTs loan.booked to the merchant's till"),
-  ("14:31:37.200", "<span class='bad'>the till answers after 30 s: the booking request has held a worker for 30 s</span>"),
-  ("14:32:00.000", "a retry inside the request; the process is restarted by a deploy"),
-  ("14:32:00.050", "<span class='bad'>the loan exists; the event is gone</span>"),
-  ("14:40:00.000", "<span class='bad'>another booking POSTs first, then its transaction rolls back: the merchant hears of a loan that does not exist</span>")]), [
- "C: The objection as a trace.",
- "[+]", "C: The loan is booked, and the request POSTs to the merchant's till.",
- "[+]", "C: The till answers after thirty seconds. The booking request held a worker for all of it.",
- "[+]", "C: A retry inside the request, and a deploy restarts the process.",
- "[+]", "C: The loan exists, and the event is gone.",
- "[+]", "C: And another booking POSTs first and then rolls back: the merchant hears of a loan that doesn't exist."])
+objection(1, "A thirty-second till, a crash, and a rollback", "obj-v1", [
+ "I: Walk me through how version one breaks.", "[+]", "C: The booking request POSTs the loan booked event to the merchant's till.", "[+]",
+ "C: The till answers after thirty seconds, and the booking request held a worker for all of it.", "[+]", "C: A retry inside the request.", "[+]",
+ "C: And a deploy restarts the process.", "[+]", "C: The loan exists, and the event is gone.", "[+]",
+ "C: And another booking POSTs first and then rolls back: the merchant hears of a loan that does not exist."], cap="Figure 5.1 — the failing case of V1")
 
-S(dia("High-level design · version 2 of 3", "No event without its commit", "base-v2", vtag="V2",
+S(dia("High-level design · version 2 of 3", "No event without its commit", "hld-v2", vtag="V2", cap="Figure 5.4 — C4 container view, V2: new boxes outlined",
       chip=chips("outbox rows", "a relay", "a log", "dispatcher workers")), [
  "[+]", "C: Version two answers that. The producer writes an outbox row in the same transaction as the loan.",
  "[+]", "C: An outbox relay publishes the rows to the event log, keyed by loan,",
  "[+]", "C: and the log keeps them for seven days.",
  "[+]", "C: Dispatcher workers consume the log and POST to the merchants, retrying in process on failure. The booking request no longer waits for anyone."], cls="dia")
 
-S(plain("V2 · the objection", "Correct at the source, and one slow till takes everyone down", cards(
-  ("red", "One shared pool", "120 calls a second to one slow till at 10 s holds 1,200 workers; the fleet has 600."),
-  ("red", "Retries in memory", "A restart forgets every pending retry; a two-day outage cannot live in a process."),
-  ("red", "Head of line", "Events for healthy merchants queue behind the slow one in the same partition."),
-  ("red", "Nobody can see", "No record of what was sent, so “you never sent it” cannot be answered."))), [
- "C: The objection to version two. It is correct at the source, but one slow till takes everyone down. A hundred and twenty calls a second at ten seconds each hold twelve hundred workers, and we have six hundred. Retries live in memory, so a restart forgets them, and a two-day outage cannot live in a process.",
- "C: Events for healthy merchants queue behind the slow one in the same partition. And there is no record of what was sent, so when a merchant says we never sent it, we can't answer."])
+objection(2, "Correct at the source, and one slow till takes everyone down", "obj-v2", [
+ "I: Version two is correct at the source. What is still missing?", "[+]", "C: A hundred and twenty calls a second to one slow till at ten seconds each hold twelve hundred workers, and we have six hundred.", "[+]",
+ "C: Events for healthy merchants queue behind the slow one in the same partition.", "[+]", "C: Retries live in memory, so a restart forgets them, and a two-day outage cannot live in a process.", "[+]",
+ "C: And there is no record of what was sent, so when a merchant says we never sent it, we cannot answer. That is version three."], cap="Figure 5.2 — the holes of V2")
 
-S(dia("High-level design · version 3 of 3", "A queue per endpoint, as rows", "base-v3", vtag="V3",
+S(dia("High-level design · version 3 of 3", "A queue per endpoint, as rows", "hld-v3", vtag="V3", cap="Figure 5.5 — C4 container view, V3: new boxes outlined",
       chip=chips("fan-out", "delivery store", "claim under a cap", "attempt log", "API")), [
  "[+]", "C: Version three keeps everything from version two.", "[+]", "C: Fan-out consumes the log and matches each event to its subscriptions.",
  "[+]", "C: It writes one row per delivery into the delivery store, keyed by endpoint. That row is the queue, and its next-attempt column is the timer.",

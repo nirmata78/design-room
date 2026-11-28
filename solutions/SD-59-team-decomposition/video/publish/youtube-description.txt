@@ -1,0 +1,32 @@
+Forty engineers, five teams, six months. How do you split the work so the teams can move independently, and what do you own as the manager? A full reference solution at the principal and senior engineering-manager bar: theory first, a three-version team-to-component map, six challenges (the critical path, a late dependency, a shared table, a contract dispute, a lost team, and how you would know the split is wrong). 51 minutes, 404 numbered slides, with an interviewer, a candidate and a coach.
+
+The thesis: cut along domain seams, put a versioned contract on every seam, give shared things one owner, integrate end to end by week four, and keep the contracts, the dependency graph and the milestones for yourself.
+
+CHAPTERS
+0:00 0 Cold open
+2:26 1 Requirements and scope
+6:54 2 Estimates
+9:07 3 Theory
+22:42 4 Contracts and entities
+24:33 5 High-level design
+29:14 5.1 Components and technologies
+31:29 5.2 When you don't need all this
+32:18 6 Bridge
+32:41 7 Challenges
+32:56 7.1 Challenge 1: Which team is on the critical path?
+35:33 7.2 Challenge 2: A dependency arrives two months late
+38:03 7.3 Challenge 3: Two teams, one table, incompatible changes
+40:35 7.4 Challenge 4: Two teams disagree on a contract
+43:12 7.5 Challenge 5: You lose a team at month three
+45:32 7.6 Challenge 6: How would you know the split is wrong?
+48:05 8 Recap and follow-ups
+
+LINKS
+Written reference design: https://github.com/nirmata78/design-room/blob/main/solutions/SD-59-team-decomposition/SD-59_Team_Decomposition_Reference_Design.md
+Run this round yourself, with an AI interviewer: https://github.com/nirmata78/design-room
+All videos: https://github.com/nirmata78/design-room/blob/main/solutions/VIDEOS.md
+
+ABOUT THIS VIDEO
+This is a scripted walkthrough, not a recording of a real interview, and the interviewer, candidate and coach are not real people. The voices are synthetic (Kokoro-82M, generated locally). Script, diagrams and the written design were produced with Claude Code. Numbers are back-of-the-envelope estimates for the exercise, labelled as illustrative, not any company's real figures. The technical content has not been reviewed by a person.
+
+#SystemDesign #EngineeringManagement #SoftwareArchitecture

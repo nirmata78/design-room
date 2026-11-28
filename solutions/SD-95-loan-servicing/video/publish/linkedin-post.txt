@@ -1,6 +1,6 @@
 Your bank debit settled on the 2nd. On the 3rd it came back. "Settled means paid" is where loan servicing designs break.
 
-I've published a 96-minute reference solution for the loan servicing question (instalment loans, BNPL-style) at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on 590 numbered slides.
+I've published a 106-minute reference solution for the loan servicing question (instalment loans, BNPL-style) at the Staff bar: theory, a three-version design, eight challenges, and the build cost, on 703 numbered slides.
 
 The idea that unlocks it: throughput is never the problem here. 600,000 collections on the 1st is 42 a second. The limits are the processor's contract and the bank's cut-off, and the hard part is correctness over months.
 

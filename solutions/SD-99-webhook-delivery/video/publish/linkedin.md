@@ -7,7 +7,7 @@ Post from a computer, after the YouTube video is public. The link is still pendi
 ```text
 One merchant's server takes ten seconds to answer. If your webhook workers are shared, every other merchant waits too.
 
-I've published a 89-minute reference solution for the webhook delivery question at the Staff bar, set at a point-of-sale lender: theory, a three-version design, seven challenges, buy against build, and the team seams, on 549 numbered slides.
+I've published a 95-minute reference solution for the webhook delivery question at the Staff bar, set at a point-of-sale lender: theory, a three-version design, seven challenges, buy against build, and the team seams, on 637 numbered slides.
 
 The idea that unlocks it: volume is not the problem. 2,400 deliveries a second is 600 calls in flight. One endpoint at ten seconds needs 1,200. So every endpoint gets its own budget.
 

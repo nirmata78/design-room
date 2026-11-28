@@ -14,7 +14,6 @@ toc-depth: 2
 numbersections: false
 ---
 
-\newpage
 
 # How to read this document
 
@@ -36,19 +35,25 @@ ask how a named mechanism works.
 
 **The coloured boxes:**
 
-::: {.key title="Top-3 number"}
-One of the back-of-the-envelope numbers worth computing out loud in the round.
-:::
+> [!IMPORTANT]
+> **Top-3 number**
+>
+> One of the back-of-the-envelope numbers worth computing out loud in the round.
 
-::: why
-Explains a term or a decision in plain words. This is for you, not for the interviewer.
-:::
+
+> [!NOTE]
+> **Why? What is it?**
+>
+> Explains a term or a decision in plain words. This is for you, not for the interviewer.
+
 
 > Words you can say in the room, nearly verbatim.
 
-::: warn
-A trap: something weak candidates do, or a claim that breaks under a follow-up question.
-:::
+> [!WARNING]
+> **Trap**
+>
+> A trap: something weak candidates do, or a claim that breaks under a follow-up question.
+
 
 **About the numbers.** The scale line in Stage 1 is illustrative: 60 million events a month, 180 million
 deliveries, a peak of 2,400 deliveries a second caused by a bank settlement file, 20,000 endpoints. Every
@@ -60,7 +65,6 @@ illustrative orders of magnitude, not quotes.
 simulator cold: `Read CLAUDE.md. Mock me: SD-99, fintech, em, full round.` (3) Debrief against the Stage 12
 self-check, then reread only the sections where you fell short.
 
-\newpage
 
 # Part I: The system in pictures
 
@@ -98,7 +102,7 @@ waits without spending any worker. On Sunday evening a probe succeeds, the endpo
 a second, and the refund arrives, in sequence order, with everything else it missed. The partner bank, in
 its own pool, never noticed either of them.
 
-![The baseline at the end of the round (V6), along the path of one event: commit with the outbox row, relay to the log, fan-out renders and writes rows, the dispatcher claims under a cap and sends through the egress proxy.](diagrams/video-base-final.pdf){width=100%}
+![The baseline at the end of the round (V6), along the path of one event: commit with the outbox row, relay to the log, fan-out renders and writes rows, the dispatcher claims under a cap and sends through the egress proxy.](diagrams/video-base-final.svg)
 
 ## The central contrast
 
@@ -118,7 +122,6 @@ events a second and 2,400 deliveries a second. Even that is about 600 calls in f
 matters is not volume but **time held**: one endpoint answering in ten seconds holds forty times the
 sockets of a healthy one. The design is shaped by the slow minority, not the busy average.
 
-\newpage
 
 # Part II: The round, stage by stage
 
@@ -149,11 +152,13 @@ moment. All illustrative.
 | Payload, regions? | About 2 KB; one region first | Storage is small; a second region is an extension |
 | Who owns the event schema? | The producing teams; merchants must not break | The public contract is separate from the internal event |
 
-::: why
-**Why ask what the merchant does with the event.** It turns "send a webhook" into a threat model. If a
-till releases goods on `loan.approved`, a forged approval is fraud, and a duplicate refund is money. The
-answer justifies signatures, sequence numbers and the advice to confirm high-value approvals by API.
-:::
+> [!NOTE]
+> **Why? What is it?**
+>
+> **Why ask what the merchant does with the event.** It turns "send a webhook" into a threat model. If a
+> till releases goods on `loan.approved`, a forged approval is fraud, and a duplicate refund is money. The
+> answer justifies signatures, sequence numbers and the advice to confirm high-value approvals by API.
+
 
 **Functional requirements.** **FR1** register an endpoint and subscribe it to event types (verified URL,
 secret shown once, pinned version). **FR2** emit an event atomically with the state change. **FR3** deliver
@@ -175,34 +180,42 @@ attempt, and redeliver one delivery or replay everything since a time at a chose
 replay, the public contract and its versions. Out, named: partner SDK internals, a schema design tool,
 webhooks we receive (SD-45), push to customers' phones (SD-12), a second region.
 
-::: {.key title="The core is three things"}
-A **durable event** before any delivery; **isolation** per endpoint; and the **consumer contract**: ID,
-sequence, signature, version.
-:::
+> [!IMPORTANT]
+> **The core is three things**
+>
+> A **durable event** before any delivery; **isolation** per endpoint; and the **consumer contract**: ID,
+> sequence, signature, version.
 
-![C4 level 1: origination and servicing produce events; the platform sends signed POSTs to merchant tills and accounting systems and loan-level events to the partner bank; developers register and replay; a key service holds the secrets.](diagrams/video-c4-context.pdf){width=96%}
+
+![C4 level 1: origination and servicing produce events; the platform sends signed POSTs to merchant tills and accounting systems and loan-level events to the partner bank; developers register and replay; a key service holds the secrets.](diagrams/video-c4-context.svg)
 
 # Stage 2: Back-of-the-envelope
 
-::: {.key title="Top-3 number 1: Little's law at the peak"}
-**Arithmetic.** 2,400 deliveries a second × 0.25 s mean answer time $\approx$ **600 calls in flight**.
-**What it means.** The fleet is small. Capacity is not the risk.
-**Say:** "Six hundred calls in flight at the peak. Volume isn't the problem; time held is."
-:::
+> [!IMPORTANT]
+> **Top-3 number 1: Little's law at the peak**
+>
+> **Arithmetic.** 2,400 deliveries a second × 0.25 s mean answer time $\approx$ **600 calls in flight**.
+> **What it means.** The fleet is small. Capacity is not the risk.
+> **Say:** "Six hundred calls in flight at the peak. Volume isn't the problem; time held is."
 
-::: {.key title="Top-3 number 2: one slow endpoint"}
-**Arithmetic.** A till vendor with 5 % of deliveries: 2,400 × 5 % = 120 a second; at our 10 s timeout,
-120 × 10 = **1,200 calls in flight**, twice the whole fleet.
-**How it changes the design.** A cap on in-flight calls per endpoint and pools per tier are mandatory.
-**Say:** "One slow vendor would need twelve hundred sockets. So every endpoint gets a cap."
-:::
 
-::: {.key title="Top-3 number 3: a two-day outage"}
-**Arithmetic.** An accounting system with 2 % of the 70-a-second average: 1.4 a second × 172,800 s
-$\approx$ **240,000 deliveries**, about 480 MB. Sent at the peak rate on recovery: about 1,700 times its
-normal load.
-**How it changes the design.** The backlog lives in durable rows; recovery is ramped, not dumped.
-:::
+> [!IMPORTANT]
+> **Top-3 number 2: one slow endpoint**
+>
+> **Arithmetic.** A till vendor with 5 % of deliveries: 2,400 × 5 % = 120 a second; at our 10 s timeout,
+> 120 × 10 = **1,200 calls in flight**, twice the whole fleet.
+> **How it changes the design.** A cap on in-flight calls per endpoint and pools per tier are mandatory.
+> **Say:** "One slow vendor would need twelve hundred sockets. So every endpoint gets a cap."
+
+
+> [!IMPORTANT]
+> **Top-3 number 3: a two-day outage**
+>
+> **Arithmetic.** An accounting system with 2 % of the 70-a-second average: 1.4 a second × 172,800 s
+> $\approx$ **240,000 deliveries**, about 480 MB. Sent at the peak rate on recovery: about 1,700 times its
+> normal load.
+> **How it changes the design.** The backlog lives in durable rows; recovery is ramped, not dumped.
+
 
 | Number | Arithmetic | Label | Decision |
 |---|---|---|---|
@@ -213,11 +226,181 @@ normal load.
 | Delivery writes at peak | 2,400 × ≈ 4 $\approx$ 10,000/s | derived | Four PostgreSQL shards by endpoint |
 | Latency budget | relay 0.5 + log and fan-out 0.5 + claim 0.5 + send 2 + spare 1.5 = 5 s | initial target | Poll intervals are the dial |
 
-::: warn
-**"Thousands of events a second: we need a big queue."** Volume is the wrong axis. Six hundred calls in
-flight is nothing; one endpoint at ten seconds is everything. Say the number, then say what it does not
-change.
-:::
+> [!WARNING]
+> **Trap**
+>
+> **"Thousands of events a second: we need a big queue."** Volume is the wrong axis. Six hundred calls in
+> flight is nothing; one endpoint at ten seconds is everything. Say the number, then say what it does not
+> change.
+
+
+# Stage 2b: Theory first
+
+What makes this problem hard, in words that outlive any product name. Properties are named by slug; each mechanism is paired with the diagram type that fits it; each option of the matrix has its own pros, cons, picture and pitfalls. The failure list is not a catalogue here: the failures are the challenges of Stage 6, and the open ones are the follow-ups at the end.
+
+<!-- theory:begin -->
+<!-- generated from video/src/ch3.py by dsl.sync_theory_md: edit the slides, not this region -->
+
+*Theory · 1 of 5 · what it is*
+> A platform that turns *committed* state changes into *signed* HTTP calls to endpoints *we do not control*, retries them for days, and never lets one endpoint take *capacity* from another.
+
+### Four things it is confused with
+*Theory · 1 of 5 · what it is not*
+- **Not a message broker.** A broker lets consumers pull at their pace (SD-07). Here we push into servers that set no pace and give no back-pressure.
+- **Not push notifications.** Pushing to our own app (SD-12) goes to a platform we trust. Here every receiver is a stranger's server.
+- **Not webhooks we receive.** Receiving (SD-45) is about verifying others. Sending is about isolating others from each other.
+- **Not exactly-once.** Across a network into a system we do not control, the best honest promise is at-least-once plus an ID.
+
+### State safety and liveness separately
+*Theory · 2 of 5 · the properties*
+- **Safety · must never happen.** **[S1-no-event-lost]** An event lost after its commit, or sent for a change that rolled back. **[S2-no-private-address]** A call to a private or internal address. **[S3-signed-no-replay]** An unsigned call, or one a third party could replay.
+- **Liveness · must eventually happen.** **[L1-delivered-or-dead-72h]** Every event is delivered, or visibly dead, within 72 hours. **[L2-healthy-stays-fast]** A healthy endpoint is served within its p99 while others fail. **[L3-recovery-no-relapse]** A recovered endpoint drains its backlog without falling over again.
+
+### Retry hard, or stay fair?
+*Theory · 3 of 5 · the central tension*
+
+| Pull | What it wants | What it costs the others |
+|---|---|---|
+| **Reliability** for one endpoint | retry soon, retry often, keep connections open | workers and sockets the healthy endpoints need |
+| **Isolation** for everyone | a hard cap per endpoint, then wait | a failing endpoint drains slower |
+| **Recovery** for the endpoint itself | send the backlog now | the endpoint falls over again; a retry storm |
+
+### A transactional outbox · SEQUENCE
+*Theory · 4 of 5 · mechanism 1 of 6*
+- **Protects.** **[S1-no-event-lost]**.
+- **How it works.** The event is a row written in the same transaction as the change. A relay publishes unsent rows and marks them sent after the log acknowledges.
+- **Rules out.** A lost event after a crash; an event for a rolled-back change.
+- **Costs.** A table and a relay per producer; at-least-once into the log.
+
+![Figure 3.1 — the event is a row in the same commit; the relay marks it sent only after the log acknowledges](diagrams/video-m-outbox.svg)
+
+### A durable, replayable log · C4
+*Theory · 4 of 5 · mechanism 2 of 6*
+- **Protects.** **[S1-no-event-lost]** and **[L1-delivered-or-dead-72h]**.
+- **How it works.** Events are appended once, keyed by loan, kept for days, and read by many consumer groups, each with its own offset.
+- **Rules out.** One consumer's bug losing events for everyone; no way to rewind after a bad deploy.
+- **Costs.** A cluster to run; ordering only within a key.
+
+![Figure 3.2 — C4 container view: appended once, read by many groups, each with its own offset](diagrams/video-m-log.svg)
+
+### A queue per endpoint, with a concurrency cap · ERD
+*Theory · 4 of 5 · mechanism 3 of 6*
+- **Protects.** **[L2-healthy-stays-fast]**.
+- **How it works.** Deliveries are rows keyed by endpoint. A worker claims only for endpoints below their in-flight cap; pools are split by tier, as bulkheads.
+- **Rules out.** Head-of-line blocking; one slow endpoint holding every worker.
+- **Costs.** A failing endpoint drains slower; caps to tune per tier.
+
+![Figure 3.3 — the queue is rows keyed by endpoint; the cap lives on the endpoint](diagrams/video-m-queue.svg)
+
+### Backoff with full jitter, a breaker, a ramp · STATE MACHINE
+*Theory · 4 of 5 · mechanism 4 of 6*
+- **Protects.** **[L3-recovery-no-relapse]**.
+- **How it works.** Retry at a random time up to a doubling ceiling, capped at an hour. After five failures the breaker opens; one probe a minute; on success the rate doubles each minute up to the cap.
+- **Rules out.** A retry storm; synchronised retries knocking a recovering endpoint over.
+- **Costs.** Slower recovery for an endpoint that was only briefly down.
+
+![Figure 3.4 — an endpoint's life: closed, open, probing, ramping](diagrams/video-m-breaker.svg)
+
+### The consumer contract · SEQUENCE
+*Theory · 4 of 5 · mechanism 5 of 6*
+- **Protects.** **[S3-signed-no-replay]**, and correctness on the merchant's side.
+- **How it works.** Every call carries an event ID, a per-loan sequence number, a timestamp and an HMAC signature; events are versioned and thin enough to say “fetch current state”.
+- **Rules out.** Double-processing a retry; a stale state overwriting a newer one; a forged approval.
+- **Costs.** Merchants must store IDs and verify signatures: documentation and SDK work.
+
+![Figure 3.5 — an ID, a sequence number and a signature make a retry harmless and a replay visible](diagrams/video-m-contract.svg)
+
+### An egress proxy · C4
+*Theory · 4 of 5 · mechanism 6 of 6*
+- **Protects.** **[S2-no-private-address]**.
+- **How it works.** Every call leaves through one proxy that resolves the name itself, refuses private ranges, and connects to the address it checked.
+- **Rules out.** Server-side request forgery, including DNS rebinding after validation.
+- **Costs.** One more hop and one more thing to keep up.
+
+![Figure 3.6 — C4 container view: the proxy resolves, checks, and connects to the address it checked](diagrams/video-m-egress.svg)
+
+### A · Call the URL inside the request · C4
+*Theory · 5 of 5 · option A*
+**Rejected · the till sets your latency**
+- ✅ Pro: No moving parts
+- ➖ Con: The booking waits for the till
+- 🔴 Pitfall: A till takes 30 s and holds a worker
+- 🔴 Pitfall: A crash loses the event; a rollback still sends it
+
+![opt-a](diagrams/video-opt-a.svg)
+
+### B · One shared queue and a worker pool · C4
+*Theory · 5 of 5 · option B*
+**Rejected · one slow endpoint holds the pool**
+- ✅ Pro: Simple to build
+- ✅ Pro: Cheap
+- ➖ Con: No isolation
+- ➖ Con: No replay
+- 🔴 Pitfall: One slow endpoint holds the pool
+- 🔴 Pitfall: Events for healthy merchants wait behind it
+
+![opt-b](diagrams/video-opt-b.svg)
+
+### C · A topic or retry topic per endpoint · C4
+*Theory · 5 of 5 · option C*
+**Rejected · head-of-line inside a partition**
+- ✅ Pro: Replayable
+- ✅ Pro: Familiar
+- ➖ Con: Fixed retry steps
+- ➖ Con: Only partial isolation
+- 🔴 Pitfall: Head-of-line blocking inside a partition
+- 🔴 Pitfall: Topic count grows with endpoints
+
+![opt-c](diagrams/video-opt-c.svg)
+
+### D · A log for events, delivery rows by endpoint, claimed under a cap · C4
+*Theory · 5 of 5 · option D*
+**The pick · with F as the honest equal**
+- ✅ Pro: Isolation per endpoint, any delay
+- ✅ Pro: Replay and an audit trail
+- ➖ Con: About four writes per delivery
+- ➖ Con: A few shards to run
+- 🔴 Pitfall: A claim without a lease strands rows
+- 🔴 Pitfall: Caps must be tuned per tier
+
+![opt-d](diagrams/video-opt-d.svg)
+
+### E · Managed pub/sub with push subscriptions · C4
+*Theory · 5 of 5 · option E*
+**Rejected · no caps, no signing, no egress control**
+- ✅ Pro: Nothing to run
+- ➖ Con: No per-endpoint caps
+- ➖ Con: No control of signing or egress
+- 🔴 Pitfall: A slow endpoint still piles up
+- 🔴 Pitfall: Private addresses cannot be refused
+
+![opt-e](diagrams/video-opt-e.svg)
+
+### F · Buy a webhook service · C4
+*Theory · 5 of 5 · option F*
+**The honest equal · the alternate path**
+- ✅ Pro: Fastest to production
+- ✅ Pro: Isolation and replay included
+- ➖ Con: Data leaves our boundary
+- ➖ Con: A cost per message
+- 🔴 Pitfall: Their retry policy, not ours
+- 🔴 Pitfall: Lock-in on payload shapes
+
+![opt-f](diagrams/video-opt-f.svg)
+
+### The matrix, as a summary
+*Theory · 5 of 5 · the options, side by side*
+
+| Approach | Isolation | Replay | Fails when |
+|---|---|---|---|
+| A · inside the request | none | none | a till takes 30 s |
+| B · one shared queue | no | no | one slow endpoint holds the pool |
+| C · a topic per endpoint | partial | yes | head-of-line inside a partition |
+| D · log, rows by endpoint, a cap | yes | yes | write volume past a few shards |
+| E · managed pub/sub | partial | some | no per-endpoint caps, signing or egress control |
+| F · buy a service | yes | yes | not a failure: data leaves, cost per message |
+
+<!-- theory:end -->
 
 # Stage 3: API and data
 
@@ -232,15 +415,17 @@ everything else, including a timeout, is retried. 429 and 503 honour `Retry-Afte
 `POST /v1/deliveries/{id}/redeliver`; `POST /v1/webhook-endpoints/{id}/replay {since, rate, mode}` where
 `mode` is *full* or *latest per loan*.
 
-![Conceptual model: a merchant owns endpoints; an endpoint listens to subscriptions; an event fans out to deliveries; a delivery goes to one endpoint and is tried by attempts.](diagrams/video-erd-chen.pdf){width=100%}
+![Conceptual model: a merchant owns endpoints; an endpoint listens to subscriptions; an event fans out to deliveries; a delivery goes to one endpoint and is tried by attempts.](diagrams/video-erd-chen.svg)
 
-![Physical model: the delivery row is sharded by endpoint, unique on endpoint and event, with its state, attempt number, next attempt time and lease; attempts are partitioned by day.](diagrams/video-erd-physical.pdf){width=100%}
+![Physical model: the delivery row is sharded by endpoint, unique on endpoint and event, with its state, attempt number, next attempt time and lease; attempts are partitioned by day.](diagrams/video-erd-physical.svg)
 
-::: why
-**Why the delivery, not the event, is the unit of state.** One event has three recipients with three
-different fates: delivered, retrying, dead. A per-event status cannot say that. A per-delivery row can, and
-it is also the queue (claimed), the timer (`next_attempt_at`) and the lock (`lease_until`).
-:::
+> [!NOTE]
+> **Why? What is it?**
+>
+> **Why the delivery, not the event, is the unit of state.** One event has three recipients with three
+> different fates: delivered, retrying, dead. A per-event status cannot say that. A per-delivery row can, and
+> it is also the queue (claimed), the timer (`next_attempt_at`) and the lock (`lease_until`).
+
 
 # Stage 4: High-level design
 
@@ -250,7 +435,11 @@ The producer POSTs to every subscribed URL inside the booking request. **The obj
 30 s holds the booking request for 30 s; a crash after commit loses the event; a call made before a
 rollback tells a merchant about a loan that does not exist.
 
-![V1: the producer calls the merchant inside the request.](diagrams/video-base-v1.pdf){width=80%}
+![V1: the producer calls the merchant inside the request.](diagrams/video-base-v1.svg)
+
+### The objection to V1, as a sequence
+
+![The failing case of V1: a thirty-second till, a crash, and a rollback.](diagrams/video-obj-v1.svg)
 
 ## Version 2: no event without its commit
 
@@ -259,7 +448,11 @@ consume the log and POST with in-process retries. **The objection:** one slow ti
 (1,200 sockets of 600); retries live in memory and vanish on restart; healthy merchants queue behind the
 slow one in the same partition; nothing records what was sent.
 
-![V2: outbox, relay, log, dispatcher.](diagrams/video-base-v2.pdf){width=90%}
+![V2: outbox, relay, log, dispatcher.](diagrams/video-base-v2.svg)
+
+### The objection to V2, as a sequence
+
+![The holes of V2: one slow till takes the shared pool, retries live in memory, nothing records what was sent.](diagrams/video-obj-v2.svg)
 
 ## Version 3: a queue per endpoint, as rows
 
@@ -267,7 +460,7 @@ Fan-out consumes the log, matches subscriptions and writes one delivery row per 
 store, sharded by endpoint. The dispatcher claims due rows only for endpoints under their cap, with a lease;
 every attempt is written to the attempt log; the webhooks API reads the log and replays by writing rows.
 
-![V3: fan-out, delivery store, attempt log and API.](diagrams/video-base-v3.pdf){width=100%}
+![V3: fan-out, delivery store, attempt log and API.](diagrams/video-base-v3.svg)
 
 ```sql
 WITH due AS (
@@ -280,28 +473,49 @@ UPDATE delivery SET state = 'IN_FLIGHT', lease_until = now() + interval '30 s'
 RETURNING delivery.id;
 ```
 
-::: why
-**Why a lease and not a lock.** A row lock lasts as long as a transaction, and holding a transaction
-open across a ten-second HTTP call would pin a database connection per call. The claim commits at once; the
-lease is a timestamp in the row. If the worker dies, the lease expires and another worker claims the row.
-The second send is safe because the event ID travels with it.
-:::
+> [!NOTE]
+> **Why? What is it?**
+>
+> **Why a lease and not a lock.** A row lock lasts as long as a transaction, and holding a transaction
+> open across a ten-second HTTP call would pin a database connection per call. The claim commits at once; the
+> lease is a timestamp in the row. If the worker dies, the lease expires and another worker claims the row.
+> The second send is safe because the event ID travels with it.
+
+
+## Where an event ends and an HTTPS call begins
+
+![C4 container view: events dashed blue, HTTPS solid.](diagrams/video-hld-boundary.svg)
+
+Inside our boundary an event is a row and a log entry; only at the very edge does the dispatcher turn a delivery row into a signed HTTPS call to a server we do not control. What the merchant's server sees, and how it answers:
+
+```http
+POST /hooks/loans
+Webhook-Id: evt_91
+Webhook-Sequence: 7
+Webhook-Signature: t=1767225600,v1=5f2c…
+
+{"type": "loan.booked", "id": "ln_5531"}
+
+HTTP/1.1 200 OK            2xx: delivered
+                           4xx, 5xx, timeout: retry with backoff
+                           410 Gone: pause the endpoint
+```
 
 ## The numbered flows and sequences
 
-![FR2, emit: the commit with the outbox row, the relay, fan-out, one row per endpoint.](diagrams/video-flow-fr2.pdf){width=96%}
+![FR2, emit: the commit with the outbox row, the relay, fan-out, one row per endpoint.](diagrams/video-flow-fr2.svg)
 
-![FR3, deliver: the row, the claim under the cap, the signed POST through the proxy, the attempt.](diagrams/video-flow-fr3.pdf){width=96%}
+![FR3, deliver: the row, the claim under the cap, the signed POST through the proxy, the attempt.](diagrams/video-flow-fr3.svg)
 
-![FR1, register: the verification ping goes through the egress proxy; the secret is shown once.](diagrams/video-seq-fr1.pdf){width=90%}
+![FR1, register: the verification ping goes through the egress proxy; the secret is shown once.](diagrams/video-seq-fr1.svg)
 
-![FR2, emit: publish, wait for the acknowledgement, then mark sent.](diagrams/video-seq-fr2.pdf){width=90%}
+![FR2, emit: publish, wait for the acknowledgement, then mark sent.](diagrams/video-seq-fr2.svg)
 
-![FR3, deliver: insert unique on endpoint and event, claim, send, record.](diagrams/video-seq-fr3.pdf){width=92%}
+![FR3, deliver: insert unique on endpoint and event, claim, send, record.](diagrams/video-seq-fr3.svg)
 
-![FR4, replay: dead rows back to pending, oldest first, at the merchant's rate.](diagrams/video-seq-fr4.pdf){width=90%}
+![FR4, replay: dead rows back to pending, oldest first, at the merchant's rate.](diagrams/video-seq-fr4.svg)
 
-![C4 level 2 at V3: relay, log, fan-out, delivery store, dispatcher, attempt log, API.](diagrams/video-c4-containers.pdf){width=100%}
+![C4 level 2 at V3: relay, log, fan-out, delivery store, dispatcher, attempt log, API.](diagrams/video-c4-containers.svg)
 
 # Stage 5: Why these choices
 
@@ -319,9 +533,9 @@ Generated from `stack.json`.
 
 ## The dispatcher and fan-out, one level down
 
-![C4 level 3, the dispatcher: claimer, tier pools, endpoint limiter, breaker, signer with the key service, HTTP client, result writer reporting to endpoint health.](diagrams/video-c4-comp-dsp.pdf){width=100%}
+![C4 level 3, the dispatcher: claimer, tier pools, endpoint limiter, breaker, signer with the key service, HTTP client, result writer reporting to endpoint health.](diagrams/video-c4-comp-dsp.svg)
 
-![C4 level 3, fan-out: log consumer, subscription cache, matcher, renderer with the schema registry, payload writer, sequence check, delivery writer.](diagrams/video-c4-comp-fan.pdf){width=100%}
+![C4 level 3, fan-out: log consumer, subscription cache, matcher, renderer with the schema registry, payload writer, sequence check, delivery writer.](diagrams/video-c4-comp-fan.svg)
 
 <!-- stack:sections -->
 
@@ -472,7 +686,7 @@ Each fix in Stage 6 rejects one tool by name:
 
 ## When you don't need all this (the alternate path)
 
-![The alternate path changes one box: the dispatcher becomes a managed webhook service; the outbox, the log, fan-out and the contract stay ours.](diagrams/video-alt.pdf){width=90%}
+![The alternate path changes one box: the dispatcher becomes a managed webhook service; the outbox, the log, fan-out and the contract stay ours.](diagrams/video-alt.svg)
 
 **The simpler design.** Buy the delivery engine: a managed webhook service stores, signs, retries and
 shows merchants their logs. Keep what is ours: the outbox, the log, fan-out and the public contract.
@@ -488,17 +702,19 @@ alone, building wins only past about 800 M deliveries a month.
 > the outbox, the log and the contract. I build when the bank won't let the data leave, or past eight
 > hundred million."
 
-::: warn
-**Treating "buy" as a non-answer.** In an engineering-manager round, *not* raising build against buy is
-the miss. Raise it, put a number on it, then say which constraint decides it here.
-:::
+> [!WARNING]
+> **Trap**
+>
+> **Treating "buy" as a non-answer.** In an engineering-manager round, *not* raising build against buy is
+> the miss. Raise it, put a number on it, then say which constraint decides it here.
+
 
 # Stage 6: Deep dives
 
 The seven challenges of the video, in the order where each fix creates the next question. Versions follow
 the challenges: V4 (endpoint health), V5 (egress proxy), V6 (contract renderer).
 
-![The challenge map: seven attack points on the same baseline.](diagrams/video-map.pdf){width=100%}
+![The challenge map: seven attack points on the same baseline.](diagrams/video-map.svg)
 
 ## 6.1 Why not publish after the commit? (correctness)
 
@@ -513,7 +729,7 @@ existed. At 800 events a second every deploy hits the window.
 The relay, every 200 ms and holding a lease per database, reads up to 500 unsent rows in ID order, sends
 each keyed by loan, waits for every acknowledgement, and only then marks them sent.
 
-**Why it works.** S1: the event exists exactly when the commit does. A crash between acknowledgement and
+**Why it works.** `[S1-no-event-lost]`: the event exists exactly when the commit does. A crash between acknowledgement and
 mark publishes twice, never zero times, and consumers de-duplicate by event ID.
 
 **The push.** *"480,000 events in ten minutes: is the relay the bottleneck?"* Not if it batches: several
@@ -532,13 +748,13 @@ partner bank?"* **The naive answer.** "Autoscale the pool."
 **The case.** 2,400 deliveries a second; the vendor's 120 a second at 10 s each holds 1,200 calls; the pool
 has 600; the bank's p99 goes from 0.3 s to minutes; doubling the pool gives the vendor 1,200 of 1,200.
 
-![The dispatcher's limiter and client under a slow endpoint.](diagrams/video-ch2-attack.pdf){width=80%}
+![The dispatcher's limiter and client under a slow endpoint.](diagrams/video-ch2-attack.svg)
 
 **The fix.** Claim only where `in_flight < cap`; `in_flight` rises in the claim's commit and falls in the
 result's, so it cannot drift from the rows. Tier pools (bank, large merchants, long tail) never share
 workers. A breaker opens after five consecutive failures.
 
-![Tier pools, the endpoint limiter and the breaker.](diagrams/video-ch2-fix.pdf){width=80%}
+![Tier pools, the endpoint limiter and the breaker.](diagrams/video-ch2-fix.svg)
 
 | Endpoint | Rate at peak | × answer time | Needed | Cap |
 |---|---|---|---|---|
@@ -547,7 +763,7 @@ workers. A breaker opens after five consecutive failures.
 | Partner bank | 800/s | 0.2 s | 160 | 200 by contract, own pool |
 | Long-tail merchant | ≤ 1/s | 0.3 s | < 1 | 10 (default) |
 
-**Why it works.** L2: a slow endpoint queues in its own rows. **What it does not cover:** a flood of events
+**Why it works.** `[L2-healthy-stays-fast]`: a slow endpoint queues in its own rows. **What it does not cover:** a flood of events
 from one merchant's activity, which fills rows, not sockets: that is a fair-share limit at fan-out.
 
 **The push.** *"The bank says the cap throttles them."* Caps are a contract, raised when their endpoint
@@ -573,11 +789,11 @@ minute. On success the endpoint opens at one call a second and doubles each clea
 over 5 % errors halves it. After an hour open, the technical contact is emailed; after 72 hours the
 endpoint is disabled. A 410 unsubscribes at once.
 
-![Version 4 on the baseline: endpoint health reads outcomes and pauses, probes and ramps.](diagrams/video-base-v4.pdf){width=80%}
+![Version 4 on the baseline: endpoint health reads outcomes and pauses, probes and ramps.](diagrams/video-base-v4.svg)
 
-![The ramp: probe, half-open at one a second, double each clean minute, halve on errors.](diagrams/video-seq-ch3-ramp.pdf){width=88%}
+![The ramp: probe, half-open at one a second, double each clean minute, halve on errors.](diagrams/video-seq-ch3-ramp.svg)
 
-**Why it works.** L3: recovery is earned. Full jitter spreads 240,000 retries so they never arrive in step.
+**Why it works.** `[L3-recovery-no-relapse]`: recovery is earned. Full jitter spreads 240,000 retries so they never arrive in step.
 **What it does not cover:** an endpoint that is up but answers 400 to everything; those deliveries die after
 the window, and the dashboard says why.
 
@@ -596,7 +812,7 @@ loan's version, incremented in the same transaction as the change and copied int
 monotonic and gap-free per loan; the receiver applies an event only if its sequence is higher than the last
 it saw. Thin events and `GET /loans/{id}` for current state.
 
-![The fan-out sequence check and delivery writer carry the producer's sequence.](diagrams/video-ch4-fix.pdf){width=80%}
+![The fan-out sequence check and delivery writer carry the producer's sequence.](diagrams/video-ch4-fix.svg)
 
 **The push.** *"Why not strict order per endpoint?"* An ordered mode is one call in flight: at 0.25 s,
 4 a second for that endpoint, and one failing event blocks everything behind it. Offer it; default to
@@ -615,9 +831,9 @@ network policy leaves no other route. Each call is signed: `v1 = HMAC-SHA256(sec
 body)`; the receiver recomputes, compares in constant time, and rejects $|now - t| > 300$ s. Answers are
 truncated and scrubbed before they reach a log.
 
-![Version 5: the egress proxy on the only path between the dispatcher and the merchant.](diagrams/video-base-v5.pdf){width=80%}
+![Version 5: the egress proxy on the only path between the dispatcher and the merchant.](diagrams/video-base-v5.svg)
 
-![What the till checks, in order.](diagrams/video-seq-ch5-verify.pdf){width=88%}
+![What the till checks, in order.](diagrams/video-seq-ch5-verify.svg)
 
 **Defence in depth.** Merchants confirm high-value approvals with `GET /loans/{id}` before releasing goods;
 the partner bank uses mutual TLS.
@@ -638,7 +854,7 @@ version, and a producer's build fails if any stops rendering: a consumer-driven 
 producer's own pipeline. Additive fields go into the current version; a rename or split is a new version;
 versions are supported for 12 months; usage is measured per endpoint.
 
-![Version 6: the contract renderer beside fan-out.](diagrams/video-base-v6.pdf){width=80%}
+![Version 6: the contract renderer beside fan-out.](diagrams/video-base-v6.svg)
 
 | Team | Owns | Contract with the others |
 |---|---|---|
@@ -771,7 +987,17 @@ failure. A public version nobody owns.
 - Did you raise build against buy with a number?
 - Did you name SLIs you own, and keep merchants' outages off your pager?
 
-\newpage
+
+## Follow-up questions to be ready for
+
+| Follow-up | Where this design answers it |
+|---|---|
+| What if a merchant's endpoint is down for a week? | Challenge 3 and the 72-hour rule |
+| How do you stop a hostile endpoint attacking us? | Challenge 5; the egress proxy |
+| How do you change a payload shape without breaking merchants? | Challenge 6; the consumer contract |
+| When would you buy instead of build? | Option F; the alternate path |
+| How do you prove to a merchant that you sent it? | Challenge 7; the attempt log |
+| What changes at ten times the volume? | Option D's write cost; the shard count |
 
 # Part III: The internals
 
@@ -830,7 +1056,6 @@ p99 stays within its objective. A chaos test that kills dispatchers mid-call and
 is completed once the lease expires. A recovery test: 240,000 pending deliveries, breaker closing, the ramp
 measured against the endpoint's error rate. A contract test per public version, in every producer's build.
 
-\newpage
 
 # One-page cheat card
 

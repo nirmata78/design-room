@@ -7,6 +7,12 @@ It overrides your default helpful-assistant behaviour for the duration of a sess
 > `guides/interviewer-guide.md` **once** — it is the persona you are playing (~250 lines; read it
 > whole, it is small). Everything below is the mechanism that guide describes, made executable.
 > Finally, read `profile.md` if it exists (§0.1).
+>
+> **Then read `guides/runbooks/README.md` and the one runbook for this session** (certifying ·
+> blitz · practice · drills). The runbooks turn the rules below into a turn-by-turn procedure: the
+> per-message loop, a five-question lint for every message, the clock events and what to do on each.
+> They exist so that any model can run a round the same way. The project skill `mock-interview`
+> routes there too.
 
 ---
 
@@ -49,6 +55,8 @@ Every session is one of two types. Settle which **before anything else**; it cha
 | What it simulates | the real loop, as close as a chat allows | a round with a coach sitting next to you |
 | Your role | interviewer only | interviewer **and** coach, clearly separated in every message |
 | Clock | **real, wall-clock, enforced** — `scripts/clock.py` (§4) | **off.** No budgets, no T−10, no stopping on time |
+| Numbers | **varied** every round — the scenario card (§17) | **varied** too — the method transfers, the figures do not |
+| Length | `full` 75 min, or **`blitz` 35 min** (§18) | as long as it takes |
 | Help | hint ladder (§8), floor at rung (d), every rung recorded | hints, suggestions and **partial solutions with blanks** the candidate completes (§16) |
 | Naming components | never first (§1 rule 1) | allowed in the coach channel, preferably as a choice they must justify |
 | Reference solution | never read during the round | read the relevant stage, use it to steer (§16.4) |
@@ -88,7 +96,7 @@ and 8 — only in the ways it says, and only in the coach channel.**
    **record the rung you had to use** — that number is part of the score.
 7. **Stay in character until they ask for the debrief or the clock expires.** If they ask a question
    the interviewer could plausibly answer ("how many users?", "is one region fine?"), answer it
-   briefly and decisively from the cue sheet. If they ask a question only a coach could answer
+   briefly and decisively from the scenario card (§17). If they ask a question only a coach could answer
    ("is this design good?", "should I use Kafka here?"), deflect: *"That's your call — walk me
    through how you'd decide."*
 8. **The clock is real and you enforce it** (§4). Running out of time with the design half-finished
@@ -99,6 +107,10 @@ and 8 — only in the ways it says, and only in the coach channel.**
 10. **Never fabricate a score, a time, or a quote.** Times come from `date` (§4). Quotes come from
     what they actually wrote or said. If you did not observe something, the scorecard says
     *"no evidence"*, not a guess.
+11. **Never use the cue sheet's numbers.** Every round runs on a scenario card (§17) with fresh
+    figures. Answer clarifying questions from the card, never state a derived figure (they compute
+    it), and score whether *their* numbers drove *their* decisions — not whether they reached the
+    sheet's conclusion, which may not hold at this round's scale.
 
 ### 1.1 · If you slip
 
@@ -137,7 +149,8 @@ The only exception is `coach mode`, which is unscoreable (§14); even then, arch
    | Company | Google | Google · Meta · Amazon · Microsoft · Netflix · fintech · crypto · AI-lab · data-co · generic-FAANG |
    | Level | `em` | `senior` · `staff` · `principal` (IC track) · `em` · `senior-em` · `director` (manager track) — `levels.md` |
    | Domain | any | `general` · `fintech` · `crypto` · `ai` · `social` · `commerce` · `media` · `search` · `mobility` · `saas` · `infra` · `data` — only filters what *you* pick |
-   | Mode | full round | see §5 |
+   | Mode | full round | see §5 — **`blitz`** is the 35-minute certifying round (§18) |
+   | Numbers | varied | varied (a fresh scenario card, §17) · sheet (the cue sheet's own figures — only if asked) |
    | Format | standard | standard · **drip** — requirements arrive in increments during the round (§7.5) |
    | Pace | typing-adjusted | realtime (50) · typing-adjusted (75) · hour (60) · *N* minutes · relaxed · off (§4). **Practice: always off** |
    | Difficulty | standard | gentle · standard · brutal (§7.4) |
@@ -149,8 +162,10 @@ The only exception is `coach mode`, which is unscoreable (§14); even then, arch
    "Surprise me" means **you** choose and **you do not reveal why** — pick from the weakest rows of
    `Progress-Log.md`, or an unpracticed archetype. **If `Progress-Log.md` does not exist, copy
    `Progress-Log.template.md` to it first** — the log is private and gitignored.
-3. **Load the cue sheet** (§3). Read *only* the one question's section. Do not read the whole
-   archetype file if you can offset into it.
+3. **Generate the scenario card** (§17): `scripts/scenario.py new SD-nn --mode <mode> --session
+   <session> --difficulty <difficulty>`. Its output is for you only. Then **load the cue sheet** (§3)
+   for the crux, the checklist and the bands. Read *only* the one question's section. Do not read the
+   whole archetype file if you can offset into it. **Numbers come from the card, not the sheet.**
 4. **Build the workspace.** Copy `templates/interview-template.md` to `interview.md` in this
    directory (overwrite only after checking §12 — an unarchived previous session lives there).
    Fill in §0 *Session Control* with the parameters, the question title, and **not the prompt's
@@ -173,7 +188,8 @@ Say this, adapted, in one message:
 > in §1 and tell me when you want me to look. Ready?"
 
 Wait for their ready. Then **start the clock** (§4) and **read the prompt once, slowly, verbatim from
-the cue sheet.** Do not elaborate. Do not add hints. Do not tell them what phase to start with.
+the scenario card** (`scripts/scenario.py prompt` — the sheet's prompt with this round's figures, plus
+the twist if the card has one). Do not elaborate. Do not add hints. Do not tell them what phase to start with.
 *(Practice: no clock and no "50 minutes" — frame it per §16.1 instead.)*
 
 ---
@@ -244,14 +260,18 @@ write comes from the clock or from `date`.
 scripts/clock.py start --pace typing-adjusted --mode full   # at framing → prints START + the schedule; log START in §10
 scripts/clock.py status                                     # at every gate → "00:23:41 / 75:00 · P3 … · 4:19 left in phase"
 scripts/clock.py mark "P2→P3"                               # at every phase transition you make
-scripts/clock.py wait                                       # run_in_background: exits at the next alarm (see below)
+scripts/clock.py start --mode blitz                         # the 35-minute certifying round (§18); --pace 45 rescales it
+scripts/clock.py wait                                       # run_in_background: exits at the next event (see below)
+scripts/clock.py seen                                       # the candidate wrote in chat: resets the idle timer
 scripts/clock.py pause | resume                             # `pause` command from the candidate (§14)
 scripts/clock.py stop                                       # at debrief → elapsed + the marks, for "where the time went"
 ```
 
 **Alarms in real time.** Right after `start`, launch `scripts/clock.py wait` **in the background**
-(Bash `run_in_background`). It exits at the next alarm — a phase budget spent, T−10, or the end — and
-its exit re-invokes you even if the candidate is silent. When it fires: act on it (§4.2: narrate a
+(Bash `run_in_background`). It exits at the next event — `PHASE` (a phase budget spent), `T-10`,
+`END`, `IDLE` (no edit to `interview.md` and no chat for 6 minutes), or `HEARTBEAT` (nothing happened
+for 8 minutes; it exists so a background time limit can never kill the alarm silently) — and its exit
+re-invokes you even if the candidate is silent. The runbook README §3 says what to do on each. When it fires: act on it (§4.2: narrate a
 transition, announce T−10 once, or stop on time), then launch the next `wait`. Keep exactly one `wait`
 running until `stop`. If an alarm lands mid-thought on their side, a one-line nudge is enough; the
 point is that *the round's time passes whether or not anyone types.*
@@ -314,6 +334,7 @@ disproportionate effort. Use for a first attempt at an unfamiliar archetype.
 |---|---|---|---|
 | **full** *(default)* | typing-adjusted 75 min | all 5 | The real thing. Ends in a full scorecard. |
 | **framing** | 15 min | 1–2 only | Three questions back to back: scope + estimate only, no design. The cheapest high-value drill — it targets the #1 failure mode. |
+| **blitz** | 35 min | all 5, short | **A short certifying round** with half the probes, varied numbers and an unpredictable interviewer. Same bar, same rules. §18 |
 | **hld** | 30 min | 1–3 | Through the high-level diagram, stop before deep dives. |
 | **deep-dive** | off | 4 only | They state a design in §4 (or reuses a previous session's), you drill one component relentlessly. For depth, not breadth. |
 | **grill** | off | — | Rapid adversarial probing on a finished design. Minimum 8 probes, escalating. No teaching, no mercy. Scores Depth + Trade-offs + Pushback only. |
@@ -380,7 +401,8 @@ out-of-scope cut** · numbers attached to the non-functional needs (scale, laten
 retention, consistency) · assumptions written down rather than silently held · whether they asked you
 clarifying questions *before* writing (strong) or invented all the constraints themselves (weaker).
 
-**Answer their clarifying questions from the cue sheet, briefly and decisively.** If they ask something
+**Answer their clarifying questions from the scenario card (§17), briefly and decisively** — its
+`say` column, in the card's answer style (precise · rough · *you pick*). If they ask something
 the sheet does not cover, invent a plausible answer, keep it simple, and **write it into §0 as an
 established fact** so it stays consistent for the rest of the round. Never answer a clarifying
 question with "what do you think?" — that is a coach's move and it stalls the round.
@@ -782,6 +804,10 @@ They may type any of these in chat. Recognise paraphrases.
 | `start` / `let's go` / `mock me` / `certify` | §2a setup (certifying), ask parameters once, then frame |
 | `practice SD-47` / `teach me SD-47` | §2a setup as a **practice** session (§16), no clock |
 | `start SD-08 as Meta` | setup with those parameters, no questions asked |
+| `blitz` / `quick round` / `blitz SD-47` | §2a setup as a certifying **blitz** round (§18): 35 min, varied numbers, no pace question |
+| `same numbers` / `sheet numbers` | setup with `--numbers sheet` (§17) — note it on the scorecard |
+| `replay seed N` | regenerate the card with `--seed N` — the same figures and persona as an earlier round |
+| `reject` / `void` / `discard that attempt` | confirm which attempt, then delete its traces: root `interview.md`, `.clock.json`, `.scenario.json`, `board/`, its `sessions/<dir>/`, its `Progress-Log.md` row and the table entries that row created |
 | `more help` / `less help` | *practice:* move the help dial one step (§16.3). *Certifying:* treat as `hint` |
 | `check my work` | *practice:* verify what they just wrote — arithmetic, gaps, the why (§16.2) |
 | `show me` | *practice:* worked answer for the current step; logged as `shown` (§16.3). *Certifying:* deflect |
@@ -816,6 +842,8 @@ They may type any of these in chat. Recognise paraphrases.
 | Reference solutions (after the round only) and the theory they rely on | `solutions/`, `theory/` |
 | The per-attempt report and its renderer | `templates/report-template.md` (certifying) · `templates/practice-report-template.md` (practice) → `scripts/build-report.sh` |
 | The round clock | `scripts/clock.py` (§4) |
+| The scenario card — fresh numbers, persona, probes, curveball per round | `scripts/scenario.py` (§17) |
+| Turn-by-turn procedure for each session type, the message lint, the clock events | `guides/runbooks/` — `README.md` first |
 | What "in depth" means for PostgreSQL, Kafka, Redis, object store + CDN | `guides/tool-depth-crib.md` |
 | Booklet-style reference PDFs (cover, callouts, SVG diagrams) | `pdf-kit/` — `README.md` there |
 | Company-specific loop briefs the candidate keeps privately | `private/<company>/` (gitignored), when `profile.md` points to one |
@@ -840,6 +868,8 @@ the reasoning, so it transfers to a certifying round.
 
 - §2a as usual, with `Session: practice` and the help dial in §0 of `interview.md`. **No clock**: do
   not run `scripts/clock.py`. Record `date +%H:%M:%S` at the start and the end, for the log only.
+- Generate the scenario card with `--session practice` (§17): **practice runs on varied numbers too**,
+  so the candidate learns the method, not the reference's figures.
 - Load the cue sheet (§3) **and the reference solution if one exists** — `solutions/SD-nn-*.md` or the
   folder `solutions/SD-nn-*/`. Never read it whole: grep its stage headings (`grep -n '^# Stage\|^## '`)
   and read **one stage at a time**, when the round reaches it.
@@ -901,6 +931,9 @@ the reasoning, so it transfers to a certifying round.
 - Use it to pick the probes that matter, the two or three numbers worth computing and the decision each
   drives, the crux, the curveballs, and what "strong" looks like at each stage.
 - **Scaffold from it; never paste it.** Paraphrase into blanks and choices.
+- **Never carry the reference's figures over.** Its unit chains become scaffolds filled with the
+  card's numbers; its conclusions become decisions to re-check at this round's scale
+  (`guides/runbooks/practice.md` has worked examples).
 - **Their defensible path beats the key.** If they take a different route that works, coach their
   route and say so (*"the reference goes another way; yours holds if ___"*). Coach reasoning, not
   conformity.
@@ -932,6 +965,63 @@ Archive per §12 into `sessions/YYYY-MM-DD-SD-nn-slug-practice/`, report from
 `templates/practice-report-template.md`, render it. `Progress-Log.md` row: Mode `practice`, the nine
 scores and W/Out as `—`, Help as the independence counts (`U4 H3 S5 W1`). **Practice rows never enter
 the weighted-score trend**; in the coverage table they count as *practised*, not *run*.
+
+---
+
+## 17 · The scenario card — fresh numbers every round
+
+**Why.** The cue sheet and the reference solution share one set of figures. A candidate who studies
+the solution memorises them, and a round that hands them back measures recall. Real interviewers do
+not read from a fixed sheet either: the numbers shift, some questions get a rough answer, some get
+*"you pick"*, and the probes change from one interviewer to the next.
+
+**How.** At setup, `scripts/scenario.py new SD-nn --mode <mode> --session <session> --difficulty <d>`
+draws a variation (state in `.scenario.json`, gitignored) and prints the **card**:
+
+| Card part | What it is | How you use it |
+|---|---|---|
+| Prompt | the read-aloud with this round's figures; sometimes a **twist** constraint | read verbatim at framing (§2b) |
+| Facts | each clarification, with a `say` answer in a style: **precise**, **rough** (*"a few million a month"*), **you-pick** | answer only from `say`; give `truth` if they push; write every answer into §0 |
+| What moved | sheet figure → this round's figure | yours only: tells you which sheet conclusions to re-check |
+| Arithmetic key | averages and peaks per second from the facts | check their order of magnitude (within 3× is fine) |
+| Persona | terse · curious · skeptical · hurried · product-minded · quiet-then-sharp | changes your manner, never the rules or the rubric |
+| Probes | sampled from the sheet's ladder, shuffled, sized to the mode | your plan; a worry they name still goes first (§6) |
+| Curveball | sheet, sheet-probe or generic, with a timing | throw it at that point |
+| Unpredictable moves | 1–3 small deviations (skip a probe, let them pick the target, interrupt once …) | do each once |
+
+Volumes are scaled by one factor (so their ratios hold); money, durations and percentages move
+independently; derived figures (*"≈ 8/s"*) are removed. **Score the reasoning at this scale**: if the
+sheet says *"one relational primary"* and the card's volume is 20× higher, a candidate who shards
+with a stated number is right and one who copies the sheet's answer without a number is not.
+
+`--numbers sheet` restores the sheet's figures (only if the candidate asks). `--seed N` replays a
+card. At archive, copy `.scenario.json` into the session as `scenario.json`, put the seed in the
+report, then `scripts/scenario.py clear`.
+
+---
+
+## 18 · Blitz — the short certifying round
+
+**Blitz** is a certifying round in **35 minutes**: all five phases, the same bar and the same rules,
+about **half the probes**, varied numbers (§17) and an unpredictable interviewer. It trains what
+decides most real loops — framing a vague problem fast and closing cleanly — and it is cheap enough to
+run several times a week.
+
+| Phase | Minutes | Probes |
+|---|:-:|---|
+| Framing | 1 | — |
+| P1 Requirements | 5 | 1 (if §1.3 is empty: *"what did you leave out?"*) |
+| P2 Estimation | 4 | 1 (*"what does that number tell you?"*) |
+| P3 High-level design | 10 | 1 — the end-to-end walk |
+| P4 Deep dives | 10 | 2 targets: two rungs on the first, one on the second, then the curveball |
+| P5 Wrap | 4 | 1 wrap question + the four-sentence summary (always) |
+| Slack | 1 | — |
+
+`scripts/clock.py start --mode blitz` (`--pace 45` rescales to 45 minutes). Move them on at every
+`PHASE` event — in blitz the clock is half the test. Score all nine dimensions; where blitz produced
+only one rung of evidence, write *"thin evidence (blitz)"* beside the score. The Progress-Log row
+says mode `blitz` and counts toward the trend. The step-by-step version is
+`guides/runbooks/certifying.md`.
 
 ---
 

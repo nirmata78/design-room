@@ -1,0 +1,79 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "render_c4_workspace",
+      "description": "Validate a Structurizr DSL workspace inside the containerized Playwright runtime, batch-export all C4 views to normalized 1080p-ready SVGs with Mode A progressive .steps.json sidecars, and run the DESIGN-TOKENS.md font and legibility gates.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "dsl": {
+            "type": "string",
+            "description": "Path to the Structurizr workspace.dsl file."
+          },
+          "out": {
+            "type": "string",
+            "description": "Output directory for normalized .svg, .steps.json, .meta.json, and optional .png files."
+          },
+          "spec": {
+            "type": "string",
+            "description": "Optional path to views.json specifying per-view slot (full|composite|split) and ordered progressive reveal steps."
+          },
+          "png": {
+            "type": "boolean",
+            "default": false,
+            "description": "Also render @2x PNG previews via Playwright Chromium."
+          }
+        },
+        "required": ["dsl", "out"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "render_c4_video",
+      "description": "Render a 1920x1080@30fps progressive C4 video clip using Mode A (Master SVG + 0.35s cross-dissolve) from a normalized .svg and its sibling .steps.json.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "svg": {
+            "type": "string",
+            "description": "Path to the normalized master .svg file."
+          },
+          "out": {
+            "type": "string",
+            "description": "Destination .mp4 file path."
+          },
+          "title": {
+            "type": "string",
+            "description": "Slide title displayed above the diagram."
+          },
+          "kicker": {
+            "type": "string",
+            "default": "C4 ARCHITECTURE",
+            "description": "Short uppercase kicker label."
+          },
+          "caption": {
+            "type": "string",
+            "default": "",
+            "description": "Footer caption text."
+          },
+          "duration": {
+            "type": "number",
+            "default": 12.0,
+            "description": "Target total video duration in seconds."
+          },
+          "ghost": {
+            "type": "number",
+            "default": 0.0,
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "description": "Optional opacity for unrevealed elements (default 0.0 = visibility: hidden; e.g. 0.10 for faint silhouettes)."
+          }
+        },
+        "required": ["svg", "out", "title"]
+      }
+    }
+  }
+]
